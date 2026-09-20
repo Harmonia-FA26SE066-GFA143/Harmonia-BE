@@ -1,0 +1,6 @@
+@Harmonia.API_HostAddress = http://localhost:5259
+
+GET {{Harmonia.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

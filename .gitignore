@@ -1,0 +1,74 @@
+## Claude Code (riêng của tôi, không commit)
+.claude/settings.local.json
+CLAUDE.local.md
+
+## Build output
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+[Ll]ogs/
+
+## Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+## Rider / VS Code
+.idea/
+*.sln.iml
+.vscode/*
+!.vscode/extensions.json
+
+## Test / coverage
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+*.coveragexml
+coverage/
+
+## NuGet
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+
+## Publish / deploy
+[Pp]ublish/
+*.publish.xml
+*.pubxml
+*.pubxml.user
+*.azurePubxml
+*.PublishSettings
+
+## Secret / env — KHÔNG được commit (xem 03-security.md)
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.key
+
+## EF Core
+Migrations/*.sql
+
+## OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+## Upload thực tế của app (nếu lưu local khi dev)
+uploads/
+wwwroot/uploads/
+
+## Khác
+*.log
+*.tmp
+*.bak
+*.swp

@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Harmonia.Domain/Harmonia.Domain.csproj" Id="2bc8b61c-4cd3-40a4-b6af-bff5db694e48" />
+    <Project Path="src/Harmonia.API/Harmonia.API.csproj" />
+    <Project Path="src/Harmonia.Application/Harmonia.Application.csproj" />
+    <Project Path="src/Harmonia.Infrastructure/Harmonia.Infrastructure.csproj" />
+  </Folder>
+</Solution>
