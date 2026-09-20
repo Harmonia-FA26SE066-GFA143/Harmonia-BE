@@ -4,7 +4,7 @@
 Giúp ca đoàn giáo xứ: quản lý thành viên + kỹ năng, lên lịch tập, quản lý thư viện
 thánh ca, đề xuất/duyệt danh sách bài hát, phân công phục vụ, điểm danh.
 
-Trả lời bằng tiếng Việt. Code, comment, tên biến bằng tiếng Anh.
+Trả lời bằng tiếng Việt. Tiếng Anh trong file `.cs`: comment, XML doc, tên biến, tên method, message của exception, message của log.
 
 ## Rule bắt buộc
 
@@ -19,7 +19,7 @@ Trả lời bằng tiếng Việt. Code, comment, tên biến bằng tiếng Anh
 |---|---|---|
 | ParishPriest | Web | Duyệt/từ chối danh sách bài hát, khai báo chương trình phụng vụ |
 | ChoirDirector | Web | Quản lý thành viên, duyệt kỹ năng, đề xuất bài hát, phân công phục vụ |
-| ChoirMember / Instrumentalist | Mobile | Khai báo kỹ năng, xác nhận tham gia, nộp bản thu tập hát |
+| ChoirMember | Mobile | Khai báo kỹ năng, xác nhận tham gia, nộp bản thu tập hát |
 | Admin | Web | Quản lý tài khoản, cấu hình danh mục, xem báo cáo |
 
 ## Quy ước
@@ -36,8 +36,12 @@ Trả lời bằng tiếng Việt. Code, comment, tên biến bằng tiếng Anh
 Số liệu thật về repo được hook `SessionStart` in ra ở đầu phiên — đọc chỗ đó,
 đừng giả định class nào đã tồn tại.
 
-TODO chưa chốt: database provider, kiểu khóa chính entity.
-Gặp việc cần hai thứ này thì HỎI, đừng tự chọn.
+Đã chốt: khóa chính mọi entity là `Guid`, khai ở `BaseEntity`.
+Entity có audit thì kế thừa `BaseAuditableEntity` (`CreatedAt/By`, `UpdatedAt/By`).
+Domain đã dựng đủ 42 entity + 21 enum theo `doc/harmonia-domain-entity-list.md`.
+Hệ thống phục vụ MỘT ca đoàn — không có entity `Choir`, không có `ChoirId`.
+
+TODO chưa chốt: database provider. Gặp việc cần nó thì HỎI, đừng tự chọn.
 
 ## Luật làm việc
 

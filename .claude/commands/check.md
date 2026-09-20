@@ -6,7 +6,7 @@ allowed-tools: Bash(git diff:*), Bash(git status:*), Bash(dotnet build:*), Read,
 Soát các file đã thay đổi so với HEAD. Chưa có commit nào hoặc không có thay đổi
 thì soát toàn bộ `src/`.
 
-Kiểm đúng 12 mục dưới đây, không phát sinh thêm. Mỗi phát hiện ghi một dòng:
+Kiểm đúng 13 mục dưới đây, không phát sinh thêm. Mỗi phát hiện ghi một dòng:
 `<file>:<dòng> — <vi phạm> — <cách sửa>`. Không có vi phạm thì ghi "sạch".
 
 ## Ranh giới layer
@@ -41,6 +41,20 @@ Kiểm đúng 12 mục dưới đây, không phát sinh thêm. Mỗi phát hiệ
 12. Có `FromSqlRaw` nối chuỗi, `AllowAnyOrigin()`, `Clients.All`, hay Hub nào
     thiếu `[Authorize]` không.
 
-Cuối cùng chạy `dotnet build Harmonia.slnx` và báo kết quả.
+## Ngôn ngữ
+13. Chạy đúng lệnh này, không tự nghĩ pattern khác:
+
+```
+    rg -n '[^\x00-\x7F]' --glob '*.cs' src
+    rg -n '[^\x00-\x7F]' src/Harmonia.API/.env.example src/Harmonia.API/appsettings*.json
+```
+
+    Báo nguyên văn mọi dòng lệnh này trả về. Mọi chuỗi và comment trong `.cs` và
+    trong file cấu hình phải là ASCII tiếng Anh; thông báo cho người dùng đi qua mã
+    lỗi trong `Application/Common/ErrorCodes.cs`.
+    Lệnh trả về rỗng thì ghi "sạch" — đừng tự kết luận khi chưa chạy.
+    (Tài liệu trong `doc/` và `.claude/` vẫn viết tiếng Việt, không nằm trong phạm vi.)
+
+Cuối cùng chạy `dotnet build Harmonia.Solution.slnx` và báo kết quả.
 
 KHÔNG tự sửa gì. Chỉ báo cáo. Tôi quyết định sửa cái nào.

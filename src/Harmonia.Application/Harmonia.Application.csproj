@@ -15,4 +15,8 @@
     <Folder Include="Services\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Harmonia.Domain\Harmonia.Domain.csproj" />
+  </ItemGroup>
+
 </Project>

@@ -1,4 +1,4 @@
-# Workflow — áp dụng cho MỌI thay đổi code
+# Workflow — áp dụng cho MỌI thay đổi file
 
 ```
 READ → SUMMARIZE → PLAN → [chờ duyệt] → IMPLEMENT → VERIFY → STOP
@@ -61,7 +61,7 @@ Nêu rõ tính năng nào đang dùng entity đó và có vỡ không.
 
 ## VERIFY
 
-- `dotnet build Harmonia.slnx`, và `dotnet test` nếu có test.
+- `dotnet build Harmonia.Solution.slnx`, và `dotnet test` nếu có test.
 - Đối chiếu file thực tế với PLAN, lệch chỗ nào nói chỗ đó.
 - Tự soát theo `01-layer-boundaries.md` và `03-security.md` ở những file vừa đụng.
 
