@@ -26,6 +26,10 @@ Kiểm đúng 13 mục dưới đây, không phát sinh thêm. Mỗi phát hiệ
 6. Tên class/property có dùng từ sai từ điển không — `ChoirLeader`, `Season`,
    `Assignment`, `Event` (đối chiếu `.claude/rules/02-naming.md`).
 7. Method async có thiếu hậu tố `Async` hoặc thiếu `CancellationToken` không.
+   Bỏ qua method có chữ ký do framework quy định (middleware `InvokeAsync`, filter, `Hub`,
+   `BackgroundService`); với các method đó chỉ báo nếu không truyền `RequestAborted` /
+   `stoppingToken` xuống lời gọi bên trong.
+
 8. Tên file DTO có đúng ba nhóm `<Entity>Dto` / `<Hành động><Entity>Request` /
    `<X>Response` không. Route controller có đúng kebab-case số nhiều không
    (`api/song-lists`, không phải `api/SongList`).

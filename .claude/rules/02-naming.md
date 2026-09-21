@@ -56,6 +56,10 @@ móc vào chúng.
 - Một file một class. Tên file trùng tên class.
 - Thuộc tính boolean bắt đầu bằng `Is` / `Has` / `Can` — `IsActive`, `IsMandatory`.
 - Async toàn bộ, hậu tố `Async`, luôn truyền `CancellationToken`.
+  Ngoại lệ: method có chữ ký do framework quy định (middleware `InvokeAsync`, filter,
+  `Hub`, `BackgroundService`) không thêm được token. Lấy token từ `HttpContext.RequestAborted`
+  hoặc `stoppingToken` rồi truyền xuống các lời gọi bên trong.
+
 - Mọi chuỗi trong `.cs` là tiếng Anh — comment, XML doc, message exception, message log.
   Không có ngoại lệ: message cho người dùng đi bằng mã lỗi, không bằng câu tiếng Việt.
 

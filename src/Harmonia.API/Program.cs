@@ -1,4 +1,6 @@
 using Harmonia.API.Extensions;
+using Harmonia.API.Middlewares;
+using Harmonia.Application;
 using Harmonia.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,12 +15,15 @@ builder.Configuration.AddEnvironmentVariables();
 
 // Add services to the container.
 
-builder.Services.AddControllers();
+builder.Services.AddApiControllers();
 builder.Services.AddApiSwagger();
 
+builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
+
+app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
 // Configure the HTTP request pipeline.
 app.UseApiSwagger();

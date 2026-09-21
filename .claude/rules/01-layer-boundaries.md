@@ -40,6 +40,10 @@ Bảng trên chỉ là lối vào nhanh. Gặp thuật ngữ chưa có ở cả 
 ## Quy ước tên khác
 
 - Async toàn bộ, hậu tố `Async`, luôn truyền `CancellationToken`.
+  Ngoại lệ: method có chữ ký do framework quy định (middleware `InvokeAsync`, filter,
+  `Hub`, `BackgroundService`) không thêm được token. Lấy token từ `HttpContext.RequestAborted`
+  hoặc `stoppingToken` rồi truyền xuống các lời gọi bên trong.
+
 - Interface repository: `I<Entity>Repository` — `ISongListRepository`.
 - Service: `<Nghiệp vụ>Service` — `SongListService`, `RosterService`, `AuthService`.
 - EF configuration: `<Entity>Configuration` — `LiturgicalEventConfiguration`.
