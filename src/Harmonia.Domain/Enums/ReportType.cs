@@ -3,7 +3,7 @@ namespace Harmonia.Domain.Enums;
 public enum ReportType
 {
     UserActivity,
-    Attendance,
+    RehearsalAttendance,
     Participation,
     AssignmentCompletion,
     SongUsage,

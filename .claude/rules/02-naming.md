@@ -64,7 +64,7 @@ móc vào chúng.
 - Entity: danh từ số ít — `SongList`, `LiturgicalEvent`.
 - Enum: số ít, KHÔNG có hậu tố `Enum` — `SongListStatus`, `ApprovalStatus`.
 - Value object: danh từ, không hậu tố — `TimeSlot`, `ContactInfo`.
-- Exception nghiệp vụ: `<Nội dung>Exception` — `SongListAlreadyApprovedException`.
+- Exception nghiệp vụ: `<Nội dung>Exception`, kế thừa `DomainException`, truyền mã từ `ErrorCodes` — `SongListAlreadyApprovedException`.
 
 ## Application
 
@@ -85,14 +85,15 @@ Không trả entity ra controller, không nhận entity làm tham số action.
 - Validator: `<Request>Validator` — `CreateSongListRequestValidator`.
 - AutoMapper profile: `<Entity>Profile`. Một profile một entity.
 - Exception ứng dụng: `<X>Exception` — `NotFoundException`, `ValidationException`.
-- Service trả `Result<T>`; danh sách trả `PagedList<T>`.
+- Service trả `Result` / `Result<T>`; danh sách trả `PagedList<T>`.
+- Service không bắt `DomainException`.
 
 ## Mã lỗi
 
 - SCREAMING_SNAKE, dạng `<ĐỐI_TƯỢNG>_<LÝ_DO>` — `SONG_LIST_ALREADY_APPROVED`.
-- Khai thành hằng trong `Application/Common/ErrorCodes.cs`, không gõ chuỗi trực tiếp.
+- Khai thành hằng trong `Domain/Common/ErrorCodes.cs`, không gõ chuỗi trực tiếp.
 - Validation dùng `.WithErrorCode(ErrorCodes.X)` của FluentValidation.
-- `Result<T>` mang mã lỗi, không mang câu tiếng Việt.
+- `Result<T>` và `DomainException` mang mã lỗi, không mang câu tiếng Việt.
 - Danh mục đầy đủ và bản dịch: `doc/error-codes.md`. Thêm mã mới phải cập nhật
   file đó trong cùng PR, nếu không FE hiển thị mã thô cho người dùng.
 

@@ -15,8 +15,33 @@ BE trả `code`, FE tra bảng này để hiển thị tiếng Việt.
 `code` — FE dùng để tra bảng. `message` tiếng Anh, cho lập trình viên đọc log và hiển
 thị tạm khi FE chưa có bản dịch cho mã mới. `errors` chỉ có ở lỗi validation (400).
 
-Mã khai thành hằng trong `Application/Common/ErrorCodes.cs`, không gõ chuỗi trực tiếp.
+Mã khai thành hằng trong `Domain/Common/ErrorCodes.cs`, không gõ chuỗi trực tiếp.
+Đặt ở Domain vì cả `DomainException` (Domain) lẫn Service/Validator (Application) đều
+dùng, mà Domain không được tham chiếu Application.
 Validation dùng `.WithErrorCode(ErrorCodes.X)` của FluentValidation.
+
+## Cách lỗi đi từ BE tới response (phương án A — đã chốt 2026-09-21)
+
+Error code là hợp đồng với FE — mọi response lỗi đều có `code`. Bên trong BE, lỗi đi
+tới response theo đúng một trong bốn đường:
+
+| Lỗi phát hiện ở đâu | Cách truyền | Ai trả response |
+|---|---|---|
+| Request sai định dạng / thiếu trường | FluentValidation `.WithErrorCode(...)` | Pipeline validation → 400 + `errors` |
+| Service kiểm tra, lỗi **lường trước được**: không tìm thấy, trùng, sai trạng thái giữa nhiều aggregate, cần query DB | `Result<T>.Failure(ErrorCodes.X)` | Controller map `code` → HTTP |
+| Entity bị gọi vi phạm luật của chính nó | **ném** `DomainException` (có `Code`) | `GlobalExceptionHandlingMiddleware` bắt → HTTP theo bảng dưới |
+| Sự cố không lường trước (bug, DB sập) | exception tự nhiên | Middleware → 500 `INTERNAL_ERROR`, không lộ message gốc ở Production |
+
+Quy tắc ngắn: **Service chủ động kiểm tra → `Result<T>`; luật trong entity → throw.**
+Service **không** `try/catch` `DomainException` — để nó bay lên middleware.
+Dịch vụ ngoài: Infrastructure bắt exception của thư viện, trả `Result.Failure(EXTERNAL_*)`.
+
+`DomainException` không biết HTTP. Middleware tra `code` → status theo cột HTTP của
+file này (bảng tra đặt ở API), mặc định 409 nếu không có trong bảng.
+Danh sách exception nào ném mã nào: xem `domain-exceptions.md`.
+
+`NotFoundException` (Application) chỉ dùng khi dữ liệu **lẽ ra phải có** mà mất (lỗi
+hệ thống). Người dùng gửi id không tồn tại → `Result.Failure(XXX_NOT_FOUND)`.
 
 **Danh sách này là tham chiếu, không phải checklist.** Chỉ thêm hằng khi làm tới chức
 năng tương ứng. Thêm mã mới thì phải cập nhật file này trong cùng PR.
@@ -148,8 +173,11 @@ thật hay không — theo `.claude/rules/03-security.md`, để không lộ ema
 | `SONG_LIST_ITEM_NOT_FOUND` | 404 | Không tìm thấy bài hát trong danh sách |
 | `SONG_LIST_SLOT_DUPLICATE` | 409 | Vị trí phụng vụ này đã có bài hát |
 | `SLOT_NOT_FOUND` | 404 | Không tìm thấy vị trí phụng vụ |
+| `SONG_LIST_CANNOT_BE_REVISED` | 409 | Chỉ tạo phiên bản mới khi danh sách bị từ chối hoặc cần sửa |
 | `REVIEW_NOTES_REQUIRED` | 400 | Vui lòng nhập ghi chú khi từ chối hoặc yêu cầu sửa |
-| `REVIEW_ALREADY_DECIDED` | 409 | Phiên bản này đã được quyết định |
+
+Duyệt một phiên bản đã được quyết định → `SONG_LIST_NOT_SUBMITTED` (mỗi phiên bản chỉ có
+một quyết định; đã quyết thì `Status` không còn `Submitted`).
 
 ## 8. Xác nhận tham gia
 
@@ -257,3 +285,7 @@ xem — trả 404, để không lộ sự tồn tại của bản ghi.
 ## Nguồn
 - 2026-09-20: tạo từ `claude/domain-entity-list.md` (42 entity, 21 enum) và các ràng
   buộc unique / chuyển trạng thái trong đó.
+- 2026-09-21: chốt phương án A (entity ném `DomainException`, middleware bắt). Thêm mục
+  "Cách lỗi đi từ BE tới response"; dời `ErrorCodes.cs` sang `Domain/Common`; thêm
+  `SONG_LIST_CANNOT_BE_REVISED`; bỏ `REVIEW_ALREADY_DECIDED` (trùng
+  `SONG_LIST_NOT_SUBMITTED`). Đồng bộ với `domain-exceptions.md`.
