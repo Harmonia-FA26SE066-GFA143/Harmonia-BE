@@ -122,7 +122,7 @@ ra 500) — không có domain exception riêng.
 | Cần query DB | mọi `*_NOT_FOUND`, `*_DUPLICATE`, `*_ALREADY_EXISTS`, `USER_EMAIL_ALREADY_EXISTS`, `EVENT_SLOT_TAKEN`, `SEASON_DATE_OVERLAP`, `REHEARSAL_TIME_CONFLICT`, `LOOKUP_IN_USE`, `USER_LAST_ADMIN` | Entity không thấy các bản ghi khác |
 | Liên quan nhiều aggregate | `SONG_LIST_NOT_LATEST_VERSION`, `SONG_LIST_EVENT_HAS_APPROVED_VERSION`, `ROSTER_SONG_LIST_NOT_APPROVED`, `ROSTER_INSUFFICIENT_MEMBERS`, `ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ASSIGNMENT_MEMBER_NOT_CONFIRMED`, `PRACTICE_NOT_ASSIGNED_TO_MEMBER` | Service điều phối, trả `Result<T>` |
 | Validate request / chính sách cấu hình | `MATERIAL_FILE_*`, `PRACTICE_AUDIO_*`, `REPORT_*`, `AUTH_PASSWORD_TOO_WEAK` | FluentValidation hoặc đọc `SystemSetting` |
-| Auth, phân quyền, dịch vụ ngoài | `AUTH_*` (trừ refresh token), `NOTIFICATION_NOT_FOR_USER`, `EXTERNAL_*` | Thuộc Application / Infrastructure |
+| Auth, phân quyền, dịch vụ ngoài | `AUTH_*` (trừ refresh token), `EXTERNAL_*` | Thuộc Application / Infrastructure |
 
 ---
 

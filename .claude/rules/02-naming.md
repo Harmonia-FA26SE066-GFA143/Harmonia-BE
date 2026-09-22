@@ -114,5 +114,8 @@ Không trả entity ra controller, không nhận entity làm tham số action.
 - Controller: `<Entity số nhiều>Controller` — `SongListsController`, `MemberSkillsController`.
 - Route kebab-case số nhiều: `api/song-lists`, `api/liturgical-events`, `api/member-skills`.
   KHÔNG dùng `api/SongList`.
+  Luật số nhiều chỉ áp cho route đại diện một tập bản ghi. Nhóm endpoint không phải
+  tài nguyên thì giữ danh từ số ít: `api/auth` (chốt 2026-09-22 — `api/auths` vô nghĩa,
+  còn đổi sang `api/sessions` thì lệch khỏi `AuthController`/`AuthService`).
 - Middleware: `<X>Middleware`. Filter: `<X>Filter`. Extension: `<X>Extensions`.
 - Hub: `<X>Hub` + interface client `I<X>Client` — `NotificationHub`, `INotificationClient`.

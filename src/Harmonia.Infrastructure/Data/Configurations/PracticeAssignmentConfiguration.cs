@@ -19,7 +19,8 @@ public class PracticeAssignmentConfiguration : IEntityTypeConfiguration<Practice
         builder.HasOne(x => x.Song)
             .WithMany()
             .HasForeignKey(x => x.SongId)
-            .OnDelete(DeleteBehavior.SetNull);
+            // SQL Server rejects a second SET NULL path (Song -> Material -> Assignment), so no DB-level action here.
+            .OnDelete(DeleteBehavior.ClientSetNull);
 
         builder.HasOne(x => x.Material)
             .WithMany()

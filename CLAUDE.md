@@ -12,6 +12,7 @@ Trả lời bằng tiếng Việt. Tiếng Anh trong file `.cs`: comment, XML do
 @.claude/rules/02-naming.md
 @.claude/rules/03-security.md
 @.claude/rules/04-workflow.md
+@.claude/rules/05-file-placement.md
 
 ## 4 actor
 
@@ -41,7 +42,7 @@ Entity có audit thì kế thừa `BaseAuditableEntity` (`CreatedAt/By`, `Update
 Domain đã dựng đủ 42 entity + 21 enum theo `doc/harmonia-domain-entity-list.md`.
 Hệ thống phục vụ MỘT ca đoàn — không có entity `Choir`, không có `ChoirId`.
 
-TODO chưa chốt: database provider. Gặp việc cần nó thì HỎI, đừng tự chọn.
+Database provider: SQL Server. Gặp việc cần nó thì HỎI, đừng tự chọn.
 
 ## Luật làm việc
 

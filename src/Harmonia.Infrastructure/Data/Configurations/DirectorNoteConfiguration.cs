@@ -13,7 +13,8 @@ public class DirectorNoteConfiguration : IEntityTypeConfiguration<DirectorNote>
         builder.HasOne(x => x.Week)
             .WithMany(x => x.DirectorNotes)
             .HasForeignKey(x => x.WeekId)
-            .OnDelete(DeleteBehavior.SetNull);
+            // SQL Server rejects a second SET NULL path (Week -> Event -> Note), so no DB-level action here.
+            .OnDelete(DeleteBehavior.ClientSetNull);
 
         builder.HasOne(x => x.LiturgicalEvent)
             .WithMany(x => x.DirectorNotes)

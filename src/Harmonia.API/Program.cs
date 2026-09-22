@@ -17,6 +17,9 @@ builder.Configuration.AddEnvironmentVariables();
 
 builder.Services.AddApiControllers();
 builder.Services.AddApiSwagger();
+builder.Services.AddApiJwtAuthentication(builder.Configuration);
+builder.Services.AddApiCors(builder.Configuration);
+builder.Services.AddApiSignalR();
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -30,8 +33,12 @@ app.UseApiSwagger();
 
 app.UseHttpsRedirection();
 
+app.UseApiCors();
+
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapApiHubs();
 
 app.Run();

@@ -36,15 +36,21 @@ Quy tắc ngắn: **Service chủ động kiểm tra → `Result<T>`; luật tro
 Service **không** `try/catch` `DomainException` — để nó bay lên middleware.
 Dịch vụ ngoài: Infrastructure bắt exception của thư viện, trả `Result.Failure(EXTERNAL_*)`.
 
-`DomainException` không biết HTTP. Middleware tra `code` → status theo cột HTTP của
-file này (bảng tra đặt ở API), mặc định 409 nếu không có trong bảng.
+`DomainException` không biết HTTP. Bảng tra `code` → status nằm ở
+`API/Middlewares/ErrorStatusMap.cs`, chép từ cột HTTP của file này, dùng chung cho cả
+middleware lẫn controller. Mã không có trong bảng lấy mặc định của nơi gọi: 409 cho
+`DomainException`, 400 cho `Result.Failure`.
 Danh sách exception nào ném mã nào: xem `domain-exceptions.md`.
 
 `NotFoundException` (Application) chỉ dùng khi dữ liệu **lẽ ra phải có** mà mất (lỗi
 hệ thống). Người dùng gửi id không tồn tại → `Result.Failure(XXX_NOT_FOUND)`.
 
-**Danh sách này là tham chiếu, không phải checklist.** Chỉ thêm hằng khi làm tới chức
-năng tương ứng. Thêm mã mới thì phải cập nhật file này trong cùng PR.
+**Toàn bộ mã trong file này đã được khai sẵn** trong `Domain/Common/ErrorCodes.cs` và
+`API/Middlewares/ErrorStatusMap.cs` (chốt 2026-09-22) — làm tới chức năng nào thì cứ
+`Result.Failure(ErrorCodes.X)`, không phải khai thêm gì. Ngược lại, thêm mã mới thì phải
+cập nhật cả ba chỗ trong cùng PR: file này, `ErrorCodes.cs`, `ErrorStatusMap.cs`.
+Thiếu dòng trong `ErrorStatusMap` là lỗi âm thầm: mã rơi về mặc định, một
+`XXX_NOT_FOUND` sẽ trả 400 thay vì 404.
 
 ---
 
@@ -89,6 +95,16 @@ Bốn mã lookup dùng chung cho 9 bảng danh mục (`Role`, `SkillCategory`,
 
 **Không có mã cho "email không tồn tại".** `forgot-password` luôn trả 200 dù email có
 thật hay không — theo `.claude/rules/03-security.md`, để không lộ email nào đã đăng ký.
+
+Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutRequest`
+(`FluentValidation.WithErrorCode(...)`, đi kèm 400 + `errors`):
+
+| Mã | HTTP | Tiếng Việt |
+|---|---|---|
+| `AUTH_EMAIL_REQUIRED` | 400 | Vui lòng nhập email |
+| `AUTH_EMAIL_INVALID_FORMAT` | 400 | Email không đúng định dạng |
+| `AUTH_PASSWORD_REQUIRED` | 400 | Vui lòng nhập mật khẩu |
+| `AUTH_REFRESH_TOKEN_REQUIRED` | 400 | Thiếu refresh token |
 
 ## 2. User & Role (Admin)
 
@@ -238,8 +254,11 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 | Mã | HTTP | Tiếng Việt |
 |---|---|---|
 | `NOTIFICATION_NOT_FOUND` | 404 | Không tìm thấy thông báo |
-| `NOTIFICATION_NOT_FOR_USER` | 403 | Thông báo này không dành cho bạn |
 | `DIRECTOR_NOTE_TARGET_REQUIRED` | 400 | Phải chọn tuần hoặc sự kiện để gửi ghi chú |
+
+**Không có mã "thông báo không dành cho bạn".** Thông báo của người khác trả
+`NOTIFICATION_NOT_FOUND` (404), vì 403 sẽ xác nhận bản ghi đó có thật. Truy vấn luôn
+lọc theo cặp `(NotificationId, UserId)` nên "không tồn tại" và "của người khác" là một.
 
 ## 13. Hệ thống & báo cáo
 
@@ -289,3 +308,10 @@ xem — trả 404, để không lộ sự tồn tại của bản ghi.
   "Cách lỗi đi từ BE tới response"; dời `ErrorCodes.cs` sang `Domain/Common`; thêm
   `SONG_LIST_CANNOT_BE_REVISED`; bỏ `REVIEW_ALREADY_DECIDED` (trùng
   `SONG_LIST_NOT_SUBMITTED`). Đồng bộ với `domain-exceptions.md`.
+- 2026-09-22: dựng tính năng Login/Refresh/Logout. Thêm 4 mã validate field
+  (`AUTH_EMAIL_REQUIRED`, `AUTH_EMAIL_INVALID_FORMAT`, `AUTH_PASSWORD_REQUIRED`,
+  `AUTH_REFRESH_TOKEN_REQUIRED`) — các mã Auth khác trong mục 1 đã có sẵn từ trước.
+- 2026-09-22: khai sẵn toàn bộ catalogue vào `ErrorCodes.cs` và gộp hai bảng tra status
+  (middleware + controller) thành `API/Middlewares/ErrorStatusMap.cs`.
+- 2026-09-22: bỏ `NOTIFICATION_NOT_FOR_USER` (403). Mọi tình huống dùng tới nó đều là
+  tình huống mà quy tắc "tài nguyên của người khác → 404" cấm trả 403. Đừng thêm lại.

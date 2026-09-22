@@ -35,7 +35,7 @@
 ## Tài khoản & mật khẩu
 
 - Tài khoản do `Admin` tạo và gán role. **KHÔNG có đăng ký công khai** —
-  chỉ `login` và `forgot-password` là `[AllowAnonymous]`.
+  chỉ `login`, `refresh` và `forgot-password` là `[AllowAnonymous]`.
 - Mật khẩu lưu ở `User.passwordHash`, dùng `PasswordHasher<T>` hoặc BCrypt.
   Không bao giờ lưu plaintext, không bao giờ trả mật khẩu ra response.
 - Token reset mật khẩu: ngẫu nhiên đủ dài, hết hạn trong 1 giờ, dùng một lần.

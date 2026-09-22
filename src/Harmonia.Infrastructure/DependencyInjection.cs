@@ -1,4 +1,8 @@
+using Harmonia.Application.Interfaces.IRepositories;
+using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Infrastructure.Data;
+using Harmonia.Infrastructure.ExternalServices;
+using Harmonia.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,12 +17,27 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException(
                 "Missing ConnectionStrings__DefaultConnection. See src/Harmonia.API/.env.example.");
 
-        // Pin the version instead of ServerVersion.AutoDetect: AutoDetect opens a real
-        // connection at startup, which breaks `dotnet ef migrations add` when MySQL is down.
-        var serverVersion = new MySqlServerVersion(new Version(8, 0, 36));
-
         services.AddDbContext<HarmoniaDbContext>(options =>
-            options.UseMySql(connectionString, serverVersion));
+            options.UseSqlServer(connectionString));
+
+        services.AddOptions<JwtOptions>()
+            .Bind(configuration.GetSection(JwtOptions.SectionName))
+            .Validate(
+                o => !string.IsNullOrWhiteSpace(o.Key)
+                    && !string.IsNullOrWhiteSpace(o.Issuer)
+                    && !string.IsNullOrWhiteSpace(o.Audience)
+                    && o.ExpiryMinutes > 0
+                    && o.RefreshTokenExpiryDays > 0,
+                "Missing or invalid Jwt__* configuration. See src/Harmonia.API/.env.example.")
+            .ValidateOnStart();
+
+        services.AddHttpContextAccessor();
+
+        services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<IJwtTokenService, JwtTokenService>();
+        services.AddScoped<IPasswordHasherService, PasswordHasherService>();
+        services.AddScoped<ICurrentUserService, CurrentUserService>();
 
         return services;
     }

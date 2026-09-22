@@ -26,6 +26,7 @@ public class RosterAssignmentConfiguration : IEntityTypeConfiguration<RosterAssi
         builder.HasOne(x => x.SongListItem)
             .WithMany(x => x.RosterAssignments)
             .HasForeignKey(x => x.SongListItemId)
-            .OnDelete(DeleteBehavior.SetNull);
+            // SQL Server rejects a second path (Event -> SongList -> Item -> Assignment vs Event -> Roster -> Assignment).
+            .OnDelete(DeleteBehavior.ClientSetNull);
     }
 }
