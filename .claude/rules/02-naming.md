@@ -84,6 +84,10 @@ DTO chia ba nhóm theo hướng đi của dữ liệu:
 Không trả entity ra controller, không nhận entity làm tham số action.
 
 - Interface repository: `I<Entity>Repository` — `ISongListRepository`.
+  Repository dùng chung: `IGenericRepository<T>` (`GetByIdAsync`, `AddAsync`, `Remove`,
+  `SaveChangesAsync`). Entity chỉ cần CRUD đơn giản thì inject thẳng `IGenericRepository<Song>`,
+  không tạo repository riêng. Cần truy vấn đặc thù thì tạo
+  `I<Entity>Repository : IGenericRepository<Entity>` và chỉ khai thêm method đặc thù.
 - Interface service: `I<Nghiệp vụ>Service` — `ISongListService`, `IRosterService`.
 - Service: bỏ chữ `I` của interface tương ứng — `SongListService`, `AuthService`.
 - Validator: `<Request>Validator` — `CreateSongListRequestValidator`.
@@ -103,7 +107,8 @@ Không trả entity ra controller, không nhận entity làm tham số action.
 
 ## Infrastructure
 
-- Repository: `<Entity>Repository`.
+- Repository: `<Entity>Repository`, kế thừa `GenericRepository<Entity>` — dùng property
+  `DbContext` của lớp cha, không giữ tham số `dbContext` riêng.
 - EF configuration: `<Entity>Configuration`.
 - `DbSet` đặt tên số nhiều — `public DbSet<SongList> SongLists`.
 - Interceptor: `<X>Interceptor`. External service đặt theo thứ nó bọc —

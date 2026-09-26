@@ -3,10 +3,8 @@ using Harmonia.Domain.Entities;
 
 namespace Harmonia.Application.Interfaces.IRepositories;
 
-public interface INotificationRepository
+public interface INotificationRepository : IGenericRepository<Notification>
 {
-    Task AddAsync(Notification notification, CancellationToken cancellationToken);
-
     /// <summary>One page of the caller's own notifications, newest first, with the notification loaded.</summary>
     Task<PagedList<NotificationRecipient>> GetForUserAsync(
         Guid userId, PagingRequest paging, CancellationToken cancellationToken);
@@ -16,6 +14,4 @@ public interface INotificationRepository
         Guid notificationId, Guid userId, CancellationToken cancellationToken);
 
     Task<int> CountUnreadAsync(Guid userId, CancellationToken cancellationToken);
-
-    Task SaveChangesAsync(CancellationToken cancellationToken);
 }

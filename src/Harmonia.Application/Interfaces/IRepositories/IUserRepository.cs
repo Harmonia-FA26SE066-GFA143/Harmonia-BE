@@ -2,7 +2,7 @@ using Harmonia.Domain.Entities;
 
 namespace Harmonia.Application.Interfaces.IRepositories;
 
-public interface IUserRepository
+public interface IUserRepository : IGenericRepository<User>
 {
     Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken);
 
@@ -11,6 +11,4 @@ public interface IUserRepository
     Task AddRefreshTokenAsync(RefreshToken refreshToken, CancellationToken cancellationToken);
 
     Task RevokeAllRefreshTokensAsync(Guid userId, CancellationToken cancellationToken);
-
-    Task SaveChangesAsync(CancellationToken cancellationToken);
 }

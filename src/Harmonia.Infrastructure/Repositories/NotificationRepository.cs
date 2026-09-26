@@ -6,15 +6,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Harmonia.Infrastructure.Repositories;
 
-public class NotificationRepository(HarmoniaDbContext dbContext) : INotificationRepository
+public class NotificationRepository(HarmoniaDbContext dbContext)
+    : GenericRepository<Notification>(dbContext), INotificationRepository
 {
-    public async Task AddAsync(Notification notification, CancellationToken cancellationToken) =>
-        await dbContext.Notifications.AddAsync(notification, cancellationToken);
-
     public async Task<PagedList<NotificationRecipient>> GetForUserAsync(
         Guid userId, PagingRequest paging, CancellationToken cancellationToken)
     {
-        var query = dbContext.NotificationRecipients
+        var query = DbContext.NotificationRecipients
             .AsNoTracking()
             .Include(x => x.Notification)
             .Where(x => x.UserId == userId)
@@ -32,13 +30,10 @@ public class NotificationRepository(HarmoniaDbContext dbContext) : INotification
 
     public Task<NotificationRecipient?> GetRecipientAsync(
         Guid notificationId, Guid userId, CancellationToken cancellationToken) =>
-        dbContext.NotificationRecipients
+        DbContext.NotificationRecipients
             .FirstOrDefaultAsync(x => x.NotificationId == notificationId && x.UserId == userId, cancellationToken);
 
     public Task<int> CountUnreadAsync(Guid userId, CancellationToken cancellationToken) =>
-        dbContext.NotificationRecipients
+        DbContext.NotificationRecipients
             .CountAsync(x => x.UserId == userId && !x.IsRead, cancellationToken);
-
-    public Task SaveChangesAsync(CancellationToken cancellationToken) =>
-        dbContext.SaveChangesAsync(cancellationToken);
 }

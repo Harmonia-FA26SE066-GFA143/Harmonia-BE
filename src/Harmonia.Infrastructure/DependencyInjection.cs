@@ -56,6 +56,8 @@ public static class DependencyInjection
 
         services.AddHttpContextAccessor();
 
+        // Plain CRUD: inject IGenericRepository<T> directly, no per-entity repository needed.
+        services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();

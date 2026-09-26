@@ -5,25 +5,26 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Harmonia.Infrastructure.Repositories;
 
-public class UserRepository(HarmoniaDbContext dbContext) : IUserRepository
+public class UserRepository(HarmoniaDbContext dbContext)
+    : GenericRepository<User>(dbContext), IUserRepository
 {
     public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken) =>
-        dbContext.Users
+        DbContext.Users
             .Include(x => x.Role)
             .FirstOrDefaultAsync(x => x.Email == email, cancellationToken);
 
     public Task<RefreshToken?> GetRefreshTokenByHashAsync(string tokenHash, CancellationToken cancellationToken) =>
-        dbContext.RefreshTokens
+        DbContext.RefreshTokens
             .Include(x => x.User)
             .ThenInclude(x => x.Role)
             .FirstOrDefaultAsync(x => x.TokenHash == tokenHash, cancellationToken);
 
     public async Task AddRefreshTokenAsync(RefreshToken refreshToken, CancellationToken cancellationToken) =>
-        await dbContext.RefreshTokens.AddAsync(refreshToken, cancellationToken);
+        await DbContext.RefreshTokens.AddAsync(refreshToken, cancellationToken);
 
     public async Task RevokeAllRefreshTokensAsync(Guid userId, CancellationToken cancellationToken)
     {
-        var activeTokens = await dbContext.RefreshTokens
+        var activeTokens = await DbContext.RefreshTokens
             .Where(x => x.UserId == userId && x.RevokedAt == null)
             .ToListAsync(cancellationToken);
 
@@ -32,7 +33,4 @@ public class UserRepository(HarmoniaDbContext dbContext) : IUserRepository
             token.Revoke();
         }
     }
-
-    public Task SaveChangesAsync(CancellationToken cancellationToken) =>
-        dbContext.SaveChangesAsync(cancellationToken);
 }
