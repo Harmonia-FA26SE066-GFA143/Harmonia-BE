@@ -14,6 +14,11 @@ public class User : BaseAuditableEntity
 
     public DateTime? LastLoginAt { get; set; }
 
+    public string? AvatarUrl { get; set; }
+
+    /// <summary>Storage id used to delete the old avatar when it is replaced.</summary>
+    public string? AvatarPublicId { get; set; }
+
     public Role Role { get; set; } = null!;
 
     public MemberProfile? MemberProfile { get; set; }

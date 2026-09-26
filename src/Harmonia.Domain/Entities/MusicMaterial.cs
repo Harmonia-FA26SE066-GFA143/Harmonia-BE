@@ -11,7 +11,8 @@ public class MusicMaterial : BaseAuditableEntity
 
     public string Title { get; set; } = string.Empty;
 
-    public string FileUrl { get; set; } = string.Empty;
+    /// <summary>Private file: serve through IFileStorageService.GetSignedUrl, never as a stored URL.</summary>
+    public string FilePublicId { get; set; } = string.Empty;
 
     public string FileName { get; set; } = string.Empty;
 

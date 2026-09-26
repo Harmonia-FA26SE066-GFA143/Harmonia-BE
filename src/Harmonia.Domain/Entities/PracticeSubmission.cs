@@ -9,7 +9,8 @@ public class PracticeSubmission : BaseEntity
 
     public Guid MemberId { get; set; }
 
-    public string AudioUrl { get; set; } = string.Empty;
+    /// <summary>Private file: serve through IFileStorageService.GetSignedUrl, never as a stored URL.</summary>
+    public string AudioPublicId { get; set; } = string.Empty;
 
     public int? DurationSeconds { get; set; }
 

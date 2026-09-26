@@ -10,6 +10,8 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
     {
         builder.Property(x => x.Email).IsRequired().HasMaxLength(256);
         builder.Property(x => x.PasswordHash).IsRequired().HasMaxLength(500);
+        builder.Property(x => x.AvatarUrl).HasMaxLength(500);
+        builder.Property(x => x.AvatarPublicId).HasMaxLength(255);
 
         builder.HasIndex(x => x.Email).IsUnique();
 

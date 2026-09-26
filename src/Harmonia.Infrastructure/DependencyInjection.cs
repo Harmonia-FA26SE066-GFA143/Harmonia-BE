@@ -31,6 +31,16 @@ public static class DependencyInjection
                 "Missing or invalid Jwt__* configuration. See src/Harmonia.API/.env.example.")
             .ValidateOnStart();
 
+        services.AddOptions<CloudinaryOptions>()
+            .Bind(configuration.GetSection(CloudinaryOptions.SectionName))
+            .Validate(
+                o => !string.IsNullOrWhiteSpace(o.CloudName)
+                    && !string.IsNullOrWhiteSpace(o.ApiKey)
+                    && !string.IsNullOrWhiteSpace(o.ApiSecret)
+                    && o.SignedUrlExpiryMinutes > 0,
+                "Missing or invalid Cloudinary__* configuration. See src/Harmonia.API/.env.example.")
+            .ValidateOnStart();
+
         services.AddHttpContextAccessor();
 
         services.AddScoped<IUserRepository, UserRepository>();
@@ -38,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IPasswordHasherService, PasswordHasherService>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
+        services.AddSingleton<IFileStorageService, CloudinaryFileStorageService>();
 
         return services;
     }

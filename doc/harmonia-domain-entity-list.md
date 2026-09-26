@@ -30,7 +30,7 @@ Written once here instead of repeated 42 times:
 ## A. Identity & Access
 
 **1. `User`** — login account, exactly one role (D2) ***auditable***
-`email` string(256) unique · `passwordHash` string · `roleId` Guid → Role · `isActive` bool = true · `lastLoginAt` DateTime?
+`email` string(256) unique · `passwordHash` string · `roleId` Guid → Role · `isActive` bool = true · `lastLoginAt` DateTime? · `avatarUrl` string(500)? · `avatarPublicId` string(255)?
 
 **2. `Role`** — 4 seeded roles: Admin, ParishPriest, ChoirDirector, ChoirMember (D1)
 `name` string(50) unique · `description` string(300)?
@@ -86,7 +86,7 @@ Written once here instead of repeated 42 times:
 `songId` Guid → Song · `skillId` Guid → Skill · `isMandatory` bool · unique `(songId, skillId)`
 
 **20. `MusicMaterial`** — sheet music / lyrics / sample audio / rehearsal material (FE-08/28) ***auditable***
-`songId` Guid → Song · `materialType` MaterialType · `title` string(200) · `fileUrl` string(500) · `fileName` string(200) · `fileSizeBytes` long? · `targetSkillId` Guid? → Skill · `isActive` bool
+`songId` Guid → Song · `materialType` MaterialType · `title` string(200) · `filePublicId` string(255) (private, signed URL on read) · `fileName` string(200) · `fileSizeBytes` long? · `targetSkillId` Guid? → Skill · `isActive` bool
 
 **21. `MaterialLearningProgress`** — Learned / Needs practice (FE-09)
 `memberId` Guid → MemberProfile · `materialId` Guid → MusicMaterial · `status` LearningStatus · `updatedAt` DateTime · unique `(memberId, materialId)`
@@ -147,7 +147,7 @@ Written once here instead of repeated 42 times:
 `practiceAssignmentId` Guid → PracticeAssignment · `targetType` TargetType · `memberId` Guid? → MemberProfile · `skillId` Guid? → Skill
 
 **35. `PracticeSubmission`** — member's recorded audio (FE-11/12)
-`practiceAssignmentId` Guid → PracticeAssignment · `memberId` Guid → MemberProfile · `audioUrl` string(500) · `durationSeconds` int? · `attemptNo` int (from 1) · `submittedAt` DateTime · `status` SubmissionStatus
+`practiceAssignmentId` Guid → PracticeAssignment · `memberId` Guid → MemberProfile · `audioPublicId` string(255) (private, signed URL on read) · `durationSeconds` int? · `attemptNo` int (from 1) · `submittedAt` DateTime · `status` SubmissionStatus
 
 **36. ⚪ `PracticeFeedback`** — director's evaluation (FE-13/43/44)
 `submissionId` Guid → PracticeSubmission · `reviewerId` Guid → User · `result` SubmissionStatus (Passed / NeedsRevision only) · `comment` string(1000)? · `reviewedAt` DateTime
@@ -272,3 +272,4 @@ Written once here instead of repeated 42 times:
 - 2026-09-19: created from FE-01→FE-54 + the canonical use case list (D1).
 - 2026-09-20: D2–D5 applied — `UserRole` removed (43 → 42); `WorshipLocation`, `EventCategory`, `SongTheme`, `LiturgicalSlot` promoted to core; song-list versioning rules added.
 - 2026-09-20: attributes expanded to typed form with conventions + 21 enums.
+- 2026-09-26: Cloudinary storage — `User` gains `avatarUrl`/`avatarPublicId`; `PracticeSubmission.audioUrl` → `audioPublicId`, `MusicMaterial.fileUrl` → `filePublicId` (private files, served by signed URL).

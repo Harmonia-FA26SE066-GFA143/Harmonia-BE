@@ -8,7 +8,7 @@ public class PracticeSubmissionConfiguration : IEntityTypeConfiguration<Practice
 {
     public void Configure(EntityTypeBuilder<PracticeSubmission> builder)
     {
-        builder.Property(x => x.AudioUrl).IsRequired().HasMaxLength(500);
+        builder.Property(x => x.AudioPublicId).IsRequired().HasMaxLength(255);
 
         builder.HasIndex(x => new { x.PracticeAssignmentId, x.MemberId, x.AttemptNo }).IsUnique();
 
