@@ -1,6 +1,7 @@
 using Harmonia.Application.Interfaces.IRepositories;
 using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Infrastructure.Data;
+using Harmonia.Infrastructure.Data.Interceptors;
 using Harmonia.Infrastructure.ExternalServices;
 using Harmonia.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -17,8 +18,11 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException(
                 "Missing ConnectionStrings__DefaultConnection. See src/Harmonia.API/.env.example.");
 
-        services.AddDbContext<HarmoniaDbContext>(options =>
-            options.UseSqlServer(connectionString));
+        // Scoped: it reads the caller through ICurrentUserService, which is per request.
+        services.AddScoped<AuditableEntityInterceptor>();
+        services.AddDbContext<HarmoniaDbContext>((serviceProvider, options) =>
+            options.UseSqlServer(connectionString)
+                .AddInterceptors(serviceProvider.GetRequiredService<AuditableEntityInterceptor>()));
 
         services.AddOptions<JwtOptions>()
             .Bind(configuration.GetSection(JwtOptions.SectionName))
@@ -41,6 +45,15 @@ public static class DependencyInjection
                 "Missing or invalid Cloudinary__* configuration. See src/Harmonia.API/.env.example.")
             .ValidateOnStart();
 
+        services.AddOptions<BrevoOptions>()
+            .Bind(configuration.GetSection(BrevoOptions.SectionName))
+            .Validate(
+                o => !string.IsNullOrWhiteSpace(o.ApiKey)
+                    && !string.IsNullOrWhiteSpace(o.FromEmail)
+                    && !string.IsNullOrWhiteSpace(o.FromName),
+                "Missing or invalid Brevo__* configuration. See src/Harmonia.API/.env.example.")
+            .ValidateOnStart();
+
         services.AddHttpContextAccessor();
 
         services.AddScoped<IUserRepository, UserRepository>();
@@ -49,6 +62,7 @@ public static class DependencyInjection
         services.AddScoped<IPasswordHasherService, PasswordHasherService>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddSingleton<IFileStorageService, CloudinaryFileStorageService>();
+        services.AddSingleton<IEmailSender, BrevoEmailSender>();
 
         return services;
     }

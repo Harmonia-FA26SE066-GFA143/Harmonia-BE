@@ -8,4 +8,7 @@ public interface ICurrentUserService
     string? RoleName { get; }
 
     bool IsAuthenticated { get; }
+
+    /// <summary>Remote IP of the caller; behind a reverse proxy this is the proxy's IP until forwarded headers are enabled.</summary>
+    string? IpAddress { get; }
 }

@@ -14,4 +14,6 @@ public class CurrentUserService(IHttpContextAccessor httpContextAccessor) : ICur
     public string? RoleName => User?.FindFirstValue(ClaimTypes.Role);
 
     public bool IsAuthenticated => User?.Identity?.IsAuthenticated ?? false;
+
+    public string? IpAddress => httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
 }
