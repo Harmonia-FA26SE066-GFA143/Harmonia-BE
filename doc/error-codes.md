@@ -93,7 +93,7 @@ Bốn mã lookup dùng chung cho 9 bảng danh mục (`Role`, `SkillCategory`,
 | `AUTH_RESET_TOKEN_EXPIRED` | 400 | Liên kết đặt lại mật khẩu đã hết hạn |
 | `AUTH_RESET_TOKEN_USED` | 400 | Liên kết đặt lại mật khẩu đã được sử dụng |
 
-**Không có mã cho "email không tồn tại".** `forgot-password` luôn trả 200 dù email có
+**Không có mã cho "email không tồn tại".** `forgot-password` luôn trả 204 dù email có
 thật hay không — theo `.claude/rules/03-security.md`, để không lộ email nào đã đăng ký.
 
 Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutRequest`

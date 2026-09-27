@@ -28,4 +28,22 @@ public class AuthController(IAuthService authService) : ApiControllerBase
     [Authorize]
     public async Task<IActionResult> LogoutAllAsync(CancellationToken cancellationToken) =>
         ToActionResult(await authService.LogoutAllAsync(User.GetUserId(), cancellationToken));
+
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePasswordAsync(
+        [FromBody] ChangePasswordRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await authService.ChangePasswordAsync(User.GetUserId(), request, cancellationToken));
+
+    [HttpPost("forgot-password")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ForgotPasswordAsync(
+        [FromBody] ForgotPasswordRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await authService.ForgotPasswordAsync(request, cancellationToken));
+
+    [HttpPost("reset-password")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ResetPasswordAsync(
+        [FromBody] ResetPasswordRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await authService.ResetPasswordAsync(request, cancellationToken));
 }

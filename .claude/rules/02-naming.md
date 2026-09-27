@@ -1,11 +1,12 @@
 # Từ điển nghiệp vụ — dùng đúng tên, không tự đặt từ đồng nghĩa
 
-Nguồn chuẩn: `doc/harmonia-domain-entity-list.md` (42 entity, 21 enum).
+Nguồn chuẩn: `doc/harmonia-domain-entity-list.md` (43 entity, 21 enum).
 Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 
 | Tiếng Việt | Tên trong code |
 |---|---|
 | tài khoản | `User` |
+| token đặt lại mật khẩu | `PasswordResetToken` |
 | vai trò | `Role` — 4 giá trị: Admin, ParishPriest, ChoirDirector, ChoirMember |
 | cha xứ / ban phụng vụ | `ParishPriest` |
 | ca trưởng | `ChoirDirector` — KHÔNG dùng `ChoirLeader` |

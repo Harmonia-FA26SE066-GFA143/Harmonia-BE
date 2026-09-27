@@ -1,3 +1,4 @@
+using Harmonia.Application.Common.Models;
 using Harmonia.Application.Interfaces.IRepositories;
 using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Infrastructure.Data;
@@ -52,6 +53,15 @@ public static class DependencyInjection
                     && !string.IsNullOrWhiteSpace(o.FromEmail)
                     && !string.IsNullOrWhiteSpace(o.FromName),
                 "Missing or invalid Brevo__* configuration. See src/Harmonia.API/.env.example.")
+            .ValidateOnStart();
+
+        // Read by AuthService in Application, bound here because this is where IConfiguration is available.
+        services.AddOptions<PasswordResetOptions>()
+            .Bind(configuration.GetSection(PasswordResetOptions.SectionName))
+            .Validate(
+                o => Uri.IsWellFormedUriString(o.WebUrl, UriKind.Absolute)
+                    && Uri.IsWellFormedUriString(o.MobileUrl, UriKind.Absolute),
+                "Missing or invalid PasswordReset__* configuration. See src/Harmonia.API/.env.example.")
             .ValidateOnStart();
 
         services.AddHttpContextAccessor();

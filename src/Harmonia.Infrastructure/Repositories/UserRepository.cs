@@ -22,6 +22,19 @@ public class UserRepository(HarmoniaDbContext dbContext)
     public async Task AddRefreshTokenAsync(RefreshToken refreshToken, CancellationToken cancellationToken) =>
         await DbContext.RefreshTokens.AddAsync(refreshToken, cancellationToken);
 
+    public Task<PasswordResetToken?> GetPasswordResetTokenByHashAsync(string tokenHash, CancellationToken cancellationToken) =>
+        DbContext.PasswordResetTokens
+            .Include(x => x.User)
+            .FirstOrDefaultAsync(x => x.TokenHash == tokenHash, cancellationToken);
+
+    public async Task AddPasswordResetTokenAsync(PasswordResetToken passwordResetToken, CancellationToken cancellationToken) =>
+        await DbContext.PasswordResetTokens.AddAsync(passwordResetToken, cancellationToken);
+
+    public async Task RemoveUnusedPasswordResetTokensAsync(Guid userId, CancellationToken cancellationToken) =>
+        DbContext.PasswordResetTokens.RemoveRange(await DbContext.PasswordResetTokens
+            .Where(x => x.UserId == userId && x.UsedAt == null)
+            .ToListAsync(cancellationToken));
+
     public async Task RevokeAllRefreshTokensAsync(Guid userId, CancellationToken cancellationToken)
     {
         var activeTokens = await DbContext.RefreshTokens
