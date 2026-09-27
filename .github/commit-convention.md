@@ -2,7 +2,7 @@
 
 Dạng: `<loại>(<phạm vi>): <mô tả>`
 
-Một dòng, dưới 72 ký tự, không dấu chấm cuối. Tiền tố tiếng Anh, mô tả tiếng Việt.
+Một dòng, dưới 150 ký tự, không dấu chấm cuối. Tiền tố tiếng Anh, mô tả tiếng Việt.
 
 ## Loại
 
