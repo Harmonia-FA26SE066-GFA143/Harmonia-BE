@@ -60,6 +60,7 @@ public static class DependencyInjection
         services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
+
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IPasswordHasherService, PasswordHasherService>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
