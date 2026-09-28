@@ -35,11 +35,17 @@
 ## Tài khoản & mật khẩu
 
 - Tài khoản do `Admin` tạo và gán role. **KHÔNG có đăng ký công khai** —
-  chỉ `login`, `refresh` và `forgot-password` là `[AllowAnonymous]`.
+  chỉ `login`, `refresh`, `forgot-password` và `reset-password` là `[AllowAnonymous]`
+  (`reset-password`: người dùng đã quên mật khẩu, danh tính xác minh bằng token trong email).
 - Mật khẩu lưu ở `User.passwordHash`, dùng `PasswordHasher<T>` hoặc BCrypt.
   Không bao giờ lưu plaintext, không bao giờ trả mật khẩu ra response.
 - Token reset mật khẩu: ngẫu nhiên đủ dài, hết hạn trong 1 giờ, dùng một lần.
-- `forgot-password` luôn trả 200 dù email có tồn tại hay không — không tiết lộ
+  Lưu ở `PasswordResetToken.TokenHash` — lưu hash, không lưu token gốc; dùng xong đánh
+  dấu `usedAt`. Link gửi qua email dựng từ `PasswordReset__WebUrl` hoặc
+  `PasswordReset__MobileUrl` tuỳ `Platform` của request.
+  Phát token mới thì xoá mọi token chưa dùng của user — chỉ link mới nhất còn hiệu lực.
+- Đổi hoặc đặt lại mật khẩu thành công → thu hồi toàn bộ `RefreshToken` của user.
+- `forgot-password` luôn trả 204 dù email có tồn tại hay không — không tiết lộ
   email nào đã đăng ký. Không có mã lỗi cho trường hợp này.
 - Đăng nhập sai luôn trả `AUTH_INVALID_CREDENTIALS`, không phân biệt sai email hay sai mật khẩu.
 

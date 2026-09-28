@@ -14,6 +14,8 @@ public class HarmoniaDbContext(DbContextOptions<HarmoniaDbContext> options) : Db
 
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+
     public DbSet<SkillCategory> SkillCategories => Set<SkillCategory>();
 
     public DbSet<Skill> Skills => Set<Skill>();

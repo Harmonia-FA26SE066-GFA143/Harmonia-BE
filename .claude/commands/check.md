@@ -36,7 +36,7 @@ Kiểm đúng 13 mục dưới đây, không phát sinh thêm. Mỗi phát hiệ
 
 ## Bảo mật
 9. Endpoint nào thiếu `[Authorize]`. Và `[AllowAnonymous]` có xuất hiện ở đâu
-   ngoài `login` và `forgot-password` không — đây là lỗi nặng hơn thiếu `[Authorize]`.
+   ngoài `login`, `refresh`, `forgot-password` và `reset-password` không — đây là lỗi nặng hơn thiếu `[Authorize]`.
 10. Controller có **nhận** entity Domain làm tham số action, hoặc **trả** thẳng
     entity thay vì DTO không.
 11. `appsettings*.json` có chuỗi nào trông như connection string thật, password,

@@ -11,7 +11,7 @@ dựng tính năng mới: cần đọc gì ở READ, nội dung PLAN, và 13 bư
 ## READ — đọc thêm
 
 Ngoài phần READ chung, còn phải đối chiếu use case trong
-`claude/use-case-descriptions.md` — đặc biệt xem có «include» UC-05 Send Notification không.
+`doc/harmonia-use-case-descriptions.md` — đặc biệt xem có «include» S-05 Send Notification không.
 
 ## PLAN — xác định thêm
 

@@ -1,11 +1,12 @@
 # Từ điển nghiệp vụ — dùng đúng tên, không tự đặt từ đồng nghĩa
 
-Nguồn chuẩn: `doc/harmonia-domain-entity-list.md` (42 entity, 21 enum).
+Nguồn chuẩn: `doc/harmonia-domain-entity-list.md` (43 entity, 21 enum).
 Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 
 | Tiếng Việt | Tên trong code |
 |---|---|
 | tài khoản | `User` |
+| token đặt lại mật khẩu | `PasswordResetToken` |
 | vai trò | `Role` — 4 giá trị: Admin, ParishPriest, ChoirDirector, ChoirMember |
 | cha xứ / ban phụng vụ | `ParishPriest` |
 | ca trưởng | `ChoirDirector` — KHÔNG dùng `ChoirLeader` |
@@ -59,6 +60,11 @@ móc vào chúng.
   Ngoại lệ: method có chữ ký do framework quy định (middleware `InvokeAsync`, filter,
   `Hub`, `BackgroundService`) không thêm được token. Lấy token từ `HttpContext.RequestAborted`
   hoặc `stoppingToken` rồi truyền xuống các lời gọi bên trong.
+  Trong `test/` (xUnit v3): method `[Fact]` / `[Theory]` giữ hậu tố `_Async`
+  (`Login_ValidCredentials_ReturnsTokensAndUser_Async`). xUnit không cho method test nhận token
+  làm tham số, nên lấy từ field `_ct = TestContext.Current.CancellationToken` rồi truyền xuống
+  mọi lời gọi — analyzer `xUnit1051` cảnh báo nếu quên. Helper async trong test vẫn phải có
+  `CancellationToken cancellationToken = default` (chốt 2026-09-27).
 
 - Mọi chuỗi trong `.cs` là tiếng Anh — comment, XML doc, message exception, message log.
   Không có ngoại lệ: message cho người dùng đi bằng mã lỗi, không bằng câu tiếng Việt.

@@ -12,6 +12,14 @@ public interface IUserRepository : IGenericRepository<User>
 
     Task RevokeAllRefreshTokensAsync(Guid userId, CancellationToken cancellationToken);
 
+    /// <summary>Tracked, with <see cref="PasswordResetToken.User"/> loaded.</summary>
+    Task<PasswordResetToken?> GetPasswordResetTokenByHashAsync(string tokenHash, CancellationToken cancellationToken);
+
+    Task AddPasswordResetTokenAsync(PasswordResetToken passwordResetToken, CancellationToken cancellationToken);
+
+    /// <summary>Marks the user's unused reset tokens for deletion, so only the newest emailed link works.</summary>
+    Task RemoveUnusedPasswordResetTokensAsync(Guid userId, CancellationToken cancellationToken);
+
     Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
 
     Task<bool> ExistsByEmailAsync(string email, Guid? excludeUserId, CancellationToken cancellationToken);

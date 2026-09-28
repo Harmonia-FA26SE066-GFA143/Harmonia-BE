@@ -1,6 +1,6 @@
 # Harmonia – Domain Entity List & Attributes (for ERD, Report 3/4)
 
-42 entities derived from FE-01→FE-54 (`claude/functional-requirements-by-actor.md`), the canonical use cases (`claude/use-case-list.md`) and the weekly-program model (`claude/weekly-liturgical-program-design.md`). Diagram: `harmonia-erd.mmd`.
+43 entities derived from FE-01→FE-54 (`claude/functional-requirements-by-actor.md`), the canonical use cases (`claude/use-case-list.md`) and the weekly-program model (`claude/weekly-liturgical-program-design.md`). Diagram: `harmonia-erd.mmd`.
 
 Conceptual/logical level: attribute names, types and constraints. No indexes, no migration syntax.
 
@@ -16,7 +16,7 @@ Conceptual/logical level: attribute names, types and constraints. No indexes, no
 
 ## Attribute conventions
 
-Written once here instead of repeated 42 times:
+Written once here instead of repeated 43 times:
 
 - **`BaseEntity`** — every entity has `id` (Guid, PK). Swap to `int` if the team prefers; nothing else changes.
 - **`BaseAuditableEntity`** — entities marked ***auditable*** also carry `createdAt`, `createdBy`, `updatedAt`, `updatedBy`. Matches `Harmonia.Domain/Common/`.
@@ -40,6 +40,9 @@ Written once here instead of repeated 42 times:
 
 **4. ⚪ `RefreshToken`** — session refresh + mobile push token
 `userId` Guid → User · `tokenHash` string(500) unique · `expiresAt` DateTime · `revokedAt` DateTime? · `deviceId` string(100)? · `platform` DevicePlatform?
+
+**43. `PasswordResetToken`** — one-time password reset link sent by forgot-password (S-03)
+`userId` Guid → User · `tokenHash` string(500) unique · `expiresAt` DateTime (issued + 1 hour) · `usedAt` DateTime?
 
 ⚪ `MemberProfile`: merge into `User` unless member records without a login are needed.
 
@@ -220,6 +223,7 @@ Written once here instead of repeated 42 times:
 - `Role` 1 — n `User` *(D2)*
 - `User` 1 — 1 `MemberProfile`
 - `User` 1 — n `RefreshToken`
+- `User` 1 — n `PasswordResetToken`
 
 **Skills**
 - `SkillCategory` 1 — n `Skill`
@@ -273,3 +277,4 @@ Written once here instead of repeated 42 times:
 - 2026-09-20: D2–D5 applied — `UserRole` removed (43 → 42); `WorshipLocation`, `EventCategory`, `SongTheme`, `LiturgicalSlot` promoted to core; song-list versioning rules added.
 - 2026-09-20: attributes expanded to typed form with conventions + 21 enums.
 - 2026-09-26: Cloudinary storage — `User` gains `avatarUrl`/`avatarPublicId`; `PracticeSubmission.audioUrl` → `audioPublicId`, `MusicMaterial.fileUrl` → `filePublicId` (private files, served by signed URL).
+- 2026-09-27: `PasswordResetToken` added for S-03 Change / Forgot Password (42 → 43).

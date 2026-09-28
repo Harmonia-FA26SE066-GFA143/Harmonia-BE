@@ -624,6 +624,36 @@ namespace Harmonia.Infrastructure.Migrations
                     b.ToTable("NotificationRecipients");
                 });
 
+            modelBuilder.Entity("Harmonia.Domain.Entities.PasswordResetToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("PasswordResetTokens");
+                });
+
             modelBuilder.Entity("Harmonia.Domain.Entities.PracticeAssignment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1724,6 +1754,17 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Harmonia.Domain.Entities.PasswordResetToken", b =>
+                {
+                    b.HasOne("Harmonia.Domain.Entities.User", "User")
+                        .WithMany("PasswordResetTokens")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Harmonia.Domain.Entities.PracticeAssignment", b =>
                 {
                     b.HasOne("Harmonia.Domain.Entities.LiturgicalEvent", "LiturgicalEvent")
@@ -2266,6 +2307,8 @@ namespace Harmonia.Infrastructure.Migrations
             modelBuilder.Entity("Harmonia.Domain.Entities.User", b =>
                 {
                     b.Navigation("MemberProfile");
+
+                    b.Navigation("PasswordResetTokens");
 
                     b.Navigation("RefreshTokens");
                 });
