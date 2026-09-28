@@ -1,3 +1,5 @@
+using System.Text;
+using Harmonia.Application.Common.Models;
 using Harmonia.Application.Interfaces.IRepositories;
 using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Infrastructure.Data;
@@ -27,7 +29,9 @@ public static class DependencyInjection
         services.AddOptions<JwtOptions>()
             .Bind(configuration.GetSection(JwtOptions.SectionName))
             .Validate(
-                o => !string.IsNullOrWhiteSpace(o.Key)
+                // HMAC-SHA256 signs with the UTF-8 bytes of Key: 03-security.md requires at least 256 bits.
+                o => Encoding.UTF8.GetByteCount(o.Key) >= 32
+                    && !string.IsNullOrWhiteSpace(o.Key)
                     && !string.IsNullOrWhiteSpace(o.Issuer)
                     && !string.IsNullOrWhiteSpace(o.Audience)
                     && o.ExpiryMinutes > 0
@@ -54,13 +58,22 @@ public static class DependencyInjection
                 "Missing or invalid Brevo__* configuration. See src/Harmonia.API/.env.example.")
             .ValidateOnStart();
 
+        // Read by AuthService in Application, bound here because this is where IConfiguration is available.
+        services.AddOptions<PasswordResetOptions>()
+            .Bind(configuration.GetSection(PasswordResetOptions.SectionName))
+            .Validate(
+                o => Uri.IsWellFormedUriString(o.WebUrl, UriKind.Absolute)
+                    && Uri.IsWellFormedUriString(o.MobileUrl, UriKind.Absolute),
+                "Missing or invalid PasswordReset__* configuration. See src/Harmonia.API/.env.example.")
+            .ValidateOnStart();
+
         services.AddHttpContextAccessor();
 
         // Plain CRUD: inject IGenericRepository<T> directly, no per-entity repository needed.
         services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
-
+        services.AddScoped<IMemberProfileRepository, MemberProfileRepository>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IPasswordHasherService, PasswordHasherService>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
