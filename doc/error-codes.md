@@ -92,6 +92,7 @@ Bốn mã lookup dùng chung cho 9 bảng danh mục (`Role`, `SkillCategory`,
 | `AUTH_RESET_TOKEN_INVALID` | 400 | Liên kết đặt lại mật khẩu không hợp lệ |
 | `AUTH_RESET_TOKEN_EXPIRED` | 400 | Liên kết đặt lại mật khẩu đã hết hạn |
 | `AUTH_RESET_TOKEN_USED` | 400 | Liên kết đặt lại mật khẩu đã được sử dụng |
+| `AUTH_GOOGLE_TOKEN_INVALID` | 401 | Đăng nhập Google không hợp lệ, vui lòng thử lại |
 
 **Không có mã cho "email không tồn tại".** `forgot-password` luôn trả 204 dù email có
 thật hay không — theo `.claude/rules/03-security.md`, để không lộ email nào đã đăng ký.
@@ -105,6 +106,7 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `AUTH_EMAIL_INVALID_FORMAT` | 400 | Email không đúng định dạng |
 | `AUTH_PASSWORD_REQUIRED` | 400 | Vui lòng nhập mật khẩu |
 | `AUTH_REFRESH_TOKEN_REQUIRED` | 400 | Thiếu refresh token |
+| `AUTH_GOOGLE_TOKEN_REQUIRED` | 400 | Thiếu Google ID token |
 
 ## 2. User & Role (Admin)
 
@@ -113,6 +115,7 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `USER_NOT_FOUND` | 404 | Không tìm thấy tài khoản |
 | `USER_EMAIL_ALREADY_EXISTS` | 409 | Email này đã được sử dụng |
 | `USER_ALREADY_INACTIVE` | 409 | Tài khoản đã ở trạng thái vô hiệu |
+| `USER_ALREADY_ACTIVE` | 409 | Tài khoản đang hoạt động |
 | `USER_CANNOT_MODIFY_SELF` | 409 | Không thể tự đổi quyền hoặc vô hiệu hoá chính mình |
 | `USER_LAST_ADMIN` | 409 | Không thể xoá quyền của quản trị viên cuối cùng |
 | `ROLE_NOT_FOUND` | 404 | Không tìm thấy vai trò |
@@ -315,3 +318,6 @@ xem — trả 404, để không lộ sự tồn tại của bản ghi.
   (middleware + controller) thành `API/Middlewares/ErrorStatusMap.cs`.
 - 2026-09-22: bỏ `NOTIFICATION_NOT_FOR_USER` (403). Mọi tình huống dùng tới nó đều là
   tình huống mà quy tắc "tài nguyên của người khác → 404" cấm trả 403. Đừng thêm lại.
+- 2026-09-29: đăng nhập Google (`api/auth/google`). Thêm `AUTH_GOOGLE_TOKEN_INVALID` (401) và
+  mã validate `AUTH_GOOGLE_TOKEN_REQUIRED`. Email Google chưa có tài khoản trả
+  `AUTH_INVALID_CREDENTIALS` — không tự tạo tài khoản, không lộ email đã đăng ký.
