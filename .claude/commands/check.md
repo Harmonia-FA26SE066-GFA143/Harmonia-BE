@@ -25,6 +25,9 @@ Kiểm đúng 13 mục dưới đây, không phát sinh thêm. Mỗi phát hiệ
 ## Quy ước
 6. Tên class/property có dùng từ sai từ điển không — `ChoirLeader`, `Season`,
    `Assignment`, `Event` (đối chiếu `.claude/rules/02-naming.md`).
+   Không tính exception đặt theo mã lỗi đã có trong `doc/error-codes.md`
+   (`SeasonDateInvalidException`, `EventDateOutsideWeekException`, `ParticipationEventPassedException`)
+   — tên phải khớp mã lỗi, đổi mã thì vỡ FE (chốt 2026-09-29).
 7. Method async có thiếu hậu tố `Async` hoặc thiếu `CancellationToken` không.
    Bỏ qua method có chữ ký do framework quy định (middleware `InvokeAsync`, filter, `Hub`,
    `BackgroundService`); với các method đó chỉ báo nếu không truyền `RequestAborted` /
@@ -36,7 +39,7 @@ Kiểm đúng 13 mục dưới đây, không phát sinh thêm. Mỗi phát hiệ
 
 ## Bảo mật
 9. Endpoint nào thiếu `[Authorize]`. Và `[AllowAnonymous]` có xuất hiện ở đâu
-   ngoài `login`, `refresh`, `forgot-password` và `reset-password` không — đây là lỗi nặng hơn thiếu `[Authorize]`.
+   ngoài `login`, `google`, `refresh`, `forgot-password` và `reset-password` không — đây là lỗi nặng hơn thiếu `[Authorize]`.
 10. Controller có **nhận** entity Domain làm tham số action, hoặc **trả** thẳng
     entity thay vì DTO không.
 11. `appsettings*.json` có chuỗi nào trông như connection string thật, password,
