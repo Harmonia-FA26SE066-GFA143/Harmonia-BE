@@ -7,6 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Anchor to ContentRootPath rather than the working directory: `dotnet ef` runs from the
 // solution root and a bare Env.Load() would not find this file.
+
 DotNetEnv.Env.Load(Path.Combine(builder.Environment.ContentRootPath, ".env"));
 
 // Reload after Env.Load: CreateBuilder reads environment variables before .env is applied,

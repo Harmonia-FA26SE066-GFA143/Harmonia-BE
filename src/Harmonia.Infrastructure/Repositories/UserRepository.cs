@@ -2,6 +2,7 @@ using Harmonia.Application.Interfaces.IRepositories;
 using Harmonia.Domain.Entities;
 using Harmonia.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Harmonia.Domain.Common;
 
 namespace Harmonia.Infrastructure.Repositories;
 
@@ -46,4 +47,18 @@ public class UserRepository(HarmoniaDbContext dbContext)
             token.Revoke();
         }
     }
+
+    public override Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+    DbContext.Users
+        .Include(x => x.Role)
+        .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+    public Task<bool> ExistsByEmailAsync(string email, Guid? excludeUserId, CancellationToken ct) => 
+        DbContext.Users.AnyAsync(x => x.Email == email && x.Id != excludeUserId, ct);
+
+    public Task<Role?> GetRoleByNameAsync(string roleName, CancellationToken ct) =>
+        DbContext.Roles.FirstOrDefaultAsync(x => x.Name == roleName, ct);
+
+    public Task<int> CountActiveAdminsAsync(CancellationToken ct) =>
+        DbContext.Users.CountAsync(x => x.Role.Name == RoleNames.Admin && x.IsActive, ct);
 }

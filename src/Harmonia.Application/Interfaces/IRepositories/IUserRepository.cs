@@ -19,4 +19,16 @@ public interface IUserRepository : IGenericRepository<User>
 
     /// <summary>Marks the user's unused reset tokens for deletion, so only the newest emailed link works.</summary>
     Task RemoveUnusedPasswordResetTokensAsync(Guid userId, CancellationToken cancellationToken);
+
+    Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
+
+    Task<bool> ExistsByEmailAsync(string email, Guid? excludeUserId, CancellationToken cancellationToken);
+
+    Task<Role?> GetRoleByNameAsync(string roleName, CancellationToken cancellationToken);
+
+    Task<int> CountActiveAdminsAsync(CancellationToken cancellationToken);
+
+    Task AddAsync(User user, CancellationToken cancellationToken);
+
+    Task SaveChangesAsync(CancellationToken cancellationToken);
 }

@@ -43,6 +43,7 @@ Bảng trên chỉ là lối vào nhanh. Gặp thuật ngữ chưa có ở cả 
   Ngoại lệ: method có chữ ký do framework quy định (middleware `InvokeAsync`, filter,
   `Hub`, `BackgroundService`) không thêm được token. Lấy token từ `HttpContext.RequestAborted`
   hoặc `stoppingToken` rồi truyền xuống các lời gọi bên trong.
+  Trong `test/`: token lấy từ `TestContext.Current.CancellationToken` (chi tiết ở `02-naming.md`).
 
 - Interface repository: `I<Entity>Repository` — `ISongListRepository`, kế thừa
   `IGenericRepository<Entity>`. CRUD đơn giản thì inject thẳng `IGenericRepository<T>`.

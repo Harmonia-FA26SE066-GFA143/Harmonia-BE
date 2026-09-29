@@ -286,4 +286,7 @@ public static class ErrorCodes
     public const string ExternalStorageFailed = "EXTERNAL_STORAGE_FAILED";
 
     public const string ExternalAiFailed = "EXTERNAL_AI_FAILED";
+
+    public const string UserAlreadyActive = "USER_ALREADY_ACTIVE";
+
 }
