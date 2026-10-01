@@ -92,6 +92,7 @@ Bốn mã lookup dùng chung cho 9 bảng danh mục (`Role`, `SkillCategory`,
 | `AUTH_RESET_TOKEN_INVALID` | 400 | Liên kết đặt lại mật khẩu không hợp lệ |
 | `AUTH_RESET_TOKEN_EXPIRED` | 400 | Liên kết đặt lại mật khẩu đã hết hạn |
 | `AUTH_RESET_TOKEN_USED` | 400 | Liên kết đặt lại mật khẩu đã được sử dụng |
+| `AUTH_GOOGLE_TOKEN_INVALID` | 401 | Đăng nhập Google không hợp lệ, vui lòng thử lại |
 
 **Không có mã cho "email không tồn tại".** `forgot-password` luôn trả 204 dù email có
 thật hay không — theo `.claude/rules/03-security.md`, để không lộ email nào đã đăng ký.
@@ -105,6 +106,7 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `AUTH_EMAIL_INVALID_FORMAT` | 400 | Email không đúng định dạng |
 | `AUTH_PASSWORD_REQUIRED` | 400 | Vui lòng nhập mật khẩu |
 | `AUTH_REFRESH_TOKEN_REQUIRED` | 400 | Thiếu refresh token |
+| `AUTH_GOOGLE_TOKEN_REQUIRED` | 400 | Thiếu Google ID token |
 
 ## 2. User & Role (Admin)
 
@@ -113,6 +115,7 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `USER_NOT_FOUND` | 404 | Không tìm thấy tài khoản |
 | `USER_EMAIL_ALREADY_EXISTS` | 409 | Email này đã được sử dụng |
 | `USER_ALREADY_INACTIVE` | 409 | Tài khoản đã ở trạng thái vô hiệu |
+| `USER_ALREADY_ACTIVE` | 409 | Tài khoản đang hoạt động |
 | `USER_CANNOT_MODIFY_SELF` | 409 | Không thể tự đổi quyền hoặc vô hiệu hoá chính mình |
 | `USER_LAST_ADMIN` | 409 | Không thể xoá quyền của quản trị viên cuối cùng |
 | `ROLE_NOT_FOUND` | 404 | Không tìm thấy vai trò |
@@ -144,14 +147,10 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 
 | Mã | HTTP | Tiếng Việt |
 |---|---|---|
-| `WEEK_NOT_FOUND` | 404 | Không tìm thấy tuần phụng vụ |
-| `WEEK_ALREADY_EXISTS` | 409 | Tuần này đã được tạo |
-| `WEEK_START_NOT_MONDAY` | 400 | Tuần phải bắt đầu vào thứ Hai |
-| `WEEK_ALREADY_PUBLISHED` | 409 | Tuần đã công bố, không thể sửa |
-| `WEEK_NOT_PUBLISHED` | 409 | Tuần chưa được công bố |
 | `EVENT_NOT_FOUND` | 404 | Không tìm thấy sự kiện |
 | `EVENT_SLOT_TAKEN` | 409 | Đã có sự kiện khác vào giờ này tại địa điểm này |
-| `EVENT_DATE_OUTSIDE_WEEK` | 400 | Ngày sự kiện không nằm trong tuần đã chọn |
+| `EVENT_ALREADY_PUBLISHED` | 409 | Sự kiện đã công bố, không thể sửa |
+| `EVENT_NOT_PUBLISHED` | 409 | Sự kiện chưa được công bố |
 | `EVENT_CANCELLED` | 409 | Sự kiện đã bị huỷ |
 | `EVENT_ALREADY_PASSED` | 409 | Sự kiện đã diễn ra |
 | `EVENT_TYPE_REQUIRED` | 400 | Phải chọn loại lễ hoặc loại nghi thức |
@@ -254,7 +253,7 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 | Mã | HTTP | Tiếng Việt |
 |---|---|---|
 | `NOTIFICATION_NOT_FOUND` | 404 | Không tìm thấy thông báo |
-| `DIRECTOR_NOTE_TARGET_REQUIRED` | 400 | Phải chọn tuần hoặc sự kiện để gửi ghi chú |
+| `DIRECTOR_NOTE_TARGET_REQUIRED` | 400 | Phải chọn ngày hoặc sự kiện để gửi ghi chú |
 
 **Không có mã "thông báo không dành cho bạn".** Thông báo của người khác trả
 `NOTIFICATION_NOT_FOUND` (404), vì 403 sẽ xác nhận bản ghi đó có thật. Truy vấn luôn
@@ -278,6 +277,7 @@ lọc theo cặp `(NotificationId, UserId)` nên "không tồn tại" và "của
 | `EXTERNAL_EMAIL_FAILED` | 502 | Không gửi được email, vui lòng thử lại |
 | `EXTERNAL_STORAGE_FAILED` | 502 | Không tải được tệp lên, vui lòng thử lại |
 | `EXTERNAL_AI_FAILED` | 502 | Không tạo được gợi ý phân công, vui lòng thử lại |
+| `EXTERNAL_CALENDAR_FAILED` | 502 | Không lấy được lịch phụng vụ, vui lòng thử lại |
 
 ---
 
@@ -315,3 +315,6 @@ xem — trả 404, để không lộ sự tồn tại của bản ghi.
   (middleware + controller) thành `API/Middlewares/ErrorStatusMap.cs`.
 - 2026-09-22: bỏ `NOTIFICATION_NOT_FOR_USER` (403). Mọi tình huống dùng tới nó đều là
   tình huống mà quy tắc "tài nguyên của người khác → 404" cấm trả 403. Đừng thêm lại.
+- 2026-09-29: đăng nhập Google (`api/auth/google`). Thêm `AUTH_GOOGLE_TOKEN_INVALID` (401) và
+  mã validate `AUTH_GOOGLE_TOKEN_REQUIRED`. Email Google chưa có tài khoản trả
+  `AUTH_INVALID_CREDENTIALS` — không tự tạo tài khoản, không lộ email đã đăng ký.

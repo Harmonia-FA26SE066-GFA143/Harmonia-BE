@@ -2,7 +2,7 @@ namespace Harmonia.Domain.Enums;
 
 public enum NotificationType
 {
-    WeekPublished,
+    EventPublished,
     SongListDecision,
     ParticipationRequest,
     AssignmentNotice,

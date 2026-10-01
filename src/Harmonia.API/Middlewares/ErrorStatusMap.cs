@@ -39,11 +39,13 @@ public static class ErrorStatusMap
         [ErrorCodes.AuthResetTokenInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.AuthResetTokenExpired] = StatusCodes.Status400BadRequest,
         [ErrorCodes.AuthResetTokenUsed] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.AuthGoogleTokenInvalid] = StatusCodes.Status401Unauthorized,
 
         // 2. User & Role.
         [ErrorCodes.UserNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.UserEmailAlreadyExists] = StatusCodes.Status409Conflict,
         [ErrorCodes.UserAlreadyInactive] = StatusCodes.Status409Conflict,
+        [ErrorCodes.UserAlreadyActive] = StatusCodes.Status409Conflict,
         [ErrorCodes.UserCannotModifySelf] = StatusCodes.Status409Conflict,
         [ErrorCodes.UserLastAdmin] = StatusCodes.Status409Conflict,
         [ErrorCodes.RoleNotFound] = StatusCodes.Status404NotFound,

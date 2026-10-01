@@ -22,6 +22,7 @@ public class AuthServiceTests
     private readonly IJwtTokenService _jwtTokenService = Substitute.For<IJwtTokenService>();
     private readonly IPasswordHasherService _passwordHasher = Substitute.For<IPasswordHasherService>();
     private readonly IEmailSender _emailSender = Substitute.For<IEmailSender>();
+    private readonly IGoogleTokenValidator _googleTokenValidator = Substitute.For<IGoogleTokenValidator>();
     private readonly AuthService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
 
@@ -36,6 +37,7 @@ public class AuthServiceTests
             _jwtTokenService,
             _passwordHasher,
             _emailSender,
+            _googleTokenValidator,
             Options.Create(new PasswordResetOptions { WebUrl = WebUrl, MobileUrl = MobileUrl }),
             Substitute.For<IMapper>());
     }
@@ -101,6 +103,62 @@ public class AuthServiceTests
                 && t.DeviceId == "d1"
                 && t.Platform == DevicePlatform.Android),
             _ct);
+        await _userRepository.Received(1).SaveChangesAsync(_ct);
+    }
+
+    // ---- Google login ----
+
+    [Fact]
+    public async Task LoginWithGoogleAsync_InvalidToken_ReturnsGoogleTokenInvalid_Async()
+    {
+        _googleTokenValidator.GetVerifiedEmailAsync("bad", _ct).Returns((string?)null);
+
+        var result = await _sut.LoginWithGoogleAsync(new GoogleLoginRequest { IdToken = "bad" }, _ct);
+
+        Assert.Equal(ErrorCodes.AuthGoogleTokenInvalid, result.Code);
+        await _userRepository.DidNotReceive().GetByEmailAsync(Arg.Any<string>(), _ct);
+    }
+
+    [Fact]
+    public async Task LoginWithGoogleAsync_EmailWithoutAccount_ReturnsInvalidCredentials_Async()
+    {
+        _googleTokenValidator.GetVerifiedEmailAsync("id-token", _ct).Returns("stranger@gmail.com");
+
+        var result = await _sut.LoginWithGoogleAsync(new GoogleLoginRequest { IdToken = "id-token" }, _ct);
+
+        Assert.Equal(ErrorCodes.AuthInvalidCredentials, result.Code);
+        await _userRepository.DidNotReceive().AddAsync(Arg.Any<User>(), _ct);
+        await _userRepository.DidNotReceive().AddRefreshTokenAsync(Arg.Any<RefreshToken>(), _ct);
+    }
+
+    [Fact]
+    public async Task LoginWithGoogleAsync_InactiveAccount_ReturnsAccountInactive_Async()
+    {
+        var user = NewUser(isActive: false);
+        _googleTokenValidator.GetVerifiedEmailAsync("id-token", _ct).Returns(user.Email);
+        _userRepository.GetByEmailAsync(user.Email, _ct).Returns(user);
+
+        var result = await _sut.LoginWithGoogleAsync(new GoogleLoginRequest { IdToken = "id-token" }, _ct);
+
+        Assert.Equal(ErrorCodes.AuthAccountInactive, result.Code);
+        await _userRepository.DidNotReceive().AddRefreshTokenAsync(Arg.Any<RefreshToken>(), _ct);
+    }
+
+    [Fact]
+    public async Task LoginWithGoogleAsync_KnownEmail_IssuesTokens_Async()
+    {
+        var user = NewUser();
+        _googleTokenValidator.GetVerifiedEmailAsync("id-token", _ct).Returns(user.Email);
+        _userRepository.GetByEmailAsync(user.Email, _ct).Returns(user);
+
+        var result = await _sut.LoginWithGoogleAsync(
+            new GoogleLoginRequest { IdToken = "id-token", DeviceId = "d1", Platform = DevicePlatform.Web }, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("raw-token", result.Value!.RefreshToken);
+        Assert.NotNull(user.LastLoginAt);
+        await _userRepository.Received(1).AddRefreshTokenAsync(
+            Arg.Is<RefreshToken>(t => t.UserId == user.Id && t.DeviceId == "d1"), _ct);
         await _userRepository.Received(1).SaveChangesAsync(_ct);
     }
 

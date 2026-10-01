@@ -16,6 +16,7 @@ public class AuthService(
     IJwtTokenService jwtTokenService,
     IPasswordHasherService passwordHasherService,
     IEmailSender emailSender,
+    IGoogleTokenValidator googleTokenValidator,
     IOptions<PasswordResetOptions> passwordResetOptions,
     IMapper mapper) : IAuthService
 {
@@ -25,6 +26,34 @@ public class AuthService(
     {
         var user = await userRepository.GetByEmailAsync(request.Email, cancellationToken);
         if (user is null || !passwordHasherService.VerifyPassword(user, request.Password))
+        {
+            return Result<LoginResponse>.Failure(ErrorCodes.AuthInvalidCredentials);
+        }
+
+        if (!user.IsActive)
+        {
+            return Result<LoginResponse>.Failure(ErrorCodes.AuthAccountInactive);
+        }
+
+        var response = await IssueTokensAsync(user, request.DeviceId, request.Platform, cancellationToken);
+        user.LastLoginAt = DateTime.UtcNow;
+        await userRepository.SaveChangesAsync(cancellationToken);
+
+        return Result<LoginResponse>.Success(response);
+    }
+
+    public async Task<Result<LoginResponse>> LoginWithGoogleAsync(
+        GoogleLoginRequest request, CancellationToken cancellationToken)
+    {
+        var email = await googleTokenValidator.GetVerifiedEmailAsync(request.IdToken, cancellationToken);
+        if (email is null)
+        {
+            return Result<LoginResponse>.Failure(ErrorCodes.AuthGoogleTokenInvalid);
+        }
+
+        // Accounts are created by Admin only: an unknown email gets the same code as a wrong password.
+        var user = await userRepository.GetByEmailAsync(email, cancellationToken);
+        if (user is null)
         {
             return Result<LoginResponse>.Failure(ErrorCodes.AuthInvalidCredentials);
         }

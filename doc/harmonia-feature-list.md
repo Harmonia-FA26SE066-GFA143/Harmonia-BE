@@ -1,6 +1,6 @@
 # Harmonia – Danh sách Feature & Function
 
-Hệ thống Harmonia gồm **12 feature**, bao phủ toàn bộ 55 function (FE-01 → FE-54 và FE-16a) cùng 5 use case dùng chung (S-01 → S-05). Mỗi function ghi kèm mã FE/UC để truy vết với Report 1–3. Mã UC theo đánh số chuẩn, giống `harmonia-use-case-descriptions.md`.
+Hệ thống Harmonia gồm **12 feature**, bao phủ toàn bộ 54 function (FE-01 → FE-54) cùng 5 use case dùng chung (S-01 → S-05). Mỗi function ghi kèm mã FE/UC để truy vết với Report 1–3. Mã UC theo đánh số chuẩn, giống `harmonia-use-case-descriptions.md`.
 
 | Mã | Actor | Nền tảng |
 | --- | --- | --- |
@@ -12,9 +12,9 @@ Hệ thống Harmonia gồm **12 feature**, bao phủ toàn bộ 55 function (FE
 | # | Feature | Số function |
 | --- | --- | --- |
 | F1 | Xác thực & Tài khoản cá nhân | 4 |
-| F2 | Quản lý Người dùng & Phân quyền | 2 |
+| F2 | Quản lý Người dùng & Phân quyền | 3 |
 | F3 | Quản lý Thành viên & Kỹ năng | 5 |
-| F4 | Chương trình Phụng vụ Tuần | 5 |
+| F4 | Lịch Phụng vụ theo Ngày | 4 |
 | F5 | Thư viện Thánh nhạc | 6 |
 | F6 | Danh sách Bài hát cho Sự kiện (Song List) | 7 |
 | F7 | Lịch tập & Xác nhận Tham gia | 4 |
@@ -38,26 +38,26 @@ Hệ thống Harmonia gồm **12 feature**, bao phủ toàn bộ 55 function (FE
 | Function | Actor | Mã |
 | --- | --- | --- |
 | Tạo / sửa / khóa tài khoản người dùng | AD | UC-31 / FE-47 |
+| Quản lý hồ sơ ca viên (thông tin, trạng thái Active / Inactive / Left) | AD | UC-31 / FE-47 |
 | Gán vai trò hệ thống (4 vai trò: PP, CD, CM, AD) | AD | UC-31 / FE-48 |
 
 ## F3. Quản lý Thành viên & Kỹ năng
 
 | Function | Actor | Mã |
 | --- | --- | --- |
-| Quản lý danh sách thành viên ca đoàn | CD | UC-18 / FE-24 |
+| Xem danh sách ca viên cùng kỹ năng đã duyệt và trạng thái (căn cứ để xếp ca viên vào bài hát) | CD | UC-18 / FE-24 |
 | Xem vai trò và các kỹ năng đã được duyệt | CM | UC-02 / FE-02 |
 | Khai báo kỹ năng mới (bè hát, nhạc cụ, hát solo, xướng đáp ca…) | CM | UC-03 / FE-03 |
 | Theo dõi trạng thái duyệt kỹ năng | CM | UC-03 / FE-04 |
 | Duyệt / từ chối kỹ năng thành viên khai báo | CD | UC-19 / FE-25 |
 
-## F4. Chương trình Phụng vụ Tuần
+## F4. Lịch Phụng vụ theo Ngày
 
 | Function | Actor | Mã |
 | --- | --- | --- |
-| Tạo / xem chương trình phụng vụ theo tuần (Thứ Hai → Chủ Nhật) | PP | UC-12 / FE-15 |
-| Định nghĩa từng sự kiện: ngày, giờ, loại lễ, nghi thức, địa điểm, yêu cầu đặc biệt (1 ngày có thể có nhiều sự kiện) | PP | UC-12 / FE-16 |
-| Sao chép chương trình tuần trước làm mẫu | PP | UC-12 / FE-16a |
-| Công bố tuần, hệ thống tự thông báo cho ca trưởng | PP | UC-12 → S-05 |
+| Xem lịch phụng vụ theo ngày (tên ngày lễ, bậc lễ, mùa phụng vụ lấy từ API lịch Công giáo) | PP | UC-12 / FE-15 |
+| Tạo sự kiện cho từng ngày: giờ, loại lễ, nghi thức, địa điểm, yêu cầu đặc biệt (1 ngày có thể có nhiều sự kiện; mùa phụng vụ được gợi ý sẵn từ API) | PP | UC-12 / FE-16 |
+| Công bố từng sự kiện, hệ thống tự thông báo cho ca trưởng | PP | UC-12 → S-05 |
 | Xem các sự kiện và lịch tập sắp tới | CM | UC-04 / FE-05 |
 
 ## F5. Thư viện Thánh nhạc
@@ -93,6 +93,8 @@ Hệ thống Harmonia gồm **12 feature**, bao phủ toàn bộ 55 function (FE
 | Xác nhận tham gia / từ chối / chưa chắc | CM | UC-05 / FE-06 |
 
 ## F8. Phân công Phục vụ (Service Roster)
+
+Đây chính là phần "quản lý ca viên" của ca trưởng: xếp ca viên vào từng bài hát của sự kiện.
 
 | Function | Actor | Mã |
 | --- | --- | --- |
@@ -131,7 +133,7 @@ Hệ thống Harmonia gồm **12 feature**, bao phủ toàn bộ 55 function (FE
 | --- | --- | --- |
 | Gửi thông báo (dùng chung, được gọi từ F4, F7, F8 và UC-17) | Hệ thống | S-05 |
 | Xem thông báo | Tất cả | S-04 |
-| Gửi ghi chú / yêu cầu cho ca trưởng | PP | UC-17 / FE-23 |
+| Gửi ghi chú / yêu cầu cho ca trưởng (gắn với một ngày hoặc một sự kiện) | PP | UC-17 / FE-23 |
 
 ## F12. Báo cáo, Nhật ký & Cấu hình Hệ thống
 
@@ -149,4 +151,6 @@ Hệ thống Harmonia gồm **12 feature**, bao phủ toàn bộ 55 function (FE
 
 - Feature được gom theo nghiệp vụ, không theo actor.
 - F12 đang gộp nhiều thứ. Nếu dùng làm module để chia việc cho BE, nên tách thành "Báo cáo & Audit" và "Cấu hình hệ thống".
+- Hồ sơ ca viên do Admin quản lý (F2). Ca trưởng chỉ xem (F3) và xếp ca viên theo bài hát (F8). Quyết định ngày 2026-09-29.
+- Lịch phụng vụ làm theo ngày, không theo tuần; FE-16a (sao chép tuần trước) đã bỏ. Quyết định ngày 2026-09-30.
 - Không có vai trò Instrumentalist: người chơi nhạc cụ là Choir Member có kỹ năng nhạc cụ đã được duyệt (F3).

@@ -35,8 +35,10 @@
 ## Tài khoản & mật khẩu
 
 - Tài khoản do `Admin` tạo và gán role. **KHÔNG có đăng ký công khai** —
-  chỉ `login`, `refresh`, `forgot-password` và `reset-password` là `[AllowAnonymous]`
+  chỉ `login`, `google`, `refresh`, `forgot-password` và `reset-password` là `[AllowAnonymous]`
   (`reset-password`: người dùng đã quên mật khẩu, danh tính xác minh bằng token trong email).
+- Đăng nhập Google (`api/auth/google`) chỉ khớp `User` có sẵn theo email đã xác minh —
+  KHÔNG tự tạo tài khoản. Email chưa có tài khoản trả `AUTH_INVALID_CREDENTIALS`.
 - Mật khẩu lưu ở `User.passwordHash`, dùng `PasswordHasher<T>` hoặc BCrypt.
   Không bao giờ lưu plaintext, không bao giờ trả mật khẩu ra response.
 - Token reset mật khẩu: ngẫu nhiên đủ dài, hết hạn trong 1 giờ, dùng một lần.
@@ -75,8 +77,8 @@
 - Ca viên chỉ đọc/sửa bản ghi **của chính mình**: `MemberSkill`, `EventParticipation`,
   `PracticeSubmission`, `MaterialLearningProgress`, `MemberProfile`.
   Truy cập bản ghi của người khác → trả **404**, không trả 403, để không lộ sự tồn tại.
-- Ca viên chỉ xem được `SongList` ở trạng thái `Approved`, và `LiturgicalWeek`
-  ở trạng thái `Published`.
+- Ca viên chỉ xem được `SongList` ở trạng thái `Approved`, và `LiturgicalEvent`
+  ở trạng thái `Published` (mỗi sự kiện publish riêng — D6).
 
 ## SignalR
 

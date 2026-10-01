@@ -56,6 +56,8 @@ public static class ErrorCodes
 
     public const string AuthResetTokenUsed = "AUTH_RESET_TOKEN_USED";
 
+    public const string AuthGoogleTokenInvalid = "AUTH_GOOGLE_TOKEN_INVALID";
+
     // Field-level codes raised by FluentValidation; they always travel inside a 400 response's
     // "errors" map, so they never appear in ErrorStatusMap.
     public const string AuthEmailRequired = "AUTH_EMAIL_REQUIRED";
@@ -65,6 +67,8 @@ public static class ErrorCodes
     public const string AuthPasswordRequired = "AUTH_PASSWORD_REQUIRED";
 
     public const string AuthRefreshTokenRequired = "AUTH_REFRESH_TOKEN_REQUIRED";
+
+    public const string AuthGoogleTokenRequired = "AUTH_GOOGLE_TOKEN_REQUIRED";
 
     // 2. User & Role (Admin).
     public const string UserNotFound = "USER_NOT_FOUND";

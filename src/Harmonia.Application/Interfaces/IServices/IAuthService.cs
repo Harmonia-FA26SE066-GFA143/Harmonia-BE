@@ -7,6 +7,9 @@ public interface IAuthService
 {
     Task<Result<LoginResponse>> LoginAsync(LoginRequest request, CancellationToken cancellationToken);
 
+    /// <summary>Signs in an existing account whose email matches a verified Google ID token; never creates one.</summary>
+    Task<Result<LoginResponse>> LoginWithGoogleAsync(GoogleLoginRequest request, CancellationToken cancellationToken);
+
     Task<Result<LoginResponse>> RefreshTokenAsync(RefreshTokenRequest request, CancellationToken cancellationToken);
 
     Task<Result> LogoutAsync(LogoutRequest request, CancellationToken cancellationToken);

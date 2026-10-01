@@ -13,10 +13,10 @@ public class LiturgicalEventConfiguration : IEntityTypeConfiguration<LiturgicalE
 
         builder.HasIndex(x => new { x.EventDate, x.Time, x.LocationId }).IsUnique();
 
-        builder.HasOne(x => x.Week)
+        builder.HasOne(x => x.LiturgicalSeason)
             .WithMany(x => x.LiturgicalEvents)
-            .HasForeignKey(x => x.WeekId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .HasForeignKey(x => x.LiturgicalSeasonId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasOne(x => x.MassType)
             .WithMany(x => x.LiturgicalEvents)

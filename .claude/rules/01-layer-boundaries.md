@@ -6,7 +6,7 @@
 | ca trưởng | `ChoirDirector` — KHÔNG dùng `ChoirLeader` |
 | ca viên | `ChoirMember` (role) · `MemberProfile` (hồ sơ) |
 | nhạc công | KHÔNG có role riêng — là `ChoirMember` có `MemberSkill` thuộc `SkillCategory` nhạc cụ |
-| tuần phụng vụ | `LiturgicalWeek` |
+| ngày phụng vụ (cache lịch Công giáo từ API ngoài) | `LiturgicalDay` — KHÔNG còn `LiturgicalWeek`, lịch lên theo ngày (D6) |
 | sự kiện / thánh lễ | `LiturgicalEvent` — KHÔNG dùng `Event` (trùng từ khoá C#) |
 | mùa phụng vụ | `LiturgicalSeason` — KHÔNG dùng `Season` |
 | loại thánh lễ | `MassType` |
@@ -34,7 +34,7 @@
 `LiturgicalEvent` là entity trung tâm — lịch tập, danh sách bài hát, phân công phục vụ
 và xác nhận tham gia đều móc vào nó. Ba hub còn lại: `MemberProfile`, `Song`, `Skill`.
 
-Nguồn chuẩn đầy đủ 43 entity + 21 enum: `doc/harmonia-domain-entity-list.md`.
+Nguồn chuẩn đầy đủ 43 entity + 20 enum: `doc/harmonia-domain-entity-list.md`.
 Bảng trên chỉ là lối vào nhanh. Gặp thuật ngữ chưa có ở cả hai chỗ: hỏi, đừng tự dịch.
 
 ## Quy ước tên khác

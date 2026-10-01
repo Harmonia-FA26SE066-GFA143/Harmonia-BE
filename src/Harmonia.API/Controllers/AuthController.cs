@@ -14,6 +14,12 @@ public class AuthController(IAuthService authService) : ApiControllerBase
     public async Task<IActionResult> LoginAsync([FromBody] LoginRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await authService.LoginAsync(request, cancellationToken));
 
+    [HttpPost("google")]
+    [AllowAnonymous]
+    public async Task<IActionResult> LoginWithGoogleAsync(
+        [FromBody] GoogleLoginRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await authService.LoginWithGoogleAsync(request, cancellationToken));
+
     [HttpPost("refresh")]
     [AllowAnonymous]
     public async Task<IActionResult> RefreshAsync([FromBody] RefreshTokenRequest request, CancellationToken cancellationToken) =>

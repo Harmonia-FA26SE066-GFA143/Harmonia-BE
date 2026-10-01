@@ -67,6 +67,13 @@ public static class DependencyInjection
                 "Missing or invalid PasswordReset__* configuration. See src/Harmonia.API/.env.example.")
             .ValidateOnStart();
 
+        services.AddOptions<GoogleAuthOptions>()
+            .Bind(configuration.GetSection(GoogleAuthOptions.SectionName))
+            .Validate(
+                o => o.GetClientIds().Length > 0,
+                "Missing or invalid Google__* configuration. See src/Harmonia.API/.env.example.")
+            .ValidateOnStart();
+
         services.AddHttpContextAccessor();
 
         // Plain CRUD: inject IGenericRepository<T> directly, no per-entity repository needed.
@@ -79,6 +86,7 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddSingleton<IFileStorageService, CloudinaryFileStorageService>();
         services.AddSingleton<IEmailSender, BrevoEmailSender>();
+        services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
 
         return services;
     }
