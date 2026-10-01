@@ -147,14 +147,10 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 
 | Mã | HTTP | Tiếng Việt |
 |---|---|---|
-| `WEEK_NOT_FOUND` | 404 | Không tìm thấy tuần phụng vụ |
-| `WEEK_ALREADY_EXISTS` | 409 | Tuần này đã được tạo |
-| `WEEK_START_NOT_MONDAY` | 400 | Tuần phải bắt đầu vào thứ Hai |
-| `WEEK_ALREADY_PUBLISHED` | 409 | Tuần đã công bố, không thể sửa |
-| `WEEK_NOT_PUBLISHED` | 409 | Tuần chưa được công bố |
 | `EVENT_NOT_FOUND` | 404 | Không tìm thấy sự kiện |
 | `EVENT_SLOT_TAKEN` | 409 | Đã có sự kiện khác vào giờ này tại địa điểm này |
-| `EVENT_DATE_OUTSIDE_WEEK` | 400 | Ngày sự kiện không nằm trong tuần đã chọn |
+| `EVENT_ALREADY_PUBLISHED` | 409 | Sự kiện đã công bố, không thể sửa |
+| `EVENT_NOT_PUBLISHED` | 409 | Sự kiện chưa được công bố |
 | `EVENT_CANCELLED` | 409 | Sự kiện đã bị huỷ |
 | `EVENT_ALREADY_PASSED` | 409 | Sự kiện đã diễn ra |
 | `EVENT_TYPE_REQUIRED` | 400 | Phải chọn loại lễ hoặc loại nghi thức |
@@ -257,7 +253,7 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 | Mã | HTTP | Tiếng Việt |
 |---|---|---|
 | `NOTIFICATION_NOT_FOUND` | 404 | Không tìm thấy thông báo |
-| `DIRECTOR_NOTE_TARGET_REQUIRED` | 400 | Phải chọn tuần hoặc sự kiện để gửi ghi chú |
+| `DIRECTOR_NOTE_TARGET_REQUIRED` | 400 | Phải chọn ngày hoặc sự kiện để gửi ghi chú |
 
 **Không có mã "thông báo không dành cho bạn".** Thông báo của người khác trả
 `NOTIFICATION_NOT_FOUND` (404), vì 403 sẽ xác nhận bản ghi đó có thật. Truy vấn luôn
@@ -281,6 +277,7 @@ lọc theo cặp `(NotificationId, UserId)` nên "không tồn tại" và "của
 | `EXTERNAL_EMAIL_FAILED` | 502 | Không gửi được email, vui lòng thử lại |
 | `EXTERNAL_STORAGE_FAILED` | 502 | Không tải được tệp lên, vui lòng thử lại |
 | `EXTERNAL_AI_FAILED` | 502 | Không tạo được gợi ý phân công, vui lòng thử lại |
+| `EXTERNAL_CALENDAR_FAILED` | 502 | Không lấy được lịch phụng vụ, vui lòng thử lại |
 
 ---
 

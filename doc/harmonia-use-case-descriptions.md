@@ -5,7 +5,9 @@ Brief use case description table for Report 3 (SRS), in the form **ID / Use Case
 - **Numbering:** canonical codes from `use-case-list` (S-01…S-05, UC-01…UC-35, plus extension use cases UC-07E, UC-25a, UC-25b, UC-34E). Same codes as `harmonia-feature-list`.
 - **Count:** 44 use cases = 39 actor-initiated + 5 reached only via «include»/«extend» (S-05, UC-07E, UC-25a, UC-25b, UC-34E).
 - **System User** is an abstract actor generalized by all four concrete actors, so S-01…S-04 are modelled once rather than repeated per role.
+- The liturgical program is planned **by day**, not by week; FE-16a (copy previous week) was dropped. (decided 2026-09-30)
 - There is **no Instrumentalist role**. An instrument player is a Choir Member with an approved instrument skill.
+- **Member records are maintained by the Admin (UC-31).** For the Choir Director, "managing members" means assigning them to songs (UC-24 → UC-27); UC-18 is view-only. (decided 2026-09-29)
 
 ## A. Account & Session — shared by every actor
 
@@ -38,7 +40,7 @@ Brief use case description table for Report 3 (SRS), in the form **ID / Use Case
 
 | ID | Use Case | Actors | Use Case Description |
 |---|---|---|---|
-| UC-12 | Manage Weekly Liturgical Program | Parish Priest / Liturgy Committee | The Parish Priest creates and maintains a weekly liturgical program (Monday → Sunday), adding one or more liturgical events (Masses, ceremonies, feast days, special events) to the days of that week, each with its own date, time, liturgical season, Mass type, ceremony type, location and any special requirements. A single day may contain multiple events at different times. The priest may copy the previous week as a starting template. Publishing the week notifies the Choir Director (includes S-05). (FE-15, FE-16, FE-16a) |
+| UC-12 | Manage Daily Liturgical Program | Parish Priest / Liturgy Committee | The Parish Priest opens the liturgical calendar by day. For each date the system shows the celebration name, rank and liturgical season taken from an external Catholic calendar API. The priest creates the liturgical events of that day (Masses, ceremonies, special events), each with its own time, Mass type, ceremony type, location and special requirements; the event's liturgical season is pre-filled from the API and can be changed. A single day may contain multiple events at different times. Each event is published on its own, and publishing notifies the Choir Director (includes S-05). (FE-15, FE-16) |
 | UC-13 | Review & Approve Song List with Notes | Parish Priest / Liturgy Committee | The Parish Priest reviews the song list proposed by the Choir Director and approves it, rejects it or requests a revision, attaching notes on theme, liturgical season, ceremony context or pastoral concerns. (FE-17, FE-18, FE-19) |
 | UC-14 | View Final Approved Song List | Parish Priest / Liturgy Committee | The Parish Priest views the finalised approved song list of an event for reference before the celebration. (FE-20) |
 | UC-15 | Monitor Choir Preparation Status | Parish Priest / Liturgy Committee | The Parish Priest views how ready the choir is for an important event, including participation confirmations, roster status and practice progress. (FE-21) |
@@ -49,13 +51,13 @@ Brief use case description table for Report 3 (SRS), in the form **ID / Use Case
 
 | ID | Use Case | Actors | Use Case Description |
 |---|---|---|---|
-| UC-18 | Manage Choir Members | Choir Director | The Choir Director adds, updates and deactivates choir member records, including their contact information and membership status. Whether a member plays an instrument is expressed through their approved instrument skills (UC-19), not through a separate role. (FE-24) |
+| UC-18 | View Choir Members & Skills | Choir Director | The Choir Director views the list of choir members with their approved skills (vocal parts, instruments) and membership status, as the basis for assigning members to songs (UC-24 → UC-27). The Choir Director does not create or edit member records — that is done by the Admin (UC-31). (FE-24) |
 | UC-19 | Approve Member-Declared Skills | Choir Director | The Choir Director reviews the skills declared by members and approves or rejects each one. Only approved skills are used when the system suggests a service roster. (FE-25) |
 | UC-20 | Schedule Rehearsals | Choir Director | The Choir Director creates rehearsal sessions for an event, specifying time, place and the songs to be rehearsed. (FE-26) |
 | UC-21 | Manage & Classify Music Library | Choir Director | The Choir Director uploads sheet music, lyrics, sample audio and rehearsal materials, then classifies each song by liturgical season, Mass type, ceremony type, theme and vocal or instrument requirements. (FE-27, FE-28, FE-29) |
 | UC-22 | Manage Song List Lifecycle (Propose / Submit / Revise) | Choir Director | The Choir Director proposes a song list for an event, submits it to the Parish Priest for approval and revises it when a revision is requested. (FE-30, FE-31, FE-32) |
 | UC-23 | Manage Member Participation Confirmation | Choir Director | The Choir Director sends participation confirmation requests to choir members and monitors their responses in real time. Includes S-05. (FE-33, FE-34) |
-| UC-24 | Define Song Personnel Requirements | Choir Director | The Choir Director specifies, for each song of an event, the number of singers needed for each vocal part and the number of players needed for each instrument. (FE-35) |
+| UC-24 | Define Song Personnel Requirements | Choir Director | First step of the Choir Director's member management, which means assigning members to each song (UC-24 → UC-27). The Choir Director specifies, for each song of an event, the number of singers needed for each vocal part and the number of players needed for each instrument. (FE-35) |
 | UC-25 | Request Service Roster Suggestion | Choir Director | The Choir Director asks the system to suggest a service roster based on required skills, approved member skills, participation confirmations and member availability. (FE-36) |
 | UC-25a | View Shortage Warning | Choir Director | «extend» UC-25. When a required vocal part, instrument or role cannot be filled, the system warns the Choir Director about the shortage. (FE-37) |
 | UC-25b | Adjust Roster Manually | Choir Director | «extend» UC-25. The Choir Director optionally overrides the suggested roster by replacing, adding or removing assigned members. (FE-38) |
@@ -69,7 +71,7 @@ Brief use case description table for Report 3 (SRS), in the form **ID / Use Case
 
 | ID | Use Case | Actors | Use Case Description |
 |---|---|---|---|
-| UC-31 | Manage User Accounts & Roles | Admin | The Admin creates, updates and deactivates user accounts and assigns system roles (Parish Priest/Liturgy Committee, Choir Director, Choir Member, Admin). (FE-47, FE-48) |
+| UC-31 | Manage User Accounts & Roles | Admin | The Admin creates, updates and deactivates user accounts, assigns system roles (Parish Priest/Liturgy Committee, Choir Director, Choir Member, Admin) and maintains choir member profiles (personal information and membership status Active / Inactive / Left). (FE-47, FE-48) |
 | UC-32 | Configure System Categories | Admin | The Admin configures the master data of the system, including skill categories, liturgical seasons, Mass types, ceremony types and event categories. (FE-49, FE-50) |
 | UC-33 | Manage System Settings | Admin | The Admin maintains the general system settings that control how the system behaves for all users. (FE-51) |
 | UC-34 | View Reports | Admin | The Admin views reports on user activity, attendance, participation confirmation and assignment completion. (FE-52) |

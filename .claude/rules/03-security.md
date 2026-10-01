@@ -77,8 +77,8 @@
 - Ca viên chỉ đọc/sửa bản ghi **của chính mình**: `MemberSkill`, `EventParticipation`,
   `PracticeSubmission`, `MaterialLearningProgress`, `MemberProfile`.
   Truy cập bản ghi của người khác → trả **404**, không trả 403, để không lộ sự tồn tại.
-- Ca viên chỉ xem được `SongList` ở trạng thái `Approved`, và `LiturgicalWeek`
-  ở trạng thái `Published`.
+- Ca viên chỉ xem được `SongList` ở trạng thái `Approved`, và `LiturgicalEvent`
+  ở trạng thái `Published` (mỗi sự kiện publish riêng — D6).
 
 ## SignalR
 

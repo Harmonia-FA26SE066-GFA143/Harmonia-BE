@@ -22,7 +22,7 @@ public class HarmoniaDbContext(DbContextOptions<HarmoniaDbContext> options) : Db
 
     public DbSet<MemberSkill> MemberSkills => Set<MemberSkill>();
 
-    public DbSet<LiturgicalWeek> LiturgicalWeeks => Set<LiturgicalWeek>();
+    public DbSet<LiturgicalDay> LiturgicalDays => Set<LiturgicalDay>();
 
     public DbSet<LiturgicalEvent> LiturgicalEvents => Set<LiturgicalEvent>();
 

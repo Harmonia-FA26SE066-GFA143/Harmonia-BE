@@ -1,6 +1,6 @@
 # Harmonia – Domain Entity List & Attributes (for ERD, Report 3/4)
 
-43 entities derived from FE-01→FE-54 (`claude/functional-requirements-by-actor.md`), the canonical use cases (`claude/use-case-list.md`) and the weekly-program model (`claude/weekly-liturgical-program-design.md`). Diagram: `harmonia-erd.mmd`.
+43 entities derived from FE-01→FE-54 (`claude/functional-requirements-by-actor.md`), the canonical use cases (`claude/use-case-list.md`) and the daily liturgical program model (D6). Diagram: `harmonia-erd.mmd`.
 
 Conceptual/logical level: attribute names, types and constraints. No indexes, no migration syntax.
 
@@ -13,6 +13,7 @@ Conceptual/logical level: attribute names, types and constraints. No indexes, no
 | D3 | **Several worship sites.** | 2026-09-20 | `WorshipLocation` is an entity; event key = `(eventDate, time, locationId)` |
 | D4 | **A rejected song list is superseded by a new version**; old versions stay as history. | 2026-09-20 | `LiturgicalEvent` 1—n `SongList`, current = highest `version` |
 | D5 | **Admin configures FE-49/FE-50 categories at runtime.** | 2026-09-20 | 9 lookup entities stay entities, not enums |
+| D6 | **Liturgical program is planned by day, not by week.** The liturgical day (celebration name, rank, season) comes from an external Catholic calendar API; the priest creates the Masses/events of each day himself; each event is published on its own. Admin still configures `LiturgicalSeason` (FE-50) — the API season only pre-fills the event's season. | 2026-09-30 | `LiturgicalWeek` removed, `LiturgicalDay` (API cache) added; publish moves to `LiturgicalEvent`; `DirectorNote.weekId` → `noteDate` |
 
 ## Attribute conventions
 
@@ -59,11 +60,11 @@ Written once here instead of repeated 43 times:
 
 ## C. Liturgical calendar
 
-**8. `LiturgicalWeek`** — weekly program, Monday → Sunday (FE-15/16a) ***auditable***
-`weekStartDate` DateOnly unique (Monday) · `weekEndDate` DateOnly (= start + 6) · `liturgicalSeasonId` Guid? → LiturgicalSeason · `status` PublishStatus · `publishedAt` DateTime?
+**8. `LiturgicalDay`** — cached result of the external Catholic calendar API for one date (FE-15, D6)
+`date` DateOnly unique · `celebrationName` string(200) · `rank` string(50)? · `seasonName` string(50)? · `fetchedAt` DateTime · no FK — `LiturgicalEvent` is matched by `eventDate = date`
 
-**9. `LiturgicalEvent`** — one Mass / ceremony / special event (FE-16) ***auditable***
-`weekId` Guid → LiturgicalWeek · `eventDate` DateOnly · `time` TimeOnly · `massTypeId` Guid? → MassType · `ceremonyTypeId` Guid? → CeremonyType · `categoryId` Guid? → EventCategory · `locationId` Guid → WorshipLocation · `title` string(200)? · `specialRequirements` string(1000)? · `status` EventStatus · unique `(eventDate, time, locationId)` (D3)
+**9. `LiturgicalEvent`** — one Mass / ceremony / special event of a day (FE-16, D6) ***auditable***
+`eventDate` DateOnly · `liturgicalSeasonId` Guid? → LiturgicalSeason (pre-filled from `LiturgicalDay.seasonName`) · `time` TimeOnly · `massTypeId` Guid? → MassType · `ceremonyTypeId` Guid? → CeremonyType · `categoryId` Guid? → EventCategory · `locationId` Guid → WorshipLocation · `title` string(200)? · `specialRequirements` string(1000)? · `status` EventStatus · `publishedAt` DateTime? · unique `(eventDate, time, locationId)` (D3)
 
 **10. `LiturgicalSeason`** — Advent, Lent, Ordinary Time… (FE-50)
 `name` string(100) · `startDate` DateOnly · `endDate` DateOnly · `colorHex` string(7)? · `isActive` bool
@@ -166,8 +167,8 @@ Written once here instead of repeated 43 times:
 **38. ⚪ `NotificationRecipient`** — recipient + read state
 `notificationId` Guid → Notification · `userId` Guid → User · `isRead` bool = false · `readAt` DateTime? · unique `(notificationId, userId)`
 
-**39. ⚪ `DirectorNote`** — priest → director note about a week/event (FE-23)
-`weekId` Guid? → LiturgicalWeek · `eventId` Guid? → LiturgicalEvent · `fromUserId` Guid → User · `toUserId` Guid → User · `content` string(2000) · `sentAt` DateTime
+**39. ⚪ `DirectorNote`** — priest → director note about a day/event (FE-23)
+`noteDate` DateOnly? · `eventId` Guid? → LiturgicalEvent · `fromUserId` Guid → User · `toUserId` Guid → User · `content` string(2000) · `sentAt` DateTime
 
 ⚪ `NotificationRecipient`: needed only for broadcast notifications.
 ⚪ `DirectorNote`: reuse `Notification` if no reply thread is required.
@@ -195,7 +196,6 @@ Written once here instead of repeated 43 times:
 | `DevicePlatform` | Android, iOS, Web |
 | `SkillLevel` | Beginner, Intermediate, Advanced |
 | `ApprovalStatus` | Pending, Approved, Rejected |
-| `PublishStatus` | Draft, Published |
 | `EventStatus` | Draft, Published, Cancelled |
 | `ClassificationTarget` | LiturgicalSeason, MassType, CeremonyType, SongTheme |
 | `MaterialType` | SheetMusic, Lyrics, SampleAudio, RehearsalMaterial |
@@ -209,11 +209,11 @@ Written once here instead of repeated 43 times:
 | `AssignmentScope` | All, SkillGroup, Individual |
 | `TargetType` | Member, Skill |
 | `SubmissionStatus` | Submitted, Passed, NeedsRevision, Overdue |
-| `NotificationType` | WeekPublished, SongListDecision, ParticipationRequest, AssignmentNotice, PracticeFeedback, DirectorNote |
+| `NotificationType` | EventPublished, SongListDecision, ParticipationRequest, AssignmentNotice, PracticeFeedback, DirectorNote |
 | `SettingDataType` | String, Int, Bool, Json |
-| `ReportType` | UserActivity, Attendance, Participation, AssignmentCompletion, SongUsage, ServiceHistory |
+| `ReportType` | UserActivity, RehearsalAttendance, Participation, AssignmentCompletion, SongUsage, ServiceHistory |
 
-21 enums. `PracticeFeedback.result` reuses `SubmissionStatus` rather than adding a near-duplicate enum.
+20 enums. `PracticeFeedback.result` reuses `SubmissionStatus` rather than adding a near-duplicate enum.
 
 ---
 
@@ -231,7 +231,8 @@ Written once here instead of repeated 43 times:
 - `MemberSkill` n — 1 `User` *(approvedBy)*
 
 **Calendar**
-- `LiturgicalSeason` 1 — n `LiturgicalWeek` 1 — n `LiturgicalEvent`
+- `LiturgicalSeason` 1 — n `LiturgicalEvent`
+- `LiturgicalDay` 1 — n `LiturgicalEvent` *(matched by date, no FK)*
 - `LiturgicalEvent` n — 1 `MassType` / `CeremonyType` / `EventCategory` / `WorshipLocation`
 
 **Music library**
@@ -262,7 +263,7 @@ Written once here instead of repeated 43 times:
 
 **Communication & system**
 - `Notification` 1 — n `NotificationRecipient` n — 1 `User`
-- `DirectorNote` n — 1 `LiturgicalWeek` / `LiturgicalEvent`, n — 1 `User` (from), n — 1 `User` (to)
+- `DirectorNote` n — 1 `LiturgicalEvent` (optional; or a `noteDate`), n — 1 `User` (from), n — 1 `User` (to)
 - `AuditLog` n — 1 `User`
 
 ## Reading the diagram
@@ -278,3 +279,5 @@ Written once here instead of repeated 43 times:
 - 2026-09-20: attributes expanded to typed form with conventions + 21 enums.
 - 2026-09-26: Cloudinary storage — `User` gains `avatarUrl`/`avatarPublicId`; `PracticeSubmission.audioUrl` → `audioPublicId`, `MusicMaterial.fileUrl` → `filePublicId` (private files, served by signed URL).
 - 2026-09-27: `PasswordResetToken` added for S-03 Change / Forgot Password (42 → 43).
+- 2026-09-30: D6 — daily program. `LiturgicalWeek` replaced by `LiturgicalDay` (count stays 43); `LiturgicalEvent` gains `liturgicalSeasonId`, `publishedAt`; `DirectorNote.weekId` → `noteDate`; enum `PublishStatus` dropped; `NotificationType.WeekPublished` → `EventPublished`.
+- 2026-10-01: `ReportType.Attendance` → `RehearsalAttendance` (naming rule: no bare `Attendance`); enum count corrected to 20.

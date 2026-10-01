@@ -14,5 +14,5 @@ public class LiturgicalSeason : BaseEntity
 
     public bool IsActive { get; set; } = true;
 
-    public ICollection<LiturgicalWeek> LiturgicalWeeks { get; set; } = [];
+    public ICollection<LiturgicalEvent> LiturgicalEvents { get; set; } = [];
 }

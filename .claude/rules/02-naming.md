@@ -1,6 +1,6 @@
 # Từ điển nghiệp vụ — dùng đúng tên, không tự đặt từ đồng nghĩa
 
-Nguồn chuẩn: `doc/harmonia-domain-entity-list.md` (43 entity, 21 enum).
+Nguồn chuẩn: `doc/harmonia-domain-entity-list.md` (43 entity, 20 enum).
 Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 
 | Tiếng Việt | Tên trong code |
@@ -15,7 +15,7 @@ Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 | nhóm kỹ năng | `SkillCategory` — Vocal, Instrument, Solo, Psalm, Conducting support |
 | kỹ năng | `Skill` — Soprano, Alto, Tenor, Bass, Guitar, Organ, Solo, Psalmist |
 | kỹ năng đã khai báo | `MemberSkill` |
-| tuần phụng vụ | `LiturgicalWeek` |
+| ngày phụng vụ (cache lịch Công giáo từ API ngoài) | `LiturgicalDay` — KHÔNG còn `LiturgicalWeek`, lịch lên theo ngày (D6) |
 | sự kiện / thánh lễ | `LiturgicalEvent` — KHÔNG dùng `Event` (trùng từ khoá C#) |
 | mùa phụng vụ | `LiturgicalSeason` — KHÔNG dùng `Season` |
 | loại thánh lễ | `MassType` |

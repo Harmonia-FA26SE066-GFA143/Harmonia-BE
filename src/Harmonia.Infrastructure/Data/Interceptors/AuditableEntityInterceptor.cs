@@ -22,7 +22,7 @@ public class AuditableEntityInterceptor(ICurrentUserService currentUser) : SaveC
         typeof(SongList), typeof(SongListReview),
         typeof(ServiceRoster), typeof(RosterAssignment),
         typeof(MemberSkill),
-        typeof(LiturgicalWeek), typeof(LiturgicalEvent)
+        typeof(LiturgicalEvent)
     ];
 
     // Stamped by this interceptor, so they add nothing to a diff.
