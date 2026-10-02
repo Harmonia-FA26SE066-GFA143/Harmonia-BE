@@ -13,6 +13,7 @@ public class MusicMaterialService(
     IMusicMaterialRepository musicMaterialRepository,
     ISongRepository songRepository,
     IGenericRepository<Skill> skillRepository,
+    IMemberProfileRepository memberProfileRepository,
     IFileStorageService fileStorageService,
     IMapper mapper) : IMusicMaterialService
 {
@@ -75,9 +76,24 @@ public class MusicMaterialService(
         if (song is not { IsActive: true }) return Result<PagedList<MusicMaterialDto>>.Failure(ErrorCodes.SongNotFound);
 
         var page = await musicMaterialRepository.GetActiveBySongAsync(songId, paging, cancellationToken);
+        return Result<PagedList<MusicMaterialDto>>.Success(ToDtoPage(page));
+    }
 
-        return Result<PagedList<MusicMaterialDto>>.Success(new PagedList<MusicMaterialDto>(
-            page.Items.Select(ToDto).ToList(), page.PageNumber, page.PageSize, page.TotalCount));
+    public async Task<Result<PagedList<MusicMaterialDto>>> GetMineAsync(
+        Guid userId, Guid? songId, PagingRequest paging, CancellationToken cancellationToken)
+    {
+        var member = await memberProfileRepository.GetByUserIdAsync(userId, cancellationToken);
+        if (member is null) return Result<PagedList<MusicMaterialDto>>.Failure(ErrorCodes.MemberNotFound);
+
+        if (songId is not null)
+        {
+            var song = await songRepository.GetByIdAsync(songId.Value, cancellationToken);
+            if (song is not { IsActive: true }) return Result<PagedList<MusicMaterialDto>>.Failure(ErrorCodes.SongNotFound);
+        }
+
+        // ponytail: filters by approved skills only; add the finalized-roster song filter once ServiceRoster ships.
+        var page = await musicMaterialRepository.GetActiveForMemberAsync(member.Id, songId, paging, cancellationToken);
+        return Result<PagedList<MusicMaterialDto>>.Success(ToDtoPage(page));
     }
 
     public async Task<Result<MusicMaterialDto>> UpdateAsync(
@@ -112,6 +128,9 @@ public class MusicMaterialService(
         dto.FileUrl = fileStorageService.GetSignedUrl(material.FilePublicId);
         return dto;
     }
+
+    private PagedList<MusicMaterialDto> ToDtoPage(PagedList<MusicMaterial> page) =>
+        new(page.Items.Select(ToDto).ToList(), page.PageNumber, page.PageSize, page.TotalCount);
 
     /// <summary>No skill id means the material is for everyone; otherwise the skill must exist and be active.</summary>
     private async Task<(Skill? Skill, string? Error)> GetTargetSkillAsync(Guid? skillId, CancellationToken cancellationToken)

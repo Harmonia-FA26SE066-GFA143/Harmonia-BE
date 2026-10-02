@@ -19,6 +19,7 @@ public class MusicMaterialServiceTests
     private readonly IMusicMaterialRepository _materials = Substitute.For<IMusicMaterialRepository>();
     private readonly ISongRepository _songs = Substitute.For<ISongRepository>();
     private readonly IGenericRepository<Skill> _skills = Substitute.For<IGenericRepository<Skill>>();
+    private readonly IMemberProfileRepository _members = Substitute.For<IMemberProfileRepository>();
     private readonly IFileStorageService _storage = Substitute.For<IFileStorageService>();
     private readonly MusicMaterialService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
@@ -28,7 +29,7 @@ public class MusicMaterialServiceTests
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<MusicMaterialProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new MusicMaterialService(_materials, _songs, _skills, _storage, mapper);
+        _sut = new MusicMaterialService(_materials, _songs, _skills, _members, _storage, mapper);
 
         _songs.GetByIdAsync(_song.Id, _ct).Returns(_song);
         _storage.UploadAsync(default!, default!, default!, default, default)
@@ -257,6 +258,43 @@ public class MusicMaterialServiceTests
         Assert.Equal("signed:harmonia/x.mp3", dto.FileUrl);
         Assert.Equal("Tenor", dto.TargetSkillName);
         Assert.Equal(1, result.Value.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetMine_Member_ReturnsMaterialsOfTheirProfileWithSignedUrls_Async()
+    {
+        var userId = Guid.NewGuid();
+        var member = new MemberProfile { Id = Guid.NewGuid(), UserId = userId };
+        _members.GetByUserIdAsync(userId, _ct).Returns(member);
+        var paging = new PagingRequest();
+        var material = new MusicMaterial { Id = Guid.NewGuid(), SongId = _song.Id, Title = "Bass", FilePublicId = "harmonia/b.mp3" };
+        _materials.GetActiveForMemberAsync(member.Id, _song.Id, paging, _ct)
+            .Returns(new PagedList<MusicMaterial>([material], 1, 20, 1));
+
+        var result = await _sut.GetMineAsync(userId, _song.Id, paging, _ct);
+
+        var dto = Assert.Single(result.Value!.Items);
+        Assert.Equal("signed:harmonia/b.mp3", dto.FileUrl);
+    }
+
+    [Fact]
+    public async Task GetMine_NoProfile_ReturnsMemberNotFound_Async()
+    {
+        var result = await _sut.GetMineAsync(Guid.NewGuid(), null, new PagingRequest(), _ct);
+
+        Assert.Equal(ErrorCodes.MemberNotFound, result.Code);
+        await _materials.DidNotReceiveWithAnyArgs().GetActiveForMemberAsync(default, default, default!, default);
+    }
+
+    [Fact]
+    public async Task GetMine_UnknownSong_ReturnsSongNotFound_Async()
+    {
+        var userId = Guid.NewGuid();
+        _members.GetByUserIdAsync(userId, _ct).Returns(new MemberProfile { Id = Guid.NewGuid(), UserId = userId });
+
+        var result = await _sut.GetMineAsync(userId, Guid.NewGuid(), new PagingRequest(), _ct);
+
+        Assert.Equal(ErrorCodes.SongNotFound, result.Code);
     }
 
     [Fact]

@@ -1,3 +1,4 @@
+using Harmonia.API.Extensions;
 using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IServices;
@@ -31,6 +32,13 @@ public class MusicMaterialsController(IMusicMaterialService musicMaterialService
     public async Task<IActionResult> GetBySongAsync(
         [FromQuery, BindRequired] Guid songId, [FromQuery] PagingRequest paging, CancellationToken cancellationToken) =>
         ToActionResult(await musicMaterialService.GetBySongAsync(songId, paging, cancellationToken));
+
+    /// <summary>Materials for the calling member's approved skills plus those for everyone (UC-07 / FE-08).</summary>
+    [HttpGet("mine")]
+    [Authorize(Roles = RoleNames.ChoirMember)]
+    public async Task<IActionResult> GetMineAsync(
+        [FromQuery] Guid? songId, [FromQuery] PagingRequest paging, CancellationToken cancellationToken) =>
+        ToActionResult(await musicMaterialService.GetMineAsync(User.GetUserId(), songId, paging, cancellationToken));
 
     [HttpPut("{id:guid}")]
     [Authorize(Roles = RoleNames.ChoirDirector)]
