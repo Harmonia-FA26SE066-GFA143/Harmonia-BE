@@ -68,14 +68,10 @@ public static class ErrorStatusMap
         [ErrorCodes.MemberSkillNotApproved] = StatusCodes.Status409Conflict,
 
         // 5. Liturgical calendar.
-        [ErrorCodes.WeekNotFound] = StatusCodes.Status404NotFound,
-        [ErrorCodes.WeekAlreadyExists] = StatusCodes.Status409Conflict,
-        [ErrorCodes.WeekStartNotMonday] = StatusCodes.Status400BadRequest,
-        [ErrorCodes.WeekAlreadyPublished] = StatusCodes.Status409Conflict,
-        [ErrorCodes.WeekNotPublished] = StatusCodes.Status409Conflict,
         [ErrorCodes.EventNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.EventSlotTaken] = StatusCodes.Status409Conflict,
-        [ErrorCodes.EventDateOutsideWeek] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.EventAlreadyPublished] = StatusCodes.Status409Conflict,
+        [ErrorCodes.EventNotPublished] = StatusCodes.Status409Conflict,
         [ErrorCodes.EventCancelled] = StatusCodes.Status409Conflict,
         [ErrorCodes.EventAlreadyPassed] = StatusCodes.Status409Conflict,
         [ErrorCodes.EventTypeRequired] = StatusCodes.Status400BadRequest,
@@ -86,9 +82,8 @@ public static class ErrorStatusMap
         [ErrorCodes.SongNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.SongInactive] = StatusCodes.Status409Conflict,
         [ErrorCodes.SongTitleDuplicate] = StatusCodes.Status409Conflict,
-        [ErrorCodes.SongClassificationDuplicate] = StatusCodes.Status409Conflict,
         [ErrorCodes.SongClassificationTargetInvalid] = StatusCodes.Status400BadRequest,
-        [ErrorCodes.SongSkillRequirementDuplicate] = StatusCodes.Status409Conflict,
+        [ErrorCodes.SongSkillRequirementCategoryInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.MaterialNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.MaterialFileRequired] = StatusCodes.Status400BadRequest,
         [ErrorCodes.MaterialFileTypeNotAllowed] = StatusCodes.Status400BadRequest,
@@ -168,6 +163,7 @@ public static class ErrorStatusMap
         [ErrorCodes.ExternalEmailFailed] = StatusCodes.Status502BadGateway,
         [ErrorCodes.ExternalStorageFailed] = StatusCodes.Status502BadGateway,
         [ErrorCodes.ExternalAiFailed] = StatusCodes.Status502BadGateway,
+        [ErrorCodes.ExternalCalendarFailed] = StatusCodes.Status502BadGateway,
     };
 
     public static int StatusFor(string code, int fallback) => StatusByCode.GetValueOrDefault(code, fallback);

@@ -272,7 +272,7 @@ thì mở màn nào.
 
 ## 6. Songs — `api/songs` · xem: mọi role · sửa: `ChoirDirector`
 
-Thư viện bài hát (UC-21 / FE-27).
+Thư viện bài hát và phân loại bài hát (UC-21 / FE-27, FE-29).
 
 ### `SongDto`
 
@@ -290,11 +290,13 @@ Thư viện bài hát (UC-21 / FE-27).
 
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
-| GET | `/api/songs?keyword=&pageNumber=1&pageSize=20` | — | 200 `PagedList<SongDto>` | — |
+| GET | `/api/songs?keyword=&liturgicalSeasonId=&massTypeId=&ceremonyTypeId=&songThemeId=&skillId=&pageNumber=1&pageSize=20` | — | 200 `PagedList<SongDto>` | — |
 | GET | `/api/songs/{id}` | — | 200 `SongDto` | 404 `SONG_NOT_FOUND` |
 | POST | `/api/songs` | `{ "title", "composer", "lyricist", "musicalKey", "tempo", "notes" }` | 200 `SongDto` | 400 `VALIDATION_FAILED` · 409 `SONG_TITLE_DUPLICATE` |
 | PUT | `/api/songs/{id}` | như POST | 200 `SongDto` | 400 `VALIDATION_FAILED` · 404 `SONG_NOT_FOUND` · 409 `SONG_TITLE_DUPLICATE` |
 | DELETE | `/api/songs/{id}` | — | 204 | 404 `SONG_NOT_FOUND` |
+| GET | `/api/songs/{id}/classification` | — | 200 `SongClassificationDto` | 404 `SONG_NOT_FOUND` |
+| PUT | `/api/songs/{id}/classification` | `UpdateSongClassificationRequest` | 200 `SongClassificationDto` | 400 `VALIDATION_FAILED`, `SONG_CLASSIFICATION_DUPLICATE`, `SONG_SKILL_REQUIREMENT_DUPLICATE`, `SONG_CLASSIFICATION_TARGET_INVALID`, `SONG_SKILL_REQUIREMENT_CATEGORY_INVALID` · 404 `SONG_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE` |
 
 - `keyword` tìm trong `title`, `composer`, `lyricist`; kết quả sắp theo `title`.
 - Chỉ `title` bắt buộc (≤ 200). `composer`, `lyricist` ≤ 150 · `musicalKey` ≤ 10 · `tempo` ≤ 50 ·
@@ -302,6 +304,42 @@ Thư viện bài hát (UC-21 / FE-27).
 - `SONG_TITLE_DUPLICATE`: đã có bài cùng `title` **và** cùng `composer` (cùng tên khác nhạc sĩ vẫn được).
 - `DELETE` là xoá mềm, không khôi phục được: bài biến khỏi danh sách và mọi route theo `id`
   trả `SONG_NOT_FOUND`; danh sách bài hát cũ vẫn giữ tham chiếu. Tạo lại bài cùng tên được.
+- Bộ lọc phân loại của `GET /api/songs` đều tuỳ chọn và kết hợp theo AND. `skillId` khớp bài có
+  yêu cầu bè **hoặc** nhạc cụ là skill đó.
+
+### Phân loại bài hát — `SongClassificationDto` / `UpdateSongClassificationRequest`
+
+```json
+{
+  "songId": "guid",
+  "liturgicalSeasons": [{ "id": "guid", "name": "Mùa Vọng" }],
+  "massTypes": [],
+  "ceremonyTypes": [],
+  "songThemes": [{ "id": "guid", "name": "Đức Mẹ" }],
+  "vocalRequirements": [{ "skillId": "guid", "skillName": "Soprano", "isMandatory": true }],
+  "instrumentRequirements": [{ "skillId": "guid", "skillName": "Organ", "isMandatory": false }]
+}
+```
+
+```json
+{
+  "liturgicalSeasonIds": ["guid"],
+  "massTypeIds": [],
+  "ceremonyTypeIds": [],
+  "songThemeIds": ["guid"],
+  "vocalRequirements": [{ "skillId": "guid", "isMandatory": true }],
+  "instrumentRequirements": [{ "skillId": "guid", "isMandatory": false }]
+}
+```
+
+- `PUT` **thay cả bộ**: mục nào không gửi lên thì bị gỡ khỏi bài. Gửi `[]` để gỡ hết một nhóm.
+- Id trùng trong cùng một danh sách → 400, `errors.<field>` chứa `SONG_CLASSIFICATION_DUPLICATE` /
+  `SONG_SKILL_REQUIREMENT_DUPLICATE` (bắt ở validator, chưa tới DB).
+- Mùa / loại lễ / nghi thức / chủ đề **thêm mới** phải tồn tại và đang hoạt động, nếu không → 400
+  `SONG_CLASSIFICATION_TARGET_INVALID`. Skill **thêm mới** phải đang hoạt động (409 `SKILL_INACTIVE`).
+  Mục bài đã có từ trước vẫn giữ được dù sau đó bị vô hiệu hoá, và `GET` vẫn hiển thị.
+- `instrumentRequirements` chỉ nhận skill thuộc nhóm Instrument; `vocalRequirements` nhận skill thuộc
+  mọi nhóm còn lại (Vocal, Solo, Psalm, Conducting support). Sai nhóm → 400 `SONG_SKILL_REQUIREMENT_CATEGORY_INVALID`.
 
 ---
 

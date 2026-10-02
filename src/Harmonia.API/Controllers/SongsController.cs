@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Harmonia.API.Controllers;
 
-/// <summary>Song library (UC-21 / FE-27): every role can browse, only the Choir Director edits.</summary>
+/// <summary>Song library and its classification (UC-21 / FE-27, FE-29): every role can browse, only the Choir Director edits.</summary>
 [Route("api/songs")]
 [Authorize]
 public class SongsController(ISongService songService) : ApiControllerBase
@@ -36,4 +36,14 @@ public class SongsController(ISongService songService) : ApiControllerBase
     [Authorize(Roles = RoleNames.ChoirDirector)]
     public async Task<IActionResult> DeleteAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await songService.DeleteAsync(id, cancellationToken));
+
+    [HttpGet("{id:guid}/classification")]
+    public async Task<IActionResult> GetClassificationAsync(Guid id, CancellationToken cancellationToken) =>
+        ToActionResult(await songService.GetClassificationAsync(id, cancellationToken));
+
+    [HttpPut("{id:guid}/classification")]
+    [Authorize(Roles = RoleNames.ChoirDirector)]
+    public async Task<IActionResult> UpdateClassificationAsync(
+        Guid id, [FromBody] UpdateSongClassificationRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await songService.UpdateClassificationAsync(id, request, cancellationToken));
 }

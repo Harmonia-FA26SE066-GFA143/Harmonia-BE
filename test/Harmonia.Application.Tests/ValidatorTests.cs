@@ -138,4 +138,35 @@ public class ValidatorTests
 
         Assert.Empty(codes);
     }
+
+    // ---- Song classification ----
+
+    [Fact]
+    public void SongClassification_DuplicateTargetId_ReturnsClassificationDuplicate()
+    {
+        var id = Guid.NewGuid();
+        var codes = ErrorCodesOf(new UpdateSongClassificationRequestValidator(),
+            new UpdateSongClassificationRequest { SongThemeIds = [id, id] });
+
+        Assert.Contains(ErrorCodes.SongClassificationDuplicate, codes);
+    }
+
+    [Fact]
+    public void SongClassification_DuplicateSkill_ReturnsSkillRequirementDuplicate()
+    {
+        var id = Guid.NewGuid();
+        var codes = ErrorCodesOf(new UpdateSongClassificationRequestValidator(),
+            new UpdateSongClassificationRequest { VocalRequirements = [new() { SkillId = id }, new() { SkillId = id, IsMandatory = true }] });
+
+        Assert.Contains(ErrorCodes.SongSkillRequirementDuplicate, codes);
+    }
+
+    [Fact]
+    public void SongClassification_NullList_ReturnsErrorWithoutThrowing()
+    {
+        var codes = ErrorCodesOf(new UpdateSongClassificationRequestValidator(),
+            new UpdateSongClassificationRequest { MassTypeIds = null!, InstrumentRequirements = null! });
+
+        Assert.Equal(2, codes.Length);
+    }
 }
