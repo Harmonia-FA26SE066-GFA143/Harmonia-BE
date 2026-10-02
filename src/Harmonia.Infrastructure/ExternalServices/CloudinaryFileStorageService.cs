@@ -1,7 +1,10 @@
 using CloudinaryDotNet;
 using CloudinaryDotNet.Actions;
+using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IServices;
+using Harmonia.Domain.Common;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Harmonia.Infrastructure.ExternalServices;
@@ -14,15 +17,17 @@ public class CloudinaryFileStorageService : IFileStorageService
 
     private readonly Cloudinary _cloudinary;
     private readonly CloudinaryOptions _options;
+    private readonly ILogger<CloudinaryFileStorageService> _logger;
 
-    public CloudinaryFileStorageService(IOptions<CloudinaryOptions> options)
+    public CloudinaryFileStorageService(IOptions<CloudinaryOptions> options, ILogger<CloudinaryFileStorageService> logger)
     {
         _options = options.Value;
+        _logger = logger;
         _cloudinary = new Cloudinary(new Account(_options.CloudName, _options.ApiKey, _options.ApiSecret));
         _cloudinary.Api.Secure = true;
     }
 
-    public async Task<FileUploadResponse> UploadAsync(
+    public async Task<Result<FileUploadResponse>> UploadAsync(
         Stream content, string fileName, string folder, bool isPrivate, CancellationToken cancellationToken)
     {
         var extension = Path.GetExtension(fileName).ToLowerInvariant();
@@ -35,20 +40,30 @@ public class CloudinaryFileStorageService : IFileStorageService
         var file = new FileDescription("upload" + extension, content);
         var type = isPrivate ? PrivateDeliveryType : PublicDeliveryType;
 
-        UploadResult result = resourceType == ResourceType.Video
-            ? await _cloudinary.UploadAsync(
-                new VideoUploadParams { File = file, PublicId = cloudinaryId, Type = type, Overwrite = false },
-                cancellationToken)
-            : await _cloudinary.UploadAsync(
-                new ImageUploadParams { File = file, PublicId = cloudinaryId, Type = type, Overwrite = false },
-                cancellationToken);
-
-        if (result.Error is not null)
+        try
         {
-            throw new InvalidOperationException($"Cloudinary upload failed: {result.Error.Message}");
-        }
+            UploadResult result = resourceType == ResourceType.Video
+                ? await _cloudinary.UploadAsync(
+                    new VideoUploadParams { File = file, PublicId = cloudinaryId, Type = type, Overwrite = false },
+                    cancellationToken)
+                : await _cloudinary.UploadAsync(
+                    new ImageUploadParams { File = file, PublicId = cloudinaryId, Type = type, Overwrite = false },
+                    cancellationToken);
 
-        return new FileUploadResponse(result.PublicId + extension, result.SecureUrl.ToString());
+            if (result.Error is not null)
+            {
+                _logger.LogWarning("Cloudinary rejected upload to {Folder}: {Error}", folder, result.Error.Message);
+                return Result<FileUploadResponse>.Failure(ErrorCodes.ExternalStorageFailed);
+            }
+
+            return Result<FileUploadResponse>.Success(
+                new FileUploadResponse(result.PublicId + extension, result.SecureUrl.ToString()));
+        }
+        catch (Exception ex) when (IsProviderFailure(ex, cancellationToken))
+        {
+            _logger.LogWarning(ex, "Cloudinary upload to {Folder} failed", folder);
+            return Result<FileUploadResponse>.Failure(ErrorCodes.ExternalStorageFailed);
+        }
     }
 
     public string GetSignedUrl(string publicId)
@@ -68,21 +83,39 @@ public class CloudinaryFileStorageService : IFileStorageService
             resourceType: GetResourceType(extension).ToString().ToLowerInvariant());
     }
 
-    public async Task DeleteAsync(string publicId, bool isPrivate, CancellationToken cancellationToken)
+    public async Task<Result> DeleteAsync(string publicId, bool isPrivate, CancellationToken cancellationToken)
     {
         var (cloudinaryId, extension) = Split(publicId);
 
-        var result = await _cloudinary.DestroyAsync(new DeletionParams(cloudinaryId)
+        try
         {
-            ResourceType = GetResourceType(extension),
-            Type = isPrivate ? PrivateDeliveryType : PublicDeliveryType
-        });
+            // The SDK's DestroyAsync takes no CancellationToken; WaitAsync stops us waiting, the call itself still completes.
+            var result = await _cloudinary.DestroyAsync(new DeletionParams(cloudinaryId)
+            {
+                ResourceType = GetResourceType(extension),
+                Type = isPrivate ? PrivateDeliveryType : PublicDeliveryType
+            }).WaitAsync(cancellationToken);
 
-        if (result.Error is not null)
+            if (result.Error is not null)
+            {
+                _logger.LogWarning("Cloudinary rejected delete of {PublicId}: {Error}", publicId, result.Error.Message);
+                return Result.Failure(ErrorCodes.ExternalStorageFailed);
+            }
+
+            return Result.Success();
+        }
+        catch (Exception ex) when (IsProviderFailure(ex, cancellationToken))
         {
-            throw new InvalidOperationException($"Cloudinary delete failed: {result.Error.Message}");
+            _logger.LogWarning(ex, "Cloudinary delete of {PublicId} failed", publicId);
+            return Result.Failure(ErrorCodes.ExternalStorageFailed);
         }
     }
+
+    // Network errors and HttpClient timeouts. A cancelled request is not the provider's fault,
+    // so it keeps propagating as OperationCanceledException.
+    private static bool IsProviderFailure(Exception ex, CancellationToken cancellationToken) =>
+        ex is HttpRequestException
+        || (ex is TaskCanceledException && !cancellationToken.IsCancellationRequested);
 
     private static (string CloudinaryId, string Extension) Split(string publicId)
     {
@@ -91,6 +124,7 @@ public class CloudinaryFileStorageService : IFileStorageService
     }
 
     // Cloudinary files audio under the "video" resource type; PDFs are served as "image".
+    // An unsupported extension is a caller bug (callers whitelist first), so it still throws.
     private static ResourceType GetResourceType(string extension) => extension switch
     {
         ".mp3" or ".m4a" or ".wav" => ResourceType.Video,

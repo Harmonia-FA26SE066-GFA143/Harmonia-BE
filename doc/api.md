@@ -305,7 +305,56 @@ Thư viện bài hát (UC-21 / FE-27).
 
 ---
 
-## 7. SignalR — `/hubs/notifications`
+## 7. Music materials — `api/music-materials` · xem: mọi role · upload / sửa / xoá: `ChoirDirector`
+
+Tư liệu của bài hát: bản nhạc, lời, audio mẫu, tài liệu tập (UC-21 / FE-28).
+
+### `MusicMaterialDto`
+
+```json
+{
+  "id": "guid",
+  "songId": "guid",
+  "materialType": "SampleAudio",
+  "title": "Audio mẫu bè Tenor",
+  "fileName": "kinh-hoa-binh-tenor.mp3",
+  "fileSizeBytes": 2048000,
+  "targetSkillId": "guid",
+  "targetSkillName": "Tenor",
+  "fileUrl": "https://...signed...",
+  "createdAt": "2026-10-02T08:00:00Z"
+}
+```
+
+| Method | Route | Body | Thành công | Lỗi |
+|---|---|---|---|---|
+| POST | `/api/music-materials` | `multipart/form-data`: `songId`, `title`, `materialType`, `targetSkillId?`, `file` | 200 `MusicMaterialDto` | 400 `VALIDATION_FAILED`, `MATERIAL_FILE_REQUIRED`, `MATERIAL_FILE_TYPE_NOT_ALLOWED` · 404 `SONG_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE` · 413 `MATERIAL_FILE_TOO_LARGE` · 502 `EXTERNAL_STORAGE_FAILED` |
+| GET | `/api/music-materials?songId=&pageNumber=1&pageSize=20` | — | 200 `PagedList<MusicMaterialDto>` | 400 `VALIDATION_FAILED` (thiếu `songId`) · 404 `SONG_NOT_FOUND` |
+| PUT | `/api/music-materials/{id}` | `{ "title", "targetSkillId" }` | 200 `MusicMaterialDto` | 400 `VALIDATION_FAILED` · 404 `MATERIAL_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE` |
+| DELETE | `/api/music-materials/{id}` | — | 204 | 404 `MATERIAL_NOT_FOUND` |
+
+- `materialType`: `SheetMusic` | `Lyrics` | `SampleAudio` | `RehearsalMaterial` (gửi tên hoặc số).
+- Định dạng theo loại, tối đa **20 MB**:
+
+  | `materialType` | Đuôi file |
+  |---|---|
+  | `SheetMusic`, `Lyrics` | `.pdf`, `.png`, `.jpg` |
+  | `SampleAudio` | `.mp3`, `.m4a`, `.wav` |
+  | `RehearsalMaterial` | cả hai nhóm trên |
+
+  Server chỉ xét đuôi file và dung lượng thật, bỏ qua `Content-Type` client gửi.
+- `targetSkillId` (tuỳ chọn): bè / nhạc cụ mà tư liệu dành cho, ví dụ audio riêng bè Tenor.
+- `fileUrl` là link có hạn (`Cloudinary__SignedUrlExpiryMinutes`); hết hạn thì gọi lại GET để lấy link mới.
+  Đừng lưu link này lại.
+- Danh sách sắp theo `materialType` rồi `title`.
+- `PUT` chỉ sửa `title` và `targetSkillId` (gửi `null` để bỏ gắn bè); `id`, file và `materialType` giữ nguyên,
+  nên tiến độ học của ca viên không mất. Muốn thay file hoặc đổi loại: xoá rồi upload lại.
+- `502 EXTERNAL_STORAGE_FAILED`: Cloudinary lỗi hoặc không phản hồi, không có gì được lưu; thử lại sau.
+- `DELETE` là xoá mềm, không khôi phục: tư liệu biến khỏi danh sách, file vẫn giữ trên storage.
+
+---
+
+## 8. SignalR — `/hubs/notifications`
 
 Chỉ server → client; client không gọi method nào trên hub.
 

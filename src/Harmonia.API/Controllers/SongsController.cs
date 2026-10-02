@@ -8,7 +8,7 @@ namespace Harmonia.API.Controllers;
 
 /// <summary>Song library (UC-21 / FE-27): every role can browse, only the Choir Director edits.</summary>
 [Route("api/songs")]
-[Authorize(Roles = $"{RoleNames.Admin},{RoleNames.ParishPriest},{RoleNames.ChoirDirector},{RoleNames.ChoirMember}")]
+[Authorize]
 public class SongsController(ISongService songService) : ApiControllerBase
 {
     [HttpGet]
