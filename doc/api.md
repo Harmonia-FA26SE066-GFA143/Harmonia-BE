@@ -270,7 +270,42 @@ thì mở màn nào.
 
 ---
 
-## 6. SignalR — `/hubs/notifications`
+## 6. Songs — `api/songs` · xem: mọi role · sửa: `ChoirDirector`
+
+Thư viện bài hát (UC-21 / FE-27).
+
+### `SongDto`
+
+```json
+{
+  "id": "guid",
+  "title": "Kinh Hòa Bình",
+  "composer": "Kim Long",
+  "lyricist": null,
+  "musicalKey": "G",
+  "tempo": "Andante",
+  "notes": null
+}
+```
+
+| Method | Route | Body | Thành công | Lỗi |
+|---|---|---|---|---|
+| GET | `/api/songs?keyword=&pageNumber=1&pageSize=20` | — | 200 `PagedList<SongDto>` | — |
+| GET | `/api/songs/{id}` | — | 200 `SongDto` | 404 `SONG_NOT_FOUND` |
+| POST | `/api/songs` | `{ "title", "composer", "lyricist", "musicalKey", "tempo", "notes" }` | 200 `SongDto` | 400 `VALIDATION_FAILED` · 409 `SONG_TITLE_DUPLICATE` |
+| PUT | `/api/songs/{id}` | như POST | 200 `SongDto` | 400 `VALIDATION_FAILED` · 404 `SONG_NOT_FOUND` · 409 `SONG_TITLE_DUPLICATE` |
+| DELETE | `/api/songs/{id}` | — | 204 | 404 `SONG_NOT_FOUND` |
+
+- `keyword` tìm trong `title`, `composer`, `lyricist`; kết quả sắp theo `title`.
+- Chỉ `title` bắt buộc (≤ 200). `composer`, `lyricist` ≤ 150 · `musicalKey` ≤ 10 · `tempo` ≤ 50 ·
+  `notes` ≤ 1000. Chuỗi được trim, chuỗi rỗng lưu thành `null`.
+- `SONG_TITLE_DUPLICATE`: đã có bài cùng `title` **và** cùng `composer` (cùng tên khác nhạc sĩ vẫn được).
+- `DELETE` là xoá mềm, không khôi phục được: bài biến khỏi danh sách và mọi route theo `id`
+  trả `SONG_NOT_FOUND`; danh sách bài hát cũ vẫn giữ tham chiếu. Tạo lại bài cùng tên được.
+
+---
+
+## 7. SignalR — `/hubs/notifications`
 
 Chỉ server → client; client không gọi method nào trên hub.
 
