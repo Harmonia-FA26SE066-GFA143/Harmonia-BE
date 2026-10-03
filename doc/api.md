@@ -343,9 +343,10 @@ Thư viện bài hát và phân loại bài hát (UC-21 / FE-27, FE-29).
 
 ---
 
-## 7. Music materials — `api/music-materials` · xem: mọi role · upload / sửa / xoá: `ChoirDirector`
+## 7. Music materials — `api/music-materials` · xem: mọi role · upload / sửa / xoá: `ChoirDirector` · tài liệu của tôi + đánh dấu tiến độ: `ChoirMember`
 
-Tư liệu của bài hát: bản nhạc, lời, audio mẫu, tài liệu tập (UC-21 / FE-28).
+Tư liệu của bài hát: bản nhạc, lời, audio mẫu, tài liệu tập (UC-21 / FE-28); ca viên tìm, lọc
+(UC-07 / UC-07E) và đánh dấu tiến độ học (UC-08 / FE-09).
 
 ### `MusicMaterialDto`
 
@@ -364,11 +365,40 @@ Tư liệu của bài hát: bản nhạc, lời, audio mẫu, tài liệu tập 
 }
 ```
 
+### `MusicMaterialDetailDto` (chỉ `/mine`)
+
+Đủ các field của `MusicMaterialDto`, thêm tiến độ học **của chính ca viên đang gọi**:
+
+```json
+{
+  "...": "các field của MusicMaterialDto",
+  "learningStatus": "NeedsPractice",
+  "learningUpdatedAt": "2026-10-03T09:15:00Z"
+}
+```
+
+- `learningStatus`: `NotStarted` | `NeedsPractice` | `Learned`. Chưa đánh dấu lần nào → `NotStarted`,
+  `learningUpdatedAt` = `null`.
+
+### `MaterialLearningProgressDto` (kết quả đánh dấu)
+
+```json
+{ "materialId": "guid", "status": "Learned", "updatedAt": "2026-10-03T09:15:00Z" }
+```
+
+### `MaterialLearningProgressDetailDto` (ca trưởng xem tiến độ)
+
+```json
+{ "memberId": "guid", "fullName": "Nguyễn Văn An", "status": "NotStarted", "updatedAt": null }
+```
+
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
 | POST | `/api/music-materials` | `multipart/form-data`: `songId`, `title`, `materialType`, `targetSkillId?`, `file` | 200 `MusicMaterialDto` | 400 `VALIDATION_FAILED`, `MATERIAL_FILE_REQUIRED`, `MATERIAL_FILE_TYPE_NOT_ALLOWED` · 404 `SONG_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE` · 413 `MATERIAL_FILE_TOO_LARGE` · 502 `EXTERNAL_STORAGE_FAILED` |
 | GET | `/api/music-materials?songId=&pageNumber=1&pageSize=20` | — | 200 `PagedList<MusicMaterialDto>` | 400 `VALIDATION_FAILED` (thiếu `songId`) · 404 `SONG_NOT_FOUND` |
-| GET | `/api/music-materials/mine?songId=&pageNumber=1&pageSize=20` · chỉ `ChoirMember` | — | 200 `PagedList<MusicMaterialDto>` — tài liệu cho mọi người + tài liệu cho kỹ năng **đã duyệt** của ca viên; `songId` tuỳ chọn (UC-07) | 404 `MEMBER_NOT_FOUND`, `SONG_NOT_FOUND` |
+| GET | `/api/music-materials/mine?keyword=&songId=&liturgicalSeasonId=&skillId=&materialType=&learningStatus=&pageNumber=1&pageSize=20` · chỉ `ChoirMember` | — | 200 `PagedList<MusicMaterialDetailDto>` — tài liệu cho mọi người + tài liệu cho kỹ năng **đã duyệt** của ca viên (UC-07); bộ lọc xem bên dưới (UC-07E) | 404 `MEMBER_NOT_FOUND`, `SONG_NOT_FOUND` |
+| PUT | `/api/music-materials/{id}/learning-progress` · chỉ `ChoirMember` | `{ "status": "Learned" }` | 200 `MaterialLearningProgressDto` | 400 `VALIDATION_FAILED` (`errors.status`: `MATERIAL_LEARNING_STATUS_INVALID`) · 404 `MEMBER_NOT_FOUND`, `MATERIAL_NOT_FOUND` |
+| GET | `/api/music-materials/{id}/learning-progress?status=&pageNumber=1&pageSize=20` · chỉ `ChoirDirector` | — | 200 `PagedList<MaterialLearningProgressDetailDto>` | 404 `MATERIAL_NOT_FOUND` |
 | PUT | `/api/music-materials/{id}` | `{ "title", "targetSkillId" }` | 200 `MusicMaterialDto` | 400 `VALIDATION_FAILED` · 404 `MATERIAL_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE` |
 | DELETE | `/api/music-materials/{id}` | — | 204 | 404 `MATERIAL_NOT_FOUND` |
 
@@ -390,6 +420,34 @@ Tư liệu của bài hát: bản nhạc, lời, audio mẫu, tài liệu tập 
   nên tiến độ học của ca viên không mất. Muốn thay file hoặc đổi loại: xoá rồi upload lại.
 - `502 EXTERNAL_STORAGE_FAILED`: Cloudinary lỗi hoặc không phản hồi, không có gì được lưu; thử lại sau.
 - `DELETE` là xoá mềm, không khôi phục: tư liệu biến khỏi danh sách, file vẫn giữ trên storage.
+
+**`/mine` — tìm và lọc (UC-07E).** Mọi tham số tuỳ chọn, kết hợp theo AND:
+
+| Tham số | Ý nghĩa |
+|---|---|
+| `keyword` | Tìm trong tên bài hát **hoặc** tên tư liệu; bỏ khoảng trắng hai đầu, chuỗi rỗng coi như không lọc |
+| `songId` | Một bài hát (`404 SONG_NOT_FOUND` nếu bài không tồn tại hoặc đã xoá) |
+| `liturgicalSeasonId` | Bài hát được phân loại vào mùa phụng vụ này |
+| `skillId` | Chỉ tư liệu dành **đúng** bè / nhạc cụ này — không kèm tư liệu chung |
+| `materialType` | Một loại tư liệu |
+| `learningStatus` | Tiến độ của chính ca viên; `NotStarted` = những tư liệu chưa đánh dấu |
+
+Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title`.
+
+**Đánh dấu tiến độ (UC-08).**
+
+- `status` chỉ nhận `Learned` hoặc `NeedsPractice`. `NotStarted` không đặt được — đó là trạng thái khi chưa
+  đánh dấu lần nào.
+- Lần đầu tạo mới, các lần sau ghi đè; gọi lại với cùng giá trị cho cùng kết quả.
+- Chỉ đánh dấu được tư liệu có trong `/mine` của ca viên. Tư liệu của bè khác, đã xoá hoặc không tồn tại
+  đều trả `404 MATERIAL_NOT_FOUND`.
+
+**Ca trưởng xem tiến độ một tư liệu.**
+
+- Danh sách gồm ca viên **đang hoạt động** cần học tư liệu đó: tư liệu chung → mọi ca viên; tư liệu theo bè /
+  nhạc cụ → ca viên đã được **duyệt** kỹ năng đó. Sắp theo `fullName`.
+- Ai chưa đánh dấu hiện `NotStarted`. Lọc `status=NotStarted` để xem ai chưa bắt đầu.
+- Tư liệu đã xoá hoặc không tồn tại → `404 MATERIAL_NOT_FOUND`.
 
 ---
 
