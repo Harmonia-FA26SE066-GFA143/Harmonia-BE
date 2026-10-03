@@ -1,6 +1,7 @@
 using AutoMapper;
 using Harmonia.Application.DTOs;
 using Harmonia.Domain.Entities;
+using Harmonia.Domain.Enums;
 
 namespace Harmonia.Application.Mappings;
 
@@ -11,5 +12,13 @@ public class MemberProfileProfile : Profile
         CreateMap<MemberProfile, MemberProfileDto>()
             .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.User.Email))
             .ForMember(dest => dest.AvatarUrl, opt => opt.MapFrom(src => src.User.AvatarUrl));
+
+        // LearningProgresses must hold only the row of one material (see GetLearnersOfMaterialAsync).
+        CreateMap<MemberProfile, MaterialLearningProgressDetailDto>()
+            .ForMember(dest => dest.MemberId, opt => opt.MapFrom(src => src.Id))
+            .ForMember(dest => dest.Status, opt => opt.MapFrom(src =>
+                src.LearningProgresses.Select(p => (LearningStatus?)p.Status).FirstOrDefault() ?? LearningStatus.NotStarted))
+            .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src =>
+                src.LearningProgresses.Select(p => (DateTime?)p.UpdatedAt).FirstOrDefault()));
     }
 }

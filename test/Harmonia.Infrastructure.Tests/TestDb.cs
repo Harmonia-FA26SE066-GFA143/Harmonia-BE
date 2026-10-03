@@ -5,6 +5,7 @@ using Harmonia.Infrastructure.Data;
 using Harmonia.Infrastructure.Data.Interceptors;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using NSubstitute;
 
 namespace Harmonia.Infrastructure.Tests;
@@ -26,11 +27,14 @@ public sealed class TestDb : IDisposable
         context.Database.EnsureCreated();
     }
 
-    /// <summary>A new context over the same database, so reads don't hit the previous context's tracker.</summary>
-    public HarmoniaDbContext NewContext() =>
+    /// <summary>
+    /// A new context over the same database, so reads don't hit the previous context's tracker.
+    /// <paramref name="interceptors"/> run after the audit interceptor.
+    /// </summary>
+    public HarmoniaDbContext NewContext(params IInterceptor[] interceptors) =>
         new(new DbContextOptionsBuilder<HarmoniaDbContext>()
             .UseSqlite(_connection)
-            .AddInterceptors(new AuditableEntityInterceptor(CurrentUser))
+            .AddInterceptors([new AuditableEntityInterceptor(CurrentUser), .. interceptors])
             .Options);
 
     public async Task<User> AddUserAsync(

@@ -20,4 +20,7 @@ public class SearchMusicMaterialsRequest : PagingRequest
     public Guid? SkillId { get; set; }
 
     public MaterialType? MaterialType { get; set; }
+
+    /// <summary>The member's own progress; NotStarted matches materials they have never marked.</summary>
+    public LearningStatus? LearningStatus { get; set; }
 }

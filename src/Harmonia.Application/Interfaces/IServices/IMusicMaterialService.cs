@@ -18,10 +18,25 @@ public interface IMusicMaterialService
 
     /// <summary>
     /// Materials the calling member can use (UC-07 / FE-08): those for everyone plus those for the member's
-    /// approved skills. The filters of <paramref name="request"/> narrow the list (UC-07E).
+    /// approved skills, each with the member's own learning status. The filters of <paramref name="request"/>
+    /// narrow the list (UC-07E).
     /// </summary>
-    Task<Result<PagedList<MusicMaterialDto>>> GetMineAsync(
+    Task<Result<PagedList<MusicMaterialDetailDto>>> GetMineAsync(
         Guid userId, SearchMusicMaterialsRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Learning status of every active member expected to learn the material, for the Choir Director (UC-08 / FE-09).
+    /// Members who never marked it show as NotStarted.
+    /// </summary>
+    Task<Result<PagedList<MaterialLearningProgressDetailDto>>> GetLearningProgressAsync(
+        Guid materialId, SearchMaterialLearningProgressRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Marks a material as learned or as needing practice for the calling member (UC-08 / FE-09).
+    /// Creates the progress row on first use. A material the member cannot see returns MATERIAL_NOT_FOUND.
+    /// </summary>
+    Task<Result<MaterialLearningProgressDto>> UpdateLearningProgressAsync(
+        Guid userId, Guid materialId, UpdateMaterialLearningProgressRequest request, CancellationToken cancellationToken);
 
     /// <summary>Changes title and target skill only; the file, type and id stay, so learning progress is kept.</summary>
     Task<Result<MusicMaterialDto>> UpdateAsync(Guid id, UpdateMusicMaterialRequest request, CancellationToken cancellationToken);

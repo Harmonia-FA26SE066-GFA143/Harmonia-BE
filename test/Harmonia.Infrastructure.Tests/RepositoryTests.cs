@@ -5,6 +5,7 @@ using Harmonia.Domain.Entities;
 using Harmonia.Domain.Enums;
 using Harmonia.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace Harmonia.Infrastructure.Tests;
 
@@ -300,6 +301,266 @@ public sealed class RepositoryTests : IDisposable
 
         Assert.Equal(3, page.TotalCount);
         Assert.Equal(["Alto audio"], page.Items.Select(m => m.Title));
+    }
+
+    [Theory]
+    [InlineData("General sheet", true)]
+    [InlineData("Alto audio", true)]
+    [InlineData("Bass audio", false)]
+    [InlineData("Deleted lyrics", false)]
+    [InlineData("Old lyrics", false)]
+    public async Task IsVisibleToMember_MatchesTheMineListScope_Async(string title, bool expected)
+    {
+        var seed = await SeedMaterialsAsync(_ct);
+        await using var context = _db.NewContext();
+        var materialId = await context.MusicMaterials.Where(m => m.Title == title).Select(m => m.Id).SingleAsync(_ct);
+
+        Assert.Equal(expected, await new MusicMaterialRepository(context).IsVisibleToMemberAsync(materialId, seed.MemberId, _ct));
+    }
+
+    [Fact]
+    public async Task IsVisibleToMember_UnknownMaterial_ReturnsFalse_Async()
+    {
+        var seed = await SeedMaterialsAsync(_ct);
+        await using var context = _db.NewContext();
+
+        Assert.False(await new MusicMaterialRepository(context).IsVisibleToMemberAsync(Guid.NewGuid(), seed.MemberId, _ct));
+    }
+
+    [Fact]
+    public async Task GetActiveForMember_LoadsOnlyTheMembersOwnLearningProgress_Async()
+    {
+        var seed = await SeedMaterialsAsync(_ct);
+        var binh = await AddMemberAsync("Binh", MemberStatus.Active, [seed.AltoId], _ct);
+        var altoAudio = await MaterialIdAsync("Alto audio", _ct);
+        await AddProgressAsync(seed.MemberId, altoAudio, LearningStatus.NeedsPractice, _ct);
+        await AddProgressAsync(binh, altoAudio, LearningStatus.Learned, _ct);
+        await AddProgressAsync(binh, await MaterialIdAsync("General sheet", _ct), LearningStatus.Learned, _ct);
+
+        var page = await SearchMaterialsAsync(seed.MemberId, null, new SearchMusicMaterialsRequest(), _ct);
+
+        var progressByTitle = page.Items.ToDictionary(m => m.Title, m => m.LearningProgresses.Select(p => p.Status).ToArray());
+        Assert.Equal([LearningStatus.NeedsPractice], progressByTitle["Alto audio"]);
+        Assert.Empty(progressByTitle["General sheet"]);
+        Assert.Empty(progressByTitle["Guitar chords"]);
+    }
+
+    [Theory]
+    [InlineData(LearningStatus.NotStarted, new[] { "Guitar chords", "General sheet" })]
+    [InlineData(LearningStatus.NeedsPractice, new[] { "Alto audio" })]
+    [InlineData(LearningStatus.Learned, new string[0])]
+    public async Task GetActiveForMember_LearningStatus_FiltersByTheMembersOwnStatus_Async(
+        LearningStatus status, string[] expected)
+    {
+        var seed = await SeedMaterialsAsync(_ct);
+        var binh = await AddMemberAsync("Binh", MemberStatus.Active, [seed.AltoId], _ct);
+        var altoAudio = await MaterialIdAsync("Alto audio", _ct);
+        await AddProgressAsync(seed.MemberId, altoAudio, LearningStatus.NeedsPractice, _ct);
+        // Another member's progress must not count for this member.
+        await AddProgressAsync(binh, await MaterialIdAsync("General sheet", _ct), LearningStatus.Learned, _ct);
+
+        var page = await SearchMaterialsAsync(
+            seed.MemberId, null, new SearchMusicMaterialsRequest { LearningStatus = status }, _ct);
+
+        Assert.Equal(expected, page.Items.Select(m => m.Title));
+        Assert.Equal(expected.Length, page.TotalCount);
+    }
+
+    // ---- MemberProfileRepository.GetLearnersOfMaterialAsync ----
+
+    [Fact]
+    public async Task GetLearnersOfMaterial_MaterialForEveryone_ReturnsActiveMembersByName_Async()
+    {
+        var seed = await SeedMaterialsAsync(_ct);
+        await AddMemberAsync("An", MemberStatus.Active, [], _ct);
+        await AddMemberAsync("Cuong", MemberStatus.Inactive, [], _ct);
+        await AddMemberAsync("Dung", MemberStatus.Left, [], _ct);
+
+        var page = await GetLearnersAsync(
+            await MaterialIdAsync("General sheet", _ct), null, new SearchMaterialLearningProgressRequest(), _ct);
+
+        Assert.Equal(["An", "Member"], page.Items.Select(m => m.FullName));
+        Assert.Equal(2, page.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetLearnersOfMaterial_SkillMaterial_ReturnsOnlyMembersWithThatSkillApproved_Async()
+    {
+        var seed = await SeedMaterialsAsync(_ct);
+        await AddMemberAsync("An", MemberStatus.Active, [], _ct);
+        await AddMemberAsync("Binh", MemberStatus.Active, [seed.AltoId], _ct);
+        var dung = await AddMemberAsync("Dung", MemberStatus.Active, [], _ct);
+        await using (var context = _db.NewContext())
+        {
+            context.MemberSkills.Add(NewMemberSkill(dung, seed.AltoId, ApprovalStatus.Pending));
+            await context.SaveChangesAsync(_ct);
+        }
+
+        var page = await GetLearnersAsync(
+            await MaterialIdAsync("Alto audio", _ct), seed.AltoId, new SearchMaterialLearningProgressRequest(), _ct);
+
+        Assert.Equal(["Binh", "Member"], page.Items.Select(m => m.FullName));
+    }
+
+    [Theory]
+    [InlineData(null, new[] { "Binh", "Member" })]
+    [InlineData(LearningStatus.NotStarted, new[] { "Binh" })]
+    [InlineData(LearningStatus.NeedsPractice, new[] { "Member" })]
+    [InlineData(LearningStatus.Learned, new string[0])]
+    public async Task GetLearnersOfMaterial_Status_FiltersAndLoadsOnlyThatMaterialsRow_Async(
+        LearningStatus? status, string[] expected)
+    {
+        var seed = await SeedMaterialsAsync(_ct);
+        await AddMemberAsync("Binh", MemberStatus.Active, [seed.AltoId], _ct);
+        var altoAudio = await MaterialIdAsync("Alto audio", _ct);
+        await AddProgressAsync(seed.MemberId, altoAudio, LearningStatus.NeedsPractice, _ct);
+        // A row on another material must neither match the filter nor be loaded.
+        await AddProgressAsync(seed.MemberId, await MaterialIdAsync("General sheet", _ct), LearningStatus.Learned, _ct);
+
+        var page = await GetLearnersAsync(altoAudio, seed.AltoId, new SearchMaterialLearningProgressRequest { Status = status }, _ct);
+
+        Assert.Equal(expected, page.Items.Select(m => m.FullName));
+        Assert.All(page.Items.SelectMany(m => m.LearningProgresses), p => Assert.Equal(altoAudio, p.MaterialId));
+    }
+
+    [Fact]
+    public async Task GetLearnersOfMaterial_Paging_CountsWholeResultAndSkips_Async()
+    {
+        await SeedMaterialsAsync(_ct);
+        await AddMemberAsync("An", MemberStatus.Active, [], _ct);
+        await AddMemberAsync("Binh", MemberStatus.Active, [], _ct);
+
+        var page = await GetLearnersAsync(await MaterialIdAsync("General sheet", _ct), null,
+            new SearchMaterialLearningProgressRequest { PageNumber = 2, PageSize = 2 }, _ct);
+
+        Assert.Equal(3, page.TotalCount);
+        Assert.Equal(["Member"], page.Items.Select(m => m.FullName));
+    }
+
+    private async Task<PagedList<MemberProfile>> GetLearnersAsync(Guid materialId, Guid? targetSkillId,
+        SearchMaterialLearningProgressRequest filter, CancellationToken cancellationToken = default)
+    {
+        await using var context = _db.NewContext();
+        return await new MemberProfileRepository(context)
+            .GetLearnersOfMaterialAsync(materialId, targetSkillId, filter, cancellationToken);
+    }
+
+    /// <summary>Adds a member whose given skills are approved; returns the member id.</summary>
+    private async Task<Guid> AddMemberAsync(
+        string fullName, MemberStatus status, Guid[] approvedSkillIds, CancellationToken cancellationToken = default)
+    {
+        var user = await _db.AddUserAsync($"{fullName.ToLowerInvariant()}@test.com", cancellationToken: cancellationToken);
+        var member = new MemberProfile { Id = Guid.NewGuid(), UserId = user.Id, FullName = fullName, Status = status };
+        await using var context = _db.NewContext();
+        context.MemberProfiles.Add(member);
+        context.MemberSkills.AddRange(approvedSkillIds.Select(id => NewMemberSkill(member.Id, id, ApprovalStatus.Approved)));
+        await context.SaveChangesAsync(cancellationToken);
+        return member.Id;
+    }
+
+    // ---- MaterialLearningProgressRepository ----
+
+    [Fact]
+    public async Task UpsertAsync_FirstMark_CreatesRow_Async()
+    {
+        var seed = await SeedMaterialsAsync(_ct);
+        var materialId = await MaterialIdAsync("General sheet", _ct);
+
+        await using (var context = _db.NewContext())
+        {
+            var progress = await new MaterialLearningProgressRepository(context)
+                .UpsertAsync(seed.MemberId, materialId, LearningStatus.Learned, _ct);
+            Assert.NotEqual(Guid.Empty, progress.Id);
+        }
+
+        await using var verify = _db.NewContext();
+        var row = await verify.MaterialLearningProgresses.SingleAsync(_ct);
+        Assert.Equal((seed.MemberId, materialId, LearningStatus.Learned), (row.MemberId, row.MaterialId, row.Status));
+    }
+
+    [Fact]
+    public async Task UpsertAsync_ExistingRow_UpdatesItAndLeavesOtherRowsAlone_Async()
+    {
+        var seed = await SeedMaterialsAsync(_ct);
+        var materialId = await MaterialIdAsync("General sheet", _ct);
+        var otherMaterialId = await MaterialIdAsync("Alto audio", _ct);
+        var existing = await AddProgressAsync(seed.MemberId, materialId, LearningStatus.Learned, _ct);
+        var other = await AddProgressAsync(seed.MemberId, otherMaterialId, LearningStatus.Learned, _ct);
+
+        await using (var context = _db.NewContext())
+        {
+            await new MaterialLearningProgressRepository(context)
+                .UpsertAsync(seed.MemberId, materialId, LearningStatus.NeedsPractice, _ct);
+        }
+
+        await using var verify = _db.NewContext();
+        var rows = await verify.MaterialLearningProgresses.ToDictionaryAsync(p => p.Id, _ct);
+        Assert.Equal(2, rows.Count);
+        Assert.Equal(LearningStatus.NeedsPractice, rows[existing.Id].Status);
+        Assert.True(rows[existing.Id].UpdatedAt > existing.UpdatedAt);
+        Assert.Equal(LearningStatus.Learned, rows[other.Id].Status);
+    }
+
+    [Fact]
+    public async Task UpsertAsync_ConcurrentFirstMark_UpdatesTheRowTheOtherRequestInserted_Async()
+    {
+        var seed = await SeedMaterialsAsync(_ct);
+        var materialId = await MaterialIdAsync("General sheet", _ct);
+        MaterialLearningProgress? raced = null;
+        // Runs after the repository has read "no row" and before it inserts, like a second request would.
+        var race = new BeforeFirstSaveInterceptor(async () =>
+            raced = await AddProgressAsync(seed.MemberId, materialId, LearningStatus.NeedsPractice, _ct));
+
+        await using (var context = _db.NewContext(race))
+        {
+            var progress = await new MaterialLearningProgressRepository(context)
+                .UpsertAsync(seed.MemberId, materialId, LearningStatus.Learned, _ct);
+
+            Assert.Equal(raced!.Id, progress.Id);
+            Assert.Equal(LearningStatus.Learned, progress.Status);
+        }
+
+        await using var verify = _db.NewContext();
+        var row = await verify.MaterialLearningProgresses.SingleAsync(_ct);
+        Assert.Equal((raced.Id, LearningStatus.Learned), (row.Id, row.Status));
+    }
+
+    private async Task<Guid> MaterialIdAsync(string title, CancellationToken cancellationToken = default)
+    {
+        await using var context = _db.NewContext();
+        return await context.MusicMaterials.Where(m => m.Title == title).Select(m => m.Id).SingleAsync(cancellationToken);
+    }
+
+    private async Task<MaterialLearningProgress> AddProgressAsync(
+        Guid memberId, Guid materialId, LearningStatus status, CancellationToken cancellationToken = default)
+    {
+        var progress = new MaterialLearningProgress
+        {
+            Id = Guid.NewGuid(), MemberId = memberId, MaterialId = materialId,
+            Status = status, UpdatedAt = DateTime.UtcNow.AddDays(-1),
+        };
+        await using var context = _db.NewContext();
+        context.MaterialLearningProgresses.Add(progress);
+        await context.SaveChangesAsync(cancellationToken);
+        return progress;
+    }
+
+    /// <summary>Runs <paramref name="action"/> once, just before the context's first save hits the database.</summary>
+    private sealed class BeforeFirstSaveInterceptor(Func<Task> action) : SaveChangesInterceptor
+    {
+        private bool _hasRun;
+
+        public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            if (!_hasRun)
+            {
+                _hasRun = true;
+                await action();
+            }
+
+            return result;
+        }
     }
 
     private async Task<PagedList<MusicMaterial>> SearchMaterialsAsync(

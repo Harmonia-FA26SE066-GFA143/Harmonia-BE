@@ -20,6 +20,7 @@ public class MusicMaterialServiceTests
     private readonly ISongRepository _songs = Substitute.For<ISongRepository>();
     private readonly IGenericRepository<Skill> _skills = Substitute.For<IGenericRepository<Skill>>();
     private readonly IMemberProfileRepository _members = Substitute.For<IMemberProfileRepository>();
+    private readonly IMaterialLearningProgressRepository _progresses = Substitute.For<IMaterialLearningProgressRepository>();
     private readonly IFileStorageService _storage = Substitute.For<IFileStorageService>();
     private readonly MusicMaterialService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
@@ -27,9 +28,14 @@ public class MusicMaterialServiceTests
 
     public MusicMaterialServiceTests()
     {
-        var mapper = new MapperConfiguration(cfg => cfg.AddProfile<MusicMaterialProfile>(), NullLoggerFactory.Instance)
+        var mapper = new MapperConfiguration(cfg =>
+            {
+                cfg.AddProfile<MusicMaterialProfile>();
+                cfg.AddProfile<MaterialLearningProgressProfile>();
+                cfg.AddProfile<MemberProfileProfile>();
+            }, NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new MusicMaterialService(_materials, _songs, _skills, _members, _storage, mapper);
+        _sut = new MusicMaterialService(_materials, _songs, _skills, _members, _progresses, _storage, mapper);
 
         _songs.GetByIdAsync(_song.Id, _ct).Returns(_song);
         _storage.UploadAsync(default!, default!, default!, default, default)
@@ -275,6 +281,73 @@ public class MusicMaterialServiceTests
 
         var dto = Assert.Single(result.Value!.Items);
         Assert.Equal("signed:harmonia/b.mp3", dto.FileUrl);
+        Assert.Equal(LearningStatus.NotStarted, dto.LearningStatus);
+        Assert.Null(dto.LearningUpdatedAt);
+    }
+
+    [Fact]
+    public async Task GetMine_MarkedMaterial_CarriesTheMembersLearningStatus_Async()
+    {
+        var (userId, member) = GivenMember();
+        var updatedAt = DateTime.UtcNow.AddHours(-2);
+        var material = new MusicMaterial
+        {
+            Id = Guid.NewGuid(), SongId = _song.Id, Title = "Alto", FilePublicId = "harmonia/a.mp3",
+            LearningProgresses =
+            [
+                new MaterialLearningProgress { MemberId = member.Id, Status = LearningStatus.NeedsPractice, UpdatedAt = updatedAt },
+            ],
+        };
+        _materials.GetActiveForMemberAsync(default, default, default!, default)
+            .ReturnsForAnyArgs(new PagedList<MusicMaterial>([material], 1, 20, 1));
+
+        var result = await _sut.GetMineAsync(userId, new SearchMusicMaterialsRequest(), _ct);
+
+        var dto = Assert.Single(result.Value!.Items);
+        Assert.Equal(LearningStatus.NeedsPractice, dto.LearningStatus);
+        Assert.Equal(updatedAt, dto.LearningUpdatedAt);
+        Assert.Equal("signed:harmonia/a.mp3", dto.FileUrl);
+    }
+
+    [Fact]
+    public async Task GetLearningProgress_ActiveMaterial_MapsMembersWithNotStartedForUnmarked_Async()
+    {
+        var skillId = Guid.NewGuid();
+        var material = new MusicMaterial { Id = Guid.NewGuid(), TargetSkillId = skillId, IsActive = true };
+        _materials.GetByIdAsync(material.Id, _ct).Returns(material);
+        var request = new SearchMaterialLearningProgressRequest();
+        var updatedAt = DateTime.UtcNow;
+        var marked = new MemberProfile
+        {
+            Id = Guid.NewGuid(), FullName = "An",
+            LearningProgresses = [new MaterialLearningProgress { Status = LearningStatus.Learned, UpdatedAt = updatedAt }],
+        };
+        var unmarked = new MemberProfile { Id = Guid.NewGuid(), FullName = "Binh" };
+        _members.GetLearnersOfMaterialAsync(material.Id, skillId, request, _ct)
+            .Returns(new PagedList<MemberProfile>([marked, unmarked], 1, 20, 2));
+
+        var result = await _sut.GetLearningProgressAsync(material.Id, request, _ct);
+
+        Assert.Equal(2, result.Value!.TotalCount);
+        var rows = result.Value.Items;
+        Assert.Equal((marked.Id, "An", LearningStatus.Learned, (DateTime?)updatedAt),
+            (rows[0].MemberId, rows[0].FullName, rows[0].Status, rows[0].UpdatedAt));
+        Assert.Equal((unmarked.Id, LearningStatus.NotStarted, (DateTime?)null),
+            (rows[1].MemberId, rows[1].Status, rows[1].UpdatedAt));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task GetLearningProgress_MissingOrDeletedMaterial_ReturnsMaterialNotFound_Async(bool exists)
+    {
+        var materialId = Guid.NewGuid();
+        if (exists) _materials.GetByIdAsync(materialId, _ct).Returns(new MusicMaterial { Id = materialId, IsActive = false });
+
+        var result = await _sut.GetLearningProgressAsync(materialId, new SearchMaterialLearningProgressRequest(), _ct);
+
+        Assert.Equal(ErrorCodes.MaterialNotFound, result.Code);
+        await _members.DidNotReceiveWithAnyArgs().GetLearnersOfMaterialAsync(default, default, default!, _ct);
     }
 
     [Theory]
@@ -293,6 +366,59 @@ public class MusicMaterialServiceTests
 
         Assert.True(result.IsSuccess);
         await _materials.Received(1).GetActiveForMemberAsync(member.Id, expected, request, _ct);
+    }
+
+    [Fact]
+    public async Task UpdateLearningProgress_VisibleMaterial_UpsertsAndReturnsProgress_Async()
+    {
+        var (userId, member) = GivenMember();
+        var materialId = Guid.NewGuid();
+        var updatedAt = DateTime.UtcNow;
+        _materials.IsVisibleToMemberAsync(materialId, member.Id, _ct).Returns(true);
+        _progresses.UpsertAsync(member.Id, materialId, LearningStatus.Learned, _ct).Returns(new MaterialLearningProgress
+        {
+            Id = Guid.NewGuid(), MemberId = member.Id, MaterialId = materialId,
+            Status = LearningStatus.Learned, UpdatedAt = updatedAt,
+        });
+
+        var result = await _sut.UpdateLearningProgressAsync(
+            userId, materialId, new UpdateMaterialLearningProgressRequest { Status = LearningStatus.Learned }, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(materialId, result.Value!.MaterialId);
+        Assert.Equal(LearningStatus.Learned, result.Value.Status);
+        Assert.Equal(updatedAt, result.Value.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task UpdateLearningProgress_MaterialNotVisibleToMember_ReturnsMaterialNotFound_Async()
+    {
+        // Covers another skill's material, a deleted material and an unknown id alike.
+        var (userId, _) = GivenMember();
+
+        var result = await _sut.UpdateLearningProgressAsync(
+            userId, Guid.NewGuid(), new UpdateMaterialLearningProgressRequest { Status = LearningStatus.Learned }, _ct);
+
+        Assert.Equal(ErrorCodes.MaterialNotFound, result.Code);
+        await _progresses.DidNotReceiveWithAnyArgs().UpsertAsync(default, default, default, _ct);
+    }
+
+    [Fact]
+    public async Task UpdateLearningProgress_NoProfile_ReturnsMemberNotFound_Async()
+    {
+        var result = await _sut.UpdateLearningProgressAsync(
+            Guid.NewGuid(), Guid.NewGuid(), new UpdateMaterialLearningProgressRequest { Status = LearningStatus.Learned }, _ct);
+
+        Assert.Equal(ErrorCodes.MemberNotFound, result.Code);
+        await _progresses.DidNotReceiveWithAnyArgs().UpsertAsync(default, default, default, _ct);
+    }
+
+    private (Guid UserId, MemberProfile Member) GivenMember()
+    {
+        var userId = Guid.NewGuid();
+        var member = new MemberProfile { Id = Guid.NewGuid(), UserId = userId };
+        _members.GetByUserIdAsync(userId, _ct).Returns(member);
+        return (userId, member);
     }
 
     [Fact]

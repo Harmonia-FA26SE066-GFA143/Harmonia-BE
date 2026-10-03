@@ -14,6 +14,7 @@ public class MusicMaterialService(
     ISongRepository songRepository,
     IGenericRepository<Skill> skillRepository,
     IMemberProfileRepository memberProfileRepository,
+    IMaterialLearningProgressRepository learningProgressRepository,
     IFileStorageService fileStorageService,
     IMapper mapper) : IMusicMaterialService
 {
@@ -66,7 +67,7 @@ public class MusicMaterialService(
         }
 
         material.TargetSkill = targetSkill;
-        return Result<MusicMaterialDto>.Success(ToDto(material));
+        return Result<MusicMaterialDto>.Success(ToDto<MusicMaterialDto>(material));
     }
 
     public async Task<Result<PagedList<MusicMaterialDto>>> GetBySongAsync(
@@ -76,26 +77,53 @@ public class MusicMaterialService(
         if (song is not { IsActive: true }) return Result<PagedList<MusicMaterialDto>>.Failure(ErrorCodes.SongNotFound);
 
         var page = await musicMaterialRepository.GetActiveBySongAsync(songId, paging, cancellationToken);
-        return Result<PagedList<MusicMaterialDto>>.Success(ToDtoPage(page));
+        return Result<PagedList<MusicMaterialDto>>.Success(ToDtoPage<MusicMaterialDto>(page));
     }
 
-    public async Task<Result<PagedList<MusicMaterialDto>>> GetMineAsync(
+    public async Task<Result<PagedList<MusicMaterialDetailDto>>> GetMineAsync(
         Guid userId, SearchMusicMaterialsRequest request, CancellationToken cancellationToken)
     {
         var member = await memberProfileRepository.GetByUserIdAsync(userId, cancellationToken);
-        if (member is null) return Result<PagedList<MusicMaterialDto>>.Failure(ErrorCodes.MemberNotFound);
+        if (member is null) return Result<PagedList<MusicMaterialDetailDto>>.Failure(ErrorCodes.MemberNotFound);
 
         if (request.SongId is { } songId)
         {
             var song = await songRepository.GetByIdAsync(songId, cancellationToken);
-            if (song is not { IsActive: true }) return Result<PagedList<MusicMaterialDto>>.Failure(ErrorCodes.SongNotFound);
+            if (song is not { IsActive: true }) return Result<PagedList<MusicMaterialDetailDto>>.Failure(ErrorCodes.SongNotFound);
         }
 
         var keyword = string.IsNullOrWhiteSpace(request.Keyword) ? null : request.Keyword.Trim();
 
         // ponytail: filters by approved skills only; add the finalized-roster song filter once ServiceRoster ships.
         var page = await musicMaterialRepository.GetActiveForMemberAsync(member.Id, keyword, request, cancellationToken);
-        return Result<PagedList<MusicMaterialDto>>.Success(ToDtoPage(page));
+        return Result<PagedList<MusicMaterialDetailDto>>.Success(ToDtoPage<MusicMaterialDetailDto>(page));
+    }
+
+    public async Task<Result<PagedList<MaterialLearningProgressDetailDto>>> GetLearningProgressAsync(
+        Guid materialId, SearchMaterialLearningProgressRequest request, CancellationToken cancellationToken)
+    {
+        var material = await musicMaterialRepository.GetByIdAsync(materialId, cancellationToken);
+        if (material is not { IsActive: true })
+            return Result<PagedList<MaterialLearningProgressDetailDto>>.Failure(ErrorCodes.MaterialNotFound);
+
+        var page = await memberProfileRepository.GetLearnersOfMaterialAsync(
+            material.Id, material.TargetSkillId, request, cancellationToken);
+        return Result<PagedList<MaterialLearningProgressDetailDto>>.Success(new PagedList<MaterialLearningProgressDetailDto>(
+            mapper.Map<List<MaterialLearningProgressDetailDto>>(page.Items), page.PageNumber, page.PageSize, page.TotalCount));
+    }
+
+    public async Task<Result<MaterialLearningProgressDto>> UpdateLearningProgressAsync(
+        Guid userId, Guid materialId, UpdateMaterialLearningProgressRequest request, CancellationToken cancellationToken)
+    {
+        var member = await memberProfileRepository.GetByUserIdAsync(userId, cancellationToken);
+        if (member is null) return Result<MaterialLearningProgressDto>.Failure(ErrorCodes.MemberNotFound);
+
+        // Same scope as GetMineAsync: a material the member cannot list is reported as missing, not forbidden.
+        if (!await musicMaterialRepository.IsVisibleToMemberAsync(materialId, member.Id, cancellationToken))
+            return Result<MaterialLearningProgressDto>.Failure(ErrorCodes.MaterialNotFound);
+
+        var progress = await learningProgressRepository.UpsertAsync(member.Id, materialId, request.Status, cancellationToken);
+        return Result<MaterialLearningProgressDto>.Success(mapper.Map<MaterialLearningProgressDto>(progress));
     }
 
     public async Task<Result<MusicMaterialDto>> UpdateAsync(
@@ -111,7 +139,7 @@ public class MusicMaterialService(
         await musicMaterialRepository.SaveChangesAsync(cancellationToken);
 
         material.TargetSkill = targetSkill;
-        return Result<MusicMaterialDto>.Success(ToDto(material));
+        return Result<MusicMaterialDto>.Success(ToDto<MusicMaterialDto>(material));
     }
 
     public async Task<Result> DeleteAsync(Guid id, CancellationToken cancellationToken)
@@ -124,15 +152,15 @@ public class MusicMaterialService(
         return Result.Success();
     }
 
-    private MusicMaterialDto ToDto(MusicMaterial material)
+    private TDto ToDto<TDto>(MusicMaterial material) where TDto : MusicMaterialDto
     {
-        var dto = mapper.Map<MusicMaterialDto>(material);
+        var dto = mapper.Map<TDto>(material);
         dto.FileUrl = fileStorageService.GetSignedUrl(material.FilePublicId);
         return dto;
     }
 
-    private PagedList<MusicMaterialDto> ToDtoPage(PagedList<MusicMaterial> page) =>
-        new(page.Items.Select(ToDto).ToList(), page.PageNumber, page.PageSize, page.TotalCount);
+    private PagedList<TDto> ToDtoPage<TDto>(PagedList<MusicMaterial> page) where TDto : MusicMaterialDto =>
+        new(page.Items.Select(ToDto<TDto>).ToList(), page.PageNumber, page.PageSize, page.TotalCount);
 
     /// <summary>No skill id means the material is for everyone; otherwise the skill must exist and be active.</summary>
     private async Task<(Skill? Skill, string? Error)> GetTargetSkillAsync(Guid? skillId, CancellationToken cancellationToken)

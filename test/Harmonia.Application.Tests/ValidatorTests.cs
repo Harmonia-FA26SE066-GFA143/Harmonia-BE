@@ -169,4 +169,28 @@ public class ValidatorTests
 
         Assert.Equal(2, codes.Length);
     }
+
+    // ---- Material learning progress ----
+
+    [Theory]
+    [InlineData(LearningStatus.Learned)]
+    [InlineData(LearningStatus.NeedsPractice)]
+    public void LearningProgress_LearnedOrNeedsPractice_HasNoErrors(LearningStatus status)
+    {
+        var codes = ErrorCodesOf(new UpdateMaterialLearningProgressRequestValidator(),
+            new UpdateMaterialLearningProgressRequest { Status = status });
+
+        Assert.Empty(codes);
+    }
+
+    [Theory]
+    [InlineData(LearningStatus.NotStarted)]
+    [InlineData((LearningStatus)99)]
+    public void LearningProgress_OtherStatus_ReturnsStatusInvalid(LearningStatus status)
+    {
+        var codes = ErrorCodesOf(new UpdateMaterialLearningProgressRequestValidator(),
+            new UpdateMaterialLearningProgressRequest { Status = status });
+
+        Assert.Equal([ErrorCodes.MaterialLearningStatusInvalid], codes);
+    }
 }
