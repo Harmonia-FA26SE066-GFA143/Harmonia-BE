@@ -17,6 +17,16 @@ public class MemberProfileRepository(HarmoniaDbContext dbContext)
             .Include(x => x.User)
             .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
 
+    public Task<MemberProfile?> GetByUserIdWithApprovedSkillsAsync(Guid userId, CancellationToken cancellationToken) =>
+        DbContext.MemberProfiles
+            .AsNoTracking()
+            .Include(x => x.User)
+                .ThenInclude(u => u.Role)
+            .Include(x => x.MemberSkills.Where(s => s.Status == ApprovalStatus.Approved && s.Skill.IsActive))
+                .ThenInclude(s => s.Skill)
+                .ThenInclude(s => s.Category)
+            .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+
     public Task<MemberProfile?> GetByUserIdForUpdateAsync(Guid userId, CancellationToken cancellationToken) =>
         DbContext.MemberProfiles
             .Include(x => x.User)

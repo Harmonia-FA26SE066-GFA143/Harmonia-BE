@@ -135,6 +135,29 @@ public class MemberProfilesEndpointsTests(HarmoniaApiFactory factory) : IClassFi
     }
 
     [Fact]
+    public async Task Member_GetMine_ReturnsRoleAndApprovedSkills_Async()
+    {
+        var user = await CreateUserAsync("mp-mine-skill@test.com", "Mine Singer", cancellationToken: _ct);
+        var alto = new Skill { Id = Guid.NewGuid(), CategoryId = SkillCategoryIds.Vocal, Name = "mp-mine-Alto" };
+        var guitar = new Skill { Id = Guid.NewGuid(), CategoryId = SkillCategoryIds.Instrument, Name = "mp-mine-Guitar" };
+        await factory.WithDbAsync(async (db, ct) =>
+        {
+            var memberId = (await db.MemberProfiles.SingleAsync(x => x.UserId == user.Id, ct)).Id;
+            db.Skills.AddRange(alto, guitar);
+            db.MemberSkills.AddRange(
+                new MemberSkill { Id = Guid.NewGuid(), MemberId = memberId, SkillId = alto.Id, Status = ApprovalStatus.Approved },
+                new MemberSkill { Id = Guid.NewGuid(), MemberId = memberId, SkillId = guitar.Id, Status = ApprovalStatus.Rejected });
+            return await db.SaveChangesAsync(ct);
+        }, _ct);
+        var member = await factory.CreateClientAsAsync("mp-mine-skill@test.com", _ct);
+
+        var mine = (await member.GetFromJsonAsync<MemberProfileDetailDto>("api/member-profiles/me", TestJson.Options, _ct))!;
+
+        Assert.Equal(RoleNames.ChoirMember, mine.RoleName);
+        Assert.Equal("mp-mine-Alto", Assert.Single(mine.ApprovedSkills).SkillName);
+    }
+
+    [Fact]
     public async Task Director_UnknownId_Returns404_Async()
     {
         var director = await factory.CreateClientAsAsync("director@test.com", _ct);

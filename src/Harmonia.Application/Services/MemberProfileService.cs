@@ -11,13 +11,13 @@ public class MemberProfileService(
     IMemberProfileRepository memberProfileRepository,
     IMapper mapper) : IMemberProfileService
 {
-    public async Task<Result<MemberProfileDto>> GetMineAsync(Guid userId, CancellationToken cancellationToken)
+    public async Task<Result<MemberProfileDetailDto>> GetMineAsync(Guid userId, CancellationToken cancellationToken)
     {
-        var profile = await memberProfileRepository.GetByUserIdAsync(userId, cancellationToken);
+        var profile = await memberProfileRepository.GetByUserIdWithApprovedSkillsAsync(userId, cancellationToken);
 
         return profile is null
-            ? Result<MemberProfileDto>.Failure(ErrorCodes.MemberNotFound)
-            : Result<MemberProfileDto>.Success(mapper.Map<MemberProfileDto>(profile));
+            ? Result<MemberProfileDetailDto>.Failure(ErrorCodes.MemberNotFound)
+            : Result<MemberProfileDetailDto>.Success(mapper.Map<MemberProfileDetailDto>(profile));
     }
 
     public async Task<Result<MemberProfileDto>> UpdateMineAsync(

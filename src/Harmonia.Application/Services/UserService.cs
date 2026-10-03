@@ -102,7 +102,7 @@ public class UserService(
 		var user = await userRepository.GetByIdAsync(id, ct);
 		if (user is null) return Result.Failure(ErrorCodes.UserNotFound);
 
-		if (user.IsActive) return Result.Failure(ErrorCodes.UserAlreadyActive); // ho?c th�m ErrorCodes.UserAlreadyActive n?u team mu?n t�ch ri�ng
+		if (user.IsActive) return Result.Failure(ErrorCodes.UserAlreadyActive);
 
 		user.IsActive = true;
 		await userRepository.SaveChangesAsync(ct);

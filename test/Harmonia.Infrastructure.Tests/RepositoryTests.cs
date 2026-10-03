@@ -472,6 +472,32 @@ public sealed class RepositoryTests : IDisposable
         Assert.Equal(1, page.TotalCount);
     }
 
+    // ---- MemberProfileRepository.GetByUserIdWithApprovedSkillsAsync ----
+
+    [Fact]
+    public async Task GetByUserIdWithApprovedSkills_LoadsRoleAndOnlyApprovedActiveSkills_Async()
+    {
+        var seed = await SeedMaterialsAsync(_ct);
+        var retired = new Skill { Id = Guid.NewGuid(), CategoryId = SkillCategoryIds.Vocal, Name = "Retired", IsActive = false };
+        Guid userId;
+        await using (var context = _db.NewContext())
+        {
+            context.Skills.Add(retired);
+            context.MemberSkills.Add(NewMemberSkill(seed.MemberId, retired.Id, ApprovalStatus.Approved));
+            await context.SaveChangesAsync(_ct);
+            userId = (await context.MemberProfiles.SingleAsync(x => x.Id == seed.MemberId, _ct)).UserId;
+        }
+
+        await using var readContext = _db.NewContext();
+        var member = await new MemberProfileRepository(readContext).GetByUserIdWithApprovedSkillsAsync(userId, _ct);
+
+        Assert.NotNull(member);
+        Assert.False(string.IsNullOrEmpty(member.User.Role.Name));
+        // Bass is pending, Retired is inactive.
+        Assert.Equal(["Alto", "Guitar"], member.MemberSkills.Select(s => s.Skill.Name).Order());
+        Assert.All(member.MemberSkills, s => Assert.NotNull(s.Skill.Category));
+    }
+
     private async Task<PagedList<MemberProfile>> SearchMembersAsync(
         SearchMemberProfilesRequest filter, CancellationToken cancellationToken = default)
     {
