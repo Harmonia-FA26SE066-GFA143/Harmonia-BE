@@ -5,13 +5,13 @@ public class SongClassificationDto
 {
     public Guid SongId { get; set; }
 
-    public List<SongClassificationItemDto> LiturgicalSeasons { get; set; } = [];
+    public List<SongClassificationSummaryDto> LiturgicalSeasons { get; set; } = [];
 
-    public List<SongClassificationItemDto> MassTypes { get; set; } = [];
+    public List<SongClassificationSummaryDto> MassTypes { get; set; } = [];
 
-    public List<SongClassificationItemDto> CeremonyTypes { get; set; } = [];
+    public List<SongClassificationSummaryDto> CeremonyTypes { get; set; } = [];
 
-    public List<SongClassificationItemDto> SongThemes { get; set; } = [];
+    public List<SongClassificationSummaryDto> SongThemes { get; set; } = [];
 
     public List<SongVocalRequirementDto> VocalRequirements { get; set; } = [];
 

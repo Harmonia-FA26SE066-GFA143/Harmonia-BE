@@ -8,6 +8,6 @@ public class EventCategoryProfile : Profile
 {
     public EventCategoryProfile()
     {
-        CreateMap<EventCategory, LookupDto>();
+        CreateMap<EventCategory, EventCategoryDto>();
     }
 }

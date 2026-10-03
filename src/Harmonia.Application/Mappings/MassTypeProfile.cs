@@ -8,6 +8,6 @@ public class MassTypeProfile : Profile
 {
     public MassTypeProfile()
     {
-        CreateMap<MassType, LookupDto>();
+        CreateMap<MassType, MassTypeDto>();
     }
 }

@@ -6,15 +6,15 @@ namespace Harmonia.Application.Interfaces.IServices;
 /// <summary>Active rows of the Admin-configured catalogs, for dropdowns. Inactive rows are hidden.</summary>
 public interface ILookupService
 {
-    Task<Result<List<LookupDto>>> GetMassTypesAsync(CancellationToken cancellationToken);
+    Task<Result<List<MassTypeDto>>> GetMassTypesAsync(CancellationToken cancellationToken);
 
-    Task<Result<List<LookupDto>>> GetCeremonyTypesAsync(CancellationToken cancellationToken);
+    Task<Result<List<CeremonyTypeDto>>> GetCeremonyTypesAsync(CancellationToken cancellationToken);
 
-    Task<Result<List<LookupDto>>> GetEventCategoriesAsync(CancellationToken cancellationToken);
+    Task<Result<List<EventCategoryDto>>> GetEventCategoriesAsync(CancellationToken cancellationToken);
 
-    Task<Result<List<LookupDto>>> GetSongThemesAsync(CancellationToken cancellationToken);
+    Task<Result<List<SongThemeDto>>> GetSongThemesAsync(CancellationToken cancellationToken);
 
-    Task<Result<List<LookupDto>>> GetSkillCategoriesAsync(CancellationToken cancellationToken);
+    Task<Result<List<SkillCategoryDto>>> GetSkillCategoriesAsync(CancellationToken cancellationToken);
 
     /// <summary>Ordered by start date.</summary>
     Task<Result<List<LiturgicalSeasonDto>>> GetLiturgicalSeasonsAsync(CancellationToken cancellationToken);

@@ -29,7 +29,7 @@ public class LookupsEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<H
             new MassType { Id = Guid.NewGuid(), Name = "Retired Mass", IsActive = false }), _ct);
         var member = await factory.CreateClientAsAsync("member@test.com", _ct);
 
-        var rows = (await member.GetFromJsonAsync<List<LookupDto>>("api/lookups/mass-types", TestJson.Options, _ct))!;
+        var rows = (await member.GetFromJsonAsync<List<MassTypeDto>>("api/lookups/mass-types", TestJson.Options, _ct))!;
 
         Assert.Equal(["Daily Mass", "Sunday Mass"], rows.Select(x => x.Name));
     }
@@ -60,7 +60,7 @@ public class LookupsEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<H
 
         var instruments = (await director.GetFromJsonAsync<List<SkillDto>>(
             $"api/lookups/skills?categoryId={SkillCategoryIds.Instrument}", TestJson.Options, _ct))!;
-        var categories = (await director.GetFromJsonAsync<List<LookupDto>>(
+        var categories = (await director.GetFromJsonAsync<List<SkillCategoryDto>>(
             "api/lookups/skill-categories", TestJson.Options, _ct))!;
 
         Assert.Equal("Organ", Assert.Single(instruments).Name);

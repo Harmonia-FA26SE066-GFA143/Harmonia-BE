@@ -8,6 +8,6 @@ public class CeremonyTypeProfile : Profile
 {
     public CeremonyTypeProfile()
     {
-        CreateMap<CeremonyType, LookupDto>();
+        CreateMap<CeremonyType, CeremonyTypeDto>();
     }
 }

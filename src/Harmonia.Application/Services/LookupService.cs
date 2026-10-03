@@ -19,20 +19,35 @@ public class LookupService(
     IGenericRepository<Skill> skills,
     IMapper mapper) : ILookupService
 {
-    public async Task<Result<List<LookupDto>>> GetMassTypesAsync(CancellationToken cancellationToken) =>
-        ByName(await massTypes.ListAsync(x => x.IsActive, cancellationToken));
+    public async Task<Result<List<MassTypeDto>>> GetMassTypesAsync(CancellationToken cancellationToken)
+    {
+        var rows = await massTypes.ListAsync(x => x.IsActive, cancellationToken);
+        return Result<List<MassTypeDto>>.Success(mapper.Map<List<MassTypeDto>>(rows.OrderBy(x => x.Name)));
+    }
 
-    public async Task<Result<List<LookupDto>>> GetCeremonyTypesAsync(CancellationToken cancellationToken) =>
-        ByName(await ceremonyTypes.ListAsync(x => x.IsActive, cancellationToken));
+    public async Task<Result<List<CeremonyTypeDto>>> GetCeremonyTypesAsync(CancellationToken cancellationToken)
+    {
+        var rows = await ceremonyTypes.ListAsync(x => x.IsActive, cancellationToken);
+        return Result<List<CeremonyTypeDto>>.Success(mapper.Map<List<CeremonyTypeDto>>(rows.OrderBy(x => x.Name)));
+    }
 
-    public async Task<Result<List<LookupDto>>> GetEventCategoriesAsync(CancellationToken cancellationToken) =>
-        ByName(await eventCategories.ListAsync(x => x.IsActive, cancellationToken));
+    public async Task<Result<List<EventCategoryDto>>> GetEventCategoriesAsync(CancellationToken cancellationToken)
+    {
+        var rows = await eventCategories.ListAsync(x => x.IsActive, cancellationToken);
+        return Result<List<EventCategoryDto>>.Success(mapper.Map<List<EventCategoryDto>>(rows.OrderBy(x => x.Name)));
+    }
 
-    public async Task<Result<List<LookupDto>>> GetSongThemesAsync(CancellationToken cancellationToken) =>
-        ByName(await songThemes.ListAsync(x => x.IsActive, cancellationToken));
+    public async Task<Result<List<SongThemeDto>>> GetSongThemesAsync(CancellationToken cancellationToken)
+    {
+        var rows = await songThemes.ListAsync(x => x.IsActive, cancellationToken);
+        return Result<List<SongThemeDto>>.Success(mapper.Map<List<SongThemeDto>>(rows.OrderBy(x => x.Name)));
+    }
 
-    public async Task<Result<List<LookupDto>>> GetSkillCategoriesAsync(CancellationToken cancellationToken) =>
-        ByName(await skillCategories.ListAsync(x => x.IsActive, cancellationToken));
+    public async Task<Result<List<SkillCategoryDto>>> GetSkillCategoriesAsync(CancellationToken cancellationToken)
+    {
+        var rows = await skillCategories.ListAsync(x => x.IsActive, cancellationToken);
+        return Result<List<SkillCategoryDto>>.Success(mapper.Map<List<SkillCategoryDto>>(rows.OrderBy(x => x.Name)));
+    }
 
     public async Task<Result<List<LiturgicalSeasonDto>>> GetLiturgicalSeasonsAsync(CancellationToken cancellationToken)
     {
@@ -51,8 +66,7 @@ public class LookupService(
     public async Task<Result<List<WorshipLocationDto>>> GetWorshipLocationsAsync(CancellationToken cancellationToken)
     {
         var rows = await worshipLocations.ListAsync(x => x.IsActive, cancellationToken);
-        return Result<List<WorshipLocationDto>>.Success(
-            mapper.Map<List<WorshipLocationDto>>(rows.OrderBy(x => x.Name)));
+        return Result<List<WorshipLocationDto>>.Success(mapper.Map<List<WorshipLocationDto>>(rows.OrderBy(x => x.Name)));
     }
 
     public async Task<Result<List<SkillDto>>> GetSkillsAsync(Guid? categoryId, CancellationToken cancellationToken)
@@ -62,7 +76,4 @@ public class LookupService(
             cancellationToken);
         return Result<List<SkillDto>>.Success(mapper.Map<List<SkillDto>>(rows.OrderBy(x => x.Name)));
     }
-
-    private Result<List<LookupDto>> ByName<T>(IEnumerable<T> rows) =>
-        Result<List<LookupDto>>.Success(mapper.Map<List<LookupDto>>(rows).OrderBy(x => x.Name).ToList());
 }

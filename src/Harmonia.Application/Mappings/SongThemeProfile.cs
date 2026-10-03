@@ -8,6 +8,6 @@ public class SongThemeProfile : Profile
 {
     public SongThemeProfile()
     {
-        CreateMap<SongTheme, LookupDto>();
+        CreateMap<SongTheme, SongThemeDto>();
     }
 }

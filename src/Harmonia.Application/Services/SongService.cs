@@ -165,14 +165,14 @@ public class SongService(ISongRepository songRepository, IMapper mapper) : ISong
 
     private async Task<SongClassificationDto> ToClassificationDtoAsync(Song song, CancellationToken cancellationToken)
     {
-        async Task<List<SongClassificationItemDto>> ItemsAsync(ClassificationTarget type, CancellationToken cancellationToken)
+        async Task<List<SongClassificationSummaryDto>> ItemsAsync(ClassificationTarget type, CancellationToken cancellationToken)
         {
             var ids = song.Classifications.Where(x => x.TargetType == type).Select(x => x.TargetId).ToList();
             if (ids.Count == 0) return [];
 
             // Inactive targets are included on purpose; a hard-deleted lookup simply drops out.
             var targets = await songRepository.GetClassificationTargetsAsync(type, ids, cancellationToken);
-            return targets.Select(x => new SongClassificationItemDto { Id = x.Key, Name = x.Value.Name }).OrderBy(x => x.Name).ToList();
+            return targets.Select(x => new SongClassificationSummaryDto { Id = x.Key, Name = x.Value.Name }).OrderBy(x => x.Name).ToList();
         }
 
         return new SongClassificationDto

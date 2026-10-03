@@ -18,7 +18,7 @@
   | Thư mục | Chứa | KHÔNG chứa |
   |---|---|---|
   | `Common/` (gốc) | — | Mọi file |
-  | `Common/Models/` | `Result`, `Result<T>`, `PagedList<T>`, `PagingRequest`, class Options mà service Application đọc (`PasswordResetOptions`) — bind và validate ở `Infrastructure/DependencyInjection.cs` | DTO nghiệp vụ, interface, code EF Core |
+  | `Common/Models/` | `Result`, `Result<T>`, `PagedList<T>`, `PagingRequest`, `FileContent` (file upload chuyển từ controller xuống service, không phụ thuộc `IFormFile`), class Options mà service Application đọc (`PasswordResetOptions`) — bind và validate ở `Infrastructure/DependencyInjection.cs` | DTO nghiệp vụ, interface, code EF Core |
   | `DTOs/` | `Dto`, `Request`, `Response` | Entity |
   | `Exceptions/` | Exception ứng dụng: NotFound, Validation, Unauthorized | Exception nghiệp vụ (→ Domain) |
   | `Interfaces/IRepositories/` | Interface truy cập dữ liệu | Code EF Core |

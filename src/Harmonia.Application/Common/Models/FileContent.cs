@@ -1,4 +1,4 @@
-namespace Harmonia.Application.DTOs;
+namespace Harmonia.Application.Common.Models;
 
 /// <summary>
 /// An uploaded file handed from the controller to a service without depending on ASP.NET's IFormFile.

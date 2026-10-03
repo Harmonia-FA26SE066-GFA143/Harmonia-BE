@@ -2,7 +2,7 @@ using Harmonia.Domain.Enums;
 
 namespace Harmonia.Application.DTOs;
 
-/// <summary>Form fields of the multipart upload; the file itself travels separately as <see cref="FileContent"/>.</summary>
+/// <summary>Form fields of the multipart upload; the file itself travels separately as <see cref="Common.Models.FileContent"/>.</summary>
 public class UploadMusicMaterialRequest
 {
     public Guid SongId { get; set; }

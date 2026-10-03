@@ -8,6 +8,6 @@ public class SkillCategoryProfile : Profile
 {
     public SkillCategoryProfile()
     {
-        CreateMap<SkillCategory, LookupDto>();
+        CreateMap<SkillCategory, SkillCategoryDto>();
     }
 }
