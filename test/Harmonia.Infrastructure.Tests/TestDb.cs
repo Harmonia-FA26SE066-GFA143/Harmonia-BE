@@ -38,12 +38,13 @@ public sealed class TestDb : IDisposable
             .Options);
 
     public async Task<User> AddUserAsync(
-        string email, string roleName = RoleNames.ChoirMember, CancellationToken cancellationToken = default)
+        string email, string roleName = RoleNames.ChoirMember, CancellationToken cancellationToken = default,
+        string fullName = "")
     {
         await using var context = NewContext();
         var role = await context.Roles.FirstOrDefaultAsync(r => r.Name == roleName, cancellationToken)
             ?? context.Roles.Add(new Role { Id = Guid.NewGuid(), Name = roleName }).Entity;
-        var user = new User { Id = Guid.NewGuid(), Email = email, PasswordHash = "hash", RoleId = role.Id };
+        var user = new User { Id = Guid.NewGuid(), Email = email, FullName = fullName, PasswordHash = "hash", RoleId = role.Id };
         context.Users.Add(user);
         await context.SaveChangesAsync(cancellationToken);
         return user;

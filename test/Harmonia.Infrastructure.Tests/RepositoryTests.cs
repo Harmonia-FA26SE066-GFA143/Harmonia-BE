@@ -379,7 +379,7 @@ public sealed class RepositoryTests : IDisposable
         var page = await GetLearnersAsync(
             await MaterialIdAsync("General sheet", _ct), null, new SearchMaterialLearningProgressRequest(), _ct);
 
-        Assert.Equal(["An", "Member"], page.Items.Select(m => m.FullName));
+        Assert.Equal(["An", "Member"], page.Items.Select(m => m.User.FullName));
         Assert.Equal(2, page.TotalCount);
     }
 
@@ -399,7 +399,7 @@ public sealed class RepositoryTests : IDisposable
         var page = await GetLearnersAsync(
             await MaterialIdAsync("Alto audio", _ct), seed.AltoId, new SearchMaterialLearningProgressRequest(), _ct);
 
-        Assert.Equal(["Binh", "Member"], page.Items.Select(m => m.FullName));
+        Assert.Equal(["Binh", "Member"], page.Items.Select(m => m.User.FullName));
     }
 
     [Theory]
@@ -419,7 +419,7 @@ public sealed class RepositoryTests : IDisposable
 
         var page = await GetLearnersAsync(altoAudio, seed.AltoId, new SearchMaterialLearningProgressRequest { Status = status }, _ct);
 
-        Assert.Equal(expected, page.Items.Select(m => m.FullName));
+        Assert.Equal(expected, page.Items.Select(m => m.User.FullName));
         Assert.All(page.Items.SelectMany(m => m.LearningProgresses), p => Assert.Equal(altoAudio, p.MaterialId));
     }
 
@@ -434,7 +434,7 @@ public sealed class RepositoryTests : IDisposable
             new SearchMaterialLearningProgressRequest { PageNumber = 2, PageSize = 2 }, _ct);
 
         Assert.Equal(3, page.TotalCount);
-        Assert.Equal(["Member"], page.Items.Select(m => m.FullName));
+        Assert.Equal(["Member"], page.Items.Select(m => m.User.FullName));
     }
 
     private async Task<PagedList<MemberProfile>> GetLearnersAsync(Guid materialId, Guid? targetSkillId,
@@ -449,8 +449,9 @@ public sealed class RepositoryTests : IDisposable
     private async Task<Guid> AddMemberAsync(
         string fullName, MemberStatus status, Guid[] approvedSkillIds, CancellationToken cancellationToken = default)
     {
-        var user = await _db.AddUserAsync($"{fullName.ToLowerInvariant()}@test.com", cancellationToken: cancellationToken);
-        var member = new MemberProfile { Id = Guid.NewGuid(), UserId = user.Id, FullName = fullName, Status = status };
+        var user = await _db.AddUserAsync(
+            $"{fullName.ToLowerInvariant()}@test.com", cancellationToken: cancellationToken, fullName: fullName);
+        var member = new MemberProfile { Id = Guid.NewGuid(), UserId = user.Id, Status = status };
         await using var context = _db.NewContext();
         context.MemberProfiles.Add(member);
         context.MemberSkills.AddRange(approvedSkillIds.Select(id => NewMemberSkill(member.Id, id, ApprovalStatus.Approved)));
@@ -578,8 +579,8 @@ public sealed class RepositoryTests : IDisposable
     /// </summary>
     private async Task<MaterialSeed> SeedMaterialsAsync(CancellationToken cancellationToken = default)
     {
-        var user = await _db.AddUserAsync("member@test.com", cancellationToken: cancellationToken);
-        var member = new MemberProfile { Id = Guid.NewGuid(), UserId = user.Id, FullName = "Member" };
+        var user = await _db.AddUserAsync("member@test.com", cancellationToken: cancellationToken, fullName: "Member");
+        var member = new MemberProfile { Id = Guid.NewGuid(), UserId = user.Id };
         var alto = new Skill { Id = Guid.NewGuid(), CategoryId = SkillCategoryIds.Vocal, Name = "Alto" };
         var bass = new Skill { Id = Guid.NewGuid(), CategoryId = SkillCategoryIds.Vocal, Name = "Bass" };
         var guitar = new Skill { Id = Guid.NewGuid(), CategoryId = SkillCategoryIds.Instrument, Name = "Guitar" };

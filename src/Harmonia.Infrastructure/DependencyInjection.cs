@@ -9,6 +9,7 @@ using Harmonia.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Harmonia.Infrastructure;
 
@@ -90,7 +91,25 @@ public static class DependencyInjection
         services.AddSingleton<IFileStorageService, CloudinaryFileStorageService>();
         services.AddSingleton<IEmailSender, BrevoEmailSender>();
         services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
+        services.AddScoped<DataSeeder>();
 
         return services;
+    }
+
+    /// <summary>Inserts the four roles and the first Admin when missing. Never updates or deletes.</summary>
+    public static async Task SeedDataAsync(this IServiceProvider serviceProvider, CancellationToken cancellationToken = default)
+    {
+        await using var scope = serviceProvider.CreateAsyncScope();
+        try
+        {
+            await scope.ServiceProvider.GetRequiredService<DataSeeder>().SeedAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Best effort: a database that is briefly unreachable (e.g. Azure SQL resuming) must not
+            // stop the app from starting; deployed databases already hold the seed anyway.
+            scope.ServiceProvider.GetRequiredService<ILogger<DataSeeder>>()
+                .LogError(ex, "Data seeding failed; the app keeps starting without it.");
+        }
     }
 }

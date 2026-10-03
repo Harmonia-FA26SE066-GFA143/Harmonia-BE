@@ -319,10 +319,10 @@ public class MusicMaterialServiceTests
         var updatedAt = DateTime.UtcNow;
         var marked = new MemberProfile
         {
-            Id = Guid.NewGuid(), FullName = "An",
+            Id = Guid.NewGuid(), User = new User { FullName = "An" },
             LearningProgresses = [new MaterialLearningProgress { Status = LearningStatus.Learned, UpdatedAt = updatedAt }],
         };
-        var unmarked = new MemberProfile { Id = Guid.NewGuid(), FullName = "Binh" };
+        var unmarked = new MemberProfile { Id = Guid.NewGuid(), User = new User { FullName = "Binh" } };
         _members.GetLearnersOfMaterialAsync(material.Id, skillId, request, _ct)
             .Returns(new PagedList<MemberProfile>([marked, unmarked], 1, 20, 2));
 

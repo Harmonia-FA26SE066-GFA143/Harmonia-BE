@@ -31,12 +31,17 @@
 
   | Thư mục | Chứa | KHÔNG chứa |
   |---|---|---|
-  | `Data/` | `HarmoniaDbContext`, `DataSeeder` (dữ liệu demo), extension truy vấn EF (`ToPagedListAsync`) | Repository |
-  | `Data/Configurations/` | `IEntityTypeConfiguration<T>`, seed cố định qua `HasData()` (role, lookup) | Dữ liệu demo |
+  | `Data/` | `HarmoniaDbContext`, `DataSeeder` (role + Admin đầu tiên, dữ liệu demo), extension truy vấn EF (`ToPagedListAsync`) | Repository |
+  | `Data/Configurations/` | `IEntityTypeConfiguration<T>`, seed cố định qua `HasData()` (lookup) | Dữ liệu demo, role |
   | `Data/Interceptors/` | EF interceptor (audit, …) | Logic nghiệp vụ |
   | `Migrations/` | Migration EF sinh ra | Bất cứ file nào viết tay — không tạo, không sửa |
   | `Repositories/` | Implementation của `IRepositories` | Logic nghiệp vụ |
   | `ExternalServices/` | Implementation chạm công nghệ ngoài: email, **phát** JWT, file storage, Gemini — **kèm class Options của chính nó** (`JwtOptions` nằm cạnh `JwtTokenService`) | Logic nghiệp vụ |
+
+  **Role KHÔNG seed bằng `HasData()`** (chốt 2026-10-03): DB Azure đã có 4 role với Id ngẫu nhiên,
+  migration `InsertData` sẽ vấp unique index `Name`. `DataSeeder` chèn role theo **tên** lúc khởi
+  động, chỉ thêm, không sửa/xoá. Admin đầu tiên tạo từ `Seed__AdminEmail` / `Seed__AdminPassword`
+  khi DB chưa có Admin nào đang hoạt động.
 
   ## Harmonia.API — trình diễn và composition root
 

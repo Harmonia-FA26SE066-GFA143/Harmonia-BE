@@ -8,6 +8,8 @@ namespace Harmonia.Application.Interfaces.IServices;
 
 public interface IUserService
 {
+    Task<Result<PagedList<UserDto>>> SearchAsync(SearchUsersRequest request, CancellationToken ct);
+    Task<Result<UserDto>> GetByIdAsync(Guid id, CancellationToken ct);
     Task<Result<UserDto>> CreateAsync(CreateUserRequest request, CancellationToken ct);
     Task<Result<UserDto>> UpdateAsync(Guid id, UpdateUserRequest request, CancellationToken ct);
     Task<Result> ActivateAsync(Guid id, CancellationToken ct);

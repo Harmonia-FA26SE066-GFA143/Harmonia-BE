@@ -1,3 +1,5 @@
+using Harmonia.Application.Common.Models;
+using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IRepositories;
 using Harmonia.Domain.Entities;
 using Harmonia.Infrastructure.Data;
@@ -13,6 +15,39 @@ public class UserRepository(HarmoniaDbContext dbContext)
         DbContext.Users
             .Include(x => x.Role)
             .FirstOrDefaultAsync(x => x.Email == email, cancellationToken);
+
+    public async Task<PagedList<User>> SearchAsync(
+        string? keyword, SearchUsersRequest filter, CancellationToken cancellationToken)
+    {
+        var query = DbContext.Users.AsNoTracking();
+
+        if (keyword is not null)
+        {
+            query = query.Where(x => x.Email.Contains(keyword));
+        }
+
+        if (filter.RoleName is not null)
+        {
+            query = query.Where(x => x.Role.Name == filter.RoleName);
+        }
+
+        if (filter.IsActive is { } isActive)
+        {
+            query = query.Where(x => x.IsActive == isActive);
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .Include(x => x.Role)
+            .OrderBy(x => x.Email)
+            .ThenBy(x => x.Id)
+            .Skip((filter.PageNumber - 1) * filter.PageSize)
+            .Take(filter.PageSize)
+            .ToListAsync(cancellationToken);
+
+        return new PagedList<User>(items, filter.PageNumber, filter.PageSize, totalCount);
+    }
 
     public Task<RefreshToken?> GetRefreshTokenByHashAsync(string tokenHash, CancellationToken cancellationToken) =>
         DbContext.RefreshTokens

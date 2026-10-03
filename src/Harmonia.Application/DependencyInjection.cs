@@ -18,6 +18,7 @@ public static class DependencyInjection
         services.AddScoped<IMemberProfileService, MemberProfileService>();
         services.AddScoped<ISongService, SongService>();
         services.AddScoped<IMusicMaterialService, MusicMaterialService>();
+        services.AddScoped<ILookupService, LookupService>();
 
         return services;
     }

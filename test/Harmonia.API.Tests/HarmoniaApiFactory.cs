@@ -46,6 +46,14 @@ public sealed class HarmoniaApiFactory : WebApplicationFactory<AuthController>
     public HarmoniaApiFactory()
     {
         _connection.Open();
+
+        // The schema must exist before Program.cs runs DataSeeder at startup.
+        using (var context = new HarmoniaDbContext(
+            new DbContextOptionsBuilder<HarmoniaDbContext>().UseSqlite(_connection).Options))
+        {
+            context.Database.EnsureCreated();
+        }
+
         EmailSender.SendAsync(default!, default!, default!, default).ReturnsForAnyArgs(Result.Success());
     }
 
@@ -105,11 +113,9 @@ public sealed class HarmoniaApiFactory : WebApplicationFactory<AuthController>
     {
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<HarmoniaDbContext>();
-        context.Database.EnsureCreated();
 
-        var roles = new[] { RoleNames.Admin, RoleNames.ParishPriest, RoleNames.ChoirDirector, RoleNames.ChoirMember }
-            .ToDictionary(name => name, name => new Role { Id = Guid.NewGuid(), Name = name });
-        context.Roles.AddRange(roles.Values);
+        // Roles come from the real DataSeeder, which already ran at startup.
+        var roles = context.Roles.ToDictionary(r => r.Name);
 
         var hasher = new PasswordHasherService();
         string[] roleOfEmail = [RoleNames.Admin, RoleNames.ParishPriest, RoleNames.ChoirDirector, RoleNames.ChoirMember, RoleNames.ChoirMember];

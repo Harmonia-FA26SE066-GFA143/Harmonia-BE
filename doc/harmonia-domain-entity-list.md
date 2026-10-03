@@ -31,13 +31,13 @@ Written once here instead of repeated 43 times:
 ## A. Identity & Access
 
 **1. `User`** — login account, exactly one role (D2) ***auditable***
-`email` string(256) unique · `passwordHash` string · `roleId` Guid → Role · `isActive` bool = true · `lastLoginAt` DateTime? · `avatarUrl` string(500)? · `avatarPublicId` string(255)?
+`email` string(256) unique · `fullName` string(100) · `passwordHash` string · `roleId` Guid → Role · `isActive` bool = true · `lastLoginAt` DateTime? · `avatarUrl` string(500)? · `avatarPublicId` string(255)?
 
 **2. `Role`** — 4 seeded roles: Admin, ParishPriest, ChoirDirector, ChoirMember (D1)
 `name` string(50) unique · `description` string(300)?
 
 **3. ⚪ `MemberProfile`** — choir member record ***auditable***
-`userId` Guid → User (unique, 1–1) · `fullName` string(100) · `phone` string(20)? · `dateOfBirth` DateOnly? · `joinedDate` DateOnly · `status` MemberStatus
+`userId` Guid → User (unique, 1–1) · `phone` string(20)? · `dateOfBirth` DateOnly? · `joinedDate` DateOnly · `status` MemberStatus
 
 **4. ⚪ `RefreshToken`** — session refresh + mobile push token
 `userId` Guid → User · `tokenHash` string(500) unique · `expiresAt` DateTime · `revokedAt` DateTime? · `deviceId` string(100)? · `platform` DevicePlatform?

@@ -9,6 +9,19 @@ public interface IMemberProfileRepository : IGenericRepository<MemberProfile>
     /// <summary>Read-only, with <see cref="MemberProfile.User"/> loaded.</summary>
     Task<MemberProfile?> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken);
 
+    /// <summary>Tracked, with <see cref="MemberProfile.User"/> loaded.</summary>
+    Task<MemberProfile?> GetByUserIdForUpdateAsync(Guid userId, CancellationToken cancellationToken);
+
+    /// <summary>Tracked, with <see cref="MemberProfile.User"/> loaded.</summary>
+    Task<MemberProfile?> GetWithUserAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Read-only page of members with their User, ordered by name. <paramref name="keyword"/> matches
+    /// part of the name or email; the status of <paramref name="filter"/> narrows the result when set.
+    /// </summary>
+    Task<PagedList<MemberProfile>> SearchAsync(
+        string? keyword, SearchMemberProfilesRequest filter, CancellationToken cancellationToken);
+
     /// <summary>
     /// Read-only page of active members expected to learn the material, ordered by name: everyone when
     /// <paramref name="targetSkillId"/> is null, otherwise those with that skill approved.
