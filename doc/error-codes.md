@@ -164,9 +164,10 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `SONG_NOT_FOUND` | 404 | Không tìm thấy bài hát |
 | `SONG_INACTIVE` | 409 | Bài hát đã bị vô hiệu hoá |
 | `SONG_TITLE_DUPLICATE` | 409 | Bài hát cùng tên đã tồn tại |
-| `SONG_CLASSIFICATION_DUPLICATE` | 409 | Bài hát đã được phân loại theo mục này |
+| `SONG_CLASSIFICATION_DUPLICATE` | 400 | Bài hát đã được phân loại theo mục này |
 | `SONG_CLASSIFICATION_TARGET_INVALID` | 400 | Đối tượng phân loại không hợp lệ |
-| `SONG_SKILL_REQUIREMENT_DUPLICATE` | 409 | Kỹ năng này đã được khai báo cho bài hát |
+| `SONG_SKILL_REQUIREMENT_DUPLICATE` | 400 | Kỹ năng này đã được khai báo cho bài hát |
+| `SONG_SKILL_REQUIREMENT_CATEGORY_INVALID` | 400 | Kỹ năng không thuộc đúng nhóm bè / nhạc cụ |
 | `MATERIAL_NOT_FOUND` | 404 | Không tìm thấy tài liệu |
 | `MATERIAL_FILE_REQUIRED` | 400 | Vui lòng chọn tệp |
 | `MATERIAL_FILE_TYPE_NOT_ALLOWED` | 400 | Định dạng tệp không được hỗ trợ |
@@ -318,3 +319,8 @@ xem — trả 404, để không lộ sự tồn tại của bản ghi.
 - 2026-09-29: đăng nhập Google (`api/auth/google`). Thêm `AUTH_GOOGLE_TOKEN_INVALID` (401) và
   mã validate `AUTH_GOOGLE_TOKEN_REQUIRED`. Email Google chưa có tài khoản trả
   `AUTH_INVALID_CREDENTIALS` — không tự tạo tài khoản, không lộ email đã đăng ký.
+- 2026-10-02: đồng bộ `ErrorCodes.cs` với D6 — bỏ `WEEK_NOT_FOUND`, `WEEK_ALREADY_EXISTS`,
+  `WEEK_START_NOT_MONDAY`, `WEEK_ALREADY_PUBLISHED`, `WEEK_NOT_PUBLISHED`, `EVENT_DATE_OUTSIDE_WEEK`
+  cùng 4 exception tương ứng; khai `EVENT_ALREADY_PUBLISHED`, `EVENT_NOT_PUBLISHED`,
+  `EXTERNAL_CALENDAR_FAILED`. Thêm `SONG_SKILL_REQUIREMENT_CATEGORY_INVALID` (FE-29).
+  `SONG_CLASSIFICATION_DUPLICATE`, `SONG_SKILL_REQUIREMENT_DUPLICATE` đổi 409 → 400: là mã validate field.

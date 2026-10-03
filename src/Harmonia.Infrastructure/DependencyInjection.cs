@@ -81,6 +81,9 @@ public static class DependencyInjection
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IMemberProfileRepository, MemberProfileRepository>();
+        services.AddScoped<ISongRepository, SongRepository>();
+        services.AddScoped<IMusicMaterialRepository, MusicMaterialRepository>();
+        services.AddScoped<IMaterialLearningProgressRepository, MaterialLearningProgressRepository>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IPasswordHasherService, PasswordHasherService>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();

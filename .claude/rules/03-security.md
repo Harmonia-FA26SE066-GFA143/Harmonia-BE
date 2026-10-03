@@ -65,7 +65,11 @@
 
 ## Phân quyền
 
-- Mọi endpoint PHẢI có `[Authorize(Roles = ...)]`.
+- Mọi endpoint PHẢI có `[Authorize]`. Endpoint cho **mọi role** đã đăng nhập thì dùng
+  `[Authorize]` trần — KHÔNG liệt kê đủ 4 role vào `Roles` (chốt 2026-10-02).
+  Chỉ dùng `[Authorize(Roles = ...)]` khi giới hạn một phần role. Controller mở cho mọi role
+  nhưng có action chỉ dành cho một role: `[Authorize]` ở controller, `[Authorize(Roles = ...)]`
+  ở action (các attribute cộng dồn theo AND).
 - **4 role**: `Admin`, `ParishPriest`, `ChoirDirector`, `ChoirMember`.
   Không có role `Instrumentalist` — nhạc công là `ChoirMember` có `MemberSkill`
   thuộc `SkillCategory` = Instrument.
@@ -89,8 +93,11 @@
 
 ## Upload file
 
-- Whitelist phần mở rộng: `MusicMaterial` nhận `.pdf`, `.png`, `.jpg`;
-  `PracticeSubmission` nhận `.mp3`, `.m4a`, `.wav`. Chặn theo whitelist, không blacklist.
+- Whitelist phần mở rộng, chặn theo whitelist, không blacklist:
+  - `MusicMaterial` theo `MaterialType` (chốt 2026-10-02): `SheetMusic`, `Lyrics` nhận
+    `.pdf`, `.png`, `.jpg`; `SampleAudio` nhận `.mp3`, `.m4a`, `.wav`;
+    `RehearsalMaterial` nhận cả hai nhóm. Tối đa 20 MB một file.
+  - `PracticeSubmission` nhận `.mp3`, `.m4a`, `.wav`.
 - Không tin `Content-Type` client gửi — kiểm phần mở rộng lẫn dung lượng ở server.
 - Lưu bằng tên sinh mới (GUID), không dùng tên gốc — tránh path traversal và ghi đè.
   `fileName` gốc chỉ để hiển thị.
