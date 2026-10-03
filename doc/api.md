@@ -93,7 +93,7 @@ Không có đăng ký công khai; tài khoản do Admin tạo.
   "accessToken": "eyJ...",
   "accessTokenExpiresAt": "2026-10-01T08:30:00Z",
   "refreshToken": "q8x...",
-  "user": { "id": "guid", "email": "a@b.com", "roleName": "ChoirMember" }
+  "user": { "id": "guid", "email": "a@b.com", "fullName": "Nguyễn Văn A", "roleName": "ChoirMember" }
 }
 ```
 
@@ -138,6 +138,11 @@ Chỉ đăng nhập được nếu email Google đã có tài khoản — không
 | 200 | `LoginResponse` mới (token cũ đã bị thu hồi) |
 | 400 | `AUTH_REFRESH_TOKEN_REQUIRED` |
 | 401 | `AUTH_REFRESH_TOKEN_NOT_FOUND`, `AUTH_REFRESH_TOKEN_REVOKED`, `AUTH_REFRESH_TOKEN_EXPIRED` → về màn đăng nhập |
+| 403 | `AUTH_ACCOUNT_INACTIVE` → về màn đăng nhập |
+
+Admin vô hiệu hoá tài khoản hoặc đổi role → mọi refresh token của user đó bị thu hồi. Lần refresh
+kế tiếp nhận `401 AUTH_REFRESH_TOKEN_REVOKED` (hoặc `403 AUTH_ACCOUNT_INACTIVE`), user phải đăng
+nhập lại. Access token đang cầm vẫn chạy tới khi hết hạn (tối đa `Jwt__ExpiryMinutes`).
 
 ### `POST /api/auth/logout` — đã đăng nhập
 
@@ -197,27 +202,35 @@ Thành công thì mọi thiết bị bị đăng xuất.
 ### `UserDto`
 
 ```json
-{ "id": "guid", "email": "a@b.com", "roleName": "ChoirDirector", "isActive": true }
+{ "id": "guid", "email": "a@b.com", "fullName": "Nguyễn Văn A", "roleName": "ChoirDirector", "isActive": true }
 ```
 
-| Method | Route | Body | Thành công | Lỗi |
+`fullName` có ở **mọi role** (lưu trên `User`). Tài khoản tạo trước 2026-10-03 có thể là `""`
+cho tới khi Admin cập nhật.
+
+| Method | Route | Body / Query | Thành công | Lỗi |
 |---|---|---|---|---|
-| POST | `/api/users` | `{ "email", "password", "roleName" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `ROLE_NOT_FOUND` · 409 `USER_EMAIL_ALREADY_EXISTS` |
-| PUT | `/api/users/{id}` | `{ "email" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `USER_NOT_FOUND` · 409 `USER_EMAIL_ALREADY_EXISTS` |
+| GET | `/api/users` | query `keyword`, `roleName`, `isActive`, `pageNumber`, `pageSize` | 200 `PagedList<UserDto>` | — |
+| GET | `/api/users/{id}` | — | 200 `UserDto` | 404 `USER_NOT_FOUND` |
+| POST | `/api/users` | `{ "email", "fullName", "password", "roleName" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `ROLE_NOT_FOUND` · 409 `USER_EMAIL_ALREADY_EXISTS` |
+| PUT | `/api/users/{id}` | `{ "email", "fullName" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `USER_NOT_FOUND` · 409 `USER_EMAIL_ALREADY_EXISTS` |
 | PATCH | `/api/users/{id}/activate` | — | 204 | 404 `USER_NOT_FOUND` · 409 `USER_ALREADY_ACTIVE` |
 | PATCH | `/api/users/{id}/deactivate` | — | 204 | 404 `USER_NOT_FOUND` · 409 `USER_CANNOT_MODIFY_SELF`, `USER_ALREADY_INACTIVE`, `USER_LAST_ADMIN` |
 | PUT | `/api/users/{id}/role` | `{ "roleName" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `USER_NOT_FOUND`, `ROLE_NOT_FOUND` · 409 `USER_CANNOT_MODIFY_SELF`, `USER_LAST_ADMIN` |
 
-`roleName` phải là một trong 4 role. Lỗi validate của nhóm này hiện chỉ trả
-`VALIDATION_FAILED` trong `errors`, chưa có mã riêng theo field.
+- `GET /api/users`: `keyword` khớp một phần email; các bộ lọc kết hợp AND; sắp theo email.
+- `fullName` bắt buộc, tối đa 100 ký tự, khoảng trắng đầu/cuối bị cắt.
+- `roleName` phải là một trong 4 role. Lỗi validate của nhóm này hiện chỉ trả
+  `VALIDATION_FAILED` trong `errors`, chưa có mã riêng theo field.
+- Tạo tài khoản role `ChoirMember` (hoặc đổi role sang `ChoirMember`) → hồ sơ ca viên được tạo
+  tự động (`status = Active`, `joinedDate` = hôm nay). Đổi role khỏi `ChoirMember` thì hồ sơ vẫn giữ.
+- `deactivate` và đổi role thu hồi mọi phiên đăng nhập của user đó (xem refresh ở mục 2).
 
 ---
 
-## 4. Member profiles — `api/member-profiles` · role `ChoirMember`
+## 4. Member profiles — `api/member-profiles` · của tôi: `ChoirMember` · quản lý: `ChoirDirector`
 
-### `GET /api/member-profiles/me`
-
-Hồ sơ của chính người gọi.
+### `MemberProfileDto`
 
 ```json
 {
@@ -233,8 +246,24 @@ Hồ sơ của chính người gọi.
 ```
 
 `status`: `Active` | `Inactive` | `Left`. `phone`, `dateOfBirth`, `avatarUrl` có thể `null`.
+`fullName`, `email`, `avatarUrl` lấy từ tài khoản (`User`).
 
-`200` · `404 MEMBER_NOT_FOUND` (tài khoản chưa có hồ sơ).
+| Method | Route | Role | Body / Query | Thành công | Lỗi |
+|---|---|---|---|---|---|
+| GET | `/api/member-profiles/me` | `ChoirMember` | — | 200 `MemberProfileDto` | 404 `MEMBER_NOT_FOUND` |
+| PUT | `/api/member-profiles/me` | `ChoirMember` | `{ "fullName", "phone", "dateOfBirth" }` | 200 `MemberProfileDto` | 400 `VALIDATION_FAILED` · 404 `MEMBER_NOT_FOUND` |
+| GET | `/api/member-profiles` | `ChoirDirector` | query `keyword`, `status`, `pageNumber`, `pageSize` | 200 `PagedList<MemberProfileDto>` | — |
+| GET | `/api/member-profiles/{id}` | `ChoirDirector` | — | 200 `MemberProfileDto` | 404 `MEMBER_NOT_FOUND` |
+| PUT | `/api/member-profiles/{id}` | `ChoirDirector` | `{ "phone", "dateOfBirth", "joinedDate", "status" }` | 200 `MemberProfileDto` | 400 `VALIDATION_FAILED`, `MEMBER_JOINED_DATE_IN_FUTURE` · 404 `MEMBER_NOT_FOUND` |
+
+- `PUT` thay **toàn bộ** các field trong body: field bỏ trống / `null` sẽ bị xoá giá trị
+  (`phone`, `dateOfBirth`). Gửi lại giá trị cũ nếu không muốn đổi.
+- `PUT .../me`: `fullName` bắt buộc (≤ 100 ký tự), đổi tên hiển thị của chính tài khoản đó.
+  `phone` ≤ 20 ký tự. `dateOfBirth` không được ở tương lai.
+- `PUT .../{id}`: `joinedDate` bắt buộc, không ở tương lai. Ca trưởng **không** sửa tên ca viên
+  (tên do ca viên tự sửa, hoặc Admin sửa qua `PUT /api/users/{id}`).
+- `GET /api/member-profiles`: `keyword` khớp một phần tên hoặc email; sắp theo tên.
+- Role khác gọi vào → `403` body rỗng.
 
 ---
 
@@ -470,3 +499,34 @@ const conn = new signalR.HubConnectionBuilder()
 conn.on("ReceiveNotificationAsync", (n) => { /* n: NotificationDto */ });
 await conn.start();
 ```
+
+---
+
+## 9. Lookups — `api/lookups` · mọi role đã đăng nhập
+
+Danh mục cho dropdown. Chỉ trả dòng **đang hoạt động**; Admin tắt một dòng thì nó biến khỏi
+danh sách (dữ liệu cũ vẫn trỏ tới nó). Không phân trang — trả mảng.
+
+| Route | Phần tử | Sắp theo |
+|---|---|---|
+| `GET /api/lookups/mass-types` | `{ "id", "name", "description" }` | tên |
+| `GET /api/lookups/ceremony-types` | `{ "id", "name", "description" }` | tên |
+| `GET /api/lookups/event-categories` | `{ "id", "name", "description" }` | tên |
+| `GET /api/lookups/song-themes` | `{ "id", "name", "description" }` | tên |
+| `GET /api/lookups/skill-categories` | `{ "id", "name", "description" }` | tên |
+| `GET /api/lookups/liturgical-seasons` | `{ "id", "name", "startDate", "endDate", "colorHex" }` | `startDate` |
+| `GET /api/lookups/liturgical-slots` | `{ "id", "name", "defaultOrder" }` | `defaultOrder` (thứ tự trong lễ) |
+| `GET /api/lookups/worship-locations` | `{ "id", "name", "address" }` | tên |
+| `GET /api/lookups/skills?categoryId=` | `{ "id", "categoryId", "name", "description" }` | tên |
+
+- `description`, `address`, `colorHex` có thể `null`.
+- `skills`: `categoryId` tuỳ chọn; bỏ qua kỹ năng thuộc nhóm đã tắt.
+- Id của 5 nhóm kỹ năng là cố định trên mọi môi trường:
+
+| Nhóm | Id |
+|---|---|
+| Vocal | `c4829abd-bb1d-4c6c-b401-9a177a88e66a` |
+| Instrument | `0904ad8b-87f2-46c5-9938-f6cfbf0fa70b` |
+| Solo | `550a67bb-0393-4bc4-8fe0-d7a453871f81` |
+| Psalm | `a1c322c5-14af-4ca4-892a-b6e8d0eacbbd` |
+| Conducting support | `e2722720-3745-48ea-9e8e-14ec7a63907d` |
