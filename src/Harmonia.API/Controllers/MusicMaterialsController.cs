@@ -33,12 +33,15 @@ public class MusicMaterialsController(IMusicMaterialService musicMaterialService
         [FromQuery, BindRequired] Guid songId, [FromQuery] PagingRequest paging, CancellationToken cancellationToken) =>
         ToActionResult(await musicMaterialService.GetBySongAsync(songId, paging, cancellationToken));
 
-    /// <summary>Materials for the calling member's approved skills plus those for everyone (UC-07 / FE-08).</summary>
+    /// <summary>
+    /// Materials for the calling member's approved skills plus those for everyone (UC-07 / FE-08),
+    /// optionally searched and filtered (UC-07E).
+    /// </summary>
     [HttpGet("mine")]
     [Authorize(Roles = RoleNames.ChoirMember)]
     public async Task<IActionResult> GetMineAsync(
-        [FromQuery] Guid? songId, [FromQuery] PagingRequest paging, CancellationToken cancellationToken) =>
-        ToActionResult(await musicMaterialService.GetMineAsync(User.GetUserId(), songId, paging, cancellationToken));
+        [FromQuery] SearchMusicMaterialsRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await musicMaterialService.GetMineAsync(User.GetUserId(), request, cancellationToken));
 
     [HttpPut("{id:guid}")]
     [Authorize(Roles = RoleNames.ChoirDirector)]

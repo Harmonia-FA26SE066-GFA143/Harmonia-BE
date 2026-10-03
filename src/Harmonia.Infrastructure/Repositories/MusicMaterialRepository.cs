@@ -1,4 +1,5 @@
 using Harmonia.Application.Common.Models;
+using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IRepositories;
 using Harmonia.Domain.Entities;
 using Harmonia.Domain.Enums;
@@ -32,7 +33,7 @@ public class MusicMaterialRepository(HarmoniaDbContext dbContext)
     }
 
     public async Task<PagedList<MusicMaterial>> GetActiveForMemberAsync(
-        Guid memberId, Guid? songId, PagingRequest paging, CancellationToken cancellationToken)
+        Guid memberId, string? keyword, SearchMusicMaterialsRequest filter, CancellationToken cancellationToken)
     {
         var approvedSkillIds = DbContext.MemberSkills
             .Where(s => s.MemberId == memberId && s.Status == ApprovalStatus.Approved)
@@ -43,7 +44,17 @@ public class MusicMaterialRepository(HarmoniaDbContext dbContext)
             .Where(x => x.IsActive && x.Song.IsActive
                 && (x.TargetSkillId == null || approvedSkillIds.Contains(x.TargetSkillId.Value)));
 
-        if (songId is not null) query = query.Where(x => x.SongId == songId);
+        // ponytail: LIKE '%keyword%' scans the table; add a full-text index if the library grows large.
+        if (keyword is not null) query = query.Where(x => x.Song.Title.Contains(keyword) || x.Title.Contains(keyword));
+        if (filter.SongId is { } songId) query = query.Where(x => x.SongId == songId);
+        if (filter.SkillId is { } skillId) query = query.Where(x => x.TargetSkillId == skillId);
+        if (filter.MaterialType is { } materialType) query = query.Where(x => x.MaterialType == materialType);
+
+        if (filter.LiturgicalSeasonId is { } seasonId)
+        {
+            query = query.Where(x => x.Song.Classifications.Any(
+                c => c.TargetType == ClassificationTarget.LiturgicalSeason && c.TargetId == seasonId));
+        }
 
         var totalCount = await query.CountAsync(cancellationToken);
 
@@ -53,10 +64,10 @@ public class MusicMaterialRepository(HarmoniaDbContext dbContext)
             .ThenBy(x => x.MaterialType)
             .ThenBy(x => x.Title)
             .ThenBy(x => x.Id)
-            .Skip((paging.PageNumber - 1) * paging.PageSize)
-            .Take(paging.PageSize)
+            .Skip((filter.PageNumber - 1) * filter.PageSize)
+            .Take(filter.PageSize)
             .ToListAsync(cancellationToken);
 
-        return new PagedList<MusicMaterial>(items, paging.PageNumber, paging.PageSize, totalCount);
+        return new PagedList<MusicMaterial>(items, filter.PageNumber, filter.PageSize, totalCount);
     }
 }

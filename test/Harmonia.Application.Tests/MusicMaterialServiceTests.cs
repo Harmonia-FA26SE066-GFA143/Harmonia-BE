@@ -266,21 +266,39 @@ public class MusicMaterialServiceTests
         var userId = Guid.NewGuid();
         var member = new MemberProfile { Id = Guid.NewGuid(), UserId = userId };
         _members.GetByUserIdAsync(userId, _ct).Returns(member);
-        var paging = new PagingRequest();
+        var request = new SearchMusicMaterialsRequest { SongId = _song.Id };
         var material = new MusicMaterial { Id = Guid.NewGuid(), SongId = _song.Id, Title = "Bass", FilePublicId = "harmonia/b.mp3" };
-        _materials.GetActiveForMemberAsync(member.Id, _song.Id, paging, _ct)
+        _materials.GetActiveForMemberAsync(member.Id, null, request, _ct)
             .Returns(new PagedList<MusicMaterial>([material], 1, 20, 1));
 
-        var result = await _sut.GetMineAsync(userId, _song.Id, paging, _ct);
+        var result = await _sut.GetMineAsync(userId, request, _ct);
 
         var dto = Assert.Single(result.Value!.Items);
         Assert.Equal("signed:harmonia/b.mp3", dto.FileUrl);
     }
 
+    [Theory]
+    [InlineData("  Hoa Binh ", "Hoa Binh")]
+    [InlineData("   ", null)]
+    public async Task GetMine_Keyword_IsTrimmedAndBlankBecomesNull_Async(string keyword, string? expected)
+    {
+        var userId = Guid.NewGuid();
+        var member = new MemberProfile { Id = Guid.NewGuid(), UserId = userId };
+        _members.GetByUserIdAsync(userId, _ct).Returns(member);
+        var request = new SearchMusicMaterialsRequest { Keyword = keyword };
+        _materials.GetActiveForMemberAsync(default, default, default!, default)
+            .ReturnsForAnyArgs(new PagedList<MusicMaterial>([], 1, 20, 0));
+
+        var result = await _sut.GetMineAsync(userId, request, _ct);
+
+        Assert.True(result.IsSuccess);
+        await _materials.Received(1).GetActiveForMemberAsync(member.Id, expected, request, _ct);
+    }
+
     [Fact]
     public async Task GetMine_NoProfile_ReturnsMemberNotFound_Async()
     {
-        var result = await _sut.GetMineAsync(Guid.NewGuid(), null, new PagingRequest(), _ct);
+        var result = await _sut.GetMineAsync(Guid.NewGuid(), new SearchMusicMaterialsRequest(), _ct);
 
         Assert.Equal(ErrorCodes.MemberNotFound, result.Code);
         await _materials.DidNotReceiveWithAnyArgs().GetActiveForMemberAsync(default, default, default!, default);
@@ -292,7 +310,7 @@ public class MusicMaterialServiceTests
         var userId = Guid.NewGuid();
         _members.GetByUserIdAsync(userId, _ct).Returns(new MemberProfile { Id = Guid.NewGuid(), UserId = userId });
 
-        var result = await _sut.GetMineAsync(userId, Guid.NewGuid(), new PagingRequest(), _ct);
+        var result = await _sut.GetMineAsync(userId, new SearchMusicMaterialsRequest { SongId = Guid.NewGuid() }, _ct);
 
         Assert.Equal(ErrorCodes.SongNotFound, result.Code);
     }

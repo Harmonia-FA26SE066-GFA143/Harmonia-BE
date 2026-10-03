@@ -80,19 +80,21 @@ public class MusicMaterialService(
     }
 
     public async Task<Result<PagedList<MusicMaterialDto>>> GetMineAsync(
-        Guid userId, Guid? songId, PagingRequest paging, CancellationToken cancellationToken)
+        Guid userId, SearchMusicMaterialsRequest request, CancellationToken cancellationToken)
     {
         var member = await memberProfileRepository.GetByUserIdAsync(userId, cancellationToken);
         if (member is null) return Result<PagedList<MusicMaterialDto>>.Failure(ErrorCodes.MemberNotFound);
 
-        if (songId is not null)
+        if (request.SongId is { } songId)
         {
-            var song = await songRepository.GetByIdAsync(songId.Value, cancellationToken);
+            var song = await songRepository.GetByIdAsync(songId, cancellationToken);
             if (song is not { IsActive: true }) return Result<PagedList<MusicMaterialDto>>.Failure(ErrorCodes.SongNotFound);
         }
 
+        var keyword = string.IsNullOrWhiteSpace(request.Keyword) ? null : request.Keyword.Trim();
+
         // ponytail: filters by approved skills only; add the finalized-roster song filter once ServiceRoster ships.
-        var page = await musicMaterialRepository.GetActiveForMemberAsync(member.Id, songId, paging, cancellationToken);
+        var page = await musicMaterialRepository.GetActiveForMemberAsync(member.Id, keyword, request, cancellationToken);
         return Result<PagedList<MusicMaterialDto>>.Success(ToDtoPage(page));
     }
 

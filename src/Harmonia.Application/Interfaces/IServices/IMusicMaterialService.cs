@@ -18,10 +18,10 @@ public interface IMusicMaterialService
 
     /// <summary>
     /// Materials the calling member can use (UC-07 / FE-08): those for everyone plus those for the member's
-    /// approved skills. <paramref name="songId"/> narrows the list to one song.
+    /// approved skills. The filters of <paramref name="request"/> narrow the list (UC-07E).
     /// </summary>
     Task<Result<PagedList<MusicMaterialDto>>> GetMineAsync(
-        Guid userId, Guid? songId, PagingRequest paging, CancellationToken cancellationToken);
+        Guid userId, SearchMusicMaterialsRequest request, CancellationToken cancellationToken);
 
     /// <summary>Changes title and target skill only; the file, type and id stay, so learning progress is kept.</summary>
     Task<Result<MusicMaterialDto>> UpdateAsync(Guid id, UpdateMusicMaterialRequest request, CancellationToken cancellationToken);
