@@ -2,7 +2,9 @@ using System.Net;
 using System.Net.Http.Json;
 using Harmonia.Application.DTOs;
 using Harmonia.Domain.Common;
+using Harmonia.Domain.Entities;
 using Harmonia.Domain.Enums;
+using Microsoft.EntityFrameworkCore;
 
 namespace Harmonia.API.Tests;
 
@@ -10,7 +12,7 @@ public class MemberProfilesEndpointsTests(HarmoniaApiFactory factory) : IClassFi
 {
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
 
-    private sealed record Page(List<MemberProfileDto> Items, int TotalCount);
+    private sealed record Page(List<MemberProfileSummaryDto> Items, int TotalCount);
 
     /// <summary>Creates the account through the API, the way Admin does, so the profile comes from UserService.</summary>
     private async Task<UserDto> CreateUserAsync(
@@ -103,6 +105,33 @@ public class MemberProfilesEndpointsTests(HarmoniaApiFactory factory) : IClassFi
 
         Assert.Equal(HttpStatusCode.Forbidden, list.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, other.StatusCode);
+    }
+
+    [Fact]
+    public async Task Director_ListsMembersWithApprovedSkills_FiltersBySkill_Async()
+    {
+        var user = await CreateUserAsync("mp-skill@test.com", "Skilled Singer", cancellationToken: _ct);
+        var tenor = new Skill { Id = Guid.NewGuid(), CategoryId = SkillCategoryIds.Vocal, Name = "mp-Tenor" };
+        var organ = new Skill { Id = Guid.NewGuid(), CategoryId = SkillCategoryIds.Instrument, Name = "mp-Organ" };
+        await factory.WithDbAsync(async (db, ct) =>
+        {
+            var memberId = (await db.MemberProfiles.SingleAsync(x => x.UserId == user.Id, ct)).Id;
+            db.Skills.AddRange(tenor, organ);
+            db.MemberSkills.AddRange(
+                new MemberSkill { Id = Guid.NewGuid(), MemberId = memberId, SkillId = tenor.Id, Status = ApprovalStatus.Approved },
+                new MemberSkill { Id = Guid.NewGuid(), MemberId = memberId, SkillId = organ.Id, Status = ApprovalStatus.Pending });
+            return await db.SaveChangesAsync(ct);
+        }, _ct);
+        var director = await factory.CreateClientAsAsync("director@test.com", _ct);
+
+        var byTenor = (await director.GetFromJsonAsync<Page>($"api/member-profiles?skillId={tenor.Id}", TestJson.Options, _ct))!;
+        var byOrgan = (await director.GetFromJsonAsync<Page>($"api/member-profiles?skillId={organ.Id}", TestJson.Options, _ct))!;
+
+        var skill = Assert.Single(Assert.Single(byTenor.Items).ApprovedSkills);
+        Assert.Equal("mp-Tenor", skill.SkillName);
+        Assert.Equal(SkillCategoryIds.Vocal, skill.CategoryId);
+        Assert.False(string.IsNullOrEmpty(skill.CategoryName));
+        Assert.Empty(byOrgan.Items);
     }
 
     [Fact]

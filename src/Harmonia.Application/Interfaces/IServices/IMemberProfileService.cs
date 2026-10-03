@@ -12,7 +12,8 @@ public interface IMemberProfileService
     Task<Result<MemberProfileDto>> UpdateMineAsync(
         Guid userId, UpdateMyMemberProfileRequest request, CancellationToken cancellationToken);
 
-    Task<Result<PagedList<MemberProfileDto>>> SearchAsync(
+    /// <summary>The Choir Director's member list with approved skills, the basis for assigning members to songs.</summary>
+    Task<Result<PagedList<MemberProfileSummaryDto>>> SearchAsync(
         SearchMemberProfilesRequest request, CancellationToken cancellationToken);
 
     Task<Result<MemberProfileDto>> GetByIdAsync(Guid id, CancellationToken cancellationToken);

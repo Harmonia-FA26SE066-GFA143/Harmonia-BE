@@ -437,6 +437,48 @@ public sealed class RepositoryTests : IDisposable
         Assert.Equal(["Member"], page.Items.Select(m => m.User.FullName));
     }
 
+    // ---- MemberProfileRepository.SearchAsync ----
+
+    [Fact]
+    public async Task SearchMembers_LoadsOnlyApprovedActiveSkillsWithCategory_Async()
+    {
+        var seed = await SeedMaterialsAsync(_ct);
+        var retired = new Skill { Id = Guid.NewGuid(), CategoryId = SkillCategoryIds.Vocal, Name = "Retired", IsActive = false };
+        await using (var context = _db.NewContext())
+        {
+            context.Skills.Add(retired);
+            context.MemberSkills.Add(NewMemberSkill(seed.MemberId, retired.Id, ApprovalStatus.Approved));
+            await context.SaveChangesAsync(_ct);
+        }
+
+        var member = Assert.Single((await SearchMembersAsync(new SearchMemberProfilesRequest(), _ct)).Items);
+
+        // Bass is pending, Retired is inactive.
+        Assert.Equal(["Alto", "Guitar"], member.MemberSkills.Select(s => s.Skill.Name).Order());
+        Assert.All(member.MemberSkills, s => Assert.NotNull(s.Skill.Category));
+    }
+
+    [Fact]
+    public async Task SearchMembers_SkillId_KeepsOnlyMembersWithThatSkillApproved_Async()
+    {
+        var seed = await SeedMaterialsAsync(_ct);
+        await AddMemberAsync("Binh", MemberStatus.Active, [seed.BassId], _ct);
+        await AddMemberAsync("An", MemberStatus.Active, [], _ct);
+
+        // "Member" has Bass only pending.
+        var page = await SearchMembersAsync(new SearchMemberProfilesRequest { SkillId = seed.BassId }, _ct);
+
+        Assert.Equal(["Binh"], page.Items.Select(m => m.User.FullName));
+        Assert.Equal(1, page.TotalCount);
+    }
+
+    private async Task<PagedList<MemberProfile>> SearchMembersAsync(
+        SearchMemberProfilesRequest filter, CancellationToken cancellationToken = default)
+    {
+        await using var context = _db.NewContext();
+        return await new MemberProfileRepository(context).SearchAsync(null, filter, cancellationToken);
+    }
+
     private async Task<PagedList<MemberProfile>> GetLearnersAsync(Guid materialId, Guid? targetSkillId,
         SearchMaterialLearningProgressRequest filter, CancellationToken cancellationToken = default)
     {

@@ -17,7 +17,9 @@ public interface IMemberProfileRepository : IGenericRepository<MemberProfile>
 
     /// <summary>
     /// Read-only page of members with their User, ordered by name. <paramref name="keyword"/> matches
-    /// part of the name or email; the status of <paramref name="filter"/> narrows the result when set.
+    /// part of the name or email; the status and skill of <paramref name="filter"/> narrow the result when set.
+    /// <see cref="MemberProfile.MemberSkills"/> holds only approved skills that are still active,
+    /// with <see cref="Skill.Category"/> loaded.
     /// </summary>
     Task<PagedList<MemberProfile>> SearchAsync(
         string? keyword, SearchMemberProfilesRequest filter, CancellationToken cancellationToken);

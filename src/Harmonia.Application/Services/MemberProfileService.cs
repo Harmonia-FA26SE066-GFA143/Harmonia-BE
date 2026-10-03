@@ -37,14 +37,14 @@ public class MemberProfileService(
         return Result<MemberProfileDto>.Success(mapper.Map<MemberProfileDto>(profile));
     }
 
-    public async Task<Result<PagedList<MemberProfileDto>>> SearchAsync(
+    public async Task<Result<PagedList<MemberProfileSummaryDto>>> SearchAsync(
         SearchMemberProfilesRequest request, CancellationToken cancellationToken)
     {
         var keyword = string.IsNullOrWhiteSpace(request.Keyword) ? null : request.Keyword.Trim();
         var page = await memberProfileRepository.SearchAsync(keyword, request, cancellationToken);
 
-        return Result<PagedList<MemberProfileDto>>.Success(new PagedList<MemberProfileDto>(
-            mapper.Map<List<MemberProfileDto>>(page.Items), page.PageNumber, page.PageSize, page.TotalCount));
+        return Result<PagedList<MemberProfileSummaryDto>>.Success(new PagedList<MemberProfileSummaryDto>(
+            mapper.Map<List<MemberProfileSummaryDto>>(page.Items), page.PageNumber, page.PageSize, page.TotalCount));
     }
 
     public async Task<Result<MemberProfileDto>> GetByIdAsync(Guid id, CancellationToken cancellationToken)

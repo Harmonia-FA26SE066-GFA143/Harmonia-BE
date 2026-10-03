@@ -42,10 +42,18 @@ public class MemberProfileRepository(HarmoniaDbContext dbContext)
             query = query.Where(x => x.Status == status);
         }
 
+        if (filter.SkillId is { } skillId)
+        {
+            query = query.Where(x => x.MemberSkills.Any(s => s.SkillId == skillId && s.Status == ApprovalStatus.Approved));
+        }
+
         var totalCount = await query.CountAsync(cancellationToken);
 
         var items = await query
             .Include(x => x.User)
+            .Include(x => x.MemberSkills.Where(s => s.Status == ApprovalStatus.Approved && s.Skill.IsActive))
+                .ThenInclude(s => s.Skill)
+                .ThenInclude(s => s.Category)
             .OrderBy(x => x.User.FullName)
             .ThenBy(x => x.Id)
             .Skip((filter.PageNumber - 1) * filter.PageSize)
