@@ -11,6 +11,10 @@ public class MemberSkillConfiguration : IEntityTypeConfiguration<MemberSkill>
     {
         builder.Property(x => x.RejectReason).HasMaxLength(500);
 
+        // A review saves only while the row still holds the status it was read with, so two
+        // directors reviewing the same Pending row cannot both succeed.
+        builder.Property(x => x.Status).IsConcurrencyToken();
+
         // One live (Pending or Approved) declaration per member and skill; rejected rows stay as
         // history, so the member can declare the same skill again after a rejection.
         builder.HasIndex(x => new { x.MemberId, x.SkillId })

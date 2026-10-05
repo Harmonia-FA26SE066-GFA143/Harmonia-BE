@@ -107,12 +107,16 @@ public class MemberSkillService(
             return Result<MemberSkillDetailDto>.Failure(ErrorCodes.MemberSkillAlreadyReviewed);
         }
 
-        // ponytail: last write wins if two directors review the same row at once; add a rowversion if that matters.
         memberSkill.Status = decision;
         memberSkill.ApprovedBy = directorUserId;
         memberSkill.ApprovedAt = DateTime.UtcNow;
         memberSkill.RejectReason = rejectReason;
-        await memberSkillRepository.SaveChangesAsync(cancellationToken);
+
+        // Another director reviewed the row between our read and our save; theirs stands.
+        if (!await memberSkillRepository.TrySaveReviewAsync(memberSkill, cancellationToken))
+        {
+            return Result<MemberSkillDetailDto>.Failure(ErrorCodes.MemberSkillAlreadyReviewed);
+        }
 
         var skillName = memberSkill.Skill.Name;
         await notificationService.SendAsync(

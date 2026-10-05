@@ -218,6 +218,7 @@ public class MemberSkillServiceTests
             Status = status, DeclaredAt = DateTime.UtcNow,
         };
         _memberSkills.GetForReviewAsync(row.Id, _ct).Returns(row);
+        _memberSkills.TrySaveReviewAsync(row, _ct).Returns(true);
         return row;
     }
 
@@ -234,7 +235,7 @@ public class MemberSkillServiceTests
         Assert.Equal("Skill Member", result.Value.MemberFullName);
         Assert.Equal(directorId, row.ApprovedBy);
         Assert.NotNull(row.ApprovedAt);
-        await _memberSkills.Received(1).SaveChangesAsync(_ct);
+        await _memberSkills.Received(1).TrySaveReviewAsync(row, _ct);
         await _notifications.Received(1).SendAsync(
             Arg.Is<SendNotificationRequest>(x => x.Type == NotificationType.SkillReview
                 && x.RecipientUserIds.Single() == _userId && x.ReferenceId == row.Id),
@@ -264,7 +265,33 @@ public class MemberSkillServiceTests
         var result = await _sut.ApproveAsync(Guid.NewGuid(), row.Id, _ct);
 
         Assert.Equal(ErrorCodes.MemberSkillAlreadyReviewed, result.Code);
-        await _memberSkills.DidNotReceive().SaveChangesAsync(_ct);
+        await _memberSkills.DidNotReceive().TrySaveReviewAsync(Arg.Any<MemberSkill>(), _ct);
+        await _notifications.DidNotReceive().SendAsync(Arg.Any<SendNotificationRequest>(), _ct);
+    }
+
+    [Theory]
+    [InlineData(ApprovalStatus.Approved)]
+    [InlineData(ApprovalStatus.Rejected)]
+    public async Task Reject_AlreadyReviewed_ReturnsAlreadyReviewed_Async(ApprovalStatus status)
+    {
+        var row = StubForReview(status);
+
+        var result = await _sut.RejectAsync(Guid.NewGuid(), row.Id, new RejectMemberSkillRequest { Reason = "Not ready" }, _ct);
+
+        Assert.Equal(ErrorCodes.MemberSkillAlreadyReviewed, result.Code);
+        await _memberSkills.DidNotReceive().TrySaveReviewAsync(Arg.Any<MemberSkill>(), _ct);
+        await _notifications.DidNotReceive().SendAsync(Arg.Any<SendNotificationRequest>(), _ct);
+    }
+
+    [Fact]
+    public async Task Approve_ConcurrentReview_ReturnsAlreadyReviewed_AndDoesNotNotify_Async()
+    {
+        var row = StubForReview(ApprovalStatus.Pending);
+        _memberSkills.TrySaveReviewAsync(row, _ct).Returns(false);
+
+        var result = await _sut.ApproveAsync(Guid.NewGuid(), row.Id, _ct);
+
+        Assert.Equal(ErrorCodes.MemberSkillAlreadyReviewed, result.Code);
         await _notifications.DidNotReceive().SendAsync(Arg.Any<SendNotificationRequest>(), _ct);
     }
 

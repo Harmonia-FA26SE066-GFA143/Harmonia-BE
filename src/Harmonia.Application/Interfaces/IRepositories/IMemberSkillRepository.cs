@@ -42,4 +42,10 @@ public interface IMemberSkillRepository : IGenericRepository<MemberSkill>
     /// and its User loaded.
     /// </summary>
     Task<MemberSkill?> GetForReviewAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Saves a review of a row loaded by <see cref="GetForReviewAsync"/>. Returns false when another
+    /// request changed the row's status after it was read, so nothing is saved.
+    /// </summary>
+    Task<bool> TrySaveReviewAsync(MemberSkill memberSkill, CancellationToken cancellationToken);
 }

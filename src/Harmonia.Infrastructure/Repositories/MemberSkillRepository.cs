@@ -100,4 +100,19 @@ public class MemberSkillRepository(HarmoniaDbContext dbContext)
             .Include(x => x.Member)
                 .ThenInclude(m => m.User)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+    public async Task<bool> TrySaveReviewAsync(MemberSkill memberSkill, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await DbContext.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Status is a concurrency token: the UPDATE matched no row because another review got there first.
+            DbContext.Entry(memberSkill).State = EntityState.Detached;
+            return false;
+        }
+    }
 }

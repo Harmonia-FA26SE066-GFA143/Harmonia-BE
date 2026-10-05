@@ -774,6 +774,41 @@ public sealed class RepositoryTests : IDisposable
         Assert.Equal(older.Id, Assert.Single(rejectedOnly.Items).Id);
     }
 
+    [Fact]
+    public async Task MemberSkill_TrySaveReview_ConcurrentReview_SecondReturnsFalseAndFirstStands_Async()
+    {
+        var (memberId, skillId) = await SeedMemberAndSkillAsync(_ct);
+        var director = await _db.AddUserAsync("director@test.com", RoleNames.ChoirDirector, _ct);
+        var row = NewMemberSkill(memberId, skillId, ApprovalStatus.Pending);
+        await using (var seed = _db.NewContext())
+        {
+            seed.MemberSkills.Add(row);
+            await seed.SaveChangesAsync(_ct);
+        }
+
+        // Both directors read the row while it is still Pending.
+        await using var first = _db.NewContext();
+        await using var second = _db.NewContext();
+        var firstRepository = new MemberSkillRepository(first);
+        var secondRepository = new MemberSkillRepository(second);
+        var firstRow = (await firstRepository.GetForReviewAsync(row.Id, _ct))!;
+        var secondRow = (await secondRepository.GetForReviewAsync(row.Id, _ct))!;
+
+        firstRow.Status = ApprovalStatus.Approved;
+        firstRow.ApprovedBy = director.Id;
+        secondRow.Status = ApprovalStatus.Rejected;
+        secondRow.ApprovedBy = director.Id;
+        secondRow.RejectReason = "Not ready";
+
+        Assert.True(await firstRepository.TrySaveReviewAsync(firstRow, _ct));
+        Assert.False(await secondRepository.TrySaveReviewAsync(secondRow, _ct));
+
+        await using var verify = _db.NewContext();
+        var saved = await verify.MemberSkills.SingleAsync(x => x.Id == row.Id, _ct);
+        Assert.Equal(ApprovalStatus.Approved, saved.Status);
+        Assert.Null(saved.RejectReason);
+    }
+
     // ---- GenericRepository ----
 
     [Fact]
