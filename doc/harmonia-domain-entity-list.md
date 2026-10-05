@@ -56,7 +56,7 @@ Written once here instead of repeated 43 times:
 `categoryId` Guid → SkillCategory · `name` string(50) · `description` string(300)? · `isActive` bool · unique `(categoryId, name)`
 
 **7. `MemberSkill`** — declared skill + approval outcome (FE-03/04/25)
-`memberId` Guid → MemberProfile · `skillId` Guid → Skill · `level` SkillLevel? · `status` ApprovalStatus · `declaredAt` DateTime · `approvedBy` Guid? → User · `approvedAt` DateTime? · `rejectReason` string(500)? · unique `(memberId, skillId)`
+`memberId` Guid → MemberProfile · `skillId` Guid → Skill · `level` SkillLevel? · `status` ApprovalStatus · `declaredAt` DateTime · `approvedBy` Guid? → User · `approvedAt` DateTime? · `rejectReason` string(500)? · unique `(memberId, skillId)` where `status ≠ Rejected` — rejected rows stay as history and the skill can be declared again as a new Pending row
 
 ## C. Liturgical calendar
 
@@ -209,7 +209,7 @@ Written once here instead of repeated 43 times:
 | `AssignmentScope` | All, SkillGroup, Individual |
 | `TargetType` | Member, Skill |
 | `SubmissionStatus` | Submitted, Passed, NeedsRevision, Overdue |
-| `NotificationType` | EventPublished, SongListDecision, ParticipationRequest, AssignmentNotice, PracticeFeedback, DirectorNote |
+| `NotificationType` | EventPublished, SongListDecision, ParticipationRequest, AssignmentNotice, PracticeFeedback, DirectorNote, SkillReview |
 | `SettingDataType` | String, Int, Bool, Json |
 | `ReportType` | UserActivity, RehearsalAttendance, Participation, AssignmentCompletion, SongUsage, ServiceHistory |
 
@@ -281,3 +281,5 @@ Written once here instead of repeated 43 times:
 - 2026-09-27: `PasswordResetToken` added for S-03 Change / Forgot Password (42 → 43).
 - 2026-09-30: D6 — daily program. `LiturgicalWeek` replaced by `LiturgicalDay` (count stays 43); `LiturgicalEvent` gains `liturgicalSeasonId`, `publishedAt`; `DirectorNote.weekId` → `noteDate`; enum `PublishStatus` dropped; `NotificationType.WeekPublished` → `EventPublished`.
 - 2026-10-01: `ReportType.Attendance` → `RehearsalAttendance` (naming rule: no bare `Attendance`); enum count corrected to 20.
+- 2026-10-05: `MemberSkill` unique `(memberId, skillId)` becomes a filtered index (`status ≠ Rejected`), so a member can re-declare a rejected skill (UC-03).
+- 2026-10-05: `NotificationType.SkillReview` added — member is notified when the Choir Director approves or rejects a declared skill (UC-19). Appended last, stored as int, no migration.

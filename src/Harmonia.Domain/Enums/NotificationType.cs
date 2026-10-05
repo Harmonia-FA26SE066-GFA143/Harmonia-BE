@@ -7,5 +7,6 @@ public enum NotificationType
     ParticipationRequest,
     AssignmentNotice,
     PracticeFeedback,
-    DirectorNote
+    DirectorNote,
+    SkillReview
 }

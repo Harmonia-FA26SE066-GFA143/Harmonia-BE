@@ -1,4 +1,5 @@
 using Harmonia.Domain.Entities;
+using Harmonia.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -10,7 +11,11 @@ public class MemberSkillConfiguration : IEntityTypeConfiguration<MemberSkill>
     {
         builder.Property(x => x.RejectReason).HasMaxLength(500);
 
-        builder.HasIndex(x => new { x.MemberId, x.SkillId }).IsUnique();
+        // One live (Pending or Approved) declaration per member and skill; rejected rows stay as
+        // history, so the member can declare the same skill again after a rejection.
+        builder.HasIndex(x => new { x.MemberId, x.SkillId })
+            .IsUnique()
+            .HasFilter($"[Status] <> {(int)ApprovalStatus.Rejected}");
 
         builder.HasOne(x => x.Member)
             .WithMany(x => x.MemberSkills)
