@@ -193,4 +193,34 @@ public class ValidatorTests
 
         Assert.Equal([ErrorCodes.MaterialLearningStatusInvalid], codes);
     }
+
+    // ---- DeclareMemberSkill ----
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(SkillLevel.Advanced)]
+    public void DeclareMemberSkill_Valid_HasNoErrors(SkillLevel? level)
+    {
+        var result = new DeclareMemberSkillRequestValidator().Validate(
+            new DeclareMemberSkillRequest { SkillId = Guid.NewGuid(), Level = level });
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void DeclareMemberSkill_EmptySkillId_IsInvalid()
+    {
+        var result = new DeclareMemberSkillRequestValidator().Validate(new DeclareMemberSkillRequest());
+
+        Assert.Equal(nameof(DeclareMemberSkillRequest.SkillId), Assert.Single(result.Errors).PropertyName);
+    }
+
+    [Fact]
+    public void DeclareMemberSkill_UnknownLevel_IsInvalid()
+    {
+        var result = new DeclareMemberSkillRequestValidator().Validate(
+            new DeclareMemberSkillRequest { SkillId = Guid.NewGuid(), Level = (SkillLevel)99 });
+
+        Assert.Equal(nameof(DeclareMemberSkillRequest.Level), Assert.Single(result.Errors).PropertyName);
+    }
 }

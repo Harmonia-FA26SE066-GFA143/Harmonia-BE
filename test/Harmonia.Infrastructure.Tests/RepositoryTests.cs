@@ -437,6 +437,74 @@ public sealed class RepositoryTests : IDisposable
         Assert.Equal(["Member"], page.Items.Select(m => m.User.FullName));
     }
 
+    // ---- MemberProfileRepository.SearchAsync ----
+
+    [Fact]
+    public async Task SearchMembers_LoadsOnlyApprovedActiveSkillsWithCategory_Async()
+    {
+        var seed = await SeedMaterialsAsync(_ct);
+        var retired = new Skill { Id = Guid.NewGuid(), CategoryId = SkillCategoryIds.Vocal, Name = "Retired", IsActive = false };
+        await using (var context = _db.NewContext())
+        {
+            context.Skills.Add(retired);
+            context.MemberSkills.Add(NewMemberSkill(seed.MemberId, retired.Id, ApprovalStatus.Approved));
+            await context.SaveChangesAsync(_ct);
+        }
+
+        var member = Assert.Single((await SearchMembersAsync(new SearchMemberProfilesRequest(), _ct)).Items);
+
+        // Bass is pending, Retired is inactive.
+        Assert.Equal(["Alto", "Guitar"], member.MemberSkills.Select(s => s.Skill.Name).Order());
+        Assert.All(member.MemberSkills, s => Assert.NotNull(s.Skill.Category));
+    }
+
+    [Fact]
+    public async Task SearchMembers_SkillId_KeepsOnlyMembersWithThatSkillApproved_Async()
+    {
+        var seed = await SeedMaterialsAsync(_ct);
+        await AddMemberAsync("Binh", MemberStatus.Active, [seed.BassId], _ct);
+        await AddMemberAsync("An", MemberStatus.Active, [], _ct);
+
+        // "Member" has Bass only pending.
+        var page = await SearchMembersAsync(new SearchMemberProfilesRequest { SkillId = seed.BassId }, _ct);
+
+        Assert.Equal(["Binh"], page.Items.Select(m => m.User.FullName));
+        Assert.Equal(1, page.TotalCount);
+    }
+
+    // ---- MemberProfileRepository.GetByUserIdWithApprovedSkillsAsync ----
+
+    [Fact]
+    public async Task GetByUserIdWithApprovedSkills_LoadsRoleAndOnlyApprovedActiveSkills_Async()
+    {
+        var seed = await SeedMaterialsAsync(_ct);
+        var retired = new Skill { Id = Guid.NewGuid(), CategoryId = SkillCategoryIds.Vocal, Name = "Retired", IsActive = false };
+        Guid userId;
+        await using (var context = _db.NewContext())
+        {
+            context.Skills.Add(retired);
+            context.MemberSkills.Add(NewMemberSkill(seed.MemberId, retired.Id, ApprovalStatus.Approved));
+            await context.SaveChangesAsync(_ct);
+            userId = (await context.MemberProfiles.SingleAsync(x => x.Id == seed.MemberId, _ct)).UserId;
+        }
+
+        await using var readContext = _db.NewContext();
+        var member = await new MemberProfileRepository(readContext).GetByUserIdWithApprovedSkillsAsync(userId, _ct);
+
+        Assert.NotNull(member);
+        Assert.False(string.IsNullOrEmpty(member.User.Role.Name));
+        // Bass is pending, Retired is inactive.
+        Assert.Equal(["Alto", "Guitar"], member.MemberSkills.Select(s => s.Skill.Name).Order());
+        Assert.All(member.MemberSkills, s => Assert.NotNull(s.Skill.Category));
+    }
+
+    private async Task<PagedList<MemberProfile>> SearchMembersAsync(
+        SearchMemberProfilesRequest filter, CancellationToken cancellationToken = default)
+    {
+        await using var context = _db.NewContext();
+        return await new MemberProfileRepository(context).SearchAsync(null, filter, cancellationToken);
+    }
+
     private async Task<PagedList<MemberProfile>> GetLearnersAsync(Guid materialId, Guid? targetSkillId,
         SearchMaterialLearningProgressRequest filter, CancellationToken cancellationToken = default)
     {
@@ -624,6 +692,122 @@ public sealed class RepositoryTests : IDisposable
             Id = Guid.NewGuid(), SongId = songId, MaterialType = type, Title = title, TargetSkillId = targetSkillId,
             FilePublicId = $"harmonia/{Guid.NewGuid()}", FileName = "file.pdf", IsActive = isActive,
         };
+
+    // ---- MemberSkillRepository ----
+
+    private async Task<(Guid MemberId, Guid SkillId)> SeedMemberAndSkillAsync(CancellationToken cancellationToken = default)
+    {
+        var user = await _db.AddUserAsync("ms@test.com", cancellationToken: cancellationToken);
+        var member = new MemberProfile { Id = Guid.NewGuid(), UserId = user.Id };
+        var tenor = new Skill { Id = Guid.NewGuid(), CategoryId = SkillCategoryIds.Vocal, Name = "Tenor" };
+
+        await using var context = _db.NewContext();
+        context.MemberProfiles.Add(member);
+        context.Skills.Add(tenor);
+        await context.SaveChangesAsync(cancellationToken);
+        return (member.Id, tenor.Id);
+    }
+
+    [Fact]
+    public async Task MemberSkill_RejectedRows_DoNotBlockNewDeclaration_Async()
+    {
+        var (memberId, skillId) = await SeedMemberAndSkillAsync(_ct);
+        await using (var seed = _db.NewContext())
+        {
+            seed.MemberSkills.AddRange(
+                NewMemberSkill(memberId, skillId, ApprovalStatus.Rejected),
+                NewMemberSkill(memberId, skillId, ApprovalStatus.Rejected));
+            await seed.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var repository = new MemberSkillRepository(context);
+        var hasLiveBefore = await repository.HasActiveDeclarationAsync(memberId, skillId, _ct);
+        var added = await repository.TryAddAsync(NewMemberSkill(memberId, skillId, ApprovalStatus.Pending), _ct);
+
+        Assert.False(hasLiveBefore);
+        Assert.True(added);
+        Assert.True(await repository.HasActiveDeclarationAsync(memberId, skillId, _ct));
+    }
+
+    [Fact]
+    public async Task MemberSkill_TryAdd_SecondLiveDeclaration_ReturnsFalse_Async()
+    {
+        var (memberId, skillId) = await SeedMemberAndSkillAsync(_ct);
+        await using (var seed = _db.NewContext())
+        {
+            seed.MemberSkills.Add(NewMemberSkill(memberId, skillId, ApprovalStatus.Approved));
+            await seed.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var added = await new MemberSkillRepository(context)
+            .TryAddAsync(NewMemberSkill(memberId, skillId, ApprovalStatus.Pending), _ct);
+
+        Assert.False(added);
+        await using var verify = _db.NewContext();
+        Assert.Equal(1, await verify.MemberSkills.CountAsync(x => x.MemberId == memberId, _ct));
+    }
+
+    [Fact]
+    public async Task MemberSkill_GetByMember_ReturnsHistoryNewestFirstWithCategory_Async()
+    {
+        var (memberId, skillId) = await SeedMemberAndSkillAsync(_ct);
+        var older = NewMemberSkill(memberId, skillId, ApprovalStatus.Rejected);
+        older.DeclaredAt = DateTime.UtcNow.AddDays(-10);
+        var newer = NewMemberSkill(memberId, skillId, ApprovalStatus.Pending);
+        await using (var seed = _db.NewContext())
+        {
+            seed.MemberSkills.AddRange(older, newer);
+            await seed.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var repository = new MemberSkillRepository(context);
+        var page = await repository.GetByMemberAsync(memberId, null, new PagingRequest(), _ct);
+        var rejectedOnly = await repository.GetByMemberAsync(memberId, ApprovalStatus.Rejected, new PagingRequest(), _ct);
+
+        Assert.Equal(2, page.TotalCount);
+        Assert.Equal([newer.Id, older.Id], page.Items.Select(x => x.Id));
+        Assert.All(page.Items, x => Assert.NotNull(x.Skill.Category));
+        Assert.Equal(1, rejectedOnly.TotalCount);
+        Assert.Equal(older.Id, Assert.Single(rejectedOnly.Items).Id);
+    }
+
+    [Fact]
+    public async Task MemberSkill_TrySaveReview_ConcurrentReview_SecondReturnsFalseAndFirstStands_Async()
+    {
+        var (memberId, skillId) = await SeedMemberAndSkillAsync(_ct);
+        var director = await _db.AddUserAsync("director@test.com", RoleNames.ChoirDirector, _ct);
+        var row = NewMemberSkill(memberId, skillId, ApprovalStatus.Pending);
+        await using (var seed = _db.NewContext())
+        {
+            seed.MemberSkills.Add(row);
+            await seed.SaveChangesAsync(_ct);
+        }
+
+        // Both directors read the row while it is still Pending.
+        await using var first = _db.NewContext();
+        await using var second = _db.NewContext();
+        var firstRepository = new MemberSkillRepository(first);
+        var secondRepository = new MemberSkillRepository(second);
+        var firstRow = (await firstRepository.GetForReviewAsync(row.Id, _ct))!;
+        var secondRow = (await secondRepository.GetForReviewAsync(row.Id, _ct))!;
+
+        firstRow.Status = ApprovalStatus.Approved;
+        firstRow.ApprovedBy = director.Id;
+        secondRow.Status = ApprovalStatus.Rejected;
+        secondRow.ApprovedBy = director.Id;
+        secondRow.RejectReason = "Not ready";
+
+        Assert.True(await firstRepository.TrySaveReviewAsync(firstRow, _ct));
+        Assert.False(await secondRepository.TrySaveReviewAsync(secondRow, _ct));
+
+        await using var verify = _db.NewContext();
+        var saved = await verify.MemberSkills.SingleAsync(x => x.Id == row.Id, _ct);
+        Assert.Equal(ApprovalStatus.Approved, saved.Status);
+        Assert.Null(saved.RejectReason);
+    }
 
     // ---- GenericRepository ----
 

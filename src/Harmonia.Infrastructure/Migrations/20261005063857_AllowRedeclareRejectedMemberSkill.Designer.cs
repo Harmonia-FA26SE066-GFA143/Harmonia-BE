@@ -4,6 +4,7 @@ using Harmonia.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Harmonia.Infrastructure.Migrations
 {
     [DbContext(typeof(HarmoniaDbContext))]
-    partial class HarmoniaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261005063857_AllowRedeclareRejectedMemberSkill")]
+    partial class AllowRedeclareRejectedMemberSkill
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -475,7 +478,6 @@ namespace Harmonia.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<int>("Status")
-                        .IsConcurrencyToken()
                         .HasColumnType("int");
 
                     b.HasKey("Id");

@@ -11,13 +11,13 @@ public class MemberProfileService(
     IMemberProfileRepository memberProfileRepository,
     IMapper mapper) : IMemberProfileService
 {
-    public async Task<Result<MemberProfileDto>> GetMineAsync(Guid userId, CancellationToken cancellationToken)
+    public async Task<Result<MemberProfileDetailDto>> GetMineAsync(Guid userId, CancellationToken cancellationToken)
     {
-        var profile = await memberProfileRepository.GetByUserIdAsync(userId, cancellationToken);
+        var profile = await memberProfileRepository.GetByUserIdWithApprovedSkillsAsync(userId, cancellationToken);
 
         return profile is null
-            ? Result<MemberProfileDto>.Failure(ErrorCodes.MemberNotFound)
-            : Result<MemberProfileDto>.Success(mapper.Map<MemberProfileDto>(profile));
+            ? Result<MemberProfileDetailDto>.Failure(ErrorCodes.MemberNotFound)
+            : Result<MemberProfileDetailDto>.Success(mapper.Map<MemberProfileDetailDto>(profile));
     }
 
     public async Task<Result<MemberProfileDto>> UpdateMineAsync(
@@ -37,14 +37,14 @@ public class MemberProfileService(
         return Result<MemberProfileDto>.Success(mapper.Map<MemberProfileDto>(profile));
     }
 
-    public async Task<Result<PagedList<MemberProfileDto>>> SearchAsync(
+    public async Task<Result<PagedList<MemberProfileSummaryDto>>> SearchAsync(
         SearchMemberProfilesRequest request, CancellationToken cancellationToken)
     {
         var keyword = string.IsNullOrWhiteSpace(request.Keyword) ? null : request.Keyword.Trim();
         var page = await memberProfileRepository.SearchAsync(keyword, request, cancellationToken);
 
-        return Result<PagedList<MemberProfileDto>>.Success(new PagedList<MemberProfileDto>(
-            mapper.Map<List<MemberProfileDto>>(page.Items), page.PageNumber, page.PageSize, page.TotalCount));
+        return Result<PagedList<MemberProfileSummaryDto>>.Success(new PagedList<MemberProfileSummaryDto>(
+            mapper.Map<List<MemberProfileSummaryDto>>(page.Items), page.PageNumber, page.PageSize, page.TotalCount));
     }
 
     public async Task<Result<MemberProfileDto>> GetByIdAsync(Guid id, CancellationToken cancellationToken)

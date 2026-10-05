@@ -267,6 +267,62 @@ cho tới khi Admin cập nhật.
 
 ---
 
+## 4a. Member skills — `api/member-skills` · khai báo + theo dõi: `ChoirMember` (UC-03)
+
+### `MemberSkillDto`
+
+```json
+{
+  "id": "guid",
+  "skillId": "guid",
+  "skillName": "Tenor",
+  "categoryId": "guid",
+  "categoryName": "Vocal",
+  "level": "Intermediate",
+  "status": "Pending",
+  "declaredAt": "2026-10-05T08:00:00Z",
+  "approvedAt": null,
+  "rejectReason": null
+}
+```
+
+`level`: `Beginner` | `Intermediate` | `Advanced` | `null`. `status`: `Pending` | `Approved` | `Rejected`.
+`approvedAt` là lúc ca trưởng duyệt **hoặc** từ chối; `rejectReason` chỉ có khi `Rejected`.
+
+| Method | Route | Role | Body / Query | Thành công | Lỗi |
+|---|---|---|---|---|---|
+| POST | `/api/member-skills` | `ChoirMember` | `{ "skillId", "level" }` | 200 `MemberSkillDto` | 400 `VALIDATION_FAILED` · 404 `MEMBER_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `MEMBER_NOT_ACTIVE`, `SKILL_INACTIVE`, `MEMBER_SKILL_ALREADY_DECLARED` |
+| GET | `/api/member-skills/mine` | `ChoirMember` | query `status`, `pageNumber`, `pageSize` | 200 `PagedList<MemberSkillDto>` | 404 `MEMBER_NOT_FOUND` |
+| GET | `/api/member-skills/{id}` | `ChoirMember` | — | 200 `MemberSkillDto` | 404 `MEMBER_NOT_FOUND`, `MEMBER_SKILL_NOT_FOUND` |
+
+- Ca viên luôn khai cho **chính mình** — không có `memberId` trong body. Kỹ năng mới vào trạng thái `Pending`.
+- `skillId` bắt buộc, lấy từ `GET /api/lookups/skills`. `level` tuỳ chọn.
+- Skill bị tắt, hoặc thuộc nhóm kỹ năng bị tắt → 409 `SKILL_INACTIVE`. Ca viên `Inactive` / `Left` → 409 `MEMBER_NOT_ACTIVE`.
+- Đã có bản khai `Pending` hoặc `Approved` cho skill đó → 409 `MEMBER_SKILL_ALREADY_DECLARED`.
+- `status` (tuỳ chọn): `Pending` | `Approved` | `Rejected` — bỏ trống thì trả mọi trạng thái.
+- `GET /{id}` chỉ trả bản khai của chính người gọi; bản khai của ca viên khác → 404 `MEMBER_SKILL_NOT_FOUND`.
+- Bị **từ chối** thì được khai lại: bản `Rejected` giữ nguyên làm lịch sử, hệ thống thêm bản mới `Pending`.
+- `GET .../mine` trả **mọi** bản khai kể cả lịch sử bị từ chối, mới nhất trước.
+- Role khác gọi vào → `403` body rỗng.
+
+### Ca trưởng duyệt kỹ năng — `ChoirDirector` (UC-19)
+
+`MemberSkillDetailDto` = `MemberSkillDto` + `memberId`, `memberFullName`.
+
+| Method | Route | Role | Body / Query | Thành công | Lỗi |
+|---|---|---|---|---|---|
+| GET | `/api/member-skills/pending` | `ChoirDirector` | query `pageNumber`, `pageSize` | 200 `PagedList<MemberSkillDetailDto>` | — |
+| PATCH | `/api/member-skills/{id}/approve` | `ChoirDirector` | — | 200 `MemberSkillDetailDto` | 404 `MEMBER_SKILL_NOT_FOUND` · 409 `MEMBER_SKILL_ALREADY_REVIEWED` |
+| PATCH | `/api/member-skills/{id}/reject` | `ChoirDirector` | `{ "reason" }` | 200 `MemberSkillDetailDto` | 400 `MEMBER_SKILL_REJECT_REASON_REQUIRED`, `VALIDATION_FAILED` · 404 `MEMBER_SKILL_NOT_FOUND` · 409 `MEMBER_SKILL_ALREADY_REVIEWED` |
+
+- `pending` trả bản khai `Pending` của mọi ca viên, cũ nhất trước.
+- `reason` bắt buộc, tối đa 500 ký tự.
+- Chỉ duyệt/từ chối được bản `Pending`; bản đã duyệt hoặc đã từ chối → 409.
+- Duyệt hoặc từ chối xong, ca viên nhận notification `type = SkillReview`,
+  `referenceType = "MemberSkill"`, `referenceId` = id bản khai (S-05).
+
+---
+
 ## 5. Notifications — `api/notifications` · mọi role đã đăng nhập
 
 Chỉ thao tác trên thông báo **của chính người gọi**.
@@ -288,7 +344,7 @@ Chỉ thao tác trên thông báo **của chính người gọi**.
 ```
 
 `type`: `EventPublished` | `SongListDecision` | `ParticipationRequest` | `AssignmentNotice` |
-`PracticeFeedback` | `DirectorNote`. `referenceType` + `referenceId` (nullable) cho biết bấm vào
+`PracticeFeedback` | `DirectorNote` | `SkillReview`. `referenceType` + `referenceId` (nullable) cho biết bấm vào
 thì mở màn nào.
 
 | Method | Route | Thành công | Lỗi |
