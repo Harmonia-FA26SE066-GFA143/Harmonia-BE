@@ -75,6 +75,13 @@ public static class DependencyInjection
                 "Missing or invalid Google__* configuration. See src/Harmonia.API/.env.example.")
             .ValidateOnStart();
 
+        services.AddOptions<GeminiOptions>()
+            .Bind(configuration.GetSection(GeminiOptions.SectionName))
+            .Validate(
+                o => !string.IsNullOrWhiteSpace(o.ApiKey) && !string.IsNullOrWhiteSpace(o.Model),
+                "Missing or invalid Gemini__* configuration. See src/Harmonia.API/.env.example.")
+            .ValidateOnStart();
+
         services.AddHttpContextAccessor();
 
         // Plain CRUD: inject IGenericRepository<T> directly, no per-entity repository needed.
@@ -86,6 +93,14 @@ public static class DependencyInjection
         services.AddScoped<ISongRepository, SongRepository>();
         services.AddScoped<IMusicMaterialRepository, MusicMaterialRepository>();
         services.AddScoped<IMaterialLearningProgressRepository, MaterialLearningProgressRepository>();
+        services.AddScoped<ISongListItemRepository, SongListItemRepository>();
+        services.AddScoped<IServiceRosterRepository, ServiceRosterRepository>();
+        services.AddHttpClient<IRosterSuggestionGenerator, GeminiRosterSuggestionGenerator>(client =>
+        {
+            client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
+            // Short on purpose: RosterService falls back to rules, so a slow model only delays the answer.
+            client.Timeout = TimeSpan.FromSeconds(20);
+        });
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IPasswordHasherService, PasswordHasherService>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();

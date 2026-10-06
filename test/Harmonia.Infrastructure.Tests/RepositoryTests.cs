@@ -853,6 +853,93 @@ public sealed class RepositoryTests : IDisposable
         Assert.Null(await new GenericRepository<Role>(verify).GetByIdAsync(id, _ct));
     }
 
+    // ---- ServiceRosterRepository ----
+
+    private sealed record RosterSeed(Guid EventId, Guid SopranoId, Guid ConfirmedId, Guid DeclinedId, Guid InactiveId, Guid PendingId);
+
+    /// <summary>
+    /// One upcoming event plus two past ones 10 and 90 days earlier. Of four sopranos only "confirmed" is a
+    /// candidate: the others declined, are inactive, or still wait for skill approval. "confirmed" served the
+    /// 10-day-old event twice (two skills) and the 90-day-old one once.
+    /// </summary>
+    private async Task<RosterSeed> SeedRosterAsync()
+    {
+        var soprano = new Skill { Id = Guid.NewGuid(), CategoryId = SkillCategoryIds.Vocal, Name = "Soprano" };
+        var alto = new Skill { Id = Guid.NewGuid(), CategoryId = SkillCategoryIds.Vocal, Name = "Alto" };
+        var location = new WorshipLocation { Id = Guid.NewGuid(), Name = "Main church" };
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        LiturgicalEvent NewEvent(int days) => new() { Id = Guid.NewGuid(), EventDate = today.AddDays(days), LocationId = location.Id };
+        var upcoming = NewEvent(5);
+        var recent = NewEvent(-10);
+        var old = NewEvent(-90);
+
+        async Task<MemberProfile> MemberAsync(string email, MemberStatus status, ParticipationStatus participation, ApprovalStatus skillStatus)
+        {
+            var user = await _db.AddUserAsync(email, fullName: email, cancellationToken: _ct);
+            var member = new MemberProfile { Id = Guid.NewGuid(), UserId = user.Id, Status = status };
+            member.EventParticipations.Add(new EventParticipation { Id = Guid.NewGuid(), EventId = upcoming.Id, Status = participation });
+            member.MemberSkills.Add(new MemberSkill { Id = Guid.NewGuid(), SkillId = soprano.Id, Status = skillStatus });
+            return member;
+        }
+
+        var confirmed = await MemberAsync("confirmed@test.com", MemberStatus.Active, ParticipationStatus.Confirmed, ApprovalStatus.Approved);
+        var declined = await MemberAsync("declined@test.com", MemberStatus.Active, ParticipationStatus.Declined, ApprovalStatus.Approved);
+        var inactive = await MemberAsync("inactive@test.com", MemberStatus.Inactive, ParticipationStatus.Confirmed, ApprovalStatus.Approved);
+        var pending = await MemberAsync("pending@test.com", MemberStatus.Active, ParticipationStatus.Confirmed, ApprovalStatus.Pending);
+
+        RosterAssignment Assign(Guid skillId) => new() { Id = Guid.NewGuid(), MemberId = confirmed.Id, SkillId = skillId };
+        await using var context = _db.NewContext();
+        context.AddRange(soprano, alto, location, upcoming, recent, old, confirmed, declined, inactive, pending);
+        context.AddRange(
+            new ServiceRoster { Id = Guid.NewGuid(), EventId = recent.Id, Assignments = [Assign(soprano.Id), Assign(alto.Id)] },
+            new ServiceRoster { Id = Guid.NewGuid(), EventId = old.Id, Assignments = [Assign(soprano.Id)] });
+        await context.SaveChangesAsync(_ct);
+
+        return new RosterSeed(upcoming.Id, soprano.Id, confirmed.Id, declined.Id, inactive.Id, pending.Id);
+    }
+
+    [Fact]
+    public async Task GetCandidateSkills_ReturnsOnlyApprovedSkillsOfActiveConfirmedMembers_Async()
+    {
+        var seed = await SeedRosterAsync();
+        await using var context = _db.NewContext();
+
+        var candidates = await new ServiceRosterRepository(context).GetCandidateSkillsAsync(seed.EventId, [seed.SopranoId], _ct);
+
+        Assert.Equal(seed.ConfirmedId, Assert.Single(candidates).MemberId);
+    }
+
+    [Fact]
+    public async Task CountRecentServices_CountsDistinctEventsInsideTheWindow_Async()
+    {
+        var seed = await SeedRosterAsync();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        await using var context = _db.NewContext();
+
+        var counts = await new ServiceRosterRepository(context).CountRecentServicesAsync(
+            [seed.ConfirmedId, seed.DeclinedId], today.AddDays(-60), today, _ct);
+
+        // Two assignments at the 10-day-old event count once; the 90-day-old event is outside the window.
+        Assert.Equal(1, Assert.Single(counts, x => x.Key == seed.ConfirmedId).Value);
+        Assert.DoesNotContain(seed.DeclinedId, counts.Keys);
+    }
+
+    [Fact]
+    public async Task GetEventWithRoster_LoadsRosterAssignmentsTracked_Async()
+    {
+        var seed = await SeedRosterAsync();
+        Guid recentEventId;
+        await using (var lookup = _db.NewContext())
+            recentEventId = (await lookup.ServiceRosters.SingleAsync(x => x.Assignments.Count == 2, _ct)).EventId;
+        await using var context = _db.NewContext();
+
+        var liturgicalEvent = await new ServiceRosterRepository(context).GetEventWithRosterAsync(recentEventId, _ct);
+
+        Assert.Equal(2, liturgicalEvent!.ServiceRoster!.Assignments.Count);
+        Assert.Equal(EntityState.Unchanged, context.Entry(liturgicalEvent.ServiceRoster).State);
+        Assert.NotEqual(seed.EventId, recentEventId);
+    }
+
     private static RefreshToken NewRefreshToken(Guid userId, string hash, DateTime? revokedAt = null) =>
         new()
         {

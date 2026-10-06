@@ -80,6 +80,8 @@ public sealed class HarmoniaApiFactory : WebApplicationFactory<AuthController>
         builder.UseSetting("PasswordReset:WebUrl", "https://web.harmonia.test/reset");
         builder.UseSetting("PasswordReset:MobileUrl", "harmonia://reset");
         builder.UseSetting("Google:ClientIds", "test-client-id.apps.googleusercontent.com");
+        builder.UseSetting("Gemini:ApiKey", "test");
+        builder.UseSetting("Gemini:Model", "test-model");
 
         builder.ConfigureTestServices(services =>
         {
