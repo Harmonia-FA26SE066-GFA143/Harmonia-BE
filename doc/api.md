@@ -585,7 +585,7 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 
 ---
 
-## 7b. Service rosters — `api/service-rosters` · role `ChoirDirector` (UC-25 / UC-25a / UC-25b)
+## 7b. Service rosters — `api/service-rosters` · role `ChoirDirector` (UC-25 / UC-25a / UC-25b / UC-26 / UC-27)
 
 ### `RosterSuggestionResponse`
 
@@ -615,8 +615,26 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 | POST | `/api/service-rosters/assignments` | `{ "eventId", "songListItemId", "skillId", "memberId" }` | 200 `RosterAssignmentDto` | 400 `VALIDATION_FAILED` · 404 `EVENT_NOT_FOUND`, `PERSONNEL_REQUIREMENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `EVENT_CANCELLED`, `EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ROSTER_SONG_LIST_NOT_APPROVED`, `ASSIGNMENT_DUPLICATE`, `MEMBER_NOT_ACTIVE`, `ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ASSIGNMENT_MEMBER_NOT_CONFIRMED` |
 | POST | `/api/service-rosters/assignments/{id}/replacement` | `{ "memberId" }` | 200 `RosterAssignmentDto` (dòng mới) | 400 `VALIDATION_FAILED` · 404 `ASSIGNMENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `EVENT_CANCELLED`, `EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ASSIGNMENT_DUPLICATE`, `MEMBER_NOT_ACTIVE`, `ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ASSIGNMENT_MEMBER_NOT_CONFIRMED` |
 | DELETE | `/api/service-rosters/assignments/{id}` | — | 204 | 404 `ASSIGNMENT_NOT_FOUND` · 409 `EVENT_CANCELLED`, `EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED` |
+| POST | `/api/service-rosters/{id}/finalization` | — | 200 `ServiceRosterDto` | 404 `ROSTER_NOT_FOUND` · 409 `EVENT_CANCELLED`, `EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ROSTER_SONG_LIST_NOT_APPROVED`, `MEMBER_NOT_ACTIVE`, `ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ASSIGNMENT_MEMBER_NOT_CONFIRMED` |
+| POST | `/api/service-rosters/{id}/notifications` | `{ "memberIds": ["guid"] }` | 204 | 400 `VALIDATION_FAILED` · 404 `ROSTER_NOT_FOUND`, `ASSIGNMENT_NOT_FOUND` · 409 `EVENT_CANCELLED`, `EVENT_ALREADY_PASSED`, `ROSTER_NOT_FINALIZED` |
 
 `RosterAssignmentDto` = một phần tử của `assignments` ở trên. `RosterShortageDto` = một phần tử của `shortages`.
+`{id}` của `finalization` / `notifications` là `rosterId` (có trong `RosterSuggestionResponse`).
+
+### `ServiceRosterDto` (kết quả chốt)
+
+```json
+{
+  "id": "guid",
+  "eventId": "guid",
+  "status": "Finalized",
+  "generatedAt": "2026-10-06T08:00:00Z",
+  "finalizedAt": "2026-10-06T09:00:00Z",
+  "finalizedBy": "guid",
+  "assignments": [ /* RosterAssignmentDto */ ],
+  "shortages": [ /* RosterShortageDto */ ]
+}
+```
 
 **Gợi ý (`suggestions`)**
 
@@ -651,6 +669,26 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 - Xoá: xoá hẳn dòng phân công.
 - `{id}` phải là dòng còn hiệu lực; dòng đã bị thay hoặc không tồn tại → 404 `ASSIGNMENT_NOT_FOUND`.
 - Sự kiện đã huỷ / đã qua, hoặc bảng đã chốt → 409, không sửa được nữa.
+
+**Chốt phân công (`finalization`, UC-26)**
+
+- Danh sách bài hát của sự kiện phải đã duyệt. Chốt xong thì không gợi ý / thêm / thay / xoá dòng, và không
+  sửa nhân sự cần cho bài được nữa. Chưa có API bỏ chốt.
+- **Còn thiếu người vẫn chốt được**: các cặp còn thiếu trả trong `shortages`.
+- Kiểm lại từng dòng còn hiệu lực: ca viên phải còn **đang hoạt động**, còn skill **đã duyệt** và vẫn
+  **xác nhận tham gia**. Dòng nào hỏng → 409 với mã tương ứng, `message` chứa id dòng đó; bảng **không** bị chốt.
+  Ca trưởng thay / xoá dòng đó rồi chốt lại.
+- `assignments` chỉ gồm dòng còn hiệu lực, sắp như `suggestions`.
+
+**Gửi thông báo phân công (`notifications`, UC-27)**
+
+- Bảng phải đã chốt, nếu không → 409 `ROSTER_NOT_FINALIZED`.
+- `memberIds` có giá trị → gửi đúng những ca viên đó, kể cả người đã được báo (gửi lại). Có id không có dòng
+  nào trên bảng → 404 `ASSIGNMENT_NOT_FOUND`, không gửi cho ai.
+- `memberIds` rỗng / bỏ trống → gửi cho mọi ca viên còn dòng **chưa được báo**.
+- Mỗi ca viên nhận **một** thông báo `AssignmentNotice` liệt kê các vị trí của mình (skill – bài),
+  `referenceType = "LiturgicalEvent"`, `referenceId` = id sự kiện. Đẩy realtime qua SignalR như mọi thông báo.
+- Các dòng đã báo được đánh dấu thời điểm gửi (chưa trả trong `RosterAssignmentDto`).
 
 ---
 
