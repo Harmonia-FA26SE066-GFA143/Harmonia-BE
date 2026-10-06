@@ -212,6 +212,7 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 | `ROSTER_NOT_FOUND` | 404 | Không tìm thấy bảng phân công |
 | `ROSTER_ALREADY_EXISTS` | 409 | Sự kiện này đã có bảng phân công |
 | `ROSTER_ALREADY_FINALIZED` | 409 | Bảng phân công đã chốt, không thể sửa |
+| `ROSTER_NOT_FINALIZED` | 409 | Bảng phân công chưa chốt, chưa thể gửi thông báo |
 | `ROSTER_SONG_LIST_NOT_APPROVED` | 409 | Phải duyệt danh sách bài hát trước khi chốt phân công |
 | `ROSTER_NO_PERSONNEL_REQUIREMENT` | 409 | Chưa khai báo nhân sự cần cho các bài hát |
 | `ROSTER_INSUFFICIENT_MEMBERS` | 409 | Không đủ người cho một số bè hoặc nhạc cụ |

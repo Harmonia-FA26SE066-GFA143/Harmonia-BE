@@ -18,6 +18,7 @@ public class RosterServiceTests
     private readonly IServiceRosterRepository _repository = Substitute.For<IServiceRosterRepository>();
     private readonly IRosterSuggestionGenerator _generator = Substitute.For<IRosterSuggestionGenerator>();
     private readonly ICurrentUserService _currentUser = Substitute.For<ICurrentUserService>();
+    private readonly INotificationService _notifications = Substitute.For<INotificationService>();
     private readonly RosterService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
 
@@ -39,7 +40,7 @@ public class RosterServiceTests
             cfg.AddProfile<ServiceRosterProfile>();
         }, NullLoggerFactory.Instance).CreateMapper();
         _currentUser.UserId.Returns(_directorId);
-        _sut = new RosterService(_repository, _generator, _currentUser, mapper);
+        _sut = new RosterService(_repository, _generator, _currentUser, _notifications, mapper);
 
         _event = new LiturgicalEvent
         {
@@ -608,5 +609,101 @@ public class RosterServiceTests
         Assert.Contains(invalid.Id.ToString(), result.Message);
         Assert.Equal(RosterStatus.Suggested, roster.Status);
         await _repository.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    // --- Assignment notifications (UC-27) ---
+
+    /// <summary>Soprano line on the entrance song, loaded the way GetRosterForNotificationAsync loads it.</summary>
+    private RosterAssignment NotifiableLine(Guid memberId, DateTime? notifiedAt = null)
+    {
+        var line = SopranoLineFor(memberId);
+        line.Member.UserId = Guid.NewGuid();
+        line.SongListItem = _entrance;
+        line.NotifiedAt = notifiedAt;
+        return line;
+    }
+
+    private ServiceRoster NotifiableRoster(RosterStatus status, params RosterAssignment[] lines)
+    {
+        var roster = ExistingRoster(status);
+        roster.LiturgicalEvent = _event;
+        foreach (var line in lines) roster.Assignments.Add(line);
+        _repository.GetRosterForNotificationAsync(roster.Id, _ct).Returns(roster);
+        return roster;
+    }
+
+    private Task<Result> NotifyAsync(ServiceRoster roster, params Guid[] memberIds) =>
+        _sut.SendNotificationsAsync(roster.Id, new SendRosterNotificationsRequest { MemberIds = [.. memberIds] }, _ct);
+
+    [Fact]
+    public async Task SendNotifications_SelectedMember_NotifiesOnlyThemAndStampsTheirLines_Async()
+    {
+        var an = NotifiableLine(_an);
+        var binh = NotifiableLine(_binh);
+        var roster = NotifiableRoster(RosterStatus.Finalized, an, binh);
+
+        var result = await NotifyAsync(roster, _an);
+
+        Assert.True(result.IsSuccess);
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(x => x.Type == NotificationType.AssignmentNotice
+                && x.RecipientUserIds.Single() == an.Member.UserId
+                && x.Content.Contains("Soprano - Nhap le")
+                && x.ReferenceId == _event.Id),
+            _ct);
+        Assert.NotNull(an.NotifiedAt);
+        Assert.Null(binh.NotifiedAt);
+        await _repository.Received(1).SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task SendNotifications_NoSelection_NotifiesOnlyMembersNotNotifiedYet_Async()
+    {
+        var an = NotifiableLine(_an, notifiedAt: DateTime.UtcNow.AddDays(-1));
+        var binh = NotifiableLine(_binh);
+        var roster = NotifiableRoster(RosterStatus.Finalized, an, binh);
+
+        var result = await NotifyAsync(roster);
+
+        Assert.True(result.IsSuccess);
+        await _notifications.Received(1).SendAsync(Arg.Any<SendNotificationRequest>(), _ct);
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(x => x.RecipientUserIds.Single() == binh.Member.UserId), _ct);
+        Assert.NotNull(binh.NotifiedAt);
+    }
+
+    [Fact]
+    public async Task SendNotifications_RosterNotFinalized_ReturnsRosterNotFinalized_Async()
+    {
+        var roster = NotifiableRoster(RosterStatus.Suggested, NotifiableLine(_an));
+
+        Assert.Equal(ErrorCodes.RosterNotFinalized, (await NotifyAsync(roster, _an)).Code);
+        await _notifications.DidNotReceive().SendAsync(Arg.Any<SendNotificationRequest>(), _ct);
+    }
+
+    [Fact]
+    public async Task SendNotifications_MissingRoster_ReturnsRosterNotFound_Async()
+    {
+        var result = await _sut.SendNotificationsAsync(Guid.NewGuid(), new SendRosterNotificationsRequest(), _ct);
+
+        Assert.Equal(ErrorCodes.RosterNotFound, result.Code);
+    }
+
+    [Fact]
+    public async Task SendNotifications_MemberNotOnRoster_ReturnsAssignmentNotFoundAndSendsNothing_Async()
+    {
+        var roster = NotifiableRoster(RosterStatus.Finalized, NotifiableLine(_an));
+
+        Assert.Equal(ErrorCodes.AssignmentNotFound, (await NotifyAsync(roster, _an, _chi)).Code);
+        await _notifications.DidNotReceive().SendAsync(Arg.Any<SendNotificationRequest>(), _ct);
+    }
+
+    [Fact]
+    public async Task SendNotifications_PastEvent_ReturnsEventAlreadyPassed_Async()
+    {
+        var roster = NotifiableRoster(RosterStatus.Finalized, NotifiableLine(_an));
+        _event.EventDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1);
+
+        Assert.Equal(ErrorCodes.EventAlreadyPassed, (await NotifyAsync(roster, _an)).Code);
     }
 }

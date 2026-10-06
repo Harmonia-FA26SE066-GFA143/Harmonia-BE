@@ -44,4 +44,11 @@ public interface IRosterService
     /// back in the result.
     /// </summary>
     Task<Result<ServiceRosterDto>> FinalizeAsync(Guid rosterId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Sends each selected member one notification listing their lines on the finalized roster and stamps
+    /// those lines' NotifiedAt (UC-27 / FE-40).
+    /// </summary>
+    Task<Result> SendNotificationsAsync(
+        Guid rosterId, SendRosterNotificationsRequest request, CancellationToken cancellationToken);
 }

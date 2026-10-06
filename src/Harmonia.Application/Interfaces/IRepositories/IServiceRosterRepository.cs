@@ -49,4 +49,10 @@ public interface IServiceRosterRepository : IGenericRepository<ServiceRoster>
     /// </summary>
     Task<List<RosterAssignment>> GetAssignmentsWithEligibilityAsync(
         Guid rosterId, Guid eventId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Tracked roster with its LiturgicalEvent and only its Active assignments loaded, each with Member, Skill
+    /// and SongListItem.Song.
+    /// </summary>
+    Task<ServiceRoster?> GetRosterForNotificationAsync(Guid rosterId, CancellationToken cancellationToken);
 }

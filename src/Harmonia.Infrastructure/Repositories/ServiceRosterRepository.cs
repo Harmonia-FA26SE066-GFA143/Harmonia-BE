@@ -85,4 +85,13 @@ public class ServiceRosterRepository(HarmoniaDbContext dbContext)
             .Where(x => x.RosterId == rosterId && x.Status == RosterAssignmentStatus.Active)
             .OrderBy(x => x.SongListItem!.DisplayOrder).ThenBy(x => x.Skill.Name).ThenBy(x => x.Member.User.FullName)
             .ToListAsync(cancellationToken);
+
+    public Task<ServiceRoster?> GetRosterForNotificationAsync(Guid rosterId, CancellationToken cancellationToken) =>
+        DbContext.ServiceRosters
+            .AsSplitQuery()
+            .Include(x => x.LiturgicalEvent)
+            .Include(x => x.Assignments.Where(a => a.Status == RosterAssignmentStatus.Active)).ThenInclude(x => x.Member)
+            .Include(x => x.Assignments).ThenInclude(x => x.Skill)
+            .Include(x => x.Assignments).ThenInclude(x => x.SongListItem).ThenInclude(x => x!.Song)
+            .FirstOrDefaultAsync(x => x.Id == rosterId, cancellationToken);
 }

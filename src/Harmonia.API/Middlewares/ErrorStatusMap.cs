@@ -116,6 +116,7 @@ public static class ErrorStatusMap
         [ErrorCodes.RosterNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.RosterAlreadyExists] = StatusCodes.Status409Conflict,
         [ErrorCodes.RosterAlreadyFinalized] = StatusCodes.Status409Conflict,
+        [ErrorCodes.RosterNotFinalized] = StatusCodes.Status409Conflict,
         [ErrorCodes.RosterSongListNotApproved] = StatusCodes.Status409Conflict,
         [ErrorCodes.RosterNoPersonnelRequirement] = StatusCodes.Status409Conflict,
         [ErrorCodes.RosterInsufficientMembers] = StatusCodes.Status409Conflict,

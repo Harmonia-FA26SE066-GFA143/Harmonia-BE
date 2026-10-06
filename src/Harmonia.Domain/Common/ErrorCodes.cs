@@ -202,6 +202,8 @@ public static class ErrorCodes
 
     public const string RosterAlreadyFinalized = "ROSTER_ALREADY_FINALIZED";
 
+    public const string RosterNotFinalized = "ROSTER_NOT_FINALIZED";
+
     public const string RosterSongListNotApproved = "ROSTER_SONG_LIST_NOT_APPROVED";
 
     public const string RosterNoPersonnelRequirement = "ROSTER_NO_PERSONNEL_REQUIREMENT";

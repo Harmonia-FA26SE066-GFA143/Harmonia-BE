@@ -13,6 +13,7 @@ public class RosterService(
     IServiceRosterRepository rosterRepository,
     IRosterSuggestionGenerator suggestionGenerator,
     ICurrentUserService currentUser,
+    INotificationService notificationService,
     IMapper mapper) : IRosterService
 {
     private const int RecentServiceDays = 60;
@@ -144,6 +145,51 @@ public class RosterService(
         dto.Assignments = mapper.Map<List<RosterAssignmentDto>>(assignments);
         dto.Shortages = ComputeShortages(songList, assignments);
         return Result<ServiceRosterDto>.Success(dto);
+    }
+
+    public async Task<Result> SendNotificationsAsync(
+        Guid rosterId, SendRosterNotificationsRequest request, CancellationToken cancellationToken)
+    {
+        var roster = await rosterRepository.GetRosterForNotificationAsync(rosterId, cancellationToken);
+        if (roster is null) return Result.Failure(ErrorCodes.RosterNotFound);
+        if (EventNotEditableCode(roster.LiturgicalEvent) is { } eventError) return Result.Failure(eventError);
+        if (roster.Status != RosterStatus.Finalized) return Result.Failure(ErrorCodes.RosterNotFinalized);
+
+        var linesByMember = roster.Assignments
+            .Where(x => x.Status == RosterAssignmentStatus.Active)
+            .GroupBy(x => x.MemberId)
+            .ToDictionary(g => g.Key, g => g.OrderBy(x => x.SongListItem?.DisplayOrder).ToList());
+
+        var memberIds = request.MemberIds.Distinct().ToList();
+        if (memberIds.Any(id => !linesByMember.ContainsKey(id))) return Result.Failure(ErrorCodes.AssignmentNotFound);
+        if (memberIds.Count == 0)
+            memberIds = linesByMember.Where(x => x.Value.Any(a => a.NotifiedAt is null)).Select(x => x.Key).ToList();
+
+        var liturgicalEvent = roster.LiturgicalEvent;
+        var eventLabel = $"{liturgicalEvent.Title ?? "the event"} on {liturgicalEvent.EventDate:dd/MM/yyyy} at {liturgicalEvent.Time:HH:mm}";
+
+        foreach (var memberId in memberIds)
+        {
+            var lines = linesByMember[memberId];
+            var notifiedAt = DateTime.UtcNow;
+            foreach (var line in lines) line.NotifiedAt = notifiedAt;
+
+            // SendAsync saves through the same scoped DbContext, so each member's NotifiedAt is stored with their notification.
+            await notificationService.SendAsync(
+                new SendNotificationRequest(
+                    NotificationType.AssignmentNotice,
+                    "Service assignment",
+                    $"You are assigned to serve at {eventLabel}: "
+                        + string.Join("; ", lines.Select(x => x.SongListItem is null ? x.Skill.Name : $"{x.Skill.Name} - {x.SongListItem.Song.Title}"))
+                        + ".",
+                    [lines[0].Member.UserId],
+                    nameof(LiturgicalEvent),
+                    roster.EventId),
+                cancellationToken);
+        }
+
+        await rosterRepository.SaveChangesAsync(cancellationToken);
+        return Result.Success();
     }
 
     /// <summary>Requirements of the song list that the given Active assignments do not fully staff, in song order.</summary>

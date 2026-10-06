@@ -43,4 +43,10 @@ public class ServiceRostersController(IRosterService rosterService) : ApiControl
     [HttpPost("{id:guid}/finalization")]
     public async Task<IActionResult> FinalizeAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await rosterService.FinalizeAsync(id, cancellationToken));
+
+    /// <summary>Notifies the selected members, or every member not notified yet, of their assignment (UC-27 / FE-40).</summary>
+    [HttpPost("{id:guid}/notifications")]
+    public async Task<IActionResult> SendNotificationsAsync(
+        Guid id, [FromBody] SendRosterNotificationsRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await rosterService.SendNotificationsAsync(id, request, cancellationToken));
 }
