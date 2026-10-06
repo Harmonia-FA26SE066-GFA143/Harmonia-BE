@@ -170,6 +170,39 @@ public class ValidatorTests
         Assert.Equal(2, codes.Length);
     }
 
+    // ---- Song personnel requirements ----
+
+    [Fact]
+    public void PersonnelRequirements_DuplicateSkill_ReturnsRequirementDuplicate()
+    {
+        var id = Guid.NewGuid();
+        var codes = ErrorCodesOf(new UpdateSongPersonnelRequirementsRequestValidator(),
+            new UpdateSongPersonnelRequirementsRequest { Requirements = [new() { SkillId = id, RequiredCount = 1 }, new() { SkillId = id, RequiredCount = 2 }] });
+
+        Assert.Equal([ErrorCodes.PersonnelRequirementDuplicate], codes);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(UpdateSongPersonnelRequirementsRequestValidator.MaxRequiredCount + 1)]
+    public void PersonnelRequirements_CountOutOfRange_ReturnsRequiredCountInvalid(int count)
+    {
+        var codes = ErrorCodesOf(new UpdateSongPersonnelRequirementsRequestValidator(),
+            new UpdateSongPersonnelRequirementsRequest { Requirements = [new() { SkillId = Guid.NewGuid(), RequiredCount = count }] });
+
+        Assert.Equal([ErrorCodes.PersonnelRequiredCountInvalid], codes);
+    }
+
+    [Fact]
+    public void PersonnelRequirements_Valid_HasNoErrors()
+    {
+        var codes = ErrorCodesOf(new UpdateSongPersonnelRequirementsRequestValidator(),
+            new UpdateSongPersonnelRequirementsRequest { Requirements = [new() { SkillId = Guid.NewGuid(), RequiredCount = UpdateSongPersonnelRequirementsRequestValidator.MaxRequiredCount }] });
+
+        Assert.Empty(codes);
+    }
+
     // ---- Material learning progress ----
 
     [Theory]

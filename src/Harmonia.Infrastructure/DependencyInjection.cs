@@ -86,6 +86,7 @@ public static class DependencyInjection
         services.AddScoped<ISongRepository, SongRepository>();
         services.AddScoped<IMusicMaterialRepository, MusicMaterialRepository>();
         services.AddScoped<IMaterialLearningProgressRepository, MaterialLearningProgressRepository>();
+        services.AddScoped<ISongListItemRepository, SongListItemRepository>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IPasswordHasherService, PasswordHasherService>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
