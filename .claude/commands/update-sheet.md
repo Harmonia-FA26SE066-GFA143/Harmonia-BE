@@ -84,6 +84,11 @@ Kèm link: https://docs.google.com/spreadsheets/d/1fWlhDqXfSpFx2rIbqBStKx_mYAZSp
   DELETE `(1, 0.780, 0.808)` (RGB 0–1); PATCH → đọc màu ô PATCH ở tab F3. Kèm viền SOLID 4 cạnh màu
   `(0.749, 0.749, 0.749)`, chữ đậm `Arial, sans-serif`, `verticalAlignment: TOP`, `wrapStrategy: WRAP`,
   không đặt `horizontalAlignment`.
+- Sau `duplicateSheet`: xoá sạch định dạng các dòng dưới dòng dữ liệu cuối (`repeatCell` với `cell: {}`,
+  `fields: "userEnteredValue,userEnteredFormat,dataValidation,note"`, bỏ `endRowIndex`) — tab gốc dài hơn
+  thì còn sót viền / màu.
+- Ghi dòng vào vùng trước đó trống (vd cuối tab `Mã lỗi`) → `copyPaste` `PASTE_FORMAT` từ một dòng dữ liệu
+  sẵn có xuống các dòng mới, nếu không chúng thiếu viền và căn lề.
 - Đọc lại tab ngay trước khi ghi tab đó (Sheets không có revision guard).
 - Không xoá tab, không xoá dòng endpoint, không đổi tên tab sẵn có.
 - Không commit. Chỉ sửa `doc/api.md` và sheet.
