@@ -52,9 +52,13 @@ Kiểm đúng 13 mục dưới đây, không phát sinh thêm. Mỗi phát hiệ
 13. Chạy đúng lệnh này, không tự nghĩ pattern khác:
 
 ```
-    rg -n '[^\x00-\x7F]' --glob '*.cs' src
+    rg -n '[^\x00-\x7F]' --glob '*.cs' --glob '!**/CatholicCalendarParser.cs' src
     rg -n '[^\x00-\x7F]' src/Harmonia.API/.env.example src/Harmonia.API/appsettings*.json
 ```
+
+    Ngoại lệ duy nhất (chốt 2026-10-06): `Application/Services/CatholicCalendarParser.cs` —
+    emoji màu và tên mùa phụng vụ tiếng Việt ở đó là chuỗi để so khớp dữ liệu từ API lịch
+    Công giáo, không phải câu hiển thị cho người dùng. Không mở rộng ngoại lệ sang file khác.
 
     Báo nguyên văn mọi dòng lệnh này trả về. Mọi chuỗi và comment trong `.cs` và
     trong file cấu hình phải là ASCII tiếng Anh; thông báo cho người dùng đi qua mã

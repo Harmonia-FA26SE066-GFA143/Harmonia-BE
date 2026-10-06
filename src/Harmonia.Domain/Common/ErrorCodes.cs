@@ -85,7 +85,6 @@ public static class ErrorCodes
 
     public const string UserAlreadyActive = "USER_ALREADY_ACTIVE";
 
-
     // 3. MemberProfile.
     public const string MemberNotFound = "MEMBER_NOT_FOUND";
 
@@ -124,10 +123,6 @@ public static class ErrorCodes
     public const string CalendarFileTooLarge = "CALENDAR_FILE_TOO_LARGE";
 
     public const string CalendarFileInvalid = "CALENDAR_FILE_INVALID";
-
-    public const string EventAlreadyPublished = "EVENT_ALREADY_PUBLISHED";
-
-    public const string EventNotPublished = "EVENT_NOT_PUBLISHED";
 
     public const string EventNotFound = "EVENT_NOT_FOUND";
 
@@ -303,7 +298,4 @@ public static class ErrorCodes
     public const string ExternalAiFailed = "EXTERNAL_AI_FAILED";
 
     public const string ExternalCalendarFailed = "EXTERNAL_CALENDAR_FAILED";
-
-    public const string UserAlreadyActive = "USER_ALREADY_ACTIVE";
-
 }

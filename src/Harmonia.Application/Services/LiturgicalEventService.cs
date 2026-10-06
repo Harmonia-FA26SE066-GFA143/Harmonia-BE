@@ -76,8 +76,8 @@ public class LiturgicalEventService(
         await notificationService.SendAsync(
             new SendNotificationRequest(
                 Type: NotificationType.EventPublished,
-                Title: "S? ki?n m?i ???c công b?",
-                Content: $"S? ki?n ngày {liturgicalEvent.EventDate:dd/MM/yyyy} lúc {liturgicalEvent.Time} ?ã ???c công b?.",
+                Title: "New event published",
+                Content: $"The event on {liturgicalEvent.EventDate:dd/MM/yyyy} at {liturgicalEvent.Time:HH:mm} has been published.",
                 RecipientUserIds: recipientUserIds,
                 ReferenceType: nameof(LiturgicalEvent),
                 ReferenceId: liturgicalEvent.Id),
