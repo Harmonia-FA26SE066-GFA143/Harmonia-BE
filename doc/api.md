@@ -248,11 +248,29 @@ cho tới khi Admin cập nhật.
 `status`: `Active` | `Inactive` | `Left`. `phone`, `dateOfBirth`, `avatarUrl` có thể `null`.
 `fullName`, `email`, `avatarUrl` lấy từ tài khoản (`User`).
 
+### `MemberProfileSummaryDto` / `MemberProfileDetailDto`
+
+`MemberProfileSummaryDto` = `MemberProfileDto` + `approvedSkills`.
+`MemberProfileDetailDto` = `MemberProfileSummaryDto` + `roleName`.
+
+```json
+{
+  "...": "các field của MemberProfileDto",
+  "roleName": "ChoirMember",
+  "approvedSkills": [
+    { "skillId": "guid", "skillName": "Tenor", "categoryId": "guid", "categoryName": "Vocal", "level": "Intermediate" }
+  ]
+}
+```
+
+`approvedSkills` chỉ gồm kỹ năng **đã duyệt** và skill đang hoạt động; `level` có thể `null`.
+Chưa có kỹ năng nào → `[]`.
+
 | Method | Route | Role | Body / Query | Thành công | Lỗi |
 |---|---|---|---|---|---|
-| GET | `/api/member-profiles/me` | `ChoirMember` | — | 200 `MemberProfileDto` | 404 `MEMBER_NOT_FOUND` |
+| GET | `/api/member-profiles/me` | `ChoirMember` | — | 200 `MemberProfileDetailDto` | 404 `MEMBER_NOT_FOUND` |
 | PUT | `/api/member-profiles/me` | `ChoirMember` | `{ "fullName", "phone", "dateOfBirth" }` | 200 `MemberProfileDto` | 400 `VALIDATION_FAILED` · 404 `MEMBER_NOT_FOUND` |
-| GET | `/api/member-profiles` | `ChoirDirector` | query `keyword`, `status`, `pageNumber`, `pageSize` | 200 `PagedList<MemberProfileDto>` | — |
+| GET | `/api/member-profiles` | `ChoirDirector` | query `keyword`, `status`, `skillId`, `pageNumber`, `pageSize` | 200 `PagedList<MemberProfileSummaryDto>` | — |
 | GET | `/api/member-profiles/{id}` | `ChoirDirector` | — | 200 `MemberProfileDto` | 404 `MEMBER_NOT_FOUND` |
 | PUT | `/api/member-profiles/{id}` | `ChoirDirector` | `{ "phone", "dateOfBirth", "joinedDate", "status" }` | 200 `MemberProfileDto` | 400 `VALIDATION_FAILED`, `MEMBER_JOINED_DATE_IN_FUTURE` · 404 `MEMBER_NOT_FOUND` |
 
@@ -262,7 +280,9 @@ cho tới khi Admin cập nhật.
   `phone` ≤ 20 ký tự. `dateOfBirth` không được ở tương lai.
 - `PUT .../{id}`: `joinedDate` bắt buộc, không ở tương lai. Ca trưởng **không** sửa tên ca viên
   (tên do ca viên tự sửa, hoặc Admin sửa qua `PUT /api/users/{id}`).
-- `GET /api/member-profiles`: `keyword` khớp một phần tên hoặc email; sắp theo tên.
+- `GET /api/member-profiles`: `keyword` khớp một phần tên hoặc email; `skillId` chỉ giữ ca viên đã
+  được **duyệt** kỹ năng đó (lấy id từ `GET /api/lookups/skills`; skill đã tắt → danh sách rỗng); các bộ lọc kết hợp AND; sắp theo tên.
+  Dùng để chọn người khi phân công theo bè / nhạc cụ.
 - Role khác gọi vào → `403` body rỗng.
 
 ---
