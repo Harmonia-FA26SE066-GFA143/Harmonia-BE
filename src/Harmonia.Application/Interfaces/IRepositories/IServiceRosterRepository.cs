@@ -27,6 +27,16 @@ public interface IServiceRosterRepository : IGenericRepository<ServiceRoster>
     Task<Dictionary<Guid, int>> CountRecentServicesAsync(
         IReadOnlyCollection<Guid> memberIds, DateOnly from, DateOnly to, CancellationToken cancellationToken);
 
-    /// <summary>Read-only assignments of the roster, with Member.User, Skill and SongListItem.Song loaded.</summary>
+    /// <summary>Read-only Active assignments of the roster, with Member.User, Skill and SongListItem.Song loaded.</summary>
     Task<List<RosterAssignment>> GetAssignmentsAsync(Guid rosterId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Read-only member with only their approved declaration of <paramref name="skillId"/> and their
+    /// confirmed participation in <paramref name="eventId"/> loaded (either collection may be empty).
+    /// </summary>
+    Task<MemberProfile?> GetMemberForAssignmentAsync(
+        Guid memberId, Guid skillId, Guid eventId, CancellationToken cancellationToken);
+
+    /// <summary>Tracked roster owning the assignment, with its LiturgicalEvent and all its assignments loaded.</summary>
+    Task<ServiceRoster?> GetRosterByAssignmentAsync(Guid assignmentId, CancellationToken cancellationToken);
 }

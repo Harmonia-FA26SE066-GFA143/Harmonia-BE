@@ -20,4 +20,21 @@ public interface IRosterService
     /// requirement is a shortage.
     /// </summary>
     Task<Result<List<RosterShortageDto>>> GetShortagesAsync(Guid eventId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Manually assigns a member to a song / skill requirement of the event's approved song list (UC-25b / FE-38).
+    /// The member needs the approved skill and a confirmed participation; the requirement's count may be exceeded.
+    /// Creates a Draft roster when the event has none yet.
+    /// </summary>
+    Task<Result<RosterAssignmentDto>> AddAssignmentAsync(CreateRosterAssignmentRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Replaces the member of an Active assignment (UC-25b / FE-38): the old line is kept as Replaced and linked
+    /// to a new Manual line for the same song and skill. Returns the new line.
+    /// </summary>
+    Task<Result<RosterAssignmentDto>> ReplaceAssignmentAsync(
+        Guid assignmentId, ReplaceRosterAssignmentRequest request, CancellationToken cancellationToken);
+
+    /// <summary>Deletes an Active assignment from a roster that is not finalized (UC-25b / FE-38).</summary>
+    Task<Result> RemoveAssignmentAsync(Guid assignmentId, CancellationToken cancellationToken);
 }

@@ -292,4 +292,223 @@ public class RosterServiceTests
 
         Assert.Equal(ErrorCodes.RosterSongListNotApproved, (await _sut.GetShortagesAsync(_event.Id, _ct)).Code);
     }
+
+    [Fact]
+    public async Task Suggest_KeepsReplacedLinesAndDoesNotPickReplacedMemberAgain_Async()
+    {
+        var roster = ExistingRoster(RosterStatus.Suggested);
+        var replaced = new RosterAssignment
+        {
+            MemberId = _binh, SkillId = _soprano.Id, SongListItemId = _entrance.Id,
+            Source = AssignmentSource.Suggested, Status = RosterAssignmentStatus.Replaced,
+        };
+        roster.Assignments.Add(replaced);
+
+        await SuggestAsync();
+
+        Assert.Contains(replaced, roster.Assignments);
+        Assert.DoesNotContain(_sentToAi.First(x => x.SkillName == "Soprano").Candidates, c => c.RecentServiceCount == 1);
+        Assert.Equal([_chi, _an], roster.Assignments
+            .Where(x => x.SkillId == _soprano.Id && x.Status == RosterAssignmentStatus.Active).Select(x => x.MemberId));
+    }
+
+    // --- Manual adjustment (UC-25b) ---
+
+    private void MemberIs(Guid memberId, bool skillApproved = true, bool confirmed = true, MemberStatus status = MemberStatus.Active)
+    {
+        var member = new MemberProfile { Id = memberId, Status = status };
+        if (skillApproved) member.MemberSkills.Add(new MemberSkill { MemberId = memberId, SkillId = _soprano.Id });
+        if (confirmed) member.EventParticipations.Add(new EventParticipation { MemberId = memberId, EventId = _event.Id });
+        _repository.GetMemberForAssignmentAsync(memberId, Arg.Any<Guid>(), _event.Id, _ct).Returns(member);
+    }
+
+    /// <summary>Existing roster, reachable by assignment id like the repository does, returning its Active lines as DTO source.</summary>
+    private ServiceRoster RosterWith(RosterStatus status, params RosterAssignment[] assignments)
+    {
+        var roster = ExistingRoster(status);
+        roster.LiturgicalEvent = _event;
+        foreach (var a in assignments)
+        {
+            a.Id = a.Id == Guid.Empty ? Guid.NewGuid() : a.Id;
+            a.RosterId = roster.Id;
+            roster.Assignments.Add(a);
+            _repository.GetRosterByAssignmentAsync(a.Id, _ct).Returns(roster);
+        }
+
+        _repository.GetAssignmentsAsync(roster.Id, _ct)
+            .Returns(_ => roster.Assignments.Where(x => x.Status == RosterAssignmentStatus.Active).ToList());
+        return roster;
+    }
+
+    private RosterAssignment SopranoLine(Guid memberId) =>
+        new() { MemberId = memberId, SkillId = _soprano.Id, SongListItemId = _entrance.Id, Source = AssignmentSource.Suggested };
+
+    private Task<Result<RosterAssignmentDto>> AddAsync(Guid memberId, Guid? skillId = null) =>
+        _sut.AddAssignmentAsync(new CreateRosterAssignmentRequest
+        {
+            EventId = _event.Id, SongListItemId = _entrance.Id, SkillId = skillId ?? _soprano.Id, MemberId = memberId,
+        }, _ct);
+
+    [Fact]
+    public async Task AddAssignment_EligibleMember_AddsManualLine_Async()
+    {
+        var roster = RosterWith(RosterStatus.Suggested);
+        MemberIs(_an);
+
+        var result = await AddAsync(_an);
+
+        var line = Assert.Single(roster.Assignments);
+        Assert.Equal(AssignmentSource.Manual, line.Source);
+        Assert.Equal(RosterAssignmentStatus.Active, line.Status);
+        Assert.Equal(line.Id, result.Value!.Id);
+        await _repository.Received(1).SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task AddAssignment_BeyondRequiredCount_IsAllowed_Async()
+    {
+        RosterWith(RosterStatus.Suggested, SopranoLine(_binh), SopranoLine(_chi));
+        MemberIs(_an);
+
+        Assert.True((await AddAsync(_an)).IsSuccess);
+    }
+
+    [Fact]
+    public async Task AddAssignment_NoRosterYet_CreatesDraftRoster_Async()
+    {
+        ServiceRoster? added = null;
+        await _repository.AddAsync(Arg.Do<ServiceRoster>(x => added = x), _ct);
+        _repository.GetAssignmentsAsync(Arg.Any<Guid>(), _ct).Returns(_ => added!.Assignments.ToList());
+        MemberIs(_an);
+
+        var result = await AddAsync(_an);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(RosterStatus.Draft, added!.Status);
+        Assert.Single(added.Assignments);
+    }
+
+    [Fact]
+    public async Task AddAssignment_SkillNotRequiredBySong_ReturnsPersonnelRequirementNotFound_Async()
+    {
+        MemberIs(_an);
+
+        Assert.Equal(ErrorCodes.PersonnelRequirementNotFound, (await AddAsync(_an, Guid.NewGuid())).Code);
+    }
+
+    [Fact]
+    public async Task AddAssignment_SkillNotApproved_ReturnsSkillNotApproved_Async()
+    {
+        MemberIs(_an, skillApproved: false);
+
+        Assert.Equal(ErrorCodes.AssignmentMemberSkillNotApproved, (await AddAsync(_an)).Code);
+    }
+
+    [Fact]
+    public async Task AddAssignment_ParticipationNotConfirmed_ReturnsNotConfirmed_Async()
+    {
+        MemberIs(_an, confirmed: false);
+
+        Assert.Equal(ErrorCodes.AssignmentMemberNotConfirmed, (await AddAsync(_an)).Code);
+    }
+
+    [Fact]
+    public async Task AddAssignment_MemberAlreadyHoldsSlot_ReturnsDuplicate_Async()
+    {
+        RosterWith(RosterStatus.Suggested, SopranoLine(_an));
+        MemberIs(_an);
+
+        Assert.Equal(ErrorCodes.AssignmentDuplicate, (await AddAsync(_an)).Code);
+    }
+
+    [Fact]
+    public async Task AddAssignment_FinalizedRoster_ReturnsRosterAlreadyFinalized_Async()
+    {
+        RosterWith(RosterStatus.Finalized);
+        MemberIs(_an);
+
+        Assert.Equal(ErrorCodes.RosterAlreadyFinalized, (await AddAsync(_an)).Code);
+        await _repository.DidNotReceiveWithAnyArgs().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task AddAssignment_MissingEvent_ReturnsEventNotFound_Async()
+    {
+        var result = await _sut.AddAssignmentAsync(new CreateRosterAssignmentRequest { EventId = Guid.NewGuid() }, _ct);
+
+        Assert.Equal(ErrorCodes.EventNotFound, result.Code);
+    }
+
+    [Fact]
+    public async Task ReplaceAssignment_KeepsOldLineAsReplacedAndLinksNewOne_Async()
+    {
+        var old = SopranoLine(_binh);
+        var roster = RosterWith(RosterStatus.Suggested, old);
+        MemberIs(_an);
+
+        var result = await _sut.ReplaceAssignmentAsync(old.Id, new ReplaceRosterAssignmentRequest { MemberId = _an }, _ct);
+
+        var replacement = Assert.Single(roster.Assignments, x => x.Status == RosterAssignmentStatus.Active);
+        Assert.Equal(_an, replacement.MemberId);
+        Assert.Equal(AssignmentSource.Manual, replacement.Source);
+        Assert.Equal((old.SkillId, old.SongListItemId), (replacement.SkillId, replacement.SongListItemId));
+        Assert.Equal(RosterAssignmentStatus.Replaced, old.Status);
+        Assert.Equal(replacement.Id, old.ReplacedByAssignmentId);
+        Assert.Equal(replacement.Id, result.Value!.Id);
+    }
+
+    [Fact]
+    public async Task ReplaceAssignment_AlreadyReplacedLine_ReturnsAssignmentNotFound_Async()
+    {
+        var old = SopranoLine(_binh);
+        old.Status = RosterAssignmentStatus.Replaced;
+        RosterWith(RosterStatus.Suggested, old);
+        MemberIs(_an);
+
+        var result = await _sut.ReplaceAssignmentAsync(old.Id, new ReplaceRosterAssignmentRequest { MemberId = _an }, _ct);
+
+        Assert.Equal(ErrorCodes.AssignmentNotFound, result.Code);
+    }
+
+    [Fact]
+    public async Task ReplaceAssignment_InactiveMember_ReturnsMemberNotActive_Async()
+    {
+        var old = SopranoLine(_binh);
+        RosterWith(RosterStatus.Suggested, old);
+        MemberIs(_an, status: MemberStatus.Inactive);
+
+        var result = await _sut.ReplaceAssignmentAsync(old.Id, new ReplaceRosterAssignmentRequest { MemberId = _an }, _ct);
+
+        Assert.Equal(ErrorCodes.MemberNotActive, result.Code);
+        Assert.Equal(RosterAssignmentStatus.Active, old.Status);
+    }
+
+    [Fact]
+    public async Task RemoveAssignment_ActiveLine_RemovesIt_Async()
+    {
+        var line = SopranoLine(_binh);
+        var roster = RosterWith(RosterStatus.Suggested, line);
+
+        var result = await _sut.RemoveAssignmentAsync(line.Id, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(roster.Assignments);
+        await _repository.Received(1).SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task RemoveAssignment_Missing_ReturnsAssignmentNotFound_Async()
+    {
+        Assert.Equal(ErrorCodes.AssignmentNotFound, (await _sut.RemoveAssignmentAsync(Guid.NewGuid(), _ct)).Code);
+    }
+
+    [Fact]
+    public async Task RemoveAssignment_PastEvent_ReturnsEventAlreadyPassed_Async()
+    {
+        var line = SopranoLine(_binh);
+        RosterWith(RosterStatus.Suggested, line);
+        _event.EventDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1);
+
+        Assert.Equal(ErrorCodes.EventAlreadyPassed, (await _sut.RemoveAssignmentAsync(line.Id, _ct)).Code);
+    }
 }
