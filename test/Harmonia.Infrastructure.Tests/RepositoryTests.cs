@@ -472,6 +472,24 @@ public sealed class RepositoryTests : IDisposable
         Assert.Equal(1, page.TotalCount);
     }
 
+    [Fact]
+    public async Task SearchMembers_SkillIdOfInactiveSkill_ReturnsEmpty_Async()
+    {
+        await SeedMaterialsAsync(_ct);
+        var retired = new Skill { Id = Guid.NewGuid(), CategoryId = SkillCategoryIds.Vocal, Name = "Retired", IsActive = false };
+        await using (var context = _db.NewContext())
+        {
+            context.Skills.Add(retired);
+            await context.SaveChangesAsync(_ct);
+        }
+        await AddMemberAsync("Binh", MemberStatus.Active, [retired.Id], _ct);
+
+        var page = await SearchMembersAsync(new SearchMemberProfilesRequest { SkillId = retired.Id }, _ct);
+
+        Assert.Empty(page.Items);
+        Assert.Equal(0, page.TotalCount);
+    }
+
     // ---- MemberProfileRepository.GetByUserIdWithApprovedSkillsAsync ----
 
     [Fact]

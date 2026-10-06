@@ -54,7 +54,9 @@ public class MemberProfileRepository(HarmoniaDbContext dbContext)
 
         if (filter.SkillId is { } skillId)
         {
-            query = query.Where(x => x.MemberSkills.Any(s => s.SkillId == skillId && s.Status == ApprovalStatus.Approved));
+            // Same condition as the ApprovedSkills include below, so a match always shows the skill.
+            query = query.Where(x => x.MemberSkills.Any(
+                s => s.SkillId == skillId && s.Status == ApprovalStatus.Approved && s.Skill.IsActive));
         }
 
         var totalCount = await query.CountAsync(cancellationToken);
