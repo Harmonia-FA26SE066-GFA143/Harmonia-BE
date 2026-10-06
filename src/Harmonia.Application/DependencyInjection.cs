@@ -21,6 +21,7 @@ public static class DependencyInjection
         services.AddScoped<IMusicMaterialService, MusicMaterialService>();
         services.AddScoped<ILookupService, LookupService>();
         services.AddScoped<ISongPersonnelRequirementService, SongPersonnelRequirementService>();
+        services.AddScoped<IRosterService, RosterService>();
 
         return services;
     }

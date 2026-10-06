@@ -556,6 +556,77 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 
 ---
 
+## 7a. Song list items — `api/song-list-items` · xem: mọi role · sửa: `ChoirDirector` (UC-24)
+
+### Nhân sự cần cho mỗi bài — `SongPersonnelRequirementDto` / `UpdateSongPersonnelRequirementsRequest`
+
+```json
+[{ "skillId": "guid", "skillName": "Soprano", "skillCategoryId": "guid", "requiredCount": 3 }]
+```
+
+```json
+{ "requirements": [{ "skillId": "guid", "requiredCount": 3 }] }
+```
+
+| Method | Route | Body | Thành công | Lỗi |
+|---|---|---|---|---|
+| GET | `/api/song-list-items/{id}/personnel-requirements` | — | 200 `SongPersonnelRequirementDto[]` | 404 `SONG_LIST_ITEM_NOT_FOUND` |
+| PUT | `/api/song-list-items/{id}/personnel-requirements` | `UpdateSongPersonnelRequirementsRequest` | 200 `SongPersonnelRequirementDto[]` | 400 `VALIDATION_FAILED` · 404 `SONG_LIST_ITEM_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE`, `SONG_LIST_NOT_LATEST_VERSION`, `ROSTER_ALREADY_FINALIZED` |
+
+- `PUT` **thay cả bộ**: skill nào không gửi lên thì bị gỡ. Gửi `[]` để gỡ hết.
+- `requiredCount` từ 1 đến 50 (`errors.<field>` chứa `PERSONNEL_REQUIRED_COUNT_INVALID`); skill trùng trong
+  danh sách → `PERSONNEL_REQUIREMENT_DUPLICATE`. Cả hai bắt ở validator, trả 400 `VALIDATION_FAILED`.
+- Nhận skill thuộc mọi nhóm (bè, nhạc cụ, solo, xướng đáp ca…). Skill **thêm mới** phải đang hoạt động;
+  skill đã có từ trước vẫn giữ được dù sau đó bị vô hiệu hoá.
+- Chỉ sửa được bài thuộc **phiên bản mới nhất** của danh sách, ở trạng thái nào cũng được, và khi bảng
+  phân công của sự kiện chưa chốt.
+- Ca viên chỉ xem được bài thuộc danh sách `Approved` của sự kiện `Published`; còn lại trả 404 như không tồn tại.
+- Kết quả sắp theo `skillName`.
+
+---
+
+## 7b. Service rosters — `api/service-rosters` · role `ChoirDirector` (UC-25)
+
+### `RosterSuggestionResponse`
+
+```json
+{
+  "rosterId": "guid",
+  "eventId": "guid",
+  "status": "Suggested",
+  "generatedAt": "2026-10-06T08:00:00Z",
+  "isAiGenerated": true,
+  "assignments": [{
+    "id": "guid", "memberId": "guid", "memberName": "Nguyễn Văn An",
+    "skillId": "guid", "skillName": "Soprano",
+    "songListItemId": "guid", "songTitle": "Hãy Nâng Tâm Hồn", "source": "Suggested"
+  }],
+  "shortages": [{
+    "songListItemId": "guid", "songTitle": "Hãy Nâng Tâm Hồn",
+    "skillId": "guid", "skillName": "Guitar", "requiredCount": 2, "assignedCount": 1
+  }]
+}
+```
+
+| Method | Route | Body | Thành công | Lỗi |
+|---|---|---|---|---|
+| POST | `/api/service-rosters/suggestions` | `{ "eventId": "guid" }` | 200 `RosterSuggestionResponse` | 400 `VALIDATION_FAILED` · 404 `EVENT_NOT_FOUND` · 409 `EVENT_CANCELLED`, `EVENT_ALREADY_PASSED`, `ROSTER_SONG_LIST_NOT_APPROVED`, `ROSTER_NO_PERSONNEL_REQUIREMENT`, `ROSTER_ALREADY_FINALIZED` |
+
+- Ứng viên cho mỗi cặp (bài, skill): ca viên **đang hoạt động**, đã được **duyệt** skill đó và đã
+  **xác nhận tham gia** (`Confirmed`) sự kiện. Không ai ngoài danh sách này được gợi ý.
+- AI (Gemini) chọn trong ứng viên, ưu tiên level cao và người ít phục vụ trong 60 ngày gần nhất. Server
+  kiểm lại mọi lựa chọn của AI, rồi tự bù chỗ còn trống theo cùng tiêu chí. AI lỗi hoặc quá 20 giây thì
+  phần bù lo toàn bộ và `isAiGenerated = false`. Endpoint không trả lỗi vì AI.
+- Một ca viên có thể phục vụ nhiều bài, và nhiều skill trong cùng một bài.
+- Gọi lại được nhiều lần cho tới khi chốt: dòng `source = Suggested` cũ bị thay; dòng `Manual` (ca trưởng sửa
+  tay) **được giữ** và tính là đã có người, nên chỉ gợi ý thêm cho phần còn thiếu.
+- `assignments` là **toàn bộ** phân công hiện tại của sự kiện (gợi ý mới + dòng tay), sắp theo thứ tự bài,
+  tên skill, tên ca viên.
+- `shortages` là các cặp (bài, skill) vẫn thiếu người sau khi gợi ý, tính lại mỗi lần gọi, không lưu.
+- Không gửi thông báo cho ca viên ở bước này (xem UC-27).
+
+---
+
 ## 8. SignalR — `/hubs/notifications`
 
 Chỉ server → client; client không gọi method nào trên hub.
