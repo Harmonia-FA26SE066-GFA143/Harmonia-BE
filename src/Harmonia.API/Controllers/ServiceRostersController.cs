@@ -38,4 +38,9 @@ public class ServiceRostersController(IRosterService rosterService) : ApiControl
     [HttpDelete("assignments/{id:guid}")]
     public async Task<IActionResult> RemoveAssignmentAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await rosterService.RemoveAssignmentAsync(id, cancellationToken));
+
+    /// <summary>Locks the roster after the song list is approved; shortages do not block (UC-26 / FE-39).</summary>
+    [HttpPost("{id:guid}/finalization")]
+    public async Task<IActionResult> FinalizeAsync(Guid id, CancellationToken cancellationToken) =>
+        ToActionResult(await rosterService.FinalizeAsync(id, cancellationToken));
 }

@@ -33,7 +33,11 @@ public class RosterServiceTests
 
     public RosterServiceTests()
     {
-        var mapper = new MapperConfiguration(cfg => cfg.AddProfile<RosterAssignmentProfile>(), NullLoggerFactory.Instance).CreateMapper();
+        var mapper = new MapperConfiguration(cfg =>
+        {
+            cfg.AddProfile<RosterAssignmentProfile>();
+            cfg.AddProfile<ServiceRosterProfile>();
+        }, NullLoggerFactory.Instance).CreateMapper();
         _currentUser.UserId.Returns(_directorId);
         _sut = new RosterService(_repository, _generator, _currentUser, mapper);
 
@@ -510,5 +514,99 @@ public class RosterServiceTests
         _event.EventDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1);
 
         Assert.Equal(ErrorCodes.EventAlreadyPassed, (await _sut.RemoveAssignmentAsync(line.Id, _ct)).Code);
+    }
+
+    // --- Finalize (UC-26) ---
+
+    /// <summary>Soprano line whose member is loaded the way GetAssignmentsWithEligibilityAsync loads it.</summary>
+    private RosterAssignment SopranoLineFor(
+        Guid memberId, MemberStatus status = MemberStatus.Active, bool skillApproved = true, bool confirmed = true)
+    {
+        var member = new MemberProfile { Id = memberId, Status = status, User = new User { FullName = "Member" } };
+        if (skillApproved) member.MemberSkills.Add(new MemberSkill { MemberId = memberId, SkillId = _soprano.Id });
+        if (confirmed) member.EventParticipations.Add(new EventParticipation { MemberId = memberId, EventId = _event.Id });
+
+        var line = SopranoLine(memberId);
+        line.Id = Guid.NewGuid();
+        line.Member = member;
+        line.Skill = _soprano;
+        return line;
+    }
+
+    private ServiceRoster FinalizableRoster(RosterStatus status, params RosterAssignment[] lines)
+    {
+        var roster = ExistingRoster(status);
+        roster.LiturgicalEvent = _event;
+        _repository.GetRosterWithEventAsync(roster.Id, _ct).Returns(roster);
+        _repository.GetAssignmentsWithEligibilityAsync(roster.Id, _event.Id, _ct).Returns(lines.ToList());
+        return roster;
+    }
+
+    [Fact]
+    public async Task Finalize_EligibleLinesWithShortage_LocksRosterAndReturnsShortage_Async()
+    {
+        var roster = FinalizableRoster(RosterStatus.Suggested, SopranoLineFor(_an), SopranoLineFor(_binh));
+
+        var result = await _sut.FinalizeAsync(roster.Id, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(RosterStatus.Finalized, roster.Status);
+        Assert.Equal(_directorId, roster.FinalizedBy);
+        Assert.NotNull(roster.FinalizedAt);
+        Assert.Equal(RosterStatus.Finalized, result.Value!.Status);
+        Assert.Equal(2, result.Value.Assignments.Count);
+        var shortage = Assert.Single(result.Value.Shortages);
+        Assert.Equal(_guitar.Id, shortage.SkillId);
+        await _repository.Received(1).SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Finalize_MissingRoster_ReturnsRosterNotFound_Async()
+    {
+        Assert.Equal(ErrorCodes.RosterNotFound, (await _sut.FinalizeAsync(Guid.NewGuid(), _ct)).Code);
+    }
+
+    [Fact]
+    public async Task Finalize_AlreadyFinalized_ReturnsRosterAlreadyFinalized_Async()
+    {
+        var roster = FinalizableRoster(RosterStatus.Finalized, SopranoLineFor(_an));
+
+        Assert.Equal(ErrorCodes.RosterAlreadyFinalized, (await _sut.FinalizeAsync(roster.Id, _ct)).Code);
+    }
+
+    [Fact]
+    public async Task Finalize_PastEvent_ReturnsEventAlreadyPassed_Async()
+    {
+        var roster = FinalizableRoster(RosterStatus.Suggested, SopranoLineFor(_an));
+        _event.EventDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1);
+
+        Assert.Equal(ErrorCodes.EventAlreadyPassed, (await _sut.FinalizeAsync(roster.Id, _ct)).Code);
+    }
+
+    [Fact]
+    public async Task Finalize_NoApprovedSongList_ReturnsSongListNotApproved_Async()
+    {
+        var roster = FinalizableRoster(RosterStatus.Suggested, SopranoLineFor(_an));
+        _repository.GetApprovedSongListAsync(_event.Id, _ct).Returns((SongList?)null);
+
+        Assert.Equal(ErrorCodes.RosterSongListNotApproved, (await _sut.FinalizeAsync(roster.Id, _ct)).Code);
+    }
+
+    [Theory]
+    [InlineData(MemberStatus.Inactive, true, true, ErrorCodes.MemberNotActive)]
+    [InlineData(MemberStatus.Active, false, true, ErrorCodes.AssignmentMemberSkillNotApproved)]
+    [InlineData(MemberStatus.Active, true, false, ErrorCodes.AssignmentMemberNotConfirmed)]
+    public async Task Finalize_LineNoLongerEligible_ReturnsItsCodeAndKeepsRosterOpen_Async(
+        MemberStatus status, bool skillApproved, bool confirmed, string expectedCode)
+    {
+        var invalid = SopranoLineFor(_binh, status, skillApproved, confirmed);
+        var roster = FinalizableRoster(RosterStatus.Suggested, SopranoLineFor(_an), invalid);
+
+        var result = await _sut.FinalizeAsync(roster.Id, _ct);
+
+        Assert.Equal(expectedCode, result.Code);
+        Assert.Contains(invalid.Id.ToString(), result.Message);
+        Assert.Equal(RosterStatus.Suggested, roster.Status);
+        await _repository.DidNotReceive().SaveChangesAsync(_ct);
     }
 }

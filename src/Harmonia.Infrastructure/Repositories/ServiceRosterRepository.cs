@@ -65,4 +65,24 @@ public class ServiceRosterRepository(HarmoniaDbContext dbContext)
             .Include(x => x.LiturgicalEvent)
             .Include(x => x.Assignments)
             .FirstOrDefaultAsync(x => x.Assignments.Any(a => a.Id == assignmentId), cancellationToken);
+
+    public Task<ServiceRoster?> GetRosterWithEventAsync(Guid rosterId, CancellationToken cancellationToken) =>
+        DbContext.ServiceRosters
+            .Include(x => x.LiturgicalEvent)
+            .FirstOrDefaultAsync(x => x.Id == rosterId, cancellationToken);
+
+    public Task<List<RosterAssignment>> GetAssignmentsWithEligibilityAsync(
+        Guid rosterId, Guid eventId, CancellationToken cancellationToken) =>
+        DbContext.RosterAssignments
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Include(x => x.Member).ThenInclude(x => x.User)
+            .Include(x => x.Member).ThenInclude(x => x.MemberSkills.Where(s => s.Status == ApprovalStatus.Approved))
+            .Include(x => x.Member).ThenInclude(x => x.EventParticipations
+                .Where(p => p.EventId == eventId && p.Status == ParticipationStatus.Confirmed))
+            .Include(x => x.Skill)
+            .Include(x => x.SongListItem).ThenInclude(x => x!.Song)
+            .Where(x => x.RosterId == rosterId && x.Status == RosterAssignmentStatus.Active)
+            .OrderBy(x => x.SongListItem!.DisplayOrder).ThenBy(x => x.Skill.Name).ThenBy(x => x.Member.User.FullName)
+            .ToListAsync(cancellationToken);
 }

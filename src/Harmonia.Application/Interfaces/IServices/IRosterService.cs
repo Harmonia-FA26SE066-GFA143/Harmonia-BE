@@ -37,4 +37,11 @@ public interface IRosterService
 
     /// <summary>Deletes an Active assignment from a roster that is not finalized (UC-25b / FE-38).</summary>
     Task<Result> RemoveAssignmentAsync(Guid assignmentId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Locks the roster once the event's song list is approved (UC-26 / FE-39). Every Active assignment must still
+    /// hold an Active member with the approved skill and a confirmed participation; shortages do not block and come
+    /// back in the result.
+    /// </summary>
+    Task<Result<ServiceRosterDto>> FinalizeAsync(Guid rosterId, CancellationToken cancellationToken);
 }

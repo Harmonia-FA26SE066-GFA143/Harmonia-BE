@@ -111,7 +111,44 @@ public class RosterService(
 
         var assignments = liturgicalEvent.ServiceRoster?.Assignments.Where(x => x.Status == RosterAssignmentStatus.Active).ToList() ?? [];
 
-        return Result<List<RosterShortageDto>>.Success(songList.Items
+        return Result<List<RosterShortageDto>>.Success(ComputeShortages(songList, assignments));
+    }
+
+    public async Task<Result<ServiceRosterDto>> FinalizeAsync(Guid rosterId, CancellationToken cancellationToken)
+    {
+        var roster = await rosterRepository.GetRosterWithEventAsync(rosterId, cancellationToken);
+        if (roster is null) return Result<ServiceRosterDto>.Failure(ErrorCodes.RosterNotFound);
+        if (RosterNotEditableCode(roster) is { } rosterError) return Result<ServiceRosterDto>.Failure(rosterError);
+
+        var songList = await rosterRepository.GetApprovedSongListAsync(roster.EventId, cancellationToken);
+        if (songList is null) return Result<ServiceRosterDto>.Failure(ErrorCodes.RosterSongListNotApproved);
+
+        // Members may have left, lost the skill or withdrawn since they were assigned.
+        var assignments = await rosterRepository.GetAssignmentsWithEligibilityAsync(roster.Id, roster.EventId, cancellationToken);
+        foreach (var assignment in assignments)
+        {
+            var code = assignment.Member.Status != MemberStatus.Active ? ErrorCodes.MemberNotActive
+                : !assignment.Member.MemberSkills.Any(s => s.SkillId == assignment.SkillId) ? ErrorCodes.AssignmentMemberSkillNotApproved
+                : assignment.Member.EventParticipations.Count == 0 ? ErrorCodes.AssignmentMemberNotConfirmed
+                : null;
+            if (code is not null)
+                return Result<ServiceRosterDto>.Failure(code, $"Assignment {assignment.Id} is no longer valid.");
+        }
+
+        roster.Status = RosterStatus.Finalized;
+        roster.FinalizedAt = DateTime.UtcNow;
+        roster.FinalizedBy = currentUser.UserId;
+        await rosterRepository.SaveChangesAsync(cancellationToken);
+
+        var dto = mapper.Map<ServiceRosterDto>(roster);
+        dto.Assignments = mapper.Map<List<RosterAssignmentDto>>(assignments);
+        dto.Shortages = ComputeShortages(songList, assignments);
+        return Result<ServiceRosterDto>.Success(dto);
+    }
+
+    /// <summary>Requirements of the song list that the given Active assignments do not fully staff, in song order.</summary>
+    private static List<RosterShortageDto> ComputeShortages(SongList songList, List<RosterAssignment> activeAssignments) =>
+        songList.Items
             .OrderBy(item => item.DisplayOrder)
             .SelectMany(item => item.PersonnelRequirements.Select(r => new RosterShortageDto
             {
@@ -120,11 +157,10 @@ public class RosterService(
                 SkillId = r.SkillId,
                 SkillName = r.Skill.Name,
                 RequiredCount = r.RequiredCount,
-                AssignedCount = assignments.Count(a => a.SongListItemId == item.Id && a.SkillId == r.SkillId),
+                AssignedCount = activeAssignments.Count(a => a.SongListItemId == item.Id && a.SkillId == r.SkillId),
             }))
             .Where(x => x.AssignedCount < x.RequiredCount)
-            .ToList());
-    }
+            .ToList();
 
     public async Task<Result<RosterAssignmentDto>> AddAssignmentAsync(CreateRosterAssignmentRequest request, CancellationToken cancellationToken)
     {

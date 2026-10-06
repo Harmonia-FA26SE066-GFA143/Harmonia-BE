@@ -39,4 +39,14 @@ public interface IServiceRosterRepository : IGenericRepository<ServiceRoster>
 
     /// <summary>Tracked roster owning the assignment, with its LiturgicalEvent and all its assignments loaded.</summary>
     Task<ServiceRoster?> GetRosterByAssignmentAsync(Guid assignmentId, CancellationToken cancellationToken);
+
+    /// <summary>Tracked roster with its LiturgicalEvent loaded (assignments not loaded).</summary>
+    Task<ServiceRoster?> GetRosterWithEventAsync(Guid rosterId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Read-only Active assignments of the roster, loaded like <see cref="GetAssignmentsAsync"/> plus, on each Member,
+    /// only their approved skill declarations and their confirmed participation in <paramref name="eventId"/>.
+    /// </summary>
+    Task<List<RosterAssignment>> GetAssignmentsWithEligibilityAsync(
+        Guid rosterId, Guid eventId, CancellationToken cancellationToken);
 }
