@@ -585,7 +585,7 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 
 ---
 
-## 7b. Service rosters — `api/service-rosters` · role `ChoirDirector` (UC-25)
+## 7b. Service rosters — `api/service-rosters` · role `ChoirDirector` (UC-25 / UC-25a / UC-25b)
 
 ### `RosterSuggestionResponse`
 
@@ -611,6 +611,14 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
 | POST | `/api/service-rosters/suggestions` | `{ "eventId": "guid" }` | 200 `RosterSuggestionResponse` | 400 `VALIDATION_FAILED` · 404 `EVENT_NOT_FOUND` · 409 `EVENT_CANCELLED`, `EVENT_ALREADY_PASSED`, `ROSTER_SONG_LIST_NOT_APPROVED`, `ROSTER_NO_PERSONNEL_REQUIREMENT`, `ROSTER_ALREADY_FINALIZED` |
+| GET | `/api/service-rosters/shortages?eventId=` | — | 200 `RosterShortageDto[]` | 404 `EVENT_NOT_FOUND` · 409 `ROSTER_SONG_LIST_NOT_APPROVED` |
+| POST | `/api/service-rosters/assignments` | `{ "eventId", "songListItemId", "skillId", "memberId" }` | 200 `RosterAssignmentDto` | 400 `VALIDATION_FAILED` · 404 `EVENT_NOT_FOUND`, `PERSONNEL_REQUIREMENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `EVENT_CANCELLED`, `EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ROSTER_SONG_LIST_NOT_APPROVED`, `ASSIGNMENT_DUPLICATE`, `MEMBER_NOT_ACTIVE`, `ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ASSIGNMENT_MEMBER_NOT_CONFIRMED` |
+| POST | `/api/service-rosters/assignments/{id}/replacement` | `{ "memberId" }` | 200 `RosterAssignmentDto` (dòng mới) | 400 `VALIDATION_FAILED` · 404 `ASSIGNMENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `EVENT_CANCELLED`, `EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ASSIGNMENT_DUPLICATE`, `MEMBER_NOT_ACTIVE`, `ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ASSIGNMENT_MEMBER_NOT_CONFIRMED` |
+| DELETE | `/api/service-rosters/assignments/{id}` | — | 204 | 404 `ASSIGNMENT_NOT_FOUND` · 409 `EVENT_CANCELLED`, `EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED` |
+
+`RosterAssignmentDto` = một phần tử của `assignments` ở trên. `RosterShortageDto` = một phần tử của `shortages`.
+
+**Gợi ý (`suggestions`)**
 
 - Ứng viên cho mỗi cặp (bài, skill): ca viên **đang hoạt động**, đã được **duyệt** skill đó và đã
   **xác nhận tham gia** (`Confirmed`) sự kiện. Không ai ngoài danh sách này được gợi ý.
@@ -624,6 +632,25 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
   tên skill, tên ca viên.
 - `shortages` là các cặp (bài, skill) vẫn thiếu người sau khi gợi ý, tính lại mỗi lần gọi, không lưu.
 - Không gửi thông báo cho ca viên ở bước này (xem UC-27).
+
+**Cảnh báo thiếu người (`shortages`, UC-25a)**
+
+- Trả các cặp (bài, skill) của danh sách bài hát đã duyệt mà số người đang phân công < `requiredCount`,
+  theo thứ tự bài. Đủ người hết → `[]`. Chưa có bảng phân công → mọi yêu cầu đều thiếu.
+- Mọi dòng phân công còn hiệu lực đều tính là có người (cả gợi ý lẫn thêm tay). Tính lại mỗi lần gọi.
+
+**Sửa tay (`assignments`, UC-25b)**
+
+- Ca viên được thêm / thay vào phải **đang hoạt động**, đã được **duyệt** skill đó và đã **xác nhận tham gia**
+  sự kiện. Đã có đúng (bài, skill, ca viên) đó trên bảng → 409 `ASSIGNMENT_DUPLICATE`.
+- Thêm: cặp (`songListItemId`, `skillId`) phải là một yêu cầu nhân sự của danh sách đã duyệt, nếu không → 404
+  `PERSONNEL_REQUIREMENT_NOT_FOUND`. Được thêm vượt `requiredCount`. Sự kiện chưa có bảng thì tự tạo bảng `Draft`.
+  Dòng thêm tay có `source = Manual`.
+- Thay: dòng cũ giữ lại làm lịch sử (không còn hiện trong `assignments`), dòng mới `Manual` cùng bài + skill.
+  Gợi ý lại sau đó không gợi ý lại người đã bị thay ở vị trí ấy.
+- Xoá: xoá hẳn dòng phân công.
+- `{id}` phải là dòng còn hiệu lực; dòng đã bị thay hoặc không tồn tại → 404 `ASSIGNMENT_NOT_FOUND`.
+- Sự kiện đã huỷ / đã qua, hoặc bảng đã chốt → 409, không sửa được nữa.
 
 ---
 

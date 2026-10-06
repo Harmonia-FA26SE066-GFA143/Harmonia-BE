@@ -54,9 +54,11 @@ rồi `get_values` từng tab cần so.
 - Đánh lại `STT` liên tục từ 1. Dòng thứ tự theo `api.md`.
 
 ### 5. Tab F chưa có
-Tạo bằng `update_spreadsheet` (`addSheet`), tên đúng như heading trong feature-list
-(rút gọn như các tab sẵn có, vd `F6. Danh sách Bài hát`), đặt `index` sao cho các tab F theo thứ tự số.
-Ghi header 9 cột, định dạng header giống tab F sẵn có (đọc định dạng tab F3 nếu cần).
+Tạo bằng `update_spreadsheet` → `duplicateSheet` từ một tab F sẵn có (giữ header, định dạng, độ rộng cột),
+`newSheetName` rút gọn như các tab sẵn có (vd `F8. Phân công Phục vụ`), `insertSheetIndex` sao cho các tab F
+theo thứ tự số. Rồi `batch_clear_values` vùng `A2:I` của tab mới trước khi ghi.
+Lưu ý: xếp tab theo feature-list, không theo mục `api.md` — vd `song-list-items/.../personnel-requirements`
+là UC-24 → F8, không phải F6.
 
 ### 6. Tab `Mã lỗi`
 Dựng lại toàn bộ từ cột `Mã lỗi` của mọi tab endpoint (thứ tự: tab F theo số, trong tab theo STT),
@@ -73,8 +75,15 @@ Kèm link: https://docs.google.com/spreadsheets/d/1fWlhDqXfSpFx2rIbqBStKx_mYAZSp
 
 ## Luật ghi
 
-- `update_values` / `append_values` luôn dùng `valueInputOption: RAW` — tránh `200`, `2026-10-01`,
-  `{ "id" }` bị Sheets đổi thành số/ngày/công thức.
+- Connector KHÔNG có `valueInputOption: RAW` — ô được parse như gõ tay. Chuỗi bắt đầu bằng `=` / `+`,
+  hoặc trông như ngày (`2026-10-01`) mà phải giữ là chữ → thêm `'` ở đầu. `200`, `404` thành số là chấp nhận được.
+- `null` trong `values` = bỏ qua ô, `""` = xoá ô.
+- Ô `Method` được tô màu TAY theo từng ô (không có conditional format). Mỗi dòng thêm mới hoặc đổi method
+  (kể cả tab vừa `duplicateSheet` — màu bám theo vị trí dòng của tab gốc) → `repeatCell` cột C, `fields: "userEnteredFormat"`:
+  nền GET `(0.776, 0.937, 0.808)` · POST `(0.988, 0.894, 0.839)` · PUT `(0.894, 0.875, 0.925)` ·
+  DELETE `(1, 0.780, 0.808)` (RGB 0–1); PATCH → đọc màu ô PATCH ở tab F3. Kèm viền SOLID 4 cạnh màu
+  `(0.749, 0.749, 0.749)`, chữ đậm `Arial, sans-serif`, `verticalAlignment: TOP`, `wrapStrategy: WRAP`,
+  không đặt `horizontalAlignment`.
 - Đọc lại tab ngay trước khi ghi tab đó (Sheets không có revision guard).
 - Không xoá tab, không xoá dòng endpoint, không đổi tên tab sẵn có.
 - Không commit. Chỉ sửa `doc/api.md` và sheet.
