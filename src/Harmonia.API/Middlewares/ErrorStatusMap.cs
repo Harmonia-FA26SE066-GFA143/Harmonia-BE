@@ -68,6 +68,13 @@ public static class ErrorStatusMap
         [ErrorCodes.MemberSkillNotApproved] = StatusCodes.Status409Conflict,
 
         // 5. Liturgical calendar.
+        [ErrorCodes.CalendarDayNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.CalendarFileRequired] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.CalendarFileTypeNotAllowed] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.CalendarFileTooLarge] = StatusCodes.Status413PayloadTooLarge,
+        [ErrorCodes.CalendarFileInvalid] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.EventAlreadyPublished] = StatusCodes.Status409Conflict,
+        [ErrorCodes.EventNotPublished] = StatusCodes.Status409Conflict,
         [ErrorCodes.WeekNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.WeekAlreadyExists] = StatusCodes.Status409Conflict,
         [ErrorCodes.WeekStartNotMonday] = StatusCodes.Status400BadRequest,

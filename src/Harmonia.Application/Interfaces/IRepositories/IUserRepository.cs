@@ -31,4 +31,6 @@ public interface IUserRepository : IGenericRepository<User>
     Task AddAsync(User user, CancellationToken cancellationToken);
 
     Task SaveChangesAsync(CancellationToken cancellationToken);
+
+    Task<List<Guid>> GetActiveUserIdsByRolesAsync(IReadOnlyCollection<string> roleNames, CancellationToken cancellationToken);
 }

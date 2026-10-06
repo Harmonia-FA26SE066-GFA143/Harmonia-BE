@@ -83,6 +83,9 @@ public static class ErrorCodes
 
     public const string RoleNotFound = "ROLE_NOT_FOUND";
 
+    public const string UserAlreadyActive = "USER_ALREADY_ACTIVE";
+
+
     // 3. MemberProfile.
     public const string MemberNotFound = "MEMBER_NOT_FOUND";
 
@@ -112,6 +115,20 @@ public static class ErrorCodes
     public const string MemberSkillNotApproved = "MEMBER_SKILL_NOT_APPROVED";
 
     // 5. Liturgical calendar.
+    public const string CalendarDayNotFound = "CALENDAR_DAY_NOT_FOUND";
+
+    public const string CalendarFileRequired = "CALENDAR_FILE_REQUIRED";
+
+    public const string CalendarFileTypeNotAllowed = "CALENDAR_FILE_TYPE_NOT_ALLOWED";
+
+    public const string CalendarFileTooLarge = "CALENDAR_FILE_TOO_LARGE";
+
+    public const string CalendarFileInvalid = "CALENDAR_FILE_INVALID";
+
+    public const string EventAlreadyPublished = "EVENT_ALREADY_PUBLISHED";
+
+    public const string EventNotPublished = "EVENT_NOT_PUBLISHED";
+
     public const string WeekNotFound = "WEEK_NOT_FOUND";
 
     public const string WeekAlreadyExists = "WEEK_ALREADY_EXISTS";
@@ -287,6 +304,5 @@ public static class ErrorCodes
 
     public const string ExternalAiFailed = "EXTERNAL_AI_FAILED";
 
-    public const string UserAlreadyActive = "USER_ALREADY_ACTIVE";
 
 }

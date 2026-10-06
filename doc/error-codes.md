@@ -147,6 +147,11 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 
 | Mã | HTTP | Tiếng Việt |
 |---|---|---|
+| `CALENDAR_DAY_NOT_FOUND` | 404 | Không tìm thấy ngày phụng vụ |
+| `CALENDAR_FILE_REQUIRED` | 400 | Vui lòng chọn tệp lịch phụng vụ (.ics) |
+| `CALENDAR_FILE_TYPE_NOT_ALLOWED` | 400 | Chỉ hỗ trợ tệp lịch định dạng .ics |
+| `CALENDAR_FILE_TOO_LARGE` | 413 | Tệp lịch vượt quá dung lượng cho phép |
+| `CALENDAR_FILE_INVALID` | 400 | Tệp lịch không hợp lệ hoặc không có ngày phụng vụ nào |
 | `EVENT_NOT_FOUND` | 404 | Không tìm thấy sự kiện |
 | `EVENT_SLOT_TAKEN` | 409 | Đã có sự kiện khác vào giờ này tại địa điểm này |
 | `EVENT_ALREADY_PUBLISHED` | 409 | Sự kiện đã công bố, không thể sửa |

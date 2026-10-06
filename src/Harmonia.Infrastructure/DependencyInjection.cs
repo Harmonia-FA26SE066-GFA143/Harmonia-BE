@@ -81,12 +81,17 @@ public static class DependencyInjection
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IMemberProfileRepository, MemberProfileRepository>();
+        services.AddScoped<ILiturgicalDayRepository, LiturgicalDayRepository>();
+        services.AddScoped<ILiturgicalEventRepository, LiturgicalEventRepository>();
+        services.AddScoped<IRehearsalRepository, RehearsalRepository>();
+
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IPasswordHasherService, PasswordHasherService>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddSingleton<IFileStorageService, CloudinaryFileStorageService>();
         services.AddSingleton<IEmailSender, BrevoEmailSender>();
         services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
+        services.AddSingleton<ICatholicCalendarParser, CatholicCalendarParser>();
 
         return services;
     }

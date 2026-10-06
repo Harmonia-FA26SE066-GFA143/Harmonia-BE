@@ -61,4 +61,15 @@ public class UserRepository(HarmoniaDbContext dbContext)
 
     public Task<int> CountActiveAdminsAsync(CancellationToken ct) =>
         DbContext.Users.CountAsync(x => x.Role.Name == RoleNames.Admin && x.IsActive, ct);
+
+    public Task<List<Guid>> GetActiveUserIdsByRolesAsync(
+    IReadOnlyCollection<string> roleNames, CancellationToken cancellationToken)
+    {
+        var roleNamesList = roleNames.ToList();
+
+        return DbContext.Users
+            .Where(x => EF.Constant(roleNamesList).Contains(x.Role.Name) && x.IsActive)
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
+    }
 }
