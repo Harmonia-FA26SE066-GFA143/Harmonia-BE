@@ -13,4 +13,11 @@ public interface IRosterService
     /// lack people come back as shortages.
     /// </summary>
     Task<Result<RosterSuggestionResponse>> SuggestAsync(SuggestServiceRosterRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Song / skill requirements of the event's approved song list that the current roster does not fully
+    /// staff (UC-25a / FE-37). Every existing assignment counts as filled; with no roster yet, every
+    /// requirement is a shortage.
+    /// </summary>
+    Task<Result<List<RosterShortageDto>>> GetShortagesAsync(Guid eventId, CancellationToken cancellationToken);
 }

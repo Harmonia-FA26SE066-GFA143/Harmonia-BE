@@ -103,6 +103,31 @@ public class RosterService(
         });
     }
 
+    public async Task<Result<List<RosterShortageDto>>> GetShortagesAsync(Guid eventId, CancellationToken cancellationToken)
+    {
+        var liturgicalEvent = await rosterRepository.GetEventWithRosterAsync(eventId, cancellationToken);
+        if (liturgicalEvent is null) return Result<List<RosterShortageDto>>.Failure(ErrorCodes.EventNotFound);
+
+        var songList = await rosterRepository.GetApprovedSongListAsync(eventId, cancellationToken);
+        if (songList is null) return Result<List<RosterShortageDto>>.Failure(ErrorCodes.RosterSongListNotApproved);
+
+        var assignments = liturgicalEvent.ServiceRoster?.Assignments ?? [];
+
+        return Result<List<RosterShortageDto>>.Success(songList.Items
+            .OrderBy(item => item.DisplayOrder)
+            .SelectMany(item => item.PersonnelRequirements.Select(r => new RosterShortageDto
+            {
+                SongListItemId = item.Id,
+                SongTitle = item.Song.Title,
+                SkillId = r.SkillId,
+                SkillName = r.Skill.Name,
+                RequiredCount = r.RequiredCount,
+                AssignedCount = assignments.Count(a => a.SongListItemId == item.Id && a.SkillId == r.SkillId),
+            }))
+            .Where(x => x.AssignedCount < x.RequiredCount)
+            .ToList());
+    }
+
     /// <summary>
     /// One slot per requirement. Manual assignments already on the roster count as filled and their
     /// members are not candidates again for that slot. A member may fill several skills of one song.

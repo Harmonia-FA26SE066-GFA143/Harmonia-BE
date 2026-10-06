@@ -15,4 +15,10 @@ public class ServiceRostersController(IRosterService rosterService) : ApiControl
     public async Task<IActionResult> SuggestAsync(
         [FromBody] SuggestServiceRosterRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await rosterService.SuggestAsync(request, cancellationToken));
+
+    /// <summary>Shortage warnings of the event's current roster (UC-25a / FE-37).</summary>
+    [HttpGet("shortages")]
+    public async Task<IActionResult> GetShortagesAsync(
+        [FromQuery] Guid eventId, CancellationToken cancellationToken) =>
+        ToActionResult(await rosterService.GetShortagesAsync(eventId, cancellationToken));
 }

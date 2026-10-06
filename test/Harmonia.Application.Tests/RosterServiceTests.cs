@@ -252,4 +252,44 @@ public class RosterServiceTests
         await _generator.DidNotReceiveWithAnyArgs().GenerateAsync(default!, _ct);
         await _repository.DidNotReceiveWithAnyArgs().SaveChangesAsync(_ct);
     }
+
+    [Fact]
+    public async Task GetShortages_PartlyStaffedRoster_ReturnsOnlyUnfilledRequirements_Async()
+    {
+        var roster = ExistingRoster(RosterStatus.Suggested);
+        roster.Assignments.Add(new RosterAssignment { MemberId = _binh, SkillId = _soprano.Id, SongListItemId = _entrance.Id });
+        roster.Assignments.Add(new RosterAssignment { MemberId = _an, SkillId = _guitar.Id, SongListItemId = _entrance.Id });
+
+        var result = await _sut.GetShortagesAsync(_event.Id, _ct);
+
+        var shortage = Assert.Single(result.Value!);
+        Assert.Equal(_soprano.Id, shortage.SkillId);
+        Assert.Equal(2, shortage.RequiredCount);
+        Assert.Equal(1, shortage.AssignedCount);
+    }
+
+    [Fact]
+    public async Task GetShortages_NoRosterYet_ReturnsEveryRequirement_Async()
+    {
+        var result = await _sut.GetShortagesAsync(_event.Id, _ct);
+
+        Assert.Equal(2, result.Value!.Count);
+        Assert.All(result.Value, x => Assert.Equal(0, x.AssignedCount));
+    }
+
+    [Fact]
+    public async Task GetShortages_MissingEvent_ReturnsEventNotFound_Async()
+    {
+        var result = await _sut.GetShortagesAsync(Guid.NewGuid(), _ct);
+
+        Assert.Equal(ErrorCodes.EventNotFound, result.Code);
+    }
+
+    [Fact]
+    public async Task GetShortages_NoApprovedSongList_ReturnsSongListNotApproved_Async()
+    {
+        _repository.GetApprovedSongListAsync(_event.Id, _ct).Returns((SongList?)null);
+
+        Assert.Equal(ErrorCodes.RosterSongListNotApproved, (await _sut.GetShortagesAsync(_event.Id, _ct)).Code);
+    }
 }
