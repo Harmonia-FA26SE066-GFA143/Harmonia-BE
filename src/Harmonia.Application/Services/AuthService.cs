@@ -82,6 +82,13 @@ public class AuthService(
         existingToken.EnsureUsable();
         existingToken.Revoke();
 
+        if (!existingToken.User.IsActive)
+        {
+            await userRepository.RevokeAllRefreshTokensAsync(existingToken.UserId, cancellationToken);
+            await userRepository.SaveChangesAsync(cancellationToken);
+            return Result<LoginResponse>.Failure(ErrorCodes.AuthAccountInactive);
+        }
+
         var response = await IssueTokensAsync(
             existingToken.User, existingToken.DeviceId, existingToken.Platform, cancellationToken);
         await userRepository.SaveChangesAsync(cancellationToken);

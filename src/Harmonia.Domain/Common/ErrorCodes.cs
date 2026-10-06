@@ -129,21 +129,13 @@ public static class ErrorCodes
 
     public const string EventNotPublished = "EVENT_NOT_PUBLISHED";
 
-    public const string WeekNotFound = "WEEK_NOT_FOUND";
-
-    public const string WeekAlreadyExists = "WEEK_ALREADY_EXISTS";
-
-    public const string WeekStartNotMonday = "WEEK_START_NOT_MONDAY";
-
-    public const string WeekAlreadyPublished = "WEEK_ALREADY_PUBLISHED";
-
-    public const string WeekNotPublished = "WEEK_NOT_PUBLISHED";
-
     public const string EventNotFound = "EVENT_NOT_FOUND";
 
     public const string EventSlotTaken = "EVENT_SLOT_TAKEN";
 
-    public const string EventDateOutsideWeek = "EVENT_DATE_OUTSIDE_WEEK";
+    public const string EventAlreadyPublished = "EVENT_ALREADY_PUBLISHED";
+
+    public const string EventNotPublished = "EVENT_NOT_PUBLISHED";
 
     public const string EventCancelled = "EVENT_CANCELLED";
 
@@ -162,11 +154,15 @@ public static class ErrorCodes
 
     public const string SongTitleDuplicate = "SONG_TITLE_DUPLICATE";
 
+    // Field-level: raised by UpdateSongClassificationRequestValidator, never in ErrorStatusMap.
     public const string SongClassificationDuplicate = "SONG_CLASSIFICATION_DUPLICATE";
 
     public const string SongClassificationTargetInvalid = "SONG_CLASSIFICATION_TARGET_INVALID";
 
+    // Field-level, same as above.
     public const string SongSkillRequirementDuplicate = "SONG_SKILL_REQUIREMENT_DUPLICATE";
+
+    public const string SongSkillRequirementCategoryInvalid = "SONG_SKILL_REQUIREMENT_CATEGORY_INVALID";
 
     public const string MaterialNotFound = "MATERIAL_NOT_FOUND";
 
@@ -222,6 +218,8 @@ public static class ErrorCodes
     public const string RosterAlreadyExists = "ROSTER_ALREADY_EXISTS";
 
     public const string RosterAlreadyFinalized = "ROSTER_ALREADY_FINALIZED";
+
+    public const string RosterNotFinalized = "ROSTER_NOT_FINALIZED";
 
     public const string RosterSongListNotApproved = "ROSTER_SONG_LIST_NOT_APPROVED";
 
@@ -304,5 +302,8 @@ public static class ErrorCodes
 
     public const string ExternalAiFailed = "EXTERNAL_AI_FAILED";
 
+    public const string ExternalCalendarFailed = "EXTERNAL_CALENDAR_FAILED";
+
+    public const string UserAlreadyActive = "USER_ALREADY_ACTIVE";
 
 }

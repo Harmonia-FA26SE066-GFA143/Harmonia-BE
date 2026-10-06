@@ -65,13 +65,18 @@
 
 ## Phân quyền
 
-- Mọi endpoint PHẢI có `[Authorize(Roles = ...)]`.
+- Mọi endpoint PHẢI có `[Authorize]`. Endpoint cho **mọi role** đã đăng nhập thì dùng
+  `[Authorize]` trần — KHÔNG liệt kê đủ 4 role vào `Roles` (chốt 2026-10-02).
+  Chỉ dùng `[Authorize(Roles = ...)]` khi giới hạn một phần role. Controller mở cho mọi role
+  nhưng có action chỉ dành cho một role: `[Authorize]` ở controller, `[Authorize(Roles = ...)]`
+  ở action (các attribute cộng dồn theo AND).
 - **4 role**: `Admin`, `ParishPriest`, `ChoirDirector`, `ChoirMember`.
   Không có role `Instrumentalist` — nhạc công là `ChoirMember` có `MemberSkill`
   thuộc `SkillCategory` = Instrument.
 - Chỉ `ChoirDirector` duyệt `MemberSkill`, tạo `Rehearsal`, chốt `ServiceRoster`.
   Chỉ `ParishPriest` tạo `SongListReview`. Chỉ `Admin` đụng `User`, `Role`,
-  `SystemSetting` và 9 bảng lookup.
+  `SystemSetting` và 9 bảng lookup. Ngoại lệ duy nhất: ca viên tự sửa `User.FullName`
+  của chính mình qua `PUT api/member-profiles/me` (chốt 2026-10-03).
 - **Kiểm quyền hai tầng**: attribute chặn theo role, service chặn theo quyền sở hữu bản ghi.
   `ICurrentUserService` cho biết ai đang gọi.
 - Ca viên chỉ đọc/sửa bản ghi **của chính mình**: `MemberSkill`, `EventParticipation`,
@@ -89,8 +94,11 @@
 
 ## Upload file
 
-- Whitelist phần mở rộng: `MusicMaterial` nhận `.pdf`, `.png`, `.jpg`;
-  `PracticeSubmission` nhận `.mp3`, `.m4a`, `.wav`. Chặn theo whitelist, không blacklist.
+- Whitelist phần mở rộng, chặn theo whitelist, không blacklist:
+  - `MusicMaterial` theo `MaterialType` (chốt 2026-10-02): `SheetMusic`, `Lyrics` nhận
+    `.pdf`, `.png`, `.jpg`; `SampleAudio` nhận `.mp3`, `.m4a`, `.wav`;
+    `RehearsalMaterial` nhận cả hai nhóm. Tối đa 20 MB một file.
+  - `PracticeSubmission` nhận `.mp3`, `.m4a`, `.wav`.
 - Không tin `Content-Type` client gửi — kiểm phần mở rộng lẫn dung lượng ở server.
 - Lưu bằng tên sinh mới (GUID), không dùng tên gốc — tránh path traversal và ghi đè.
   `fileName` gốc chỉ để hiển thị.

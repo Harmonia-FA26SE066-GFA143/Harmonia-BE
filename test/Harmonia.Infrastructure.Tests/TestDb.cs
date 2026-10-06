@@ -5,6 +5,7 @@ using Harmonia.Infrastructure.Data;
 using Harmonia.Infrastructure.Data.Interceptors;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using NSubstitute;
 
 namespace Harmonia.Infrastructure.Tests;
@@ -26,20 +27,24 @@ public sealed class TestDb : IDisposable
         context.Database.EnsureCreated();
     }
 
-    /// <summary>A new context over the same database, so reads don't hit the previous context's tracker.</summary>
-    public HarmoniaDbContext NewContext() =>
+    /// <summary>
+    /// A new context over the same database, so reads don't hit the previous context's tracker.
+    /// <paramref name="interceptors"/> run after the audit interceptor.
+    /// </summary>
+    public HarmoniaDbContext NewContext(params IInterceptor[] interceptors) =>
         new(new DbContextOptionsBuilder<HarmoniaDbContext>()
             .UseSqlite(_connection)
-            .AddInterceptors(new AuditableEntityInterceptor(CurrentUser))
+            .AddInterceptors([new AuditableEntityInterceptor(CurrentUser), .. interceptors])
             .Options);
 
     public async Task<User> AddUserAsync(
-        string email, string roleName = RoleNames.ChoirMember, CancellationToken cancellationToken = default)
+        string email, string roleName = RoleNames.ChoirMember, CancellationToken cancellationToken = default,
+        string fullName = "")
     {
         await using var context = NewContext();
         var role = await context.Roles.FirstOrDefaultAsync(r => r.Name == roleName, cancellationToken)
             ?? context.Roles.Add(new Role { Id = Guid.NewGuid(), Name = roleName }).Entity;
-        var user = new User { Id = Guid.NewGuid(), Email = email, PasswordHash = "hash", RoleId = role.Id };
+        var user = new User { Id = Guid.NewGuid(), Email = email, FullName = fullName, PasswordHash = "hash", RoleId = role.Id };
         context.Users.Add(user);
         await context.SaveChangesAsync(cancellationToken);
         return user;

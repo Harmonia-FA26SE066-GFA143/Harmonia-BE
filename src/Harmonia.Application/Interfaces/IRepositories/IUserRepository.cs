@@ -1,3 +1,5 @@
+using Harmonia.Application.Common.Models;
+using Harmonia.Application.DTOs;
 using Harmonia.Domain.Entities;
 
 namespace Harmonia.Application.Interfaces.IRepositories;
@@ -5,6 +7,12 @@ namespace Harmonia.Application.Interfaces.IRepositories;
 public interface IUserRepository : IGenericRepository<User>
 {
     Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// One page of users with their Role, ordered by email. <paramref name="keyword"/> matches part of
+    /// the email; the role and active filters of <paramref name="filter"/> narrow the result when set.
+    /// </summary>
+    Task<PagedList<User>> SearchAsync(string? keyword, SearchUsersRequest filter, CancellationToken cancellationToken);
 
     Task<RefreshToken?> GetRefreshTokenByHashAsync(string tokenHash, CancellationToken cancellationToken);
 

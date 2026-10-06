@@ -26,6 +26,8 @@ public class DependencyInjectionTests
         ["Brevo:FromName"] = "Harmonia",
         ["PasswordReset:WebUrl"] = "https://web.test/reset",
         ["PasswordReset:MobileUrl"] = "harmonia://reset",
+        ["Gemini:ApiKey"] = "key",
+        ["Gemini:Model"] = "model",
     };
 
     private static ServiceProvider Build(Action<Dictionary<string, string?>>? change = null)
@@ -45,6 +47,19 @@ public class DependencyInjectionTests
         Assert.Equal("Harmonia", provider.GetRequiredService<IOptions<BrevoOptions>>().Value.FromName);
         Assert.Equal("cloud", provider.GetRequiredService<IOptions<CloudinaryOptions>>().Value.CloudName);
         Assert.Equal("harmonia://reset", provider.GetRequiredService<IOptions<PasswordResetOptions>>().Value.MobileUrl);
+        Assert.Equal("model", provider.GetRequiredService<IOptions<GeminiOptions>>().Value.Model);
+    }
+
+    [Theory]
+    [InlineData("Gemini:ApiKey")]
+    [InlineData("Gemini:Model")]
+    public void MissingGeminiSetting_FailsValidationWithSectionName(string key)
+    {
+        using var provider = Build(s => s.Remove(key));
+
+        var ex = Assert.Throws<OptionsValidationException>(
+            () => provider.GetRequiredService<IOptions<GeminiOptions>>().Value);
+        Assert.Contains("Gemini__", ex.Message);
     }
 
     [Fact]

@@ -9,6 +9,7 @@ using Harmonia.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Harmonia.Infrastructure;
 
@@ -74,6 +75,13 @@ public static class DependencyInjection
                 "Missing or invalid Google__* configuration. See src/Harmonia.API/.env.example.")
             .ValidateOnStart();
 
+        services.AddOptions<GeminiOptions>()
+            .Bind(configuration.GetSection(GeminiOptions.SectionName))
+            .Validate(
+                o => !string.IsNullOrWhiteSpace(o.ApiKey) && !string.IsNullOrWhiteSpace(o.Model),
+                "Missing or invalid Gemini__* configuration. See src/Harmonia.API/.env.example.")
+            .ValidateOnStart();
+
         services.AddHttpContextAccessor();
 
         // Plain CRUD: inject IGenericRepository<T> directly, no per-entity repository needed.
@@ -81,6 +89,18 @@ public static class DependencyInjection
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IMemberProfileRepository, MemberProfileRepository>();
+        services.AddScoped<IMemberSkillRepository, MemberSkillRepository>();
+        services.AddScoped<ISongRepository, SongRepository>();
+        services.AddScoped<IMusicMaterialRepository, MusicMaterialRepository>();
+        services.AddScoped<IMaterialLearningProgressRepository, MaterialLearningProgressRepository>();
+        services.AddScoped<ISongListItemRepository, SongListItemRepository>();
+        services.AddScoped<IServiceRosterRepository, ServiceRosterRepository>();
+        services.AddHttpClient<IRosterSuggestionGenerator, GeminiRosterSuggestionGenerator>(client =>
+        {
+            client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
+            // Short on purpose: RosterService falls back to rules, so a slow model only delays the answer.
+            client.Timeout = TimeSpan.FromSeconds(20);
+        });
         services.AddScoped<ILiturgicalDayRepository, LiturgicalDayRepository>();
         services.AddScoped<ILiturgicalEventRepository, LiturgicalEventRepository>();
         services.AddScoped<IRehearsalRepository, RehearsalRepository>();
@@ -91,8 +111,26 @@ public static class DependencyInjection
         services.AddSingleton<IFileStorageService, CloudinaryFileStorageService>();
         services.AddSingleton<IEmailSender, BrevoEmailSender>();
         services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
+        services.AddScoped<DataSeeder>();
         services.AddSingleton<ICatholicCalendarParser, CatholicCalendarParser>();
 
         return services;
+    }
+
+    /// <summary>Inserts the four roles and the first Admin when missing. Never updates or deletes.</summary>
+    public static async Task SeedDataAsync(this IServiceProvider serviceProvider, CancellationToken cancellationToken = default)
+    {
+        await using var scope = serviceProvider.CreateAsyncScope();
+        try
+        {
+            await scope.ServiceProvider.GetRequiredService<DataSeeder>().SeedAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Best effort: a database that is briefly unreachable (e.g. Azure SQL resuming) must not
+            // stop the app from starting; deployed databases already hold the seed anyway.
+            scope.ServiceProvider.GetRequiredService<ILogger<DataSeeder>>()
+                .LogError(ex, "Data seeding failed; the app keeps starting without it.");
+        }
     }
 }

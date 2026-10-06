@@ -193,6 +193,24 @@ public class AuthServiceTests
     }
 
     [Fact]
+    public async Task RefreshTokenAsync_InactiveUser_RevokesAllAndIssuesNothing_Async()
+    {
+        var user = NewUser(isActive: false);
+        var old = new RefreshToken
+        {
+            UserId = user.Id, User = user, TokenHash = "hash:old", ExpiresAt = DateTime.UtcNow.AddDays(1),
+        };
+        _userRepository.GetRefreshTokenByHashAsync("hash:old", _ct).Returns(old);
+
+        var result = await _sut.RefreshTokenAsync(new RefreshTokenRequest { RefreshToken = "old" }, _ct);
+
+        Assert.Equal(ErrorCodes.AuthAccountInactive, result.Code);
+        Assert.NotNull(old.RevokedAt);
+        await _userRepository.Received(1).RevokeAllRefreshTokensAsync(user.Id, _ct);
+        await _userRepository.DidNotReceive().AddRefreshTokenAsync(Arg.Any<RefreshToken>(), _ct);
+    }
+
+    [Fact]
     public async Task RefreshTokenAsync_RevokedToken_ThrowsAndIssuesNothing_Async()
     {
         var old = new RefreshToken

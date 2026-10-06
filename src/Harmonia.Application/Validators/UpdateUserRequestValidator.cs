@@ -9,6 +9,6 @@ public class UpdateUserRequestValidator : AbstractValidator<UpdateUserRequest>
 	public UpdateUserRequestValidator()
 	{
 		RuleFor(x => x.Email).NotEmpty().EmailAddress();
-			
+		RuleFor(x => x.FullName).NotEmpty().MaximumLength(100);
 	}
 }

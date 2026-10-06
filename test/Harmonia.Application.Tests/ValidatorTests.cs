@@ -138,4 +138,122 @@ public class ValidatorTests
 
         Assert.Empty(codes);
     }
+
+    // ---- Song classification ----
+
+    [Fact]
+    public void SongClassification_DuplicateTargetId_ReturnsClassificationDuplicate()
+    {
+        var id = Guid.NewGuid();
+        var codes = ErrorCodesOf(new UpdateSongClassificationRequestValidator(),
+            new UpdateSongClassificationRequest { SongThemeIds = [id, id] });
+
+        Assert.Contains(ErrorCodes.SongClassificationDuplicate, codes);
+    }
+
+    [Fact]
+    public void SongClassification_DuplicateSkill_ReturnsSkillRequirementDuplicate()
+    {
+        var id = Guid.NewGuid();
+        var codes = ErrorCodesOf(new UpdateSongClassificationRequestValidator(),
+            new UpdateSongClassificationRequest { VocalRequirements = [new() { SkillId = id }, new() { SkillId = id, IsMandatory = true }] });
+
+        Assert.Contains(ErrorCodes.SongSkillRequirementDuplicate, codes);
+    }
+
+    [Fact]
+    public void SongClassification_NullList_ReturnsErrorWithoutThrowing()
+    {
+        var codes = ErrorCodesOf(new UpdateSongClassificationRequestValidator(),
+            new UpdateSongClassificationRequest { MassTypeIds = null!, InstrumentRequirements = null! });
+
+        Assert.Equal(2, codes.Length);
+    }
+
+    // ---- Song personnel requirements ----
+
+    [Fact]
+    public void PersonnelRequirements_DuplicateSkill_ReturnsRequirementDuplicate()
+    {
+        var id = Guid.NewGuid();
+        var codes = ErrorCodesOf(new UpdateSongPersonnelRequirementsRequestValidator(),
+            new UpdateSongPersonnelRequirementsRequest { Requirements = [new() { SkillId = id, RequiredCount = 1 }, new() { SkillId = id, RequiredCount = 2 }] });
+
+        Assert.Equal([ErrorCodes.PersonnelRequirementDuplicate], codes);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(UpdateSongPersonnelRequirementsRequestValidator.MaxRequiredCount + 1)]
+    public void PersonnelRequirements_CountOutOfRange_ReturnsRequiredCountInvalid(int count)
+    {
+        var codes = ErrorCodesOf(new UpdateSongPersonnelRequirementsRequestValidator(),
+            new UpdateSongPersonnelRequirementsRequest { Requirements = [new() { SkillId = Guid.NewGuid(), RequiredCount = count }] });
+
+        Assert.Equal([ErrorCodes.PersonnelRequiredCountInvalid], codes);
+    }
+
+    [Fact]
+    public void PersonnelRequirements_Valid_HasNoErrors()
+    {
+        var codes = ErrorCodesOf(new UpdateSongPersonnelRequirementsRequestValidator(),
+            new UpdateSongPersonnelRequirementsRequest { Requirements = [new() { SkillId = Guid.NewGuid(), RequiredCount = UpdateSongPersonnelRequirementsRequestValidator.MaxRequiredCount }] });
+
+        Assert.Empty(codes);
+    }
+
+    // ---- Material learning progress ----
+
+    [Theory]
+    [InlineData(LearningStatus.Learned)]
+    [InlineData(LearningStatus.NeedsPractice)]
+    public void LearningProgress_LearnedOrNeedsPractice_HasNoErrors(LearningStatus status)
+    {
+        var codes = ErrorCodesOf(new UpdateMaterialLearningProgressRequestValidator(),
+            new UpdateMaterialLearningProgressRequest { Status = status });
+
+        Assert.Empty(codes);
+    }
+
+    [Theory]
+    [InlineData(LearningStatus.NotStarted)]
+    [InlineData((LearningStatus)99)]
+    public void LearningProgress_OtherStatus_ReturnsStatusInvalid(LearningStatus status)
+    {
+        var codes = ErrorCodesOf(new UpdateMaterialLearningProgressRequestValidator(),
+            new UpdateMaterialLearningProgressRequest { Status = status });
+
+        Assert.Equal([ErrorCodes.MaterialLearningStatusInvalid], codes);
+    }
+
+    // ---- DeclareMemberSkill ----
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(SkillLevel.Advanced)]
+    public void DeclareMemberSkill_Valid_HasNoErrors(SkillLevel? level)
+    {
+        var result = new DeclareMemberSkillRequestValidator().Validate(
+            new DeclareMemberSkillRequest { SkillId = Guid.NewGuid(), Level = level });
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void DeclareMemberSkill_EmptySkillId_IsInvalid()
+    {
+        var result = new DeclareMemberSkillRequestValidator().Validate(new DeclareMemberSkillRequest());
+
+        Assert.Equal(nameof(DeclareMemberSkillRequest.SkillId), Assert.Single(result.Errors).PropertyName);
+    }
+
+    [Fact]
+    public void DeclareMemberSkill_UnknownLevel_IsInvalid()
+    {
+        var result = new DeclareMemberSkillRequestValidator().Validate(
+            new DeclareMemberSkillRequest { SkillId = Guid.NewGuid(), Level = (SkillLevel)99 });
+
+        Assert.Equal(nameof(DeclareMemberSkillRequest.Level), Assert.Single(result.Errors).PropertyName);
+    }
 }

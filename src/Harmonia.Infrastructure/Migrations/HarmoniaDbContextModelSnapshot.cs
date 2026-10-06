@@ -419,11 +419,6 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Property<DateOnly?>("DateOfBirth")
                         .HasColumnType("date");
 
-                    b.Property<string>("FullName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
                     b.Property<DateOnly>("JoinedDate")
                         .HasColumnType("date");
 
@@ -480,6 +475,7 @@ namespace Harmonia.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<int>("Status")
+                        .IsConcurrencyToken()
                         .HasColumnType("int");
 
                     b.HasKey("Id");
@@ -489,7 +485,8 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("SkillId");
 
                     b.HasIndex("MemberId", "SkillId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[Status] <> 2");
 
                     b.ToTable("MemberSkills");
                 });
@@ -977,6 +974,9 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Property<DateTime?>("NotifiedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<Guid?>("ReplacedByAssignmentId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("RosterId")
                         .HasColumnType("uniqueidentifier");
 
@@ -989,9 +989,14 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Property<int>("Source")
                         .HasColumnType("int");
 
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("MemberId");
+
+                    b.HasIndex("ReplacedByAssignmentId");
 
                     b.HasIndex("RosterId");
 
@@ -1133,6 +1138,38 @@ namespace Harmonia.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("SkillCategories");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("c4829abd-bb1d-4c6c-b401-9a177a88e66a"),
+                            IsActive = true,
+                            Name = "Vocal"
+                        },
+                        new
+                        {
+                            Id = new Guid("0904ad8b-87f2-46c5-9938-f6cfbf0fa70b"),
+                            IsActive = true,
+                            Name = "Instrument"
+                        },
+                        new
+                        {
+                            Id = new Guid("550a67bb-0393-4bc4-8fe0-d7a453871f81"),
+                            IsActive = true,
+                            Name = "Solo"
+                        },
+                        new
+                        {
+                            Id = new Guid("a1c322c5-14af-4ca4-892a-b6e8d0eacbbd"),
+                            IsActive = true,
+                            Name = "Psalm"
+                        },
+                        new
+                        {
+                            Id = new Guid("e2722720-3745-48ea-9e8e-14ec7a63907d"),
+                            IsActive = true,
+                            Name = "Conducting support"
+                        });
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.Song", b =>
@@ -1484,6 +1521,11 @@ namespace Harmonia.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
@@ -1899,6 +1941,10 @@ namespace Harmonia.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Harmonia.Domain.Entities.RosterAssignment", "ReplacedByAssignment")
+                        .WithMany()
+                        .HasForeignKey("ReplacedByAssignmentId");
+
                     b.HasOne("Harmonia.Domain.Entities.ServiceRoster", "Roster")
                         .WithMany("Assignments")
                         .HasForeignKey("RosterId")
@@ -1916,6 +1962,8 @@ namespace Harmonia.Infrastructure.Migrations
                         .HasForeignKey("SongListItemId");
 
                     b.Navigation("Member");
+
+                    b.Navigation("ReplacedByAssignment");
 
                     b.Navigation("Roster");
 

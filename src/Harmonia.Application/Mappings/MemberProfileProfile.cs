@@ -1,6 +1,7 @@
 using AutoMapper;
 using Harmonia.Application.DTOs;
 using Harmonia.Domain.Entities;
+using Harmonia.Domain.Enums;
 
 namespace Harmonia.Application.Mappings;
 
@@ -10,6 +11,31 @@ public class MemberProfileProfile : Profile
     {
         CreateMap<MemberProfile, MemberProfileDto>()
             .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.User.Email))
+            .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => src.User.FullName))
             .ForMember(dest => dest.AvatarUrl, opt => opt.MapFrom(src => src.User.AvatarUrl));
+
+        // MemberSkills must hold only the approved, active skills (see IMemberProfileRepository.SearchAsync).
+        CreateMap<MemberProfile, MemberProfileSummaryDto>()
+            .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.User.Email))
+            .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => src.User.FullName))
+            .ForMember(dest => dest.AvatarUrl, opt => opt.MapFrom(src => src.User.AvatarUrl))
+            .ForMember(dest => dest.ApprovedSkills, opt => opt.MapFrom(src => src.MemberSkills));
+
+        // MemberSkills must hold only the approved, active skills (see GetByUserIdWithApprovedSkillsAsync).
+        CreateMap<MemberProfile, MemberProfileDetailDto>()
+            .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.User.Email))
+            .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => src.User.FullName))
+            .ForMember(dest => dest.AvatarUrl, opt => opt.MapFrom(src => src.User.AvatarUrl))
+            .ForMember(dest => dest.RoleName, opt => opt.MapFrom(src => src.User.Role.Name))
+            .ForMember(dest => dest.ApprovedSkills, opt => opt.MapFrom(src => src.MemberSkills));
+
+        // LearningProgresses must hold only the row of one material (see GetLearnersOfMaterialAsync).
+        CreateMap<MemberProfile, MaterialLearningProgressDetailDto>()
+            .ForMember(dest => dest.MemberId, opt => opt.MapFrom(src => src.Id))
+            .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => src.User.FullName))
+            .ForMember(dest => dest.Status, opt => opt.MapFrom(src =>
+                src.LearningProgresses.Select(p => (LearningStatus?)p.Status).FirstOrDefault() ?? LearningStatus.NotStarted))
+            .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src =>
+                src.LearningProgresses.Select(p => (DateTime?)p.UpdatedAt).FirstOrDefault()));
     }
 }
