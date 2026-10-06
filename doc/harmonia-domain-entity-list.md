@@ -129,7 +129,7 @@ Written once here instead of repeated 43 times:
 `eventId` Guid → LiturgicalEvent (unique, 1–1) · `status` RosterStatus · `generatedAt` DateTime? · `generatedBy` Guid? → User · `finalizedAt` DateTime? · `finalizedBy` Guid? → User
 
 **29. `RosterAssignment`** — one assignment line (FE-38/40)
-`rosterId` Guid → ServiceRoster · `memberId` Guid → MemberProfile · `skillId` Guid → Skill · `songListItemId` Guid? → SongListItem · `source` AssignmentSource · `notifiedAt` DateTime?
+`rosterId` Guid → ServiceRoster · `memberId` Guid → MemberProfile · `skillId` Guid → Skill · `songListItemId` Guid? → SongListItem · `source` AssignmentSource · `notifiedAt` DateTime? · `status` RosterAssignmentStatus · `replacedByAssignmentId` Guid? → RosterAssignment (self; set when Replaced)
 
 **30. ⚪ `RosterShortage`** — shortage warning (FE-37)
 `rosterId` Guid → ServiceRoster · `skillId` Guid → Skill · `requiredCount` int · `availableCount` int · `detectedAt` DateTime
@@ -205,6 +205,7 @@ Written once here instead of repeated 43 times:
 | `ParticipationStatus` | Invited, Confirmed, Declined, Unsure |
 | `RosterStatus` | Draft, Suggested, Finalized |
 | `AssignmentSource` | Suggested, Manual |
+| `RosterAssignmentStatus` | Active, Replaced |
 | `AttendanceStatus` | Present, Absent, Late, Excused |
 | `AssignmentScope` | All, SkillGroup, Individual |
 | `TargetType` | Member, Skill |
@@ -213,7 +214,7 @@ Written once here instead of repeated 43 times:
 | `SettingDataType` | String, Int, Bool, Json |
 | `ReportType` | UserActivity, RehearsalAttendance, Participation, AssignmentCompletion, SongUsage, ServiceHistory |
 
-20 enums. `PracticeFeedback.result` reuses `SubmissionStatus` rather than adding a near-duplicate enum.
+21 enums. `PracticeFeedback.result` reuses `SubmissionStatus` rather than adding a near-duplicate enum.
 
 ---
 
@@ -283,3 +284,4 @@ Written once here instead of repeated 43 times:
 - 2026-10-01: `ReportType.Attendance` → `RehearsalAttendance` (naming rule: no bare `Attendance`); enum count corrected to 20.
 - 2026-10-05: `MemberSkill` unique `(memberId, skillId)` becomes a filtered index (`status ≠ Rejected`), so a member can re-declare a rejected skill (UC-03).
 - 2026-10-05: `NotificationType.SkillReview` added — member is notified when the Choir Director approves or rejects a declared skill (UC-19). Appended last, stored as int, no migration.
+- 2026-10-06: UC-25b — `RosterAssignment` gains `status` (enum `RosterAssignmentStatus`, 20 → 21) and `replacedByAssignmentId`: replacing a member keeps the old line as Replaced, linked to the new line.

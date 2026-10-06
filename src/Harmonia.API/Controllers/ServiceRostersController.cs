@@ -15,4 +15,27 @@ public class ServiceRostersController(IRosterService rosterService) : ApiControl
     public async Task<IActionResult> SuggestAsync(
         [FromBody] SuggestServiceRosterRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await rosterService.SuggestAsync(request, cancellationToken));
+
+    /// <summary>Shortage warnings of the event's current roster (UC-25a / FE-37).</summary>
+    [HttpGet("shortages")]
+    public async Task<IActionResult> GetShortagesAsync(
+        [FromQuery] Guid eventId, CancellationToken cancellationToken) =>
+        ToActionResult(await rosterService.GetShortagesAsync(eventId, cancellationToken));
+
+    /// <summary>Manually assigns a member to a song / skill (UC-25b / FE-38).</summary>
+    [HttpPost("assignments")]
+    public async Task<IActionResult> AddAssignmentAsync(
+        [FromBody] CreateRosterAssignmentRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await rosterService.AddAssignmentAsync(request, cancellationToken));
+
+    /// <summary>Replaces the member of an assignment; the old line is kept as Replaced (UC-25b / FE-38).</summary>
+    [HttpPost("assignments/{id:guid}/replacement")]
+    public async Task<IActionResult> ReplaceAssignmentAsync(
+        Guid id, [FromBody] ReplaceRosterAssignmentRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await rosterService.ReplaceAssignmentAsync(id, request, cancellationToken));
+
+    /// <summary>Removes a member from the roster (UC-25b / FE-38).</summary>
+    [HttpDelete("assignments/{id:guid}")]
+    public async Task<IActionResult> RemoveAssignmentAsync(Guid id, CancellationToken cancellationToken) =>
+        ToActionResult(await rosterService.RemoveAssignmentAsync(id, cancellationToken));
 }
