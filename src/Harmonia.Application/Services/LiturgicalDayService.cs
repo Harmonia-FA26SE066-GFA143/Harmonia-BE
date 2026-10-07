@@ -60,7 +60,7 @@ public class LiturgicalDayService(
             return Result<int>.Failure(parsed.Code!);
         }
 
-        var fetchedAt = DateTime.Now;
+        var fetchedAt = DateTime.UtcNow;
         var newDays = new List<LiturgicalDay>();
 
         // A yearly feed can spill into the neighbouring year, so check the cache year by year.

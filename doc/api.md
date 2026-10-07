@@ -6,7 +6,13 @@ mới thì cập nhật file này trong cùng PR.
 - Base URL dev: `http://localhost:5259` · `https://localhost:7112`
 - Swagger (dev): `/swagger`
 - Định dạng: JSON, tên field `camelCase`. Enum truyền bằng **tên** (`"Android"`, không phải `0`).
-- Thời gian: `DateTime` là UTC ISO-8601, `DateOnly` dạng `yyyy-MM-dd`.
+- Thời gian:
+  - `DateTime` (mốc thời gian: `createdAt`, `publishedAt`, `accessTokenExpiresAt`, `startTime`…) là
+    UTC ISO-8601, **luôn có hậu tố `Z`** — `"2026-10-07T01:00:00Z"`. Client tự đổi sang giờ địa phương
+    khi hiển thị. Request gửi `DateTime` phải có `Z` hoặc offset.
+  - `DateOnly` (`yyyy-MM-dd`) và `TimeOnly` (`HH:mm:ss`) là ngày/giờ trên lịch tại Việt Nam, không mang
+    múi giờ — `eventDate`, `time`, `dateOfBirth`. Không đổi múi giờ, không parse bằng `new Date()`.
+  - "Hôm nay" (sự kiện đã qua, lịch sắp tới, ngày sinh không ở tương lai) tính theo giờ Việt Nam (UTC+7).
 
 ## 1. Quy ước chung
 
@@ -378,8 +384,12 @@ Chưa có kỹ năng nào → `[]`.
 |---|---|---|---|---|
 | GET | `/api/liturgical-days/{date}` (`date` dạng `yyyy-MM-dd`) | — | 200 `LiturgicalDayDto` | 404 `CALENDAR_DAY_NOT_FOUND` |
 | POST | `/api/liturgical-days/import` | `multipart/form-data`: `file` (.ics) | 200 số ngày mới thêm (`int`) | 400 `CALENDAR_FILE_REQUIRED`, `CALENDAR_FILE_TYPE_NOT_ALLOWED`, `CALENDAR_FILE_INVALID` · 413 `CALENDAR_FILE_TOO_LARGE` |
+| GET | `/api/liturgical-events?fromDate=&toDate=&status=&pageNumber=&pageSize=` | — | 200 `PagedList<LiturgicalEventDto>` | — |
+| GET | `/api/liturgical-events/{id}` | — | 200 `LiturgicalEventDto` | 404 `EVENT_NOT_FOUND` |
 | POST | `/api/liturgical-events` | `{ "eventDate", "time", "liturgicalSeasonId?", "massTypeId?", "ceremonyTypeId?", "categoryId?", "locationId", "title?", "specialRequirements?" }` | 200 `LiturgicalEventDto` | 400 `VALIDATION_FAILED` (`EVENT_TYPE_REQUIRED`) · 409 `EVENT_SLOT_TAKEN` |
+| PUT | `/api/liturgical-events/{id}` | như `POST` | 200 `LiturgicalEventDto` | 400 `VALIDATION_FAILED` (`EVENT_TYPE_REQUIRED`) · 404 `EVENT_NOT_FOUND` · 409 `EVENT_CANCELLED`, `EVENT_SLOT_TAKEN` |
 | PATCH | `/api/liturgical-events/{id}/publish` | — | 200 `LiturgicalEventDto` | 404 `EVENT_NOT_FOUND` · 409 `EVENT_ALREADY_PUBLISHED`, `EVENT_CANCELLED` |
+| PATCH | `/api/liturgical-events/{id}/cancel` | — | 200 `LiturgicalEventDto` | 404 `EVENT_NOT_FOUND` · 409 `EVENT_CANCELLED`, `EVENT_ALREADY_PASSED` |
 | GET | `/api/schedule/events` · mọi role | — | 200 `LiturgicalEventSummaryDto[]` | — |
 | GET | `/api/schedule/rehearsals` · mọi role | — | 200 `RehearsalSummaryDto[]` | — |
 
@@ -400,6 +410,13 @@ Chưa có kỹ năng nào → `[]`.
   notification `type = EventPublished` cho mọi ca trưởng và ca viên đang hoạt động,
   `referenceType = "LiturgicalEvent"`, `referenceId` = id sự kiện (S-05).
 - Mỗi sự kiện công bố riêng (D6). Ca viên chỉ thấy sự kiện `Published`.
+- Danh sách (`GET`) trả sự kiện **mọi trạng thái** (kể cả `Draft`, `Cancelled`), sắp theo ngày rồi giờ; các bộ lọc
+  `fromDate`, `toDate` (bao gồm hai đầu, `yyyy-MM-dd`) và `status` kết hợp AND, đều tuỳ chọn.
+- Sửa (`PUT`) được khi sự kiện `Draft` hoặc `Published`; gửi đủ mọi trường như `POST`. Sửa không đổi trạng thái,
+  không gửi thông báo. Trùng ngày + giờ + địa điểm với sự kiện **khác** → 409 `EVENT_SLOT_TAKEN`.
+- Huỷ (`cancel`) chuyển sang `Cancelled`, không hoàn tác được; sự kiện đã qua (trước hôm nay theo giờ Việt Nam)
+  → 409 `EVENT_ALREADY_PASSED`. Nếu sự kiện đang `Published`, gửi notification `type = EventCancelled` cho mọi ca
+  trưởng và ca viên đang hoạt động (`referenceType = "LiturgicalEvent"`); huỷ `Draft` thì không gửi.
 - Hiện tại `locationName` trong response của `POST` và `publish` là `null` (server chưa nạp địa điểm);
   lấy tên địa điểm từ `GET /api/lookups/worship-locations` theo `locationId`.
 
@@ -432,7 +449,7 @@ Chỉ thao tác trên thông báo **của chính người gọi**.
 ```
 
 `type`: `EventPublished` | `SongListDecision` | `ParticipationRequest` | `AssignmentNotice` |
-`PracticeFeedback` | `DirectorNote` | `SkillReview`. `referenceType` + `referenceId` (nullable) cho biết bấm vào
+`PracticeFeedback` | `DirectorNote` | `SkillReview` | `EventCancelled`. `referenceType` + `referenceId` (nullable) cho biết bấm vào
 thì mở màn nào.
 
 | Method | Route | Thành công | Lỗi |
@@ -679,6 +696,7 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
 | POST | `/api/service-rosters/suggestions` | `{ "eventId": "guid" }` | 200 `RosterSuggestionResponse` | 400 `VALIDATION_FAILED` · 404 `EVENT_NOT_FOUND` · 409 `EVENT_CANCELLED`, `EVENT_ALREADY_PASSED`, `ROSTER_SONG_LIST_NOT_APPROVED`, `ROSTER_NO_PERSONNEL_REQUIREMENT`, `ROSTER_ALREADY_FINALIZED` |
+| GET | `/api/service-rosters?eventId=` | — | 200 `ServiceRosterDto` (assignment `Active` + shortage; `shortages` rỗng nếu sự kiện không còn song list đã duyệt) | 404 `EVENT_NOT_FOUND`, `ROSTER_NOT_FOUND` (chưa có roster — gọi `suggestions` hoặc thêm tay) |
 | GET | `/api/service-rosters/shortages?eventId=` | — | 200 `RosterShortageDto[]` | 404 `EVENT_NOT_FOUND` · 409 `ROSTER_SONG_LIST_NOT_APPROVED` |
 | POST | `/api/service-rosters/assignments` | `{ "eventId", "songListItemId", "skillId", "memberId" }` | 200 `RosterAssignmentDto` | 400 `VALIDATION_FAILED` · 404 `EVENT_NOT_FOUND`, `PERSONNEL_REQUIREMENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `EVENT_CANCELLED`, `EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ROSTER_SONG_LIST_NOT_APPROVED`, `ASSIGNMENT_DUPLICATE`, `MEMBER_NOT_ACTIVE`, `ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ASSIGNMENT_MEMBER_NOT_CONFIRMED` |
 | POST | `/api/service-rosters/assignments/{id}/replacement` | `{ "memberId" }` | 200 `RosterAssignmentDto` (dòng mới) | 400 `VALIDATION_FAILED` · 404 `ASSIGNMENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `EVENT_CANCELLED`, `EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ASSIGNMENT_DUPLICATE`, `MEMBER_NOT_ACTIVE`, `ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ASSIGNMENT_MEMBER_NOT_CONFIRMED` |
@@ -687,9 +705,9 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 | POST | `/api/service-rosters/{id}/notifications` | `{ "memberIds": ["guid"] }` | 204 | 400 `VALIDATION_FAILED` · 404 `ROSTER_NOT_FOUND`, `ASSIGNMENT_NOT_FOUND` · 409 `EVENT_CANCELLED`, `EVENT_ALREADY_PASSED`, `ROSTER_NOT_FINALIZED` |
 
 `RosterAssignmentDto` = một phần tử của `assignments` ở trên. `RosterShortageDto` = một phần tử của `shortages`.
-`{id}` của `finalization` / `notifications` là `rosterId` (có trong `RosterSuggestionResponse`).
+`{id}` của `finalization` / `notifications` là `rosterId` (có trong `RosterSuggestionResponse` và `ServiceRosterDto.id`).
 
-### `ServiceRosterDto` (kết quả chốt)
+### `ServiceRosterDto` (đọc roster hiện tại / kết quả chốt)
 
 ```json
 {
@@ -782,25 +800,45 @@ await conn.start();
 
 ---
 
-## 9. Lookups — `api/lookups` · mọi role đã đăng nhập
+## 9. Lookups — `api/lookups` · đọc: mọi role đã đăng nhập · ghi: `Admin` (UC-32 / FE-49, FE-50)
 
 Danh mục cho dropdown. Chỉ trả dòng **đang hoạt động**; Admin tắt một dòng thì nó biến khỏi
 danh sách (dữ liệu cũ vẫn trỏ tới nó). Không phân trang — trả mảng.
 
 | Route | Phần tử | Sắp theo |
 |---|---|---|
-| `GET /api/lookups/mass-types` | `{ "id", "name", "description" }` | tên |
-| `GET /api/lookups/ceremony-types` | `{ "id", "name", "description" }` | tên |
-| `GET /api/lookups/event-categories` | `{ "id", "name", "description" }` | tên |
+| `GET /api/lookups/mass-types` | `{ "id", "name", "description", "isActive" }` | tên |
+| `GET /api/lookups/ceremony-types` | `{ "id", "name", "description", "isActive" }` | tên |
+| `GET /api/lookups/event-categories` | `{ "id", "name", "description", "isActive" }` | tên |
 | `GET /api/lookups/song-themes` | `{ "id", "name", "description" }` | tên |
-| `GET /api/lookups/skill-categories` | `{ "id", "name", "description" }` | tên |
-| `GET /api/lookups/liturgical-seasons` | `{ "id", "name", "startDate", "endDate", "colorHex" }` | `startDate` |
+| `GET /api/lookups/skill-categories` | `{ "id", "name", "description", "isActive" }` | tên |
+| `GET /api/lookups/liturgical-seasons` | `{ "id", "name", "startDate", "endDate", "colorHex", "isActive" }` | `startDate` |
 | `GET /api/lookups/liturgical-slots` | `{ "id", "name", "defaultOrder" }` | `defaultOrder` (thứ tự trong lễ) |
 | `GET /api/lookups/worship-locations` | `{ "id", "name", "address" }` | tên |
-| `GET /api/lookups/skills?categoryId=` | `{ "id", "categoryId", "name", "description" }` | tên |
+| `GET /api/lookups/skills?categoryId=` | `{ "id", "categoryId", "name", "description", "isActive" }` | tên |
 
 - `description`, `address`, `colorHex` có thể `null`.
 - `skills`: `categoryId` tuỳ chọn; bỏ qua kỹ năng thuộc nhóm đã tắt.
+- `?includeInactive=true` trên `mass-types`, `ceremony-types`, `event-categories`, `skill-categories`,
+  `liturgical-seasons`, `skills`: trả cả dòng đã tắt (kể cả kỹ năng thuộc nhóm đã tắt) — **chỉ Admin**; role khác
+  gửi cờ này bị bỏ qua.
+
+### Admin cấu hình danh mục (UC-32 / FE-49, FE-50)
+
+| Method | Route | Body | Thành công | Lỗi |
+|---|---|---|---|---|
+| POST · PUT `{id}` | `/api/lookups/mass-types` · `ceremony-types` · `event-categories` · `skill-categories` | `{ "name", "description?", "isActive" }` | 200 phần tử như bảng trên | 400 `VALIDATION_FAILED` · 404 `LOOKUP_NOT_FOUND` (PUT) · 409 `LOOKUP_NAME_DUPLICATE` |
+| POST · PUT `{id}` | `/api/lookups/skills` | `{ "categoryId", "name", "description?", "isActive" }` | 200 `SkillDto` | 400 `VALIDATION_FAILED` · 404 `SKILL_CATEGORY_NOT_FOUND`, `SKILL_NOT_FOUND` (PUT) · 409 `SKILL_NAME_DUPLICATE` |
+| POST · PUT `{id}` | `/api/lookups/liturgical-seasons` | `{ "name", "startDate", "endDate", "colorHex?", "isActive" }` | 200 `LiturgicalSeasonDto` | 400 `VALIDATION_FAILED` (`SEASON_DATE_INVALID`) · 404 `LOOKUP_NOT_FOUND` (PUT) · 409 `SEASON_DATE_OVERLAP` |
+
+- `isActive` mặc định `true`. **Không có xoá**: các bảng khác đang trỏ tới danh mục, nên muốn bỏ thì gửi
+  `PUT` với `isActive: false`. Bật lại bằng `isActive: true`.
+- `PUT` gửi đủ mọi trường (thay toàn bộ). `name` được cắt khoảng trắng hai đầu.
+- `name`: bắt buộc, tối đa 50 ký tự (mùa phụng vụ: 100); `description` tối đa 300; trùng tên (không phân biệt
+  hoa thường) với dòng khác → 409. Tên kỹ năng chỉ cần duy nhất **trong nhóm**.
+- Mùa phụng vụ: `endDate` phải sau `startDate`, nếu không → `SEASON_DATE_INVALID`; `colorHex` dạng `#RRGGBB`.
+  Tên mùa được trùng (mỗi năm một dòng), nhưng một mùa đang hoạt động không được trùng khoảng ngày với mùa
+  đang hoạt động khác → 409 `SEASON_DATE_OVERLAP`.
 - Id của 5 nhóm kỹ năng là cố định trên mọi môi trường:
 
 | Nhóm | Id |

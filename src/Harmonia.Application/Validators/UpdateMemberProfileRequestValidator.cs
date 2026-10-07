@@ -9,10 +9,10 @@ public class UpdateMemberProfileRequestValidator : AbstractValidator<UpdateMembe
     public UpdateMemberProfileRequestValidator()
     {
         RuleFor(x => x.Phone).MaximumLength(20);
-        RuleFor(x => x.DateOfBirth).LessThanOrEqualTo(_ => DateOnly.FromDateTime(DateTime.Now));
+        RuleFor(x => x.DateOfBirth).LessThanOrEqualTo(_ => VietnamTime.Today);
         RuleFor(x => x.JoinedDate)
             .NotEmpty()
-            .LessThanOrEqualTo(_ => DateOnly.FromDateTime(DateTime.Now))
+            .LessThanOrEqualTo(_ => VietnamTime.Today)
             .WithErrorCode(ErrorCodes.MemberJoinedDateInFuture);
         RuleFor(x => x.Status).IsInEnum();
     }

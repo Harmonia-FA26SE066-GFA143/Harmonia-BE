@@ -139,7 +139,7 @@ public class UserService(
 	{
 		Id = Guid.NewGuid(),
 		UserId = userId,
-		JoinedDate = DateOnly.FromDateTime(DateTime.Now),
+		JoinedDate = VietnamTime.Today,
 		Status = MemberStatus.Active,
 	};
 }

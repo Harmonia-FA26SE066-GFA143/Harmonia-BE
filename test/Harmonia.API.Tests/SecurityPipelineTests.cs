@@ -72,7 +72,7 @@ public class SecurityPipelineTests(HarmoniaApiFactory factory) : IClassFixture<H
     {
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
-            "Bearer", SignToken("test-signing-key-that-is-at-least-32-bytes-long!!", DateTime.Now.AddMinutes(-1)));
+            "Bearer", SignToken("test-signing-key-that-is-at-least-32-bytes-long!!", DateTime.UtcNow.AddMinutes(-1)));
 
         var response = await client.GetAsync("api/notifications", _ct);
 
@@ -85,7 +85,7 @@ public class SecurityPipelineTests(HarmoniaApiFactory factory) : IClassFixture<H
     {
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
-            "Bearer", SignToken("attacker-key-attacker-key-attacker-key-123", DateTime.Now.AddMinutes(10)));
+            "Bearer", SignToken("attacker-key-attacker-key-attacker-key-123", DateTime.UtcNow.AddMinutes(10)));
 
         var response = await client.GetAsync("api/notifications", _ct);
 

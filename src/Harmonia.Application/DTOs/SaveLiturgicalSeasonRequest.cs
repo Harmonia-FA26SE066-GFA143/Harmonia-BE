@@ -1,9 +1,8 @@
 namespace Harmonia.Application.DTOs;
 
-public class LiturgicalSeasonDto
+/// <summary>Create / update body of a liturgical season (UC-32 / FE-50).</summary>
+public class SaveLiturgicalSeasonRequest
 {
-    public Guid Id { get; set; }
-
     public string Name { get; set; } = string.Empty;
 
     public DateOnly StartDate { get; set; }
@@ -12,5 +11,5 @@ public class LiturgicalSeasonDto
 
     public string? ColorHex { get; set; }
 
-    public bool IsActive { get; set; }
+    public bool IsActive { get; set; } = true;
 }

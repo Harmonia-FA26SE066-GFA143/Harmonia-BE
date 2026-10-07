@@ -22,6 +22,12 @@ public interface IRosterService
     Task<Result<List<RosterShortageDto>>> GetShortagesAsync(Guid eventId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Current roster of the event with its Active assignments and shortages, so a saved roster can be reopened.
+    /// Shortages are empty when the event no longer has an approved song list.
+    /// </summary>
+    Task<Result<ServiceRosterDto>> GetByEventAsync(Guid eventId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Manually assigns a member to a song / skill requirement of the event's approved song list (UC-25b / FE-38).
     /// The member needs the approved skill and a confirmed participation; the requirement's count may be exceeded.
     /// Creates a Draft roster when the event has none yet.

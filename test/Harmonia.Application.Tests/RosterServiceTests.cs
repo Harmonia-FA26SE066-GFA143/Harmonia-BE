@@ -45,7 +45,7 @@ public class RosterServiceTests
         _event = new LiturgicalEvent
         {
             Id = Guid.NewGuid(),
-            EventDate = DateOnly.FromDateTime(DateTime.Now).AddDays(3),
+            EventDate = VietnamTime.Today.AddDays(3),
             Status = EventStatus.Published,
         };
         _entrance = new SongListItem { Id = Guid.NewGuid(), Song = new Song { Title = "Nhap le" } };
@@ -225,7 +225,7 @@ public class RosterServiceTests
     [Fact]
     public async Task Suggest_PastEvent_ReturnsEventAlreadyPassed_Async()
     {
-        _event.EventDate = DateOnly.FromDateTime(DateTime.Now).AddDays(-1);
+        _event.EventDate = VietnamTime.Today.AddDays(-1);
 
         Assert.Equal(ErrorCodes.EventAlreadyPassed, (await SuggestAsync()).Code);
     }
@@ -296,6 +296,41 @@ public class RosterServiceTests
         _repository.GetApprovedSongListAsync(_event.Id, _ct).Returns((SongList?)null);
 
         Assert.Equal(ErrorCodes.RosterSongListNotApproved, (await _sut.GetShortagesAsync(_event.Id, _ct)).Code);
+    }
+
+    [Fact]
+    public async Task GetByEvent_SavedRoster_ReturnsAssignmentsAndShortages_Async()
+    {
+        var roster = ExistingRoster(RosterStatus.Suggested);
+        _repository.GetAssignmentsAsync(roster.Id, _ct).Returns(
+        [
+            new RosterAssignment { Id = Guid.NewGuid(), MemberId = _an, SkillId = _guitar.Id, SongListItemId = _entrance.Id },
+        ]);
+
+        var result = await _sut.GetByEventAsync(_event.Id, _ct);
+
+        Assert.Equal(roster.Id, result.Value!.Id);
+        Assert.Equal(RosterStatus.Suggested, result.Value.Status);
+        Assert.Single(result.Value.Assignments);
+        Assert.Equal(_soprano.Id, Assert.Single(result.Value.Shortages).SkillId);
+    }
+
+    [Fact]
+    public async Task GetByEvent_NoRosterYet_ReturnsRosterNotFound_Async()
+    {
+        Assert.Equal(ErrorCodes.RosterNotFound, (await _sut.GetByEventAsync(_event.Id, _ct)).Code);
+    }
+
+    [Fact]
+    public async Task GetByEvent_NoApprovedSongList_ReturnsRosterWithoutShortages_Async()
+    {
+        ExistingRoster();
+        _repository.GetApprovedSongListAsync(_event.Id, _ct).Returns((SongList?)null);
+
+        var result = await _sut.GetByEventAsync(_event.Id, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value!.Shortages);
     }
 
     [Fact]
@@ -512,7 +547,7 @@ public class RosterServiceTests
     {
         var line = SopranoLine(_binh);
         RosterWith(RosterStatus.Suggested, line);
-        _event.EventDate = DateOnly.FromDateTime(DateTime.Now).AddDays(-1);
+        _event.EventDate = VietnamTime.Today.AddDays(-1);
 
         Assert.Equal(ErrorCodes.EventAlreadyPassed, (await _sut.RemoveAssignmentAsync(line.Id, _ct)).Code);
     }
@@ -579,7 +614,7 @@ public class RosterServiceTests
     public async Task Finalize_PastEvent_ReturnsEventAlreadyPassed_Async()
     {
         var roster = FinalizableRoster(RosterStatus.Suggested, SopranoLineFor(_an));
-        _event.EventDate = DateOnly.FromDateTime(DateTime.Now).AddDays(-1);
+        _event.EventDate = VietnamTime.Today.AddDays(-1);
 
         Assert.Equal(ErrorCodes.EventAlreadyPassed, (await _sut.FinalizeAsync(roster.Id, _ct)).Code);
     }
@@ -659,7 +694,7 @@ public class RosterServiceTests
     [Fact]
     public async Task SendNotifications_NoSelection_NotifiesOnlyMembersNotNotifiedYet_Async()
     {
-        var an = NotifiableLine(_an, notifiedAt: DateTime.Now.AddDays(-1));
+        var an = NotifiableLine(_an, notifiedAt: DateTime.UtcNow.AddDays(-1));
         var binh = NotifiableLine(_binh);
         var roster = NotifiableRoster(RosterStatus.Finalized, an, binh);
 
@@ -702,7 +737,7 @@ public class RosterServiceTests
     public async Task SendNotifications_PastEvent_ReturnsEventAlreadyPassed_Async()
     {
         var roster = NotifiableRoster(RosterStatus.Finalized, NotifiableLine(_an));
-        _event.EventDate = DateOnly.FromDateTime(DateTime.Now).AddDays(-1);
+        _event.EventDate = VietnamTime.Today.AddDays(-1);
 
         Assert.Equal(ErrorCodes.EventAlreadyPassed, (await NotifyAsync(roster, _an)).Code);
     }

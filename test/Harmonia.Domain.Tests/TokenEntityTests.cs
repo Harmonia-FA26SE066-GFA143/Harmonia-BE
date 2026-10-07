@@ -10,7 +10,7 @@ public class TokenEntityTests
     [Fact]
     public void RefreshToken_ActiveAndNotExpired_IsUsable()
     {
-        var token = new RefreshToken { ExpiresAt = DateTime.Now.AddMinutes(5) };
+        var token = new RefreshToken { ExpiresAt = DateTime.UtcNow.AddMinutes(5) };
 
         token.EnsureUsable();
     }
@@ -18,7 +18,7 @@ public class TokenEntityTests
     [Fact]
     public void RefreshToken_Revoked_ThrowsRevoked()
     {
-        var token = new RefreshToken { ExpiresAt = DateTime.Now.AddDays(1), RevokedAt = DateTime.Now };
+        var token = new RefreshToken { ExpiresAt = DateTime.UtcNow.AddDays(1), RevokedAt = DateTime.UtcNow };
 
         Assert.Throws<RefreshTokenRevokedException>(token.EnsureUsable);
     }
@@ -26,7 +26,7 @@ public class TokenEntityTests
     [Fact]
     public void RefreshToken_RevokedAndExpired_ReportsRevokedFirst()
     {
-        var token = new RefreshToken { ExpiresAt = DateTime.Now.AddDays(-1), RevokedAt = DateTime.Now };
+        var token = new RefreshToken { ExpiresAt = DateTime.UtcNow.AddDays(-1), RevokedAt = DateTime.UtcNow };
 
         Assert.Throws<RefreshTokenRevokedException>(token.EnsureUsable);
     }
@@ -34,7 +34,7 @@ public class TokenEntityTests
     [Fact]
     public void RefreshToken_Expired_ThrowsExpired()
     {
-        var token = new RefreshToken { ExpiresAt = DateTime.Now.AddSeconds(-1) };
+        var token = new RefreshToken { ExpiresAt = DateTime.UtcNow.AddSeconds(-1) };
 
         Assert.Throws<RefreshTokenExpiredException>(token.EnsureUsable);
     }
@@ -42,7 +42,7 @@ public class TokenEntityTests
     [Fact]
     public void RefreshToken_Revoke_SetsRevokedAtOnce()
     {
-        var firstRevokedAt = DateTime.Now.AddHours(-1);
+        var firstRevokedAt = DateTime.UtcNow.AddHours(-1);
         var token = new RefreshToken { RevokedAt = firstRevokedAt };
 
         token.Revoke();

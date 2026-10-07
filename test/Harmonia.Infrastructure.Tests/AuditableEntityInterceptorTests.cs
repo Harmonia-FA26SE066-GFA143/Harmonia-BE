@@ -38,8 +38,18 @@ public sealed class AuditableEntityInterceptorTests : IDisposable
         await using var context = _db.NewContext();
         var saved = await context.Users.SingleAsync(u => u.Id == user.Id, _ct);
         Assert.Equal(_actorId, saved.CreatedBy);
-        Assert.True(saved.CreatedAt > DateTime.Now.AddMinutes(-1));
+        Assert.True(saved.CreatedAt > DateTime.UtcNow.AddMinutes(-1));
         Assert.Null(saved.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task ReadBack_DateTimeIsMarkedUtc_Async()
+    {
+        var user = await _db.AddUserAsync("a@test.com", cancellationToken: _ct);
+
+        await using var context = _db.NewContext();
+        var saved = await context.Users.SingleAsync(u => u.Id == user.Id, _ct);
+        Assert.Equal(DateTimeKind.Utc, saved.CreatedAt.Kind);
     }
 
     [Fact]
@@ -105,7 +115,7 @@ public sealed class AuditableEntityInterceptorTests : IDisposable
         var user = await _db.AddUserAsync("a@test.com", cancellationToken: _ct);
         await using (var context = _db.NewContext())
         {
-            (await context.Users.SingleAsync(u => u.Id == user.Id, _ct)).LastLoginAt = DateTime.Now;
+            (await context.Users.SingleAsync(u => u.Id == user.Id, _ct)).LastLoginAt = DateTime.UtcNow;
             await context.SaveChangesAsync(_ct);
         }
 
@@ -134,7 +144,7 @@ public sealed class AuditableEntityInterceptorTests : IDisposable
         {
             context.RefreshTokens.Add(new RefreshToken
             {
-                Id = tokenId, UserId = user.Id, TokenHash = "h", ExpiresAt = DateTime.Now.AddDays(1),
+                Id = tokenId, UserId = user.Id, TokenHash = "h", ExpiresAt = DateTime.UtcNow.AddDays(1),
             });
             await context.SaveChangesAsync(_ct);
         }

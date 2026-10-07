@@ -289,7 +289,7 @@ public class MusicMaterialServiceTests
     public async Task GetMine_MarkedMaterial_CarriesTheMembersLearningStatus_Async()
     {
         var (userId, member) = GivenMember();
-        var updatedAt = DateTime.Now.AddHours(-2);
+        var updatedAt = DateTime.UtcNow.AddHours(-2);
         var material = new MusicMaterial
         {
             Id = Guid.NewGuid(), SongId = _song.Id, Title = "Alto", FilePublicId = "harmonia/a.mp3",
@@ -316,7 +316,7 @@ public class MusicMaterialServiceTests
         var material = new MusicMaterial { Id = Guid.NewGuid(), TargetSkillId = skillId, IsActive = true };
         _materials.GetByIdAsync(material.Id, _ct).Returns(material);
         var request = new SearchMaterialLearningProgressRequest();
-        var updatedAt = DateTime.Now;
+        var updatedAt = DateTime.UtcNow;
         var marked = new MemberProfile
         {
             Id = Guid.NewGuid(), User = new User { FullName = "An" },
@@ -373,7 +373,7 @@ public class MusicMaterialServiceTests
     {
         var (userId, member) = GivenMember();
         var materialId = Guid.NewGuid();
-        var updatedAt = DateTime.Now;
+        var updatedAt = DateTime.UtcNow;
         _materials.IsVisibleToMemberAsync(materialId, member.Id, _ct).Returns(true);
         _progresses.UpsertAsync(member.Id, materialId, LearningStatus.Learned, _ct).Returns(new MaterialLearningProgress
         {

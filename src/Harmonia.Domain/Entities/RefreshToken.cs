@@ -28,7 +28,7 @@ public class RefreshToken : BaseEntity
             throw new RefreshTokenRevokedException();
         }
 
-        if (ExpiresAt <= DateTime.Now)
+        if (ExpiresAt <= DateTime.UtcNow)
         {
             throw new RefreshTokenExpiredException();
         }
@@ -36,6 +36,6 @@ public class RefreshToken : BaseEntity
 
     public void Revoke()
     {
-        RevokedAt ??= DateTime.Now;
+        RevokedAt ??= DateTime.UtcNow;
     }
 }

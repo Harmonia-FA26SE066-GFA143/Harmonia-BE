@@ -52,12 +52,12 @@ public class JwtTokenServiceTests
     [Fact]
     public void GenerateAccessToken_ExpiresAfterConfiguredMinutes()
     {
-        var before = DateTime.Now;
+        var before = DateTime.UtcNow;
 
         var (token, expiresAt) = _sut.GenerateAccessToken(NewUser());
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
 
-        Assert.InRange(expiresAt, before.AddMinutes(30), DateTime.Now.AddMinutes(30));
+        Assert.InRange(expiresAt, before.AddMinutes(30), DateTime.UtcNow.AddMinutes(30));
         // JWT "exp" has second precision.
         Assert.True(Math.Abs((jwt.ValidTo - expiresAt.ToUniversalTime()).TotalSeconds) < 1);
     }
@@ -92,11 +92,11 @@ public class JwtTokenServiceTests
     [Fact]
     public void GetRefreshTokenExpiry_UsesConfiguredDays()
     {
-        var before = DateTime.Now;
+        var before = DateTime.UtcNow;
 
         var expiry = _sut.GetRefreshTokenExpiry();
 
-        Assert.InRange(expiry, before.AddDays(7), DateTime.Now.AddDays(7));
+        Assert.InRange(expiry, before.AddDays(7), DateTime.UtcNow.AddDays(7));
     }
 
     [Fact]
