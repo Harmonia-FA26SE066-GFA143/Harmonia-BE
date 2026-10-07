@@ -47,9 +47,11 @@
   `PasswordReset__MobileUrl` tuỳ `Platform` của request.
   Phát token mới thì xoá mọi token chưa dùng của user — chỉ link mới nhất còn hiệu lực.
 - Đổi hoặc đặt lại mật khẩu thành công → thu hồi toàn bộ `RefreshToken` của user.
-- Admin tạo tài khoản → mật khẩu Admin nhập được gửi tới email người dùng (chốt 2026-10-07) và
+- Admin tạo tài khoản → server tự sinh mật khẩu đầu tiên (Admin không nhập, không thấy) và gửi tới email
+  người dùng (chốt 2026-10-07); mật khẩu không có trong response. Đồng thời
   `User.IsPasswordChangeRequired = true`; đổi hoặc đặt lại mật khẩu thì về `false`. Không ghi mật khẩu
-  vào log. Cờ đi trong access token (claim `pwd_change_required`); `PasswordChangeRequiredFilter` trả
+  vào log. Gửi mail lỗi thì người dùng vào bằng `forgot-password`. Cờ đi trong access token
+  (claim `pwd_change_required`); `PasswordChangeRequiredFilter` trả
   403 `AUTH_PASSWORD_CHANGE_REQUIRED` cho mọi action, trừ action gắn `[AllowWhenPasswordChangeRequired]`
   (change-password, logout, logout-all, me). Thêm action mới cho người chưa đổi mật khẩu thì gắn attribute này.
 - `forgot-password` luôn trả 204 dù email có tồn tại hay không — không tiết lộ

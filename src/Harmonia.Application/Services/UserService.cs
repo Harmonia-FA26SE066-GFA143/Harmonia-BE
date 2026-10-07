@@ -7,7 +7,9 @@ using Harmonia.Domain.Common;
 using Harmonia.Domain.Entities;
 using Harmonia.Domain.Enums;
 using System;
+using System.Linq;
 using System.Net;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -57,20 +59,21 @@ public class UserService(
 			IsActive = true,
 			IsPasswordChangeRequired = true,
 		};
-		user.PasswordHash = passwordHasherService.HashPassword(user, request.Password);
+		var initialPassword = GenerateInitialPassword();
+		user.PasswordHash = passwordHasherService.HashPassword(user, initialPassword);
 		if (role.Name == RoleNames.ChoirMember)
 			user.MemberProfile = NewMemberProfile(user.Id);
 
 		await userRepository.AddAsync(user, ct);
 		await userRepository.SaveChangesAsync(ct);
 
-		// The result is ignored on purpose: the account exists and the Admin who typed the password can still
-		// pass it on; the sender already logs the failure.
+		// The result is ignored on purpose: the account exists, and if the email is lost the user can still get in
+		// through forgot-password; the sender already logs the failure. The password is never logged or returned.
 		await emailSender.SendAsync(
 			user.Email,
 			"Harmonia - Your account",
 			"<p>An account has been created for you on Harmonia.</p>"
-				+ $"<p>Email: <b>{WebUtility.HtmlEncode(user.Email)}</b><br/>Password: <b>{WebUtility.HtmlEncode(request.Password)}</b></p>"
+				+ $"<p>Email: <b>{WebUtility.HtmlEncode(user.Email)}</b><br/>Password: <b>{WebUtility.HtmlEncode(initialPassword)}</b></p>"
 				+ "<p>You will be asked to choose a new password the first time you sign in.</p>",
 			ct);
 
@@ -162,6 +165,18 @@ public class UserService(
 		await userRepository.RevokeAllRefreshTokensAsync(id, ct);
 		await userRepository.SaveChangesAsync(ct);
 		return Result<UserDto>.Success(mapper.Map<UserDto>(user));
+	}
+
+	// No look-alike characters (0/O, 1/l/I), since people retype it from an email.
+	private const string InitialPasswordAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+
+	/// <summary>Random 12-character first password with upper case, lower case and a digit, so it passes StrongPassword.</summary>
+	private static string GenerateInitialPassword()
+	{
+		string password;
+		do password = RandomNumberGenerator.GetString(InitialPasswordAlphabet, 12);
+		while (!password.Any(char.IsUpper) || !password.Any(char.IsLower) || !password.Any(char.IsDigit));
+		return password;
 	}
 
 	private static string? NormalizePhone(string? phone) => string.IsNullOrWhiteSpace(phone) ? null : phone.Trim();

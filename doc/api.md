@@ -103,7 +103,7 @@ Không có đăng ký công khai; tài khoản do Admin tạo.
 }
 ```
 
-`user.isPasswordChangeRequired = true` → tài khoản vừa được Admin tạo, mật khẩu đã gửi qua email: client đưa người
+`user.isPasswordChangeRequired = true` → tài khoản vừa được Admin tạo, mật khẩu do server sinh đã gửi qua email: client đưa người
 dùng tới màn đổi mật khẩu (`POST /api/auth/change-password`) trước khi cho dùng tiếp. Đổi hoặc đặt lại mật khẩu xong
 cờ về `false`.
 
@@ -238,17 +238,18 @@ hiển thị email thay tên. `phone` có thể `null`.
 |---|---|---|---|---|
 | GET | `/api/users` | query `keyword`, `roleName`, `isActive`, `pageNumber`, `pageSize` | 200 `PagedList<UserDto>` | — |
 | GET | `/api/users/{id}` | — | 200 `UserDto` | 404 `USER_NOT_FOUND` |
-| POST | `/api/users` | `{ "email", "fullName?", "phone?", "password", "roleName" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `ROLE_NOT_FOUND` · 409 `USER_EMAIL_ALREADY_EXISTS` |
+| POST | `/api/users` | `{ "email", "fullName?", "phone?", "roleName" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `ROLE_NOT_FOUND` · 409 `USER_EMAIL_ALREADY_EXISTS` |
 | PUT | `/api/users/{id}` | `{ "email", "fullName?", "phone?" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `USER_NOT_FOUND` · 409 `USER_EMAIL_ALREADY_EXISTS` |
 | PATCH | `/api/users/{id}/activate` | — | 204 | 404 `USER_NOT_FOUND` · 409 `USER_ALREADY_ACTIVE` |
 | PATCH | `/api/users/{id}/deactivate` | — | 204 | 404 `USER_NOT_FOUND` · 409 `USER_CANNOT_MODIFY_SELF`, `USER_ALREADY_INACTIVE`, `USER_LAST_ADMIN` |
 | PUT | `/api/users/{id}/role` | `{ "roleName" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `USER_NOT_FOUND`, `ROLE_NOT_FOUND` · 409 `USER_CANNOT_MODIFY_SELF`, `USER_LAST_ADMIN` |
 
 - `GET /api/users`: `keyword` khớp một phần email; các bộ lọc kết hợp AND; sắp theo email.
-- Bắt buộc: `email`, `password` (tối thiểu 8 ký tự), `roleName`. Tuỳ chọn: `fullName` (≤ 100, bỏ trống → `""`),
+- Bắt buộc: `email`, `roleName`. Tuỳ chọn: `fullName` (≤ 100, bỏ trống → `""`),
   `phone` (≤ 20, bỏ trống → `null`); khoảng trắng đầu/cuối bị cắt. `PUT` thay toàn bộ: trường bỏ trống bị xoá.
-- Tạo xong, server gửi email chứa email đăng nhập + mật khẩu tới người dùng và đặt `isPasswordChangeRequired = true`.
-  Gửi mail thất bại thì tài khoản **vẫn được tạo** (200) — Admin tự báo mật khẩu.
+- Admin **không** nhập mật khẩu: server tự sinh mật khẩu đầu tiên (12 ký tự ngẫu nhiên), gửi email chứa email đăng
+  nhập + mật khẩu tới người dùng và đặt `isPasswordChangeRequired = true`. Mật khẩu không bao giờ có trong response.
+  Gửi mail thất bại thì tài khoản **vẫn được tạo** (200) — người dùng lấy lại quyền vào qua `forgot-password`.
 - `roleName` phải là một trong 4 role. Lỗi validate của nhóm này hiện chỉ trả
   `VALIDATION_FAILED` trong `errors`, chưa có mã riêng theo field.
 - Tạo tài khoản role `ChoirMember` (hoặc đổi role sang `ChoirMember`) → hồ sơ ca viên được tạo

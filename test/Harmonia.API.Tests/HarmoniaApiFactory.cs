@@ -149,13 +149,14 @@ public sealed class HarmoniaApiFactory : WebApplicationFactory<AuthController>
     }
 
     /// <summary>
-    /// Stands in for the first password change of a user the Admin created through the API, so tests can act as
-    /// that user without being stopped by AUTH_PASSWORD_CHANGE_REQUIRED.
+    /// Stands in for the first password change of a user the Admin created through the API: sets the password to
+    /// <see cref="Password"/> and clears IsPasswordChangeRequired, so tests can sign in as that user.
     /// </summary>
-    public Task ClearPasswordChangeRequiredAsync(string email, CancellationToken cancellationToken = default) =>
+    public Task CompleteFirstSignInAsync(string email, CancellationToken cancellationToken = default) =>
         WithDbAsync(async (db, ct) =>
         {
             var user = await db.Users.SingleAsync(u => u.Email == email, ct);
+            user.PasswordHash = new PasswordHasherService().HashPassword(user, Password);
             user.IsPasswordChangeRequired = false;
             return await db.SaveChangesAsync(ct);
         }, cancellationToken);

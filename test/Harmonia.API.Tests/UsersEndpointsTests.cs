@@ -12,6 +12,15 @@ public class UsersEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<Har
 
     private sealed record Page(List<UserDto> Items, int TotalCount);
 
+    /// <summary>The generated first password, read back from the welcome email the server sent.</summary>
+    private string EmailedPassword(string email)
+    {
+        var body = factory.EmailSender.ReceivedCalls()
+            .Select(c => c.GetArguments())
+            .Last(a => (string)a[0]! == email)[2] as string;
+        return System.Text.RegularExpressions.Regex.Match(body!, "Password: <b>([^<]+)</b>").Groups[1].Value;
+    }
+
     [Fact]
     public async Task Search_AsAdmin_FiltersByRoleAndActive_Async()
     {
@@ -57,9 +66,10 @@ public class UsersEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<Har
 
         var created = await admin.PostAsJsonAsync(
             "api/users",
-            new { email = "users-named@test.com", fullName = " Maria Nguyen ", password = HarmoniaApiFactory.Password, roleName = RoleNames.ChoirDirector },
+            new { email = "users-named@test.com", fullName = " Maria Nguyen ", roleName = RoleNames.ChoirDirector },
             _ct);
         var id = (await created.Content.ReadFromJsonAsync<UserDto>(TestJson.Options, _ct))!.Id;
+        await factory.CompleteFirstSignInAsync("users-named@test.com", _ct);
         var fetched = (await admin.GetFromJsonAsync<UserDto>($"api/users/{id}", TestJson.Options, _ct))!;
         var login = await factory.LoginAsync("users-named@test.com", cancellationToken: _ct);
 
@@ -75,7 +85,7 @@ public class UsersEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<Har
 
         var response = await admin.PostAsJsonAsync(
             "api/users",
-            new { email = "users-noname@test.com", phone = " 0901234567 ", password = HarmoniaApiFactory.Password, roleName = RoleNames.ChoirMember },
+            new { email = "users-noname@test.com", phone = " 0901234567 ", roleName = RoleNames.ChoirMember },
             _ct);
         var created = (await response.Content.ReadFromJsonAsync<UserDto>(TestJson.Options, _ct))!;
 
@@ -83,8 +93,7 @@ public class UsersEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<Har
         Assert.Equal(string.Empty, created.FullName);
         Assert.Equal("0901234567", created.Phone);
         Assert.True(created.IsPasswordChangeRequired);
-        await factory.EmailSender.Received(1).SendAsync(
-            "users-noname@test.com", Arg.Any<string>(), Arg.Is<string>(b => b.Contains(HarmoniaApiFactory.Password)), Arg.Any<CancellationToken>());
+        Assert.Matches("^[A-Za-z2-9]{12}$", EmailedPassword("users-noname@test.com"));
     }
 
     [Fact]
@@ -93,15 +102,17 @@ public class UsersEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<Har
         var admin = await factory.CreateClientAsAsync("admin@test.com", _ct);
         await admin.PostAsJsonAsync(
             "api/users",
-            new { email = "users-firstlogin@test.com", password = HarmoniaApiFactory.Password, roleName = RoleNames.ParishPriest },
+            new { email = "users-firstlogin@test.com", roleName = RoleNames.ParishPriest },
             _ct);
 
-        var first = await factory.LoginAsync("users-firstlogin@test.com", cancellationToken: _ct);
-        var client = await factory.CreateClientAsAsync("users-firstlogin@test.com", _ct);
+        var emailed = EmailedPassword("users-firstlogin@test.com");
+        var first = await factory.LoginAsync("users-firstlogin@test.com", emailed, _ct);
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new("Bearer", first.AccessToken);
         var blocked = await client.GetAsync("api/lookups/mass-types", _ct);
         var me = await client.GetAsync("api/auth/me", _ct);
         var change = await client.PostAsJsonAsync(
-            "api/auth/change-password", new { currentPassword = HarmoniaApiFactory.Password, newPassword = "BrandNew123" }, _ct);
+            "api/auth/change-password", new { currentPassword = emailed, newPassword = "BrandNew123" }, _ct);
         var second = await factory.LoginAsync("users-firstlogin@test.com", "BrandNew123", _ct);
         client.DefaultRequestHeaders.Authorization = new("Bearer", second.AccessToken);
         var unblocked = await client.GetAsync("api/lookups/mass-types", _ct);

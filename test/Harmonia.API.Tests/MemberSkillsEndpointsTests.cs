@@ -20,10 +20,10 @@ public class MemberSkillsEndpointsTests(HarmoniaApiFactory factory) : IClassFixt
         var admin = await factory.CreateClientAsAsync("admin@test.com", cancellationToken);
         var response = await admin.PostAsJsonAsync(
             "api/users",
-            new { email, fullName = "Skill Member", password = HarmoniaApiFactory.Password, roleName = RoleNames.ChoirMember },
+            new { email, fullName = "Skill Member", roleName = RoleNames.ChoirMember },
             cancellationToken);
         response.EnsureSuccessStatusCode();
-        await factory.ClearPasswordChangeRequiredAsync(email, cancellationToken);
+        await factory.CompleteFirstSignInAsync(email, cancellationToken);
         return await factory.CreateClientAsAsync(email, cancellationToken);
     }
 
