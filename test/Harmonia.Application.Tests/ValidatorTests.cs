@@ -256,4 +256,42 @@ public class ValidatorTests
 
         Assert.Equal(nameof(DeclareMemberSkillRequest.Level), Assert.Single(result.Errors).PropertyName);
     }
+
+    // ---- Practice assignment ----
+
+    private static CreatePracticeAssignmentRequest PracticeAssignment(AssignmentScope scope) => new()
+    {
+        Title = "Learn the entrance hymn",
+        Scope = scope,
+        DueDate = DateTime.UtcNow.AddDays(3),
+    };
+
+    [Fact]
+    public void CreatePracticeAssignment_AllScopeWithoutTargets_HasNoErrors()
+    {
+        var codes = ErrorCodesOf(new CreatePracticeAssignmentRequestValidator(), PracticeAssignment(AssignmentScope.All));
+
+        Assert.Empty(codes);
+    }
+
+    [Fact]
+    public void CreatePracticeAssignment_DueDateInPast_ReturnsDueDateInPast()
+    {
+        var request = PracticeAssignment(AssignmentScope.All);
+        request.DueDate = DateTime.UtcNow.AddMinutes(-1);
+
+        var codes = ErrorCodesOf(new CreatePracticeAssignmentRequestValidator(), request);
+
+        Assert.Equal([ErrorCodes.PracticeDueDateInPast], codes);
+    }
+
+    [Theory]
+    [InlineData(AssignmentScope.SkillGroup)]
+    [InlineData(AssignmentScope.Individual)]
+    public void CreatePracticeAssignment_TargetedScopeWithoutTargets_ReturnsTargetRequired(AssignmentScope scope)
+    {
+        var codes = ErrorCodesOf(new CreatePracticeAssignmentRequestValidator(), PracticeAssignment(scope));
+
+        Assert.Equal([ErrorCodes.PracticeTargetRequired], codes);
+    }
 }

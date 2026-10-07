@@ -803,6 +803,41 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 
 ---
 
+## 7c. Practice assignments — `api/practice-assignments` · role `ChoirDirector` (UC-28)
+
+### `PracticeAssignmentDto`
+
+```json
+{
+  "id": "guid",
+  "eventId": "guid | null",
+  "songId": "guid | null",
+  "materialId": "guid | null",
+  "title": "Tập bài Nhập lễ",
+  "instruction": "Thu âm bè Soprano, đoạn điệp khúc | null",
+  "scope": "SkillGroup",
+  "dueDate": "2026-10-12T15:00:00Z",
+  "skillIds": ["guid"],
+  "memberIds": []
+}
+```
+
+| Method | Path | Body | Thành công | Lỗi |
+|---|---|---|---|---|
+| POST | `/api/practice-assignments` | `{ "title", "instruction?", "scope", "dueDate", "eventId?", "songId?", "materialId?", "skillIds?", "memberIds?" }` | 200 `PracticeAssignmentDto` | 400 `VALIDATION_FAILED` (`PRACTICE_DUE_DATE_IN_PAST`, `PRACTICE_TARGET_REQUIRED`) · 404 `EVENT_NOT_FOUND`, `SONG_NOT_FOUND`, `MATERIAL_NOT_FOUND`, `SKILL_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `EVENT_CANCELLED`, `SONG_INACTIVE`, `SKILL_INACTIVE` |
+
+- `scope`: `All` | `SkillGroup` | `Individual`.
+  - `All`: giao cho mọi ca viên **đang hoạt động**. `skillIds` / `memberIds` bị bỏ qua.
+  - `SkillGroup`: `skillIds` bắt buộc. Người nhận là ca viên đang hoạt động đã được **duyệt** ít nhất một skill trong danh sách.
+  - `Individual`: `memberIds` (id hồ sơ ca viên) bắt buộc. Ca viên không còn hoạt động → 404 `MEMBER_NOT_FOUND`.
+- `title` tối đa 200 ký tự, `instruction` tối đa 1000. `dueDate` là UTC, phải sau thời điểm gửi.
+- `eventId`, `songId`, `materialId` đều tuỳ chọn. Sự kiện đã huỷ → 409 `EVENT_CANCELLED`. Tư liệu đã tắt, hoặc
+  không thuộc `songId` khi gửi cả hai → 404 `MATERIAL_NOT_FOUND`.
+- Tạo xong, mỗi ca viên được giao nhận một thông báo `AssignmentNotice`, `referenceType = "PracticeAssignment"`,
+  `referenceId` = id bài tập.
+
+---
+
 ## 8. SignalR — `/hubs/notifications`
 
 Chỉ server → client; client không gọi method nào trên hub.

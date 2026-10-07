@@ -25,6 +25,7 @@ public static class DependencyInjection
         services.AddScoped<ILiturgicalDayService, LiturgicalDayService>();
         services.AddScoped<IUpcomingScheduleService, UpcomingScheduleService>();
         services.AddScoped<ILiturgicalEventService, LiturgicalEventService>();
+        services.AddScoped<IPracticeAssignmentService, PracticeAssignmentService>();
 
         return services;
     }

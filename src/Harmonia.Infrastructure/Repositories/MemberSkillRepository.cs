@@ -115,4 +115,15 @@ public class MemberSkillRepository(HarmoniaDbContext dbContext)
             return false;
         }
     }
+
+    public Task<List<Guid>> GetActiveMemberUserIdsBySkillsAsync(
+        IReadOnlyCollection<Guid> skillIds, CancellationToken cancellationToken) =>
+        DbContext.MemberSkills
+            .AsNoTracking()
+            .Where(x => skillIds.Contains(x.SkillId)
+                && x.Status == ApprovalStatus.Approved
+                && x.Member.Status == MemberStatus.Active)
+            .Select(x => x.Member.UserId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
 }
