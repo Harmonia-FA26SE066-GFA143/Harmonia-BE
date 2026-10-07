@@ -10,7 +10,9 @@ namespace Harmonia.API.Controllers;
 
 [Route("api/practice-assignments")]
 [Authorize]
-public class PracticeAssignmentsController(IPracticeAssignmentService practiceAssignmentService) : ApiControllerBase
+public class PracticeAssignmentsController(
+    IPracticeAssignmentService practiceAssignmentService,
+    IPracticeSubmissionService practiceSubmissionService) : ApiControllerBase
 {
     [HttpPost]
     [Authorize(Roles = RoleNames.ChoirDirector)]
@@ -29,6 +31,13 @@ public class PracticeAssignmentsController(IPracticeAssignmentService practiceAs
     [Authorize(Roles = RoleNames.ChoirMember)]
     public async Task<IActionResult> GetMineByIdAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await practiceAssignmentService.GetMineByIdAsync(User.GetUserId(), id, cancellationToken));
+
+    /// <summary>Submissions of one assignment for the Choir Director to listen to (UC-29 / FE-42).</summary>
+    [HttpGet("{id:guid}/submissions")]
+    [Authorize(Roles = RoleNames.ChoirDirector)]
+    public async Task<IActionResult> GetSubmissionsAsync(
+        Guid id, [FromQuery] SearchPracticeSubmissionsRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await practiceSubmissionService.GetByAssignmentAsync(id, request, cancellationToken));
 
     /// <summary>Submits the calling member's recorded audio as their next attempt (UC-09 / FE-11).</summary>
     [HttpPost("{id:guid}/submissions")]

@@ -903,6 +903,35 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 
 ---
 
+## 7d. Practice submissions — `api/practice-submissions` · role `ChoirDirector` (UC-29 / FE-42)
+
+`PracticeSubmissionDetailDto`: đủ các field của `PracticeSubmissionDto`, thêm người nộp và bài tập:
+
+```json
+{
+  "...": "các field của PracticeSubmissionDto",
+  "memberId": "guid",
+  "memberName": "Nguyễn Văn An",
+  "memberAvatarUrl": "string | null",
+  "assignmentTitle": "Tập bài Nhập lễ",
+  "assignmentDueDate": "2026-10-12T15:00:00Z"
+}
+```
+
+| Method | Path | Thành công | Lỗi |
+|---|---|---|---|
+| GET | `/api/practice-assignments/{id}/submissions?status=&allAttempts=&pageNumber=&pageSize=` | 200 `PagedList<PracticeSubmissionDetailDto>` | 404 `PRACTICE_ASSIGNMENT_NOT_FOUND` |
+| GET | `/api/practice-submissions?status=&allAttempts=&pageNumber=&pageSize=` | 200 `PagedList<PracticeSubmissionDetailDto>` | — |
+| GET | `/api/practice-submissions/{id}` | 200 `PracticeSubmissionDetailDto` | 404 `PRACTICE_SUBMISSION_NOT_FOUND` |
+
+- `allAttempts`: mặc định `false` = mỗi ca viên chỉ lần nộp **mới nhất** của mỗi bài; `true` = mọi lần nộp.
+- `status` (`Submitted` | `Passed` | `NeedsRevision` | `Overdue`) lọc **sau** bước trên: hàng chờ chấm là
+  `GET /api/practice-submissions?status=Submitted` — chỉ ca viên có lần mới nhất còn chờ chấm.
+- Thứ tự: theo một bài tập → tên ca viên, lần mới nhất trước; hàng chờ (mọi bài tập) → `submittedAt` cũ nhất trước.
+- `audioUrl` hết hạn sau ít phút: gọi `GET /api/practice-submissions/{id}` ngay trước khi phát để lấy URL mới.
+
+---
+
 ## 8. SignalR — `/hubs/notifications`
 
 Chỉ server → client; client không gọi method nào trên hub.
