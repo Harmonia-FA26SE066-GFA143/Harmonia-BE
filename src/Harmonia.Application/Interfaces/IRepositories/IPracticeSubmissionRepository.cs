@@ -24,4 +24,18 @@ public interface IPracticeSubmissionRepository : IGenericRepository<PracticeSubm
 
     /// <summary>Read-only, with <see cref="PracticeSubmission.Member"/> and its User, and the assignment loaded.</summary>
     Task<PracticeSubmission?> GetWithMemberAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Tracked, with <see cref="PracticeSubmission.Member"/> and its User, and the assignment loaded.</summary>
+    Task<PracticeSubmission?> GetForReviewAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>True when the member has no later attempt of the same assignment.</summary>
+    Task<bool> IsLatestAttemptAsync(PracticeSubmission submission, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Inserts <paramref name="feedback"/> and saves the status change of a row loaded by
+    /// <see cref="GetForReviewAsync"/>. Returns false when another request changed the row's status after it
+    /// was read, so nothing is saved.
+    /// </summary>
+    Task<bool> TrySaveReviewAsync(
+        PracticeSubmission submission, PracticeFeedback feedback, CancellationToken cancellationToken);
 }

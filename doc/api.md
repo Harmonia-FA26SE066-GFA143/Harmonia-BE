@@ -930,6 +930,36 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 - Thứ tự: theo một bài tập → tên ca viên, lần mới nhất trước; hàng chờ (mọi bài tập) → `submittedAt` cũ nhất trước.
 - `audioUrl` hết hạn sau ít phút: gọi `GET /api/practice-submissions/{id}` ngay trước khi phát để lấy URL mới.
 
+### Ca trưởng chấm bản thu (UC-29 / FE-43, FE-44)
+
+`PracticeSubmissionReviewDto`: đủ các field của `PracticeSubmissionDetailDto` (`status` đã là kết quả mới), thêm:
+
+```json
+{
+  "...": "các field của PracticeSubmissionDetailDto",
+  "feedback": {
+    "id": "guid",
+    "result": "NeedsRevision",
+    "comment": "Giữ nốt cuối dài hơn | null",
+    "reviewerId": "guid",
+    "reviewedAt": "2026-10-10T10:00:00Z"
+  }
+}
+```
+
+| Method | Path | Body | Thành công | Lỗi |
+|---|---|---|---|---|
+| POST | `/api/practice-submissions/{id}/feedback` | `{ "result", "comment?" }` | 200 `PracticeSubmissionReviewDto` | 400 `VALIDATION_FAILED` · 404 `PRACTICE_SUBMISSION_NOT_FOUND` · 409 `PRACTICE_SUBMISSION_SUPERSEDED`, `PRACTICE_SUBMISSION_ALREADY_REVIEWED` |
+
+- `result`: chỉ `Passed` hoặc `NeedsRevision`. `comment` tối đa 1000 ký tự, **bắt buộc khi `NeedsRevision`**.
+- Chỉ chấm được **lần nộp mới nhất** của ca viên cho bài đó; lần cũ → 409 `PRACTICE_SUBMISSION_SUPERSEDED`.
+- Mỗi bản thu chấm **một lần**: `status` khác `Submitted` → 409 `PRACTICE_SUBMISSION_ALREADY_REVIEWED`. Hai ca trưởng
+  chấm cùng lúc thì người sau cũng nhận mã này, kết quả của người trước được giữ. Chưa có API sửa kết quả đã chấm.
+- Quá hạn nộp vẫn chấm được.
+- Chấm xong, ca viên nhận thông báo `PracticeFeedback`, `referenceType = "PracticeSubmission"`, `referenceId` = id bản thu.
+  Nội dung thông báo không chứa nhận xét; ca viên mở bản thu để đọc.
+- `NeedsRevision` → ca viên nộp lại được (lần nộp mới). `Passed` → không nộp thêm cho bài đó.
+
 ---
 
 ## 8. SignalR — `/hubs/notifications`

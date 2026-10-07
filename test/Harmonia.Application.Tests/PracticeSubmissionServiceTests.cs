@@ -18,6 +18,7 @@ public class PracticeSubmissionServiceTests
     private readonly IPracticeSubmissionRepository _submissions = Substitute.For<IPracticeSubmissionRepository>();
     private readonly IPracticeAssignmentRepository _assignments = Substitute.For<IPracticeAssignmentRepository>();
     private readonly IFileStorageService _storage = Substitute.For<IFileStorageService>();
+    private readonly INotificationService _notifications = Substitute.For<INotificationService>();
     private readonly PracticeSubmissionService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
 
@@ -32,7 +33,7 @@ public class PracticeSubmissionServiceTests
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<PracticeSubmissionProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new PracticeSubmissionService(_submissions, _assignments, _storage, mapper);
+        _sut = new PracticeSubmissionService(_submissions, _assignments, _notifications, _storage, mapper);
         _storage.GetSignedUrl(Arg.Any<string>()).Returns(call => $"signed:{call.Arg<string>()}");
 
         _submission = new PracticeSubmission
@@ -41,7 +42,7 @@ public class PracticeSubmissionServiceTests
             PracticeAssignmentId = _assignment.Id,
             PracticeAssignment = _assignment,
             MemberId = Guid.NewGuid(),
-            Member = new MemberProfile { User = new User { FullName = "Anna", AvatarUrl = "avatar" } },
+            Member = new MemberProfile { UserId = Guid.NewGuid(), User = new User { FullName = "Anna", AvatarUrl = "avatar" } },
             AudioPublicId = "harmonia/practice-submissions/a.m4a",
             AttemptNo = 2,
             Status = SubmissionStatus.Submitted,
@@ -110,5 +111,106 @@ public class PracticeSubmissionServiceTests
 
         Assert.Equal(ErrorCodes.PracticeSubmissionNotFound, result.Code);
         _storage.DidNotReceiveWithAnyArgs().GetSignedUrl(default!);
+    }
+
+    // ---- Review (FE-43, FE-44) ----
+
+    private readonly Guid _directorId = Guid.NewGuid();
+
+    private PracticeFeedback? _savedFeedback;
+
+    private void ReviewableSubmission(bool isLatest = true, bool saves = true)
+    {
+        _submissions.GetForReviewAsync(_submission.Id, _ct).Returns(_submission);
+        _submissions.IsLatestAttemptAsync(_submission, _ct).Returns(isLatest);
+        _submissions.TrySaveReviewAsync(_submission, Arg.Do<PracticeFeedback>(f => _savedFeedback = f), _ct).Returns(saves);
+    }
+
+    private Task<Result<PracticeSubmissionReviewDto>> ReviewAsync(SubmissionStatus result, string? comment = null) =>
+        _sut.ReviewAsync(_directorId, _submission.Id, new ReviewPracticeSubmissionRequest { Result = result, Comment = comment }, _ct);
+
+    private async Task AssertNotReviewedAsync()
+    {
+        Assert.Equal(SubmissionStatus.Submitted, _submission.Status);
+        await _submissions.DidNotReceiveWithAnyArgs().TrySaveReviewAsync(default!, default!, default);
+        await _notifications.DidNotReceiveWithAnyArgs().SendAsync(default!, default);
+    }
+
+    [Theory]
+    [InlineData(SubmissionStatus.Passed, null, "Practice passed")]
+    [InlineData(SubmissionStatus.NeedsRevision, "  Hold the last note longer  ", "Practice needs revision")]
+    public async Task Review_LatestSubmitted_RecordsFeedbackAndNotifiesMember_Async(
+        SubmissionStatus decision, string? comment, string expectedTitle)
+    {
+        ReviewableSubmission();
+
+        var result = await ReviewAsync(decision, comment);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(decision, _submission.Status);
+        var feedback = Assert.IsType<PracticeFeedback>(_savedFeedback);
+        Assert.Equal(_submission.Id, feedback.SubmissionId);
+        Assert.Equal(decision, feedback.Result);
+        Assert.Equal(_directorId, feedback.ReviewerId);
+        Assert.Equal(comment?.Trim(), feedback.Comment);
+        Assert.Equal(decision, result.Value!.Status);
+        Assert.Equal(decision, result.Value.Feedback.Result);
+        Assert.Equal(comment?.Trim(), result.Value.Feedback.Comment);
+        Assert.Equal($"signed:{_submission.AudioPublicId}", result.Value.AudioUrl);
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(x =>
+                x.Type == NotificationType.PracticeFeedback
+                && x.Title == expectedTitle
+                && x.ReferenceType == nameof(PracticeSubmission)
+                && x.ReferenceId == _submission.Id
+                && x.RecipientUserIds.SequenceEqual(new[] { _submission.Member.UserId })),
+            _ct);
+    }
+
+    [Fact]
+    public async Task Review_UnknownSubmission_ReturnsPracticeSubmissionNotFound_Async()
+    {
+        var result = await ReviewAsync(SubmissionStatus.Passed);
+
+        Assert.Equal(ErrorCodes.PracticeSubmissionNotFound, result.Code);
+        await AssertNotReviewedAsync();
+    }
+
+    [Fact]
+    public async Task Review_OlderAttempt_ReturnsSuperseded_Async()
+    {
+        ReviewableSubmission(isLatest: false);
+
+        var result = await ReviewAsync(SubmissionStatus.Passed);
+
+        Assert.Equal(ErrorCodes.PracticeSubmissionSuperseded, result.Code);
+        await AssertNotReviewedAsync();
+    }
+
+    [Theory]
+    [InlineData(SubmissionStatus.Passed)]
+    [InlineData(SubmissionStatus.NeedsRevision)]
+    [InlineData(SubmissionStatus.Overdue)]
+    public async Task Review_NotSubmitted_ReturnsAlreadyReviewed_Async(SubmissionStatus status)
+    {
+        _submission.Status = status;
+        ReviewableSubmission();
+
+        var result = await ReviewAsync(SubmissionStatus.Passed);
+
+        Assert.Equal(ErrorCodes.PracticeSubmissionAlreadyReviewed, result.Code);
+        Assert.Equal(status, _submission.Status);
+        await _notifications.DidNotReceiveWithAnyArgs().SendAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task Review_ConcurrentReviewWins_ReturnsAlreadyReviewedWithoutNotifying_Async()
+    {
+        ReviewableSubmission(saves: false);
+
+        var result = await ReviewAsync(SubmissionStatus.Passed);
+
+        Assert.Equal(ErrorCodes.PracticeSubmissionAlreadyReviewed, result.Code);
+        await _notifications.DidNotReceiveWithAnyArgs().SendAsync(default!, default);
     }
 }

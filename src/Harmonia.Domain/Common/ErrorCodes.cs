@@ -268,6 +268,9 @@ public static class ErrorCodes
 
     public const string PracticeSubmissionAlreadyPassed = "PRACTICE_SUBMISSION_ALREADY_PASSED";
 
+    // The member submitted a newer attempt; only the newest attempt of an assignment is reviewed.
+    public const string PracticeSubmissionSuperseded = "PRACTICE_SUBMISSION_SUPERSEDED";
+
     // Two submissions of the same assignment raced for the same attempt number; the client reloads and retries.
     public const string PracticeSubmissionConflict = "PRACTICE_SUBMISSION_CONFLICT";
 

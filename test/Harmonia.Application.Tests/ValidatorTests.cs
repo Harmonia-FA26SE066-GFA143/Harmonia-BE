@@ -295,6 +295,33 @@ public class ValidatorTests
         Assert.Equal([ErrorCodes.PracticeTargetRequired], codes);
     }
 
+    // ---- Practice review ----
+
+    [Theory]
+    [InlineData(SubmissionStatus.Passed, null, true)]
+    [InlineData(SubmissionStatus.Passed, "Well done", true)]
+    [InlineData(SubmissionStatus.NeedsRevision, "Hold the last note", true)]
+    [InlineData(SubmissionStatus.NeedsRevision, null, false)]
+    [InlineData(SubmissionStatus.NeedsRevision, "   ", false)]
+    [InlineData(SubmissionStatus.Submitted, null, false)]
+    [InlineData(SubmissionStatus.Overdue, null, false)]
+    public void ReviewPracticeSubmission_ResultAndComment(SubmissionStatus result, string? comment, bool isValid)
+    {
+        var validation = new ReviewPracticeSubmissionRequestValidator().Validate(
+            new ReviewPracticeSubmissionRequest { Result = result, Comment = comment });
+
+        Assert.Equal(isValid, validation.IsValid);
+    }
+
+    [Fact]
+    public void ReviewPracticeSubmission_CommentTooLong_IsInvalid()
+    {
+        var validation = new ReviewPracticeSubmissionRequestValidator().Validate(
+            new ReviewPracticeSubmissionRequest { Result = SubmissionStatus.Passed, Comment = new string('a', 1001) });
+
+        Assert.False(validation.IsValid);
+    }
+
     // ---- Practice submission ----
 
     [Theory]

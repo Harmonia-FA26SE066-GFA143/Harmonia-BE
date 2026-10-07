@@ -253,6 +253,7 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 | `PRACTICE_SUBMISSION_PAST_DUE` | 409 | Đã quá hạn nộp |
 | `PRACTICE_SUBMISSION_ALREADY_REVIEWED` | 409 | Bản thu này đã được nhận xét |
 | `PRACTICE_SUBMISSION_ALREADY_PASSED` | 409 | Bài tập này đã đạt, không cần nộp lại |
+| `PRACTICE_SUBMISSION_SUPERSEDED` | 409 | Ca viên đã nộp bản thu mới hơn, vui lòng chấm bản mới nhất |
 | `PRACTICE_SUBMISSION_CONFLICT` | 409 | Bản thu vừa được nộp từ thao tác khác, vui lòng tải lại |
 | `PRACTICE_AUDIO_REQUIRED` | 400 | Vui lòng chọn tệp ghi âm |
 | `PRACTICE_AUDIO_TYPE_NOT_ALLOWED` | 400 | Định dạng ghi âm không được hỗ trợ |

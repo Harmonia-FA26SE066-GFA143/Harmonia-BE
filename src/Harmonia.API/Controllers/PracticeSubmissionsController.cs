@@ -1,3 +1,4 @@
+using Harmonia.API.Extensions;
 using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Domain.Common;
@@ -21,4 +22,10 @@ public class PracticeSubmissionsController(IPracticeSubmissionService practiceSu
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await practiceSubmissionService.GetByIdAsync(id, cancellationToken));
+
+    /// <summary>Grades the submission as Passed or NeedsRevision with an optional comment (FE-43, FE-44).</summary>
+    [HttpPost("{id:guid}/feedback")]
+    public async Task<IActionResult> ReviewAsync(
+        Guid id, [FromBody] ReviewPracticeSubmissionRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await practiceSubmissionService.ReviewAsync(User.GetUserId(), id, request, cancellationToken));
 }

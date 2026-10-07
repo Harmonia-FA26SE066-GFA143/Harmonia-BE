@@ -16,4 +16,11 @@ public interface IPracticeSubmissionService
 
     /// <summary>One submission with a freshly signed audio URL, fetched right before playback.</summary>
     Task<Result<PracticeSubmissionDetailDto>> GetByIdAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Grades the member's newest attempt as Passed or NeedsRevision with an optional comment (FE-43, FE-44),
+    /// then notifies the member (S-05). A submission is reviewed once.
+    /// </summary>
+    Task<Result<PracticeSubmissionReviewDto>> ReviewAsync(
+        Guid directorUserId, Guid id, ReviewPracticeSubmissionRequest request, CancellationToken cancellationToken);
 }

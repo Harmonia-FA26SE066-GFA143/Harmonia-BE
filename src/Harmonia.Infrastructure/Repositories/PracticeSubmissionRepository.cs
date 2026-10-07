@@ -70,6 +70,39 @@ public class PracticeSubmissionRepository(HarmoniaDbContext dbContext)
         WithMemberAndAssignment(DbContext.PracticeSubmissions.AsNoTracking())
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
+    public Task<PracticeSubmission?> GetForReviewAsync(Guid id, CancellationToken cancellationToken) =>
+        WithMemberAndAssignment(DbContext.PracticeSubmissions)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+    public async Task<bool> IsLatestAttemptAsync(PracticeSubmission submission, CancellationToken cancellationToken) =>
+        !await DbContext.PracticeSubmissions.AnyAsync(
+            x => x.PracticeAssignmentId == submission.PracticeAssignmentId
+                && x.MemberId == submission.MemberId
+                && x.AttemptNo > submission.AttemptNo,
+            cancellationToken);
+
+    public async Task<bool> TrySaveReviewAsync(
+        PracticeSubmission submission, PracticeFeedback feedback, CancellationToken cancellationToken)
+    {
+        // Added explicitly: a new child with its Id already set, reached only through the tracked parent's
+        // collection, would be taken for an existing row and UPDATEd instead of inserted.
+        DbContext.PracticeFeedbacks.Add(feedback);
+
+        try
+        {
+            await DbContext.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Status is a concurrency token: the UPDATE matched no row because another review got there first.
+            // The save ran in one transaction, so our feedback was rolled back with it; detach both.
+            DbContext.Entry(feedback).State = EntityState.Detached;
+            DbContext.Entry(submission).State = EntityState.Detached;
+            return false;
+        }
+    }
+
     private static IQueryable<PracticeSubmission> WithMemberAndAssignment(IQueryable<PracticeSubmission> query) =>
         query
             .Include(x => x.Member)

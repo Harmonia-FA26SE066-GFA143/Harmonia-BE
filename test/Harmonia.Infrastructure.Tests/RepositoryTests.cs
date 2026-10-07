@@ -1058,6 +1058,55 @@ public sealed class RepositoryTests : IDisposable
         Assert.Null(await repository.GetWithMemberAsync(Guid.NewGuid(), _ct));
     }
 
+    [Fact]
+    public async Task PracticeSubmission_IsLatestAttempt_FalseWhenMemberSubmittedAgain_Async()
+    {
+        var seed = await SeedSubmissionsAsync();
+        await using var context = _db.NewContext();
+        var repository = new PracticeSubmissionRepository(context);
+
+        var old = await repository.GetForReviewAsync(seed.BinhOld, _ct);
+        var newest = await repository.GetForReviewAsync(seed.BinhNewest, _ct);
+
+        Assert.False(await repository.IsLatestAttemptAsync(old!, _ct));
+        Assert.True(await repository.IsLatestAttemptAsync(newest!, _ct));
+    }
+
+    [Fact]
+    public async Task PracticeSubmission_TrySaveReview_ConcurrentReview_SecondReturnsFalseAndFirstStands_Async()
+    {
+        var seed = await SeedSubmissionsAsync();
+        var directorId = (await _db.AddUserAsync("director@test.com", RoleNames.ChoirDirector, _ct)).Id;
+        await using var firstContext = _db.NewContext();
+        await using var secondContext = _db.NewContext();
+        var first = new PracticeSubmissionRepository(firstContext);
+        var second = new PracticeSubmissionRepository(secondContext);
+
+        // Both directors read the row while it is still Submitted.
+        var firstRead = await first.GetForReviewAsync(seed.BinhNewest, _ct);
+        var secondRead = await second.GetForReviewAsync(seed.BinhNewest, _ct);
+
+        PracticeFeedback Review(PracticeSubmission submission, SubmissionStatus result)
+        {
+            submission.Status = result;
+            return new PracticeFeedback
+            {
+                Id = Guid.NewGuid(), SubmissionId = submission.Id, ReviewerId = directorId, Result = result,
+                ReviewedAt = DateTime.UtcNow,
+            };
+        }
+
+        Assert.True(await first.TrySaveReviewAsync(firstRead!, Review(firstRead!, SubmissionStatus.Passed), _ct));
+        Assert.False(await second.TrySaveReviewAsync(secondRead!, Review(secondRead!, SubmissionStatus.NeedsRevision), _ct));
+
+        await using var check = _db.NewContext();
+        var saved = await check.PracticeSubmissions.Include(x => x.Feedbacks).SingleAsync(x => x.Id == seed.BinhNewest, _ct);
+        Assert.Equal(SubmissionStatus.Passed, saved.Status);
+        Assert.Equal(SubmissionStatus.Passed, Assert.Single(saved.Feedbacks).Result);
+        // Nothing of the losing review is left pending for a later save in the same request.
+        Assert.DoesNotContain(secondContext.ChangeTracker.Entries(), e => e.State != EntityState.Unchanged);
+    }
+
     // ---- GenericRepository ----
 
     [Fact]

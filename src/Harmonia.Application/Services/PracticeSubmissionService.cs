@@ -5,12 +5,14 @@ using Harmonia.Application.Interfaces.IRepositories;
 using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Domain.Common;
 using Harmonia.Domain.Entities;
+using Harmonia.Domain.Enums;
 
 namespace Harmonia.Application.Services;
 
 public class PracticeSubmissionService(
     IPracticeSubmissionRepository practiceSubmissionRepository,
     IPracticeAssignmentRepository practiceAssignmentRepository,
+    INotificationService notificationService,
     IFileStorageService fileStorageService,
     IMapper mapper) : IPracticeSubmissionService
 {
@@ -37,16 +39,63 @@ public class PracticeSubmissionService(
 
         return submission is null
             ? Result<PracticeSubmissionDetailDto>.Failure(ErrorCodes.PracticeSubmissionNotFound)
-            : Result<PracticeSubmissionDetailDto>.Success(ToDto(submission));
+            : Result<PracticeSubmissionDetailDto>.Success(ToDto<PracticeSubmissionDetailDto>(submission));
     }
 
-    private PracticeSubmissionDetailDto ToDto(PracticeSubmission submission)
+    public async Task<Result<PracticeSubmissionReviewDto>> ReviewAsync(
+        Guid directorUserId, Guid id, ReviewPracticeSubmissionRequest request, CancellationToken cancellationToken)
     {
-        var dto = mapper.Map<PracticeSubmissionDetailDto>(submission);
+        var submission = await practiceSubmissionRepository.GetForReviewAsync(id, cancellationToken);
+        if (submission is null) return Result<PracticeSubmissionReviewDto>.Failure(ErrorCodes.PracticeSubmissionNotFound);
+
+        if (!await practiceSubmissionRepository.IsLatestAttemptAsync(submission, cancellationToken))
+            return Result<PracticeSubmissionReviewDto>.Failure(ErrorCodes.PracticeSubmissionSuperseded);
+
+        if (submission.Status != SubmissionStatus.Submitted)
+            return Result<PracticeSubmissionReviewDto>.Failure(ErrorCodes.PracticeSubmissionAlreadyReviewed);
+
+        var comment = string.IsNullOrWhiteSpace(request.Comment) ? null : request.Comment.Trim();
+        var feedback = new PracticeFeedback
+        {
+            Id = Guid.NewGuid(),
+            SubmissionId = submission.Id,
+            ReviewerId = directorUserId,
+            Result = request.Result,
+            Comment = comment,
+            ReviewedAt = DateTime.UtcNow,
+        };
+        submission.Status = request.Result;
+
+        // Another director reviewed the submission between our read and our save; theirs stands.
+        if (!await practiceSubmissionRepository.TrySaveReviewAsync(submission, feedback, cancellationToken))
+            return Result<PracticeSubmissionReviewDto>.Failure(ErrorCodes.PracticeSubmissionAlreadyReviewed);
+
+        // The comment stays out of the content: it can fill the whole 1000-character column on its own.
+        var title = submission.PracticeAssignment.Title;
+        await notificationService.SendAsync(
+            new SendNotificationRequest(
+                NotificationType.PracticeFeedback,
+                request.Result == SubmissionStatus.Passed ? "Practice passed" : "Practice needs revision",
+                request.Result == SubmissionStatus.Passed
+                    ? $"Your recording for \"{title}\" has passed."
+                    : $"Your recording for \"{title}\" needs revision. Open it to read the feedback.",
+                [submission.Member.UserId],
+                nameof(PracticeSubmission),
+                submission.Id),
+            cancellationToken);
+
+        var dto = ToDto<PracticeSubmissionReviewDto>(submission);
+        dto.Feedback = mapper.Map<PracticeFeedbackDto>(feedback);
+        return Result<PracticeSubmissionReviewDto>.Success(dto);
+    }
+
+    private TDto ToDto<TDto>(PracticeSubmission submission) where TDto : PracticeSubmissionDetailDto
+    {
+        var dto = mapper.Map<TDto>(submission);
         dto.AudioUrl = fileStorageService.GetSignedUrl(submission.AudioPublicId);
         return dto;
     }
 
     private PagedList<PracticeSubmissionDetailDto> ToDtoPage(PagedList<PracticeSubmission> page) =>
-        new(page.Items.Select(ToDto).ToList(), page.PageNumber, page.PageSize, page.TotalCount);
+        new(page.Items.Select(ToDto<PracticeSubmissionDetailDto>).ToList(), page.PageNumber, page.PageSize, page.TotalCount);
 }
