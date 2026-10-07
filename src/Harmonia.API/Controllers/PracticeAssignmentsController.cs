@@ -1,4 +1,5 @@
 using Harmonia.API.Extensions;
+using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Domain.Common;
@@ -28,4 +29,19 @@ public class PracticeAssignmentsController(IPracticeAssignmentService practiceAs
     [Authorize(Roles = RoleNames.ChoirMember)]
     public async Task<IActionResult> GetMineByIdAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await practiceAssignmentService.GetMineByIdAsync(User.GetUserId(), id, cancellationToken));
+
+    /// <summary>Submits the calling member's recorded audio as their next attempt (UC-09 / FE-11).</summary>
+    [HttpPost("{id:guid}/submissions")]
+    [Authorize(Roles = RoleNames.ChoirMember)]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> SubmitAsync(
+        Guid id, [FromForm] CreatePracticeSubmissionRequest request, IFormFile? file, CancellationToken cancellationToken)
+    {
+        if (file is null)
+            return ToActionResult(await practiceAssignmentService.SubmitAsync(User.GetUserId(), id, request, null, cancellationToken));
+
+        await using var content = file.OpenReadStream();
+        return ToActionResult(await practiceAssignmentService.SubmitAsync(
+            User.GetUserId(), id, request, new FileContent(content, file.FileName, file.Length), cancellationToken));
+    }
 }

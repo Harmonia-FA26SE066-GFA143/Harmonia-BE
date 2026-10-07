@@ -294,4 +294,20 @@ public class ValidatorTests
 
         Assert.Equal([ErrorCodes.PracticeTargetRequired], codes);
     }
+
+    // ---- Practice submission ----
+
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData(1, true)]
+    [InlineData(3600, true)]
+    [InlineData(0, false)]
+    [InlineData(3601, false)]
+    public void CreatePracticeSubmission_DurationSeconds_IsValidOnlyInRange(int? durationSeconds, bool isValid)
+    {
+        var result = new CreatePracticeSubmissionRequestValidator().Validate(
+            new CreatePracticeSubmissionRequest { DurationSeconds = durationSeconds });
+
+        Assert.Equal(isValid, result.IsValid);
+    }
 }

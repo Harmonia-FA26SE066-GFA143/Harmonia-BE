@@ -23,7 +23,9 @@ public class PracticeAssignmentServiceTests
     private readonly IGenericRepository<Skill> _skills = Substitute.For<IGenericRepository<Skill>>();
     private readonly IMemberProfileRepository _members = Substitute.For<IMemberProfileRepository>();
     private readonly IMemberSkillRepository _memberSkills = Substitute.For<IMemberSkillRepository>();
+    private readonly IPracticeSubmissionRepository _submissions = Substitute.For<IPracticeSubmissionRepository>();
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
+    private readonly IFileStorageService _storage = Substitute.For<IFileStorageService>();
     private readonly PracticeAssignmentService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
 
@@ -33,10 +35,21 @@ public class PracticeAssignmentServiceTests
 
     public PracticeAssignmentServiceTests()
     {
-        var mapper = new MapperConfiguration(cfg => cfg.AddProfile<PracticeAssignmentProfile>(), NullLoggerFactory.Instance)
+        var mapper = new MapperConfiguration(cfg =>
+            {
+                cfg.AddProfile<PracticeAssignmentProfile>();
+                cfg.AddProfile<PracticeSubmissionProfile>();
+            }, NullLoggerFactory.Instance)
             .CreateMapper();
         _sut = new PracticeAssignmentService(
-            _assignments, _events, _songs, _materials, _skills, _members, _memberSkills, _notifications, mapper);
+            _assignments, _events, _songs, _materials, _skills, _members, _memberSkills, _submissions,
+            _notifications, _storage, mapper);
+
+        _storage.UploadAsync(default!, default!, default!, default, default)
+            .ReturnsForAnyArgs(Result<FileUploadResponse>.Success(new FileUploadResponse(StoredAudio, "unused")));
+        _storage.DeleteAsync(default!, default, default).ReturnsForAnyArgs(Result.Success());
+        _storage.GetSignedUrl(Arg.Any<string>()).Returns(call => $"signed:{call.Arg<string>()}");
+        _submissions.TryAddAsync(Arg.Any<PracticeSubmission>(), _ct).Returns(true);
 
         // Run the service's predicate over in-memory rows, so the Active filter is exercised too.
         MemberProfile[] members = [_activeMember, _leftMember];
@@ -250,5 +263,146 @@ public class PracticeAssignmentServiceTests
         var result = await _sut.GetMineByIdAsync(_activeMember.UserId, Guid.NewGuid(), _ct);
 
         Assert.Equal(ErrorCodes.PracticeAssignmentNotFound, result.Code);
+    }
+
+    // ---- Submit practice audio (UC-09 / FE-11) ----
+
+    private const string StoredAudio = "harmonia/practice-submissions/stored.m4a";
+
+    private static FileContent NewAudio(string fileName = "take.m4a", long length = 1024) =>
+        new(new MemoryStream([1, 2, 3]), fileName, length);
+
+    /// <summary>An assignment the active member receives, with their newest attempt when given.</summary>
+    private PracticeAssignment ReceivedAssignment(PracticeSubmission? latest = null, int dueInDays = 2)
+    {
+        var assignment = new PracticeAssignment
+        {
+            Id = Guid.NewGuid(),
+            DueDate = DateTime.UtcNow.AddDays(dueInDays),
+            Submissions = latest is null ? [] : [latest],
+        };
+        _members.GetByUserIdAsync(_activeMember.UserId, _ct).Returns(_activeMember);
+        _assignments.GetByIdForMemberAsync(assignment.Id, _activeMember.Id, _ct).Returns(assignment);
+        return assignment;
+    }
+
+    private Task<Result<PracticeSubmissionDto>> SubmitAsync(PracticeAssignment assignment, FileContent? file) =>
+        _sut.SubmitAsync(_activeMember.UserId, assignment.Id, new CreatePracticeSubmissionRequest { DurationSeconds = 95 }, file, _ct);
+
+    private async Task AssertNothingUploadedAsync() =>
+        await _storage.DidNotReceiveWithAnyArgs().UploadAsync(default!, default!, default!, default, default);
+
+    [Fact]
+    public async Task Submit_FirstAttempt_UploadsPrivateAudioAndSavesAttemptOne_Async()
+    {
+        var assignment = ReceivedAssignment();
+
+        var result = await SubmitAsync(assignment, NewAudio());
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.Value!.AttemptNo);
+        Assert.Equal(SubmissionStatus.Submitted, result.Value.Status);
+        Assert.Equal(95, result.Value.DurationSeconds);
+        Assert.Equal($"signed:{StoredAudio}", result.Value.AudioUrl);
+        await _storage.Received(1).UploadAsync(Arg.Any<Stream>(), "take.m4a", "practice-submissions", true, _ct);
+        await _submissions.Received(1).TryAddAsync(
+            Arg.Is<PracticeSubmission>(x => x.MemberId == _activeMember.Id
+                && x.PracticeAssignmentId == assignment.Id
+                && x.AudioPublicId == StoredAudio),
+            _ct);
+    }
+
+    [Fact]
+    public async Task Submit_AfterNeedsRevision_SavesNextAttempt_Async()
+    {
+        var assignment = ReceivedAssignment(new PracticeSubmission { AttemptNo = 2, Status = SubmissionStatus.NeedsRevision });
+
+        var result = await SubmitAsync(assignment, NewAudio());
+
+        Assert.Equal(3, result.Value!.AttemptNo);
+    }
+
+    [Fact]
+    public async Task Submit_AssignmentNotReceived_ReturnsPracticeAssignmentNotFound_Async()
+    {
+        _members.GetByUserIdAsync(_activeMember.UserId, _ct).Returns(_activeMember);
+
+        var result = await _sut.SubmitAsync(
+            _activeMember.UserId, Guid.NewGuid(), new CreatePracticeSubmissionRequest(), NewAudio(), _ct);
+
+        Assert.Equal(ErrorCodes.PracticeAssignmentNotFound, result.Code);
+        await AssertNothingUploadedAsync();
+    }
+
+    [Fact]
+    public async Task Submit_LatestAttemptPassed_ReturnsAlreadyPassed_Async()
+    {
+        var assignment = ReceivedAssignment(new PracticeSubmission { AttemptNo = 1, Status = SubmissionStatus.Passed });
+
+        var result = await SubmitAsync(assignment, NewAudio());
+
+        Assert.Equal(ErrorCodes.PracticeSubmissionAlreadyPassed, result.Code);
+        await AssertNothingUploadedAsync();
+    }
+
+    [Fact]
+    public async Task Submit_PastDueDate_ReturnsPastDue_Async()
+    {
+        var assignment = ReceivedAssignment(dueInDays: -1);
+
+        var result = await SubmitAsync(assignment, NewAudio());
+
+        Assert.Equal(ErrorCodes.PracticeSubmissionPastDue, result.Code);
+        await AssertNothingUploadedAsync();
+    }
+
+    [Theory]
+    [InlineData(null, 0, ErrorCodes.PracticeAudioRequired)]
+    [InlineData("take.m4a", 0, ErrorCodes.PracticeAudioRequired)]
+    [InlineData("take.ogg", 1024, ErrorCodes.PracticeAudioTypeNotAllowed)]
+    [InlineData("take.MP3.exe", 1024, ErrorCodes.PracticeAudioTypeNotAllowed)]
+    [InlineData("take.wav", PracticeAssignmentService.MaxAudioSizeBytes + 1, ErrorCodes.PracticeAudioTooLarge)]
+    public async Task Submit_InvalidAudio_ReturnsCode_Async(string? fileName, long length, string expectedCode)
+    {
+        var assignment = ReceivedAssignment();
+
+        var result = await SubmitAsync(assignment, fileName is null ? null : NewAudio(fileName, length));
+
+        Assert.Equal(expectedCode, result.Code);
+        await AssertNothingUploadedAsync();
+    }
+
+    [Fact]
+    public async Task Submit_UppercaseExtension_IsAccepted_Async()
+    {
+        var assignment = ReceivedAssignment();
+
+        var result = await SubmitAsync(assignment, NewAudio("TAKE.WAV"));
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task Submit_ConcurrentAttempt_DeletesUploadedAudioAndReturnsConflict_Async()
+    {
+        var assignment = ReceivedAssignment();
+        _submissions.TryAddAsync(Arg.Any<PracticeSubmission>(), _ct).Returns(false);
+
+        var result = await SubmitAsync(assignment, NewAudio());
+
+        Assert.Equal(ErrorCodes.PracticeSubmissionConflict, result.Code);
+        await _storage.Received(1).DeleteAsync(StoredAudio, true, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Submit_SaveThrows_DeletesUploadedAudioAndRethrows_Async()
+    {
+        var assignment = ReceivedAssignment();
+        _submissions.TryAddAsync(Arg.Any<PracticeSubmission>(), _ct)
+            .Returns<bool>(_ => throw new InvalidOperationException("db down"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => SubmitAsync(assignment, NewAudio()));
+
+        await _storage.Received(1).DeleteAsync(StoredAudio, true, CancellationToken.None);
     }
 }

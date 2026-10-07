@@ -17,9 +17,15 @@ public class PracticeAssignmentService(
     IGenericRepository<Skill> skillRepository,
     IMemberProfileRepository memberProfileRepository,
     IMemberSkillRepository memberSkillRepository,
+    IPracticeSubmissionRepository practiceSubmissionRepository,
     INotificationService notificationService,
+    IFileStorageService fileStorageService,
     IMapper mapper) : IPracticeAssignmentService
 {
+    public const long MaxAudioSizeBytes = 20 * 1024 * 1024;
+
+    private static readonly string[] AudioExtensions = [".mp3", ".m4a", ".wav"];
+
     public async Task<Result<PracticeAssignmentDto>> CreateAsync(
         CreatePracticeAssignmentRequest request, CancellationToken cancellationToken)
     {
@@ -129,6 +135,77 @@ public class PracticeAssignmentService(
         return assignment is null
             ? Result<PracticeAssignmentDetailDto>.Failure(ErrorCodes.PracticeAssignmentNotFound)
             : Result<PracticeAssignmentDetailDto>.Success(mapper.Map<PracticeAssignmentDetailDto>(assignment));
+    }
+
+    public async Task<Result<PracticeSubmissionDto>> SubmitAsync(
+        Guid userId, Guid assignmentId, CreatePracticeSubmissionRequest request, FileContent? file,
+        CancellationToken cancellationToken)
+    {
+        var member = await memberProfileRepository.GetByUserIdAsync(userId, cancellationToken);
+        if (member is null) return Result<PracticeSubmissionDto>.Failure(ErrorCodes.MemberNotFound);
+
+        // Same scope as GetMineAsync: an assignment the member does not receive is reported as missing.
+        var assignment = await practiceAssignmentRepository.GetByIdForMemberAsync(assignmentId, member.Id, cancellationToken);
+        if (assignment is null) return Result<PracticeSubmissionDto>.Failure(ErrorCodes.PracticeAssignmentNotFound);
+
+        // Submissions holds only the member's newest attempt.
+        var latest = assignment.Submissions.MaxBy(x => x.AttemptNo);
+        if (latest?.Status == SubmissionStatus.Passed)
+            return Result<PracticeSubmissionDto>.Failure(ErrorCodes.PracticeSubmissionAlreadyPassed);
+
+        if (DateTime.UtcNow > assignment.DueDate)
+            return Result<PracticeSubmissionDto>.Failure(ErrorCodes.PracticeSubmissionPastDue);
+
+        if (CheckAudio(file) is { } fileError) return Result<PracticeSubmissionDto>.Failure(fileError);
+
+        var upload = await fileStorageService.UploadAsync(
+            file!.Content, file.FileName, "practice-submissions", isPrivate: true, cancellationToken);
+        if (!upload.IsSuccess) return Result<PracticeSubmissionDto>.Failure(upload.Code!);
+
+        var submission = new PracticeSubmission
+        {
+            Id = Guid.NewGuid(),
+            PracticeAssignmentId = assignment.Id,
+            MemberId = member.Id,
+            AudioPublicId = upload.Value!.PublicId,
+            DurationSeconds = request.DurationSeconds,
+            AttemptNo = (latest?.AttemptNo ?? 0) + 1,
+            SubmittedAt = DateTime.UtcNow,
+            Status = SubmissionStatus.Submitted,
+        };
+
+        bool added;
+        try
+        {
+            added = await practiceSubmissionRepository.TryAddAsync(submission, cancellationToken);
+        }
+        catch
+        {
+            // No row points at the file, so remove it rather than leave an orphan in storage.
+            await fileStorageService.DeleteAsync(submission.AudioPublicId, isPrivate: true, CancellationToken.None);
+            throw;
+        }
+
+        if (!added)
+        {
+            await fileStorageService.DeleteAsync(submission.AudioPublicId, isPrivate: true, CancellationToken.None);
+            return Result<PracticeSubmissionDto>.Failure(ErrorCodes.PracticeSubmissionConflict);
+        }
+
+        var dto = mapper.Map<PracticeSubmissionDto>(submission);
+        dto.AudioUrl = fileStorageService.GetSignedUrl(submission.AudioPublicId);
+        return Result<PracticeSubmissionDto>.Success(dto);
+    }
+
+    /// <summary>Extension and size come from the server-side upload; the client's Content-Type is never trusted.</summary>
+    private static string? CheckAudio(FileContent? file)
+    {
+        if (file is null || file.Length == 0) return ErrorCodes.PracticeAudioRequired;
+
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!AudioExtensions.Contains(extension)) return ErrorCodes.PracticeAudioTypeNotAllowed;
+
+        return file.Length > MaxAudioSizeBytes ? ErrorCodes.PracticeAudioTooLarge : null;
     }
 
     /// <summary>Returns the error code of the first optional reference that is missing or unusable, or null.</summary>

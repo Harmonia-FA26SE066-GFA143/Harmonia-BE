@@ -19,4 +19,12 @@ public interface IPracticeAssignmentService
     /// <summary>One assignment of the calling member; one they do not receive is reported as missing, not forbidden.</summary>
     Task<Result<PracticeAssignmentDetailDto>> GetMineByIdAsync(
         Guid userId, Guid id, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Stores the calling member's recorded audio as their next attempt (UC-09 / FE-11). Allowed until the due
+    /// date while the newest attempt is not Passed.
+    /// </summary>
+    Task<Result<PracticeSubmissionDto>> SubmitAsync(
+        Guid userId, Guid assignmentId, CreatePracticeSubmissionRequest request, FileContent? file,
+        CancellationToken cancellationToken);
 }

@@ -873,6 +873,34 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 - `latestSubmissionStatus` / `latestSubmittedAt` là lần nộp mới nhất **của chính ca viên**; `null` = chưa nộp.
 - Mở file tư liệu qua `api/music-materials` bằng `materialId`.
 
+### Ca viên nộp bản thu — `ChoirMember` (UC-09 / FE-11)
+
+`PracticeSubmissionDto`:
+
+```json
+{
+  "id": "guid",
+  "practiceAssignmentId": "guid",
+  "attemptNo": 2,
+  "submittedAt": "2026-10-10T09:00:00Z",
+  "status": "Submitted",
+  "durationSeconds": 95,
+  "audioUrl": "https://...signed..."
+}
+```
+
+| Method | Path | Body | Thành công | Lỗi |
+|---|---|---|---|---|
+| POST | `/api/practice-assignments/{id}/submissions` | `multipart/form-data`: `file`, `durationSeconds?` | 200 `PracticeSubmissionDto` | 400 `VALIDATION_FAILED`, `PRACTICE_AUDIO_REQUIRED`, `PRACTICE_AUDIO_TYPE_NOT_ALLOWED` · 404 `MEMBER_NOT_FOUND`, `PRACTICE_ASSIGNMENT_NOT_FOUND` · 409 `PRACTICE_SUBMISSION_ALREADY_PASSED`, `PRACTICE_SUBMISSION_PAST_DUE`, `PRACTICE_SUBMISSION_CONFLICT` · 413 `PRACTICE_AUDIO_TOO_LARGE` · 502 `EXTERNAL_STORAGE_FAILED` |
+
+- `file`: `.mp3`, `.m4a`, `.wav`, tối đa 20 MB. Server kiểm đuôi và dung lượng, không tin `Content-Type`.
+- `durationSeconds`: do app ghi âm báo, 1–3600, chỉ để hiển thị.
+- Bài không dành cho ca viên → 404 `PRACTICE_ASSIGNMENT_NOT_FOUND`.
+- Nộp được nhiều lần tới hạn nộp; mỗi lần là một bản thu mới, `attemptNo` tăng dần từ 1, `status = Submitted`.
+  Lần mới nhất đã `Passed` → 409 `PRACTICE_SUBMISSION_ALREADY_PASSED`. Quá `dueDate` → 409 `PRACTICE_SUBMISSION_PAST_DUE`.
+- Hai lần nộp cùng lúc (bấm hai lần) → lần sau nhận 409 `PRACTICE_SUBMISSION_CONFLICT`; tải lại bài tập rồi nộp lại.
+- `audioUrl` là URL ký, hết hạn sau ít phút; cần nghe lại thì gọi lại API. Không gửi thông báo cho ca trưởng.
+
 ---
 
 ## 8. SignalR — `/hubs/notifications`

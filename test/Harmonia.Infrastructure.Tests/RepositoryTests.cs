@@ -931,6 +931,29 @@ public sealed class RepositoryTests : IDisposable
         Assert.Null(await repository.GetByIdForMemberAsync(seed.ForOtherMember, seed.MemberId, _ct));
     }
 
+    // ---- PracticeSubmissionRepository ----
+
+    [Fact]
+    public async Task PracticeSubmission_TryAdd_SameAttemptTwice_SecondReturnsFalse_Async()
+    {
+        var seed = await SeedPracticeAsync();
+        PracticeSubmission Attempt(int attemptNo) => new()
+        {
+            Id = Guid.NewGuid(), PracticeAssignmentId = seed.ForMember, MemberId = seed.MemberId,
+            AttemptNo = attemptNo, AudioPublicId = "audio", SubmittedAt = DateTime.UtcNow,
+        };
+
+        await using (var first = _db.NewContext())
+        {
+            Assert.True(await new PracticeSubmissionRepository(first).TryAddAsync(Attempt(1), _ct));
+        }
+
+        await using var second = _db.NewContext();
+        var repository = new PracticeSubmissionRepository(second);
+        Assert.False(await repository.TryAddAsync(Attempt(1), _ct));
+        Assert.True(await repository.TryAddAsync(Attempt(2), _ct));
+    }
+
     // ---- GenericRepository ----
 
     [Fact]
