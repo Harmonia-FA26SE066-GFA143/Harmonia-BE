@@ -20,7 +20,7 @@ public class MaterialLearningProgressRepository(HarmoniaDbContext dbContext)
         }
 
         progress.Status = status;
-        progress.UpdatedAt = DateTime.UtcNow;
+        progress.UpdatedAt = DateTime.Now;
 
         try
         {
@@ -37,7 +37,7 @@ public class MaterialLearningProgressRepository(HarmoniaDbContext dbContext)
             if (existing is null) throw;
 
             existing.Status = status;
-            existing.UpdatedAt = DateTime.UtcNow;
+            existing.UpdatedAt = DateTime.Now;
             await DbContext.SaveChangesAsync(cancellationToken);
             return existing;
         }

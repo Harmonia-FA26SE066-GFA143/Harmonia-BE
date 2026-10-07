@@ -9,6 +9,6 @@ public class UpdateMyMemberProfileRequestValidator : AbstractValidator<UpdateMyM
     {
         RuleFor(x => x.FullName).NotEmpty().MaximumLength(100);
         RuleFor(x => x.Phone).MaximumLength(20);
-        RuleFor(x => x.DateOfBirth).LessThanOrEqualTo(_ => DateOnly.FromDateTime(DateTime.UtcNow));
+        RuleFor(x => x.DateOfBirth).LessThanOrEqualTo(_ => DateOnly.FromDateTime(DateTime.Now));
     }
 }

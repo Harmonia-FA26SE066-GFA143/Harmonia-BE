@@ -65,7 +65,7 @@ public class AuditableEntityInterceptor(ICurrentUserService currentUser) : SaveC
 
         context.ChangeTracker.DetectChanges();
 
-        var now = DateTime.UtcNow;
+        var now = DateTime.Now;
         var userId = currentUser.UserId;
 
         // Build log rows before stamping, so the diff reflects only what the caller changed.

@@ -28,7 +28,7 @@ public class AuthServiceTests
 
     public AuthServiceTests()
     {
-        _jwtTokenService.GenerateAccessToken(Arg.Any<User>()).Returns(("access", DateTime.UtcNow.AddMinutes(30)));
+        _jwtTokenService.GenerateAccessToken(Arg.Any<User>()).Returns(("access", DateTime.Now.AddMinutes(30)));
         _jwtTokenService.GenerateRefreshToken().Returns("raw-token");
         _jwtTokenService.HashRefreshToken(Arg.Any<string>()).Returns(ci => "hash:" + ci.Arg<string>());
 
@@ -178,7 +178,7 @@ public class AuthServiceTests
         var user = NewUser();
         var old = new RefreshToken
         {
-            UserId = user.Id, User = user, TokenHash = "hash:old", ExpiresAt = DateTime.UtcNow.AddDays(1),
+            UserId = user.Id, User = user, TokenHash = "hash:old", ExpiresAt = DateTime.Now.AddDays(1),
             DeviceId = "d1", Platform = DevicePlatform.iOS,
         };
         _userRepository.GetRefreshTokenByHashAsync("hash:old", _ct).Returns(old);
@@ -198,7 +198,7 @@ public class AuthServiceTests
         var user = NewUser(isActive: false);
         var old = new RefreshToken
         {
-            UserId = user.Id, User = user, TokenHash = "hash:old", ExpiresAt = DateTime.UtcNow.AddDays(1),
+            UserId = user.Id, User = user, TokenHash = "hash:old", ExpiresAt = DateTime.Now.AddDays(1),
         };
         _userRepository.GetRefreshTokenByHashAsync("hash:old", _ct).Returns(old);
 
@@ -215,7 +215,7 @@ public class AuthServiceTests
     {
         var old = new RefreshToken
         {
-            User = NewUser(), ExpiresAt = DateTime.UtcNow.AddDays(1), RevokedAt = DateTime.UtcNow.AddMinutes(-1),
+            User = NewUser(), ExpiresAt = DateTime.Now.AddDays(1), RevokedAt = DateTime.Now.AddMinutes(-1),
         };
         _userRepository.GetRefreshTokenByHashAsync("hash:old", _ct).Returns(old);
 
@@ -227,7 +227,7 @@ public class AuthServiceTests
     [Fact]
     public async Task RefreshTokenAsync_ExpiredToken_Throws_Async()
     {
-        var old = new RefreshToken { User = NewUser(), ExpiresAt = DateTime.UtcNow.AddSeconds(-1) };
+        var old = new RefreshToken { User = NewUser(), ExpiresAt = DateTime.Now.AddSeconds(-1) };
         _userRepository.GetRefreshTokenByHashAsync("hash:old", _ct).Returns(old);
 
         await Assert.ThrowsAsync<RefreshTokenExpiredException>(
@@ -247,7 +247,7 @@ public class AuthServiceTests
     [Fact]
     public async Task LogoutAsync_ValidToken_MarksRevokedAt_Async()
     {
-        var token = new RefreshToken { ExpiresAt = DateTime.UtcNow.AddDays(1) };
+        var token = new RefreshToken { ExpiresAt = DateTime.Now.AddDays(1) };
         _userRepository.GetRefreshTokenByHashAsync("hash:t", _ct).Returns(token);
 
         var result = await _sut.LogoutAsync(new LogoutRequest { RefreshToken = "t" }, _ct);
@@ -353,8 +353,8 @@ public class AuthServiceTests
         await _userRepository.Received(1).AddPasswordResetTokenAsync(
             Arg.Is<PasswordResetToken>(t => t.UserId == user.Id
                 && t.TokenHash == "hash:raw-token"
-                && t.ExpiresAt > DateTime.UtcNow.AddMinutes(59)
-                && t.ExpiresAt <= DateTime.UtcNow.AddHours(1)),
+                && t.ExpiresAt > DateTime.Now.AddMinutes(59)
+                && t.ExpiresAt <= DateTime.Now.AddHours(1)),
             _ct);
     }
 
@@ -404,7 +404,7 @@ public class AuthServiceTests
     [Fact]
     public async Task ResetPasswordAsync_InactiveUser_ReturnsInvalid_Async()
     {
-        var token = new PasswordResetToken { User = NewUser(isActive: false), ExpiresAt = DateTime.UtcNow.AddHours(1) };
+        var token = new PasswordResetToken { User = NewUser(isActive: false), ExpiresAt = DateTime.Now.AddHours(1) };
         _userRepository.GetPasswordResetTokenByHashAsync("hash:t", _ct).Returns(token);
 
         var result = await _sut.ResetPasswordAsync(new ResetPasswordRequest { Token = "t", NewPassword = "NewPass123" }, _ct);
@@ -418,7 +418,7 @@ public class AuthServiceTests
     {
         var token = new PasswordResetToken
         {
-            User = NewUser(), ExpiresAt = DateTime.UtcNow.AddHours(1), UsedAt = DateTime.UtcNow.AddMinutes(-5),
+            User = NewUser(), ExpiresAt = DateTime.Now.AddHours(1), UsedAt = DateTime.Now.AddMinutes(-5),
         };
         _userRepository.GetPasswordResetTokenByHashAsync("hash:t", _ct).Returns(token);
 
@@ -430,7 +430,7 @@ public class AuthServiceTests
     [Fact]
     public async Task ResetPasswordAsync_ExpiredToken_Throws_Async()
     {
-        var token = new PasswordResetToken { User = NewUser(), ExpiresAt = DateTime.UtcNow.AddSeconds(-1) };
+        var token = new PasswordResetToken { User = NewUser(), ExpiresAt = DateTime.Now.AddSeconds(-1) };
         _userRepository.GetPasswordResetTokenByHashAsync("hash:t", _ct).Returns(token);
 
         await Assert.ThrowsAsync<PasswordResetTokenExpiredException>(
@@ -441,7 +441,7 @@ public class AuthServiceTests
     public async Task ResetPasswordAsync_ValidToken_MarksUsedUpdatesHashAndRevokesAllTokens_Async()
     {
         var user = NewUser();
-        var token = new PasswordResetToken { UserId = user.Id, User = user, ExpiresAt = DateTime.UtcNow.AddHours(1) };
+        var token = new PasswordResetToken { UserId = user.Id, User = user, ExpiresAt = DateTime.Now.AddHours(1) };
         _userRepository.GetPasswordResetTokenByHashAsync("hash:t", _ct).Returns(token);
         _passwordHasher.HashPassword(user, "NewPass123").Returns("new-hash");
 

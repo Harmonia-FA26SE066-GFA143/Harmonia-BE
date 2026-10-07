@@ -67,7 +67,7 @@ public class LiturgicalEventService(
         }
 
         liturgicalEvent.Status = EventStatus.Published;
-        liturgicalEvent.PublishedAt = DateTime.UtcNow;
+        liturgicalEvent.PublishedAt = DateTime.Now;
         await liturgicalEventRepository.SaveChangesAsync(cancellationToken);
 
         var recipientUserIds = await userRepository.GetActiveUserIdsByRolesAsync(

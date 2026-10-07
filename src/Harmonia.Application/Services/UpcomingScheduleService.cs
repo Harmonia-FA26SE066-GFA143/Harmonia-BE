@@ -19,7 +19,7 @@ public class UpcomingScheduleService(
         CancellationToken cancellationToken)
     {
         var events = await liturgicalEventRepository.GetUpcomingPublishedAsync(
-            DateOnly.FromDateTime(DateTime.UtcNow), cancellationToken);
+            DateOnly.FromDateTime(DateTime.Now), cancellationToken);
 
         return Result<List<LiturgicalEventSummaryDto>>.Success(
             mapper.Map<List<LiturgicalEventSummaryDto>>(events));
@@ -28,7 +28,7 @@ public class UpcomingScheduleService(
     public async Task<Result<List<RehearsalSummaryDto>>> GetUpcomingRehearsalsAsync(
         CancellationToken cancellationToken)
     {
-        var rehearsals = await rehearsalRepository.GetUpcomingAsync(DateTime.UtcNow, cancellationToken);
+        var rehearsals = await rehearsalRepository.GetUpcomingAsync(DateTime.Now, cancellationToken);
 
         return Result<List<RehearsalSummaryDto>>.Success(mapper.Map<List<RehearsalSummaryDto>>(rehearsals));
     }

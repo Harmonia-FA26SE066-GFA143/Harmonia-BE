@@ -40,7 +40,7 @@ public class MemberSkillService(
             SkillId = skill.Id,
             Level = request.Level,
             Status = ApprovalStatus.Pending,
-            DeclaredAt = DateTime.UtcNow
+            DeclaredAt = DateTime.Now
         };
 
         if (!await memberSkillRepository.TryAddAsync(memberSkill, cancellationToken))
@@ -109,7 +109,7 @@ public class MemberSkillService(
 
         memberSkill.Status = decision;
         memberSkill.ApprovedBy = directorUserId;
-        memberSkill.ApprovedAt = DateTime.UtcNow;
+        memberSkill.ApprovedAt = DateTime.Now;
         memberSkill.RejectReason = rejectReason;
 
         // Another director reviewed the row between our read and our save; theirs stands.

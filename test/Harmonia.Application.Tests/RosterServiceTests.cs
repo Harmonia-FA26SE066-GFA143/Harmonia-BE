@@ -45,7 +45,7 @@ public class RosterServiceTests
         _event = new LiturgicalEvent
         {
             Id = Guid.NewGuid(),
-            EventDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(3),
+            EventDate = DateOnly.FromDateTime(DateTime.Now).AddDays(3),
             Status = EventStatus.Published,
         };
         _entrance = new SongListItem { Id = Guid.NewGuid(), Song = new Song { Title = "Nhap le" } };
@@ -225,7 +225,7 @@ public class RosterServiceTests
     [Fact]
     public async Task Suggest_PastEvent_ReturnsEventAlreadyPassed_Async()
     {
-        _event.EventDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1);
+        _event.EventDate = DateOnly.FromDateTime(DateTime.Now).AddDays(-1);
 
         Assert.Equal(ErrorCodes.EventAlreadyPassed, (await SuggestAsync()).Code);
     }
@@ -512,7 +512,7 @@ public class RosterServiceTests
     {
         var line = SopranoLine(_binh);
         RosterWith(RosterStatus.Suggested, line);
-        _event.EventDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1);
+        _event.EventDate = DateOnly.FromDateTime(DateTime.Now).AddDays(-1);
 
         Assert.Equal(ErrorCodes.EventAlreadyPassed, (await _sut.RemoveAssignmentAsync(line.Id, _ct)).Code);
     }
@@ -579,7 +579,7 @@ public class RosterServiceTests
     public async Task Finalize_PastEvent_ReturnsEventAlreadyPassed_Async()
     {
         var roster = FinalizableRoster(RosterStatus.Suggested, SopranoLineFor(_an));
-        _event.EventDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1);
+        _event.EventDate = DateOnly.FromDateTime(DateTime.Now).AddDays(-1);
 
         Assert.Equal(ErrorCodes.EventAlreadyPassed, (await _sut.FinalizeAsync(roster.Id, _ct)).Code);
     }
@@ -659,7 +659,7 @@ public class RosterServiceTests
     [Fact]
     public async Task SendNotifications_NoSelection_NotifiesOnlyMembersNotNotifiedYet_Async()
     {
-        var an = NotifiableLine(_an, notifiedAt: DateTime.UtcNow.AddDays(-1));
+        var an = NotifiableLine(_an, notifiedAt: DateTime.Now.AddDays(-1));
         var binh = NotifiableLine(_binh);
         var roster = NotifiableRoster(RosterStatus.Finalized, an, binh);
 
@@ -702,7 +702,7 @@ public class RosterServiceTests
     public async Task SendNotifications_PastEvent_ReturnsEventAlreadyPassed_Async()
     {
         var roster = NotifiableRoster(RosterStatus.Finalized, NotifiableLine(_an));
-        _event.EventDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1);
+        _event.EventDate = DateOnly.FromDateTime(DateTime.Now).AddDays(-1);
 
         Assert.Equal(ErrorCodes.EventAlreadyPassed, (await NotifyAsync(roster, _an)).Code);
     }

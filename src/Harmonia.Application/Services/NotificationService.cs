@@ -29,7 +29,7 @@ public class NotificationService(
             Content = request.Content,
             ReferenceType = request.ReferenceType,
             ReferenceId = request.ReferenceId,
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = DateTime.Now,
             Recipients = recipientUserIds
                 .Select(userId => new NotificationRecipient { Id = Guid.NewGuid(), UserId = userId })
                 .ToList(),
@@ -67,7 +67,7 @@ public class NotificationService(
         if (!recipient.IsRead)
         {
             recipient.IsRead = true;
-            recipient.ReadAt = DateTime.UtcNow;
+            recipient.ReadAt = DateTime.Now;
             await notificationRepository.SaveChangesAsync(cancellationToken);
         }
 

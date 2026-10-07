@@ -125,7 +125,7 @@ public class NotificationServiceTests
     {
         var userId = Guid.NewGuid();
         var notificationId = Guid.NewGuid();
-        var readAt = DateTime.UtcNow.AddDays(-1);
+        var readAt = DateTime.Now.AddDays(-1);
         var recipient = new NotificationRecipient { IsRead = true, ReadAt = readAt };
         _repository.GetRecipientAsync(notificationId, userId, _ct).Returns(recipient);
 

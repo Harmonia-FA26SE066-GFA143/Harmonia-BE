@@ -61,7 +61,7 @@ public sealed class RepositoryTests : IDisposable
     {
         var user = await _db.AddUserAsync("a@test.com", cancellationToken: _ct);
         var other = await _db.AddUserAsync("b@test.com", cancellationToken: _ct);
-        var alreadyRevokedAt = DateTime.UtcNow.AddDays(-2);
+        var alreadyRevokedAt = DateTime.Now.AddDays(-2);
         await using (var seed = _db.NewContext())
         {
             seed.RefreshTokens.AddRange(
@@ -97,7 +97,7 @@ public sealed class RepositoryTests : IDisposable
             seed.PasswordResetTokens.AddRange(
                 NewResetToken(user.Id, "unused1"),
                 NewResetToken(user.Id, "unused2"),
-                NewResetToken(user.Id, "used", usedAt: DateTime.UtcNow.AddHours(-1)),
+                NewResetToken(user.Id, "used", usedAt: DateTime.Now.AddHours(-1)),
                 NewResetToken(other.Id, "other"));
             await seed.SaveChangesAsync(_ct);
         }
@@ -172,7 +172,7 @@ public sealed class RepositoryTests : IDisposable
     {
         var owner = await _db.AddUserAsync("a@test.com", cancellationToken: _ct);
         var stranger = await _db.AddUserAsync("b@test.com", cancellationToken: _ct);
-        var notification = NewNotification("n", DateTime.UtcNow, owner.Id);
+        var notification = NewNotification("n", DateTime.Now, owner.Id);
         await using (var seed = _db.NewContext())
         {
             seed.Notifications.Add(notification);
@@ -194,10 +194,10 @@ public sealed class RepositoryTests : IDisposable
         await using (var seed = _db.NewContext())
         {
             seed.Notifications.AddRange(
-                NewNotification("1", DateTime.UtcNow, user.Id),
-                NewNotification("2", DateTime.UtcNow, user.Id),
-                NewNotification("3", DateTime.UtcNow, user.Id, isRead: true),
-                NewNotification("4", DateTime.UtcNow, other.Id));
+                NewNotification("1", DateTime.Now, user.Id),
+                NewNotification("2", DateTime.Now, user.Id),
+                NewNotification("3", DateTime.Now, user.Id, isRead: true),
+                NewNotification("4", DateTime.Now, other.Id));
             await seed.SaveChangesAsync(_ct);
         }
 
@@ -624,7 +624,7 @@ public sealed class RepositoryTests : IDisposable
         var progress = new MaterialLearningProgress
         {
             Id = Guid.NewGuid(), MemberId = memberId, MaterialId = materialId,
-            Status = status, UpdatedAt = DateTime.UtcNow.AddDays(-1),
+            Status = status, UpdatedAt = DateTime.Now.AddDays(-1),
         };
         await using var context = _db.NewContext();
         context.MaterialLearningProgresses.Add(progress);
@@ -701,7 +701,7 @@ public sealed class RepositoryTests : IDisposable
     }
 
     private static MemberSkill NewMemberSkill(Guid memberId, Guid skillId, ApprovalStatus status) =>
-        new() { Id = Guid.NewGuid(), MemberId = memberId, SkillId = skillId, Status = status, DeclaredAt = DateTime.UtcNow };
+        new() { Id = Guid.NewGuid(), MemberId = memberId, SkillId = skillId, Status = status, DeclaredAt = DateTime.Now };
 
     private static MusicMaterial NewMaterial(
         Guid songId, MaterialType type, string title, Guid? targetSkillId, bool isActive = true) =>
@@ -772,7 +772,7 @@ public sealed class RepositoryTests : IDisposable
     {
         var (memberId, skillId) = await SeedMemberAndSkillAsync(_ct);
         var older = NewMemberSkill(memberId, skillId, ApprovalStatus.Rejected);
-        older.DeclaredAt = DateTime.UtcNow.AddDays(-10);
+        older.DeclaredAt = DateTime.Now.AddDays(-10);
         var newer = NewMemberSkill(memberId, skillId, ApprovalStatus.Pending);
         await using (var seed = _db.NewContext())
         {
@@ -867,7 +867,7 @@ public sealed class RepositoryTests : IDisposable
         var soprano = new Skill { Id = Guid.NewGuid(), CategoryId = SkillCategoryIds.Vocal, Name = "Soprano" };
         var alto = new Skill { Id = Guid.NewGuid(), CategoryId = SkillCategoryIds.Vocal, Name = "Alto" };
         var location = new WorshipLocation { Id = Guid.NewGuid(), Name = "Main church" };
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(DateTime.Now);
         LiturgicalEvent NewEvent(int days) => new() { Id = Guid.NewGuid(), EventDate = today.AddDays(days), LocationId = location.Id };
         var upcoming = NewEvent(5);
         var recent = NewEvent(-10);
@@ -913,7 +913,7 @@ public sealed class RepositoryTests : IDisposable
     public async Task CountRecentServices_CountsDistinctEventsInsideTheWindow_Async()
     {
         var seed = await SeedRosterAsync();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(DateTime.Now);
         await using var context = _db.NewContext();
 
         var counts = await new ServiceRosterRepository(context).CountRecentServicesAsync(
@@ -944,14 +944,14 @@ public sealed class RepositoryTests : IDisposable
         new()
         {
             Id = Guid.NewGuid(), UserId = userId, TokenHash = hash,
-            ExpiresAt = DateTime.UtcNow.AddDays(7), RevokedAt = revokedAt,
+            ExpiresAt = DateTime.Now.AddDays(7), RevokedAt = revokedAt,
         };
 
     private static PasswordResetToken NewResetToken(Guid userId, string hash, DateTime? usedAt = null) =>
         new()
         {
             Id = Guid.NewGuid(), UserId = userId, TokenHash = hash,
-            ExpiresAt = DateTime.UtcNow.AddHours(1), UsedAt = usedAt,
+            ExpiresAt = DateTime.Now.AddHours(1), UsedAt = usedAt,
         };
 
     private static Notification NewNotification(string title, DateTime createdAt, Guid userId, bool isRead = false) =>

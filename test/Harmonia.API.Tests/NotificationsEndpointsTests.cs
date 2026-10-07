@@ -20,7 +20,7 @@ public class NotificationsEndpointsTests(HarmoniaApiFactory factory) : IClassFix
                 var userId = await db.Users.Where(u => u.Email == recipientEmail).Select(u => u.Id).SingleAsync(ct);
                 var notification = new Notification
                 {
-                    Id = Guid.NewGuid(), Title = title, Content = "c", CreatedAt = DateTime.UtcNow,
+                    Id = Guid.NewGuid(), Title = title, Content = "c", CreatedAt = DateTime.Now,
                     Recipients = [new NotificationRecipient { Id = Guid.NewGuid(), UserId = userId }],
                 };
                 db.Notifications.Add(notification);

@@ -343,6 +343,74 @@ Chưa có kỹ năng nào → `[]`.
 
 ---
 
+## 4b. Lịch phụng vụ & sự kiện — `api/liturgical-days`, `api/liturgical-events` · role `ParishPriest` · lịch sắp tới `api/schedule`: mọi role (UC-12 / UC-04)
+
+### `LiturgicalDayDto`
+
+```json
+{ "date": "2026-12-25", "celebrationName": "Lễ Giáng Sinh", "rank": "Lễ trọng", "seasonName": "Giáng Sinh" }
+```
+
+### `LiturgicalEventDto`
+
+```json
+{
+  "id": "guid",
+  "eventDate": "2026-12-25",
+  "time": "08:00:00",
+  "liturgicalSeasonId": "guid",
+  "massTypeId": "guid",
+  "ceremonyTypeId": null,
+  "categoryId": "guid",
+  "locationId": "guid",
+  "locationName": "Nhà thờ chính",
+  "title": "Thánh lễ Giáng Sinh",
+  "specialRequirements": null,
+  "status": "Draft",
+  "publishedAt": null
+}
+```
+
+`status`: `Draft` | `Published` | `Cancelled`. `LiturgicalEventSummaryDto` = `{ id, eventDate, time, title, locationName, status }`.
+`RehearsalSummaryDto` = `{ id, startTime, endTime, locationName, note }`.
+
+| Method | Route | Body | Thành công | Lỗi |
+|---|---|---|---|---|
+| GET | `/api/liturgical-days/{date}` (`date` dạng `yyyy-MM-dd`) | — | 200 `LiturgicalDayDto` | 404 `CALENDAR_DAY_NOT_FOUND` |
+| POST | `/api/liturgical-days/import` | `multipart/form-data`: `file` (.ics) | 200 số ngày mới thêm (`int`) | 400 `CALENDAR_FILE_REQUIRED`, `CALENDAR_FILE_TYPE_NOT_ALLOWED`, `CALENDAR_FILE_INVALID` · 413 `CALENDAR_FILE_TOO_LARGE` |
+| POST | `/api/liturgical-events` | `{ "eventDate", "time", "liturgicalSeasonId?", "massTypeId?", "ceremonyTypeId?", "categoryId?", "locationId", "title?", "specialRequirements?" }` | 200 `LiturgicalEventDto` | 400 `VALIDATION_FAILED` (`EVENT_TYPE_REQUIRED`) · 409 `EVENT_SLOT_TAKEN` |
+| PATCH | `/api/liturgical-events/{id}/publish` | — | 200 `LiturgicalEventDto` | 404 `EVENT_NOT_FOUND` · 409 `EVENT_ALREADY_PUBLISHED`, `EVENT_CANCELLED` |
+| GET | `/api/schedule/events` · mọi role | — | 200 `LiturgicalEventSummaryDto[]` | — |
+| GET | `/api/schedule/rehearsals` · mọi role | — | 200 `RehearsalSummaryDto[]` | — |
+
+**Ngày phụng vụ (UC-12 / FE-15)**
+
+- Ngày phụng vụ là bản cache của lịch Công giáo, nạp bằng file `.ics`. Chỉ nhận đuôi `.ics`, tối đa **2 MB**;
+  server chỉ xét đuôi và dung lượng thật, bỏ qua `Content-Type`.
+- Import chỉ **thêm** ngày chưa có; ngày đã có giữ nguyên, không ghi đè. Kết quả là số ngày mới thêm (`0` nếu
+  file không có ngày nào mới). File không đọc được hoặc không có ngày nào → 400 `CALENDAR_FILE_INVALID`.
+- `rank`, `seasonName` có thể `null`.
+
+**Sự kiện (UC-12 / FE-16)**
+
+- Phải có `massTypeId` **hoặc** `ceremonyTypeId`, thiếu cả hai → 400 `VALIDATION_FAILED` với
+  `errors` chứa `EVENT_TYPE_REQUIRED`. `title` tối đa 200, `specialRequirements` tối đa 1000 ký tự.
+- Một ngày có nhiều sự kiện được, nhưng trùng cả ngày + giờ + địa điểm → 409 `EVENT_SLOT_TAKEN`.
+- Sự kiện mới luôn ở `Draft`. Công bố (`publish`) chuyển sang `Published`, ghi `publishedAt`, rồi gửi
+  notification `type = EventPublished` cho mọi ca trưởng và ca viên đang hoạt động,
+  `referenceType = "LiturgicalEvent"`, `referenceId` = id sự kiện (S-05).
+- Mỗi sự kiện công bố riêng (D6). Ca viên chỉ thấy sự kiện `Published`.
+- Hiện tại `locationName` trong response của `POST` và `publish` là `null` (server chưa nạp địa điểm);
+  lấy tên địa điểm từ `GET /api/lookups/worship-locations` theo `locationId`.
+
+**Lịch sắp tới (UC-04 / FE-05)**
+
+- `events`: sự kiện `Published` từ hôm nay trở đi, sắp theo ngày rồi giờ.
+- `rehearsals`: buổi tập bắt đầu từ thời điểm gọi trở đi, sắp theo giờ bắt đầu. `locationName`, `note` có thể `null`.
+- Không phân trang — trả mảng; không có gì → `[]`.
+
+---
+
 ## 5. Notifications — `api/notifications` · mọi role đã đăng nhập
 
 Chỉ thao tác trên thông báo **của chính người gọi**.

@@ -40,7 +40,7 @@ public class MemberSkillServiceTests
         _memberSkills.GetWithSkillAsync(Arg.Any<Guid>(), _ct).Returns(call => new MemberSkill
         {
             Id = call.Arg<Guid>(), MemberId = _member.Id, SkillId = _tenor.Id, Skill = _tenor,
-            Level = SkillLevel.Intermediate, Status = ApprovalStatus.Pending, DeclaredAt = DateTime.UtcNow,
+            Level = SkillLevel.Intermediate, Status = ApprovalStatus.Pending, DeclaredAt = DateTime.Now,
         });
     }
 
@@ -215,7 +215,7 @@ public class MemberSkillServiceTests
         var row = new MemberSkill
         {
             Id = Guid.NewGuid(), MemberId = _member.Id, Member = _member, SkillId = _tenor.Id, Skill = _tenor,
-            Status = status, DeclaredAt = DateTime.UtcNow,
+            Status = status, DeclaredAt = DateTime.Now,
         };
         _memberSkills.GetForReviewAsync(row.Id, _ct).Returns(row);
         _memberSkills.TrySaveReviewAsync(row, _ct).Returns(true);

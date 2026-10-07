@@ -15,7 +15,7 @@ public class JwtTokenService(IOptions<JwtOptions> options) : IJwtTokenService
 
     public (string Token, DateTime ExpiresAt) GenerateAccessToken(User user)
     {
-        var expiresAt = DateTime.UtcNow.AddMinutes(_options.ExpiryMinutes);
+        var expiresAt = DateTime.Now.AddMinutes(_options.ExpiryMinutes);
 
         var claims = new[]
         {
@@ -38,7 +38,7 @@ public class JwtTokenService(IOptions<JwtOptions> options) : IJwtTokenService
 
     public string GenerateRefreshToken() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
 
-    public DateTime GetRefreshTokenExpiry() => DateTime.UtcNow.AddDays(_options.RefreshTokenExpiryDays);
+    public DateTime GetRefreshTokenExpiry() => DateTime.Now.AddDays(_options.RefreshTokenExpiryDays);
 
     public string HashRefreshToken(string rawToken) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawToken)));
