@@ -7,6 +7,7 @@ using Harmonia.Domain.Common;
 using Harmonia.Domain.Entities;
 using Harmonia.Domain.Enums;
 using System;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -16,6 +17,7 @@ public class UserService(
 	IUserRepository userRepository,
 	IMemberProfileRepository memberProfileRepository,
 	IPasswordHasherService passwordHasherService,
+	IEmailSender emailSender,
 	ICurrentUserService currentUserService,
 	IMapper mapper) : IUserService
 {
@@ -49,9 +51,11 @@ public class UserService(
 		{
 			Id = Guid.NewGuid(),
 			Email = request.Email,
-			FullName = request.FullName.Trim(),
+			FullName = request.FullName?.Trim() ?? string.Empty,
+			Phone = NormalizePhone(request.Phone),
 			RoleId = role.Id,
 			IsActive = true,
+			IsPasswordChangeRequired = true,
 		};
 		user.PasswordHash = passwordHasherService.HashPassword(user, request.Password);
 		if (role.Name == RoleNames.ChoirMember)
@@ -59,6 +63,17 @@ public class UserService(
 
 		await userRepository.AddAsync(user, ct);
 		await userRepository.SaveChangesAsync(ct);
+
+		// The result is ignored on purpose: the account exists and the Admin who typed the password can still
+		// pass it on; the sender already logs the failure.
+		await emailSender.SendAsync(
+			user.Email,
+			"Harmonia - Your account",
+			"<p>An account has been created for you on Harmonia.</p>"
+				+ $"<p>Email: <b>{WebUtility.HtmlEncode(user.Email)}</b><br/>Password: <b>{WebUtility.HtmlEncode(request.Password)}</b></p>"
+				+ "<p>You will be asked to choose a new password the first time you sign in.</p>",
+			ct);
+
 		return Result<UserDto>.Success(mapper.Map<UserDto>(user));
 	}
 
@@ -71,7 +86,21 @@ public class UserService(
 			return Result<UserDto>.Failure(ErrorCodes.UserEmailAlreadyExists);
 
 		user.Email = request.Email;
-		user.FullName = request.FullName.Trim();
+		user.FullName = request.FullName?.Trim() ?? string.Empty;
+		user.Phone = NormalizePhone(request.Phone);
+		await userRepository.SaveChangesAsync(ct);
+		return Result<UserDto>.Success(mapper.Map<UserDto>(user));
+	}
+
+	public Task<Result<UserDto>> GetMeAsync(Guid userId, CancellationToken ct) => GetByIdAsync(userId, ct);
+
+	public async Task<Result<UserDto>> UpdateMeAsync(Guid userId, UpdateMyUserRequest request, CancellationToken ct)
+	{
+		var user = await userRepository.GetByIdAsync(userId, ct);
+		if (user is null) return Result<UserDto>.Failure(ErrorCodes.UserNotFound);
+
+		user.FullName = request.FullName?.Trim() ?? string.Empty;
+		user.Phone = NormalizePhone(request.Phone);
 		await userRepository.SaveChangesAsync(ct);
 		return Result<UserDto>.Success(mapper.Map<UserDto>(user));
 	}
@@ -134,6 +163,8 @@ public class UserService(
 		await userRepository.SaveChangesAsync(ct);
 		return Result<UserDto>.Success(mapper.Map<UserDto>(user));
 	}
+
+	private static string? NormalizePhone(string? phone) => string.IsNullOrWhiteSpace(phone) ? null : phone.Trim();
 
 	private static MemberProfile NewMemberProfile(Guid userId) => new()
 	{

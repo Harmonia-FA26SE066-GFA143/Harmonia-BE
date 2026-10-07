@@ -10,6 +10,7 @@ public static class ControllersExtensions
         services
             .AddControllers(options =>
             {
+                options.Filters.Add<PasswordChangeRequiredFilter>();
                 options.Filters.Add<ValidationFilter>();
 
                 // Required-ness is decided by FluentValidation, which carries our error codes.

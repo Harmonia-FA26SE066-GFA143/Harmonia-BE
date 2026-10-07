@@ -22,6 +22,7 @@ public class MemberProfilesEndpointsTests(HarmoniaApiFactory factory) : IClassFi
         var response = await admin.PostAsJsonAsync(
             "api/users", new { email, fullName, password = HarmoniaApiFactory.Password, roleName }, cancellationToken);
         response.EnsureSuccessStatusCode();
+        await factory.ClearPasswordChangeRequiredAsync(email, cancellationToken);
         return (await response.Content.ReadFromJsonAsync<UserDto>(TestJson.Options, cancellationToken))!;
     }
 

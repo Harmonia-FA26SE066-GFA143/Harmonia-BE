@@ -36,6 +36,8 @@ public static class ErrorCodes
 
     public const string AuthAccountInactive = "AUTH_ACCOUNT_INACTIVE";
 
+    public const string AuthPasswordChangeRequired = "AUTH_PASSWORD_CHANGE_REQUIRED";
+
     public const string AuthTokenInvalid = "AUTH_TOKEN_INVALID";
 
     public const string AuthTokenExpired = "AUTH_TOKEN_EXPIRED";

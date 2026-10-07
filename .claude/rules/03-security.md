@@ -47,6 +47,11 @@
   `PasswordReset__MobileUrl` tuỳ `Platform` của request.
   Phát token mới thì xoá mọi token chưa dùng của user — chỉ link mới nhất còn hiệu lực.
 - Đổi hoặc đặt lại mật khẩu thành công → thu hồi toàn bộ `RefreshToken` của user.
+- Admin tạo tài khoản → mật khẩu Admin nhập được gửi tới email người dùng (chốt 2026-10-07) và
+  `User.IsPasswordChangeRequired = true`; đổi hoặc đặt lại mật khẩu thì về `false`. Không ghi mật khẩu
+  vào log. Cờ đi trong access token (claim `pwd_change_required`); `PasswordChangeRequiredFilter` trả
+  403 `AUTH_PASSWORD_CHANGE_REQUIRED` cho mọi action, trừ action gắn `[AllowWhenPasswordChangeRequired]`
+  (change-password, logout, logout-all, me). Thêm action mới cho người chưa đổi mật khẩu thì gắn attribute này.
 - `forgot-password` luôn trả 204 dù email có tồn tại hay không — không tiết lộ
   email nào đã đăng ký. Không có mã lỗi cho trường hợp này.
 - Đăng nhập sai luôn trả `AUTH_INVALID_CREDENTIALS`, không phân biệt sai email hay sai mật khẩu.
@@ -75,8 +80,8 @@
   thuộc `SkillCategory` = Instrument.
 - Chỉ `ChoirDirector` duyệt `MemberSkill`, tạo `Rehearsal`, chốt `ServiceRoster`.
   Chỉ `ParishPriest` tạo `SongListReview`. Chỉ `Admin` đụng `User`, `Role`,
-  `SystemSetting` và 9 bảng lookup. Ngoại lệ duy nhất: ca viên tự sửa `User.FullName`
-  của chính mình qua `PUT api/member-profiles/me` (chốt 2026-10-03).
+  `SystemSetting` và 9 bảng lookup. Ngoại lệ: mọi role tự sửa `User.FullName` và `User.Phone`
+  của chính mình qua `PUT api/auth/me` (ca viên còn qua `PUT api/member-profiles/me`) (chốt 2026-10-07).
 - **Kiểm quyền hai tầng**: attribute chặn theo role, service chặn theo quyền sở hữu bản ghi.
   `ICurrentUserService` cho biết ai đang gọi.
 - Ca viên chỉ đọc/sửa bản ghi **của chính mình**: `MemberSkill`, `EventParticipation`,

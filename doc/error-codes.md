@@ -82,6 +82,7 @@ Bốn mã lookup dùng chung cho 9 bảng danh mục (`Role`, `SkillCategory`,
 |---|---|---|
 | `AUTH_INVALID_CREDENTIALS` | 401 | Sai tài khoản hoặc mật khẩu |
 | `AUTH_ACCOUNT_INACTIVE` | 403 | Tài khoản đã bị vô hiệu hoá |
+| `AUTH_PASSWORD_CHANGE_REQUIRED` | 403 | Bạn cần đổi mật khẩu trước khi tiếp tục |
 | `AUTH_TOKEN_INVALID` | 401 | Phiên đăng nhập không hợp lệ |
 | `AUTH_TOKEN_EXPIRED` | 401 | Phiên đăng nhập đã hết hạn |
 | `AUTH_REFRESH_TOKEN_NOT_FOUND` | 401 | Phiên đăng nhập không tồn tại |

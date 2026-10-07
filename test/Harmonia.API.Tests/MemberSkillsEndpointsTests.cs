@@ -23,6 +23,7 @@ public class MemberSkillsEndpointsTests(HarmoniaApiFactory factory) : IClassFixt
             new { email, fullName = "Skill Member", password = HarmoniaApiFactory.Password, roleName = RoleNames.ChoirMember },
             cancellationToken);
         response.EnsureSuccessStatusCode();
+        await factory.ClearPasswordChangeRequiredAsync(email, cancellationToken);
         return await factory.CreateClientAsAsync(email, cancellationToken);
     }
 

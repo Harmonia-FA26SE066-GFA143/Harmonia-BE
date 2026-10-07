@@ -99,9 +99,17 @@ Không có đăng ký công khai; tài khoản do Admin tạo.
   "accessToken": "eyJ...",
   "accessTokenExpiresAt": "2026-10-01T08:30:00Z",
   "refreshToken": "q8x...",
-  "user": { "id": "guid", "email": "a@b.com", "fullName": "Nguyễn Văn A", "roleName": "ChoirMember" }
+  "user": { "id": "guid", "email": "a@b.com", "fullName": "Nguyễn Văn A", "roleName": "ChoirMember", "isPasswordChangeRequired": false }
 }
 ```
+
+`user.isPasswordChangeRequired = true` → tài khoản vừa được Admin tạo, mật khẩu đã gửi qua email: client đưa người
+dùng tới màn đổi mật khẩu (`POST /api/auth/change-password`) trước khi cho dùng tiếp. Đổi hoặc đặt lại mật khẩu xong
+cờ về `false`.
+
+Khi cờ là `true`, server trả **403 `AUTH_PASSWORD_CHANGE_REQUIRED`** cho mọi endpoint cần đăng nhập, **trừ**
+`change-password`, `logout`, `logout-all`, `GET/PUT me` (endpoint anonymous như `refresh` không bị ảnh hưởng).
+Đổi mật khẩu xong mọi phiên bị thu hồi → đăng nhập lại bằng mật khẩu mới là hết bị chặn.
 
 ### `POST /api/auth/login` — anonymous
 
@@ -176,6 +184,18 @@ Thành công thì mọi thiết bị bị đăng xuất — client phải đăng
 | 400 | `AUTH_PASSWORD_REQUIRED`, `AUTH_PASSWORD_TOO_WEAK`, `AUTH_CURRENT_PASSWORD_INVALID` |
 | 404 | `USER_NOT_FOUND` |
 
+### `GET /api/auth/me` · `PUT /api/auth/me` — đã đăng nhập, mọi role
+
+Tài khoản của chính người gọi. `GET` trả `UserDto` (mục 3). `PUT` nhận `{ "fullName", "phone" }`, cả hai tuỳ chọn
+(`fullName` ≤ 100, `phone` ≤ 20 ký tự, cắt khoảng trắng; gửi rỗng / `null` là xoá) và trả `UserDto`.
+Gửi đủ cả hai trường — trường bỏ trống bị xoá. Email và role không đổi được ở đây.
+
+| HTTP | Kết quả |
+|---|---|
+| 200 | `UserDto` |
+| 400 | `VALIDATION_FAILED` |
+| 401 | Chưa đăng nhập |
+
 ### `POST /api/auth/forgot-password` — anonymous
 
 ```json
@@ -208,24 +228,27 @@ Thành công thì mọi thiết bị bị đăng xuất.
 ### `UserDto`
 
 ```json
-{ "id": "guid", "email": "a@b.com", "fullName": "Nguyễn Văn A", "roleName": "ChoirDirector", "isActive": true }
+{ "id": "guid", "email": "a@b.com", "fullName": "Nguyễn Văn A", "phone": "0900000000", "roleName": "ChoirDirector", "isActive": true, "isPasswordChangeRequired": false }
 ```
 
-`fullName` có ở **mọi role** (lưu trên `User`). Tài khoản tạo trước 2026-10-03 có thể là `""`
-cho tới khi Admin cập nhật.
+`fullName` và `phone` có ở **mọi role** (lưu trên `User`). `fullName` có thể là `""` (Admin bỏ trống) — client
+hiển thị email thay tên. `phone` có thể `null`.
 
 | Method | Route | Body / Query | Thành công | Lỗi |
 |---|---|---|---|---|
 | GET | `/api/users` | query `keyword`, `roleName`, `isActive`, `pageNumber`, `pageSize` | 200 `PagedList<UserDto>` | — |
 | GET | `/api/users/{id}` | — | 200 `UserDto` | 404 `USER_NOT_FOUND` |
-| POST | `/api/users` | `{ "email", "fullName", "password", "roleName" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `ROLE_NOT_FOUND` · 409 `USER_EMAIL_ALREADY_EXISTS` |
-| PUT | `/api/users/{id}` | `{ "email", "fullName" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `USER_NOT_FOUND` · 409 `USER_EMAIL_ALREADY_EXISTS` |
+| POST | `/api/users` | `{ "email", "fullName?", "phone?", "password", "roleName" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `ROLE_NOT_FOUND` · 409 `USER_EMAIL_ALREADY_EXISTS` |
+| PUT | `/api/users/{id}` | `{ "email", "fullName?", "phone?" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `USER_NOT_FOUND` · 409 `USER_EMAIL_ALREADY_EXISTS` |
 | PATCH | `/api/users/{id}/activate` | — | 204 | 404 `USER_NOT_FOUND` · 409 `USER_ALREADY_ACTIVE` |
 | PATCH | `/api/users/{id}/deactivate` | — | 204 | 404 `USER_NOT_FOUND` · 409 `USER_CANNOT_MODIFY_SELF`, `USER_ALREADY_INACTIVE`, `USER_LAST_ADMIN` |
 | PUT | `/api/users/{id}/role` | `{ "roleName" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `USER_NOT_FOUND`, `ROLE_NOT_FOUND` · 409 `USER_CANNOT_MODIFY_SELF`, `USER_LAST_ADMIN` |
 
 - `GET /api/users`: `keyword` khớp một phần email; các bộ lọc kết hợp AND; sắp theo email.
-- `fullName` bắt buộc, tối đa 100 ký tự, khoảng trắng đầu/cuối bị cắt.
+- Bắt buộc: `email`, `password` (tối thiểu 8 ký tự), `roleName`. Tuỳ chọn: `fullName` (≤ 100, bỏ trống → `""`),
+  `phone` (≤ 20, bỏ trống → `null`); khoảng trắng đầu/cuối bị cắt. `PUT` thay toàn bộ: trường bỏ trống bị xoá.
+- Tạo xong, server gửi email chứa email đăng nhập + mật khẩu tới người dùng và đặt `isPasswordChangeRequired = true`.
+  Gửi mail thất bại thì tài khoản **vẫn được tạo** (200) — Admin tự báo mật khẩu.
 - `roleName` phải là một trong 4 role. Lỗi validate của nhóm này hiện chỉ trả
   `VALIDATION_FAILED` trong `errors`, chưa có mã riêng theo field.
 - Tạo tài khoản role `ChoirMember` (hoặc đổi role sang `ChoirMember`) → hồ sơ ca viên được tạo

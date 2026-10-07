@@ -198,10 +198,13 @@ public class AuthService(
         return Result.Success();
     }
 
-    /// <summary>Stores the new hash and revokes every refresh token, so all devices must sign in again.</summary>
+    /// <summary>
+    /// Stores the new hash, clears IsPasswordChangeRequired and revokes every refresh token, so all devices must sign in again.
+    /// </summary>
     private async Task SetPasswordAsync(User user, string newPassword, CancellationToken cancellationToken)
     {
         user.PasswordHash = passwordHasherService.HashPassword(user, newPassword);
+        user.IsPasswordChangeRequired = false;
         await userRepository.RevokeAllRefreshTokensAsync(user.Id, cancellationToken);
         await userRepository.SaveChangesAsync(cancellationToken);
     }

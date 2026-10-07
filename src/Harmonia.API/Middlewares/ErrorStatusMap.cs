@@ -29,6 +29,7 @@ public static class ErrorStatusMap
         // 1. Auth.
         [ErrorCodes.AuthInvalidCredentials] = StatusCodes.Status401Unauthorized,
         [ErrorCodes.AuthAccountInactive] = StatusCodes.Status403Forbidden,
+        [ErrorCodes.AuthPasswordChangeRequired] = StatusCodes.Status403Forbidden,
         [ErrorCodes.AuthTokenInvalid] = StatusCodes.Status401Unauthorized,
         [ErrorCodes.AuthTokenExpired] = StatusCodes.Status401Unauthorized,
         [ErrorCodes.AuthRefreshTokenNotFound] = StatusCodes.Status401Unauthorized,

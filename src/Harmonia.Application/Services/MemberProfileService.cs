@@ -30,7 +30,7 @@ public class MemberProfileService(
         }
 
         profile.User.FullName = request.FullName.Trim();
-        profile.Phone = NormalizePhone(request.Phone);
+        profile.User.Phone = NormalizePhone(request.Phone);
         profile.DateOfBirth = request.DateOfBirth;
         await memberProfileRepository.SaveChangesAsync(cancellationToken);
 
@@ -65,7 +65,7 @@ public class MemberProfileService(
             return Result<MemberProfileDto>.Failure(ErrorCodes.MemberNotFound);
         }
 
-        profile.Phone = NormalizePhone(request.Phone);
+        profile.User.Phone = NormalizePhone(request.Phone);
         profile.DateOfBirth = request.DateOfBirth;
         profile.JoinedDate = request.JoinedDate;
         profile.Status = request.Status;

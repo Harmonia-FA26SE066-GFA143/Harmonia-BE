@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Harmonia.Application.DTOs;
 using Harmonia.Domain.Common;
+using NSubstitute;
 
 namespace Harmonia.API.Tests;
 
@@ -68,16 +69,73 @@ public class UsersEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<Har
     }
 
     [Fact]
-    public async Task Create_WithoutFullName_Returns400_Async()
+    public async Task Create_WithoutFullName_StoresEmptyNameAndPhone_EmailsPassword_Async()
     {
         var admin = await factory.CreateClientAsAsync("admin@test.com", _ct);
 
         var response = await admin.PostAsJsonAsync(
             "api/users",
-            new { email = "users-noname@test.com", password = HarmoniaApiFactory.Password, roleName = RoleNames.ChoirMember },
+            new { email = "users-noname@test.com", phone = " 0901234567 ", password = HarmoniaApiFactory.Password, roleName = RoleNames.ChoirMember },
+            _ct);
+        var created = (await response.Content.ReadFromJsonAsync<UserDto>(TestJson.Options, _ct))!;
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(string.Empty, created.FullName);
+        Assert.Equal("0901234567", created.Phone);
+        Assert.True(created.IsPasswordChangeRequired);
+        await factory.EmailSender.Received(1).SendAsync(
+            "users-noname@test.com", Arg.Any<string>(), Arg.Is<string>(b => b.Contains(HarmoniaApiFactory.Password)), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Create_BlocksUntilPasswordChanged_Async()
+    {
+        var admin = await factory.CreateClientAsAsync("admin@test.com", _ct);
+        await admin.PostAsJsonAsync(
+            "api/users",
+            new { email = "users-firstlogin@test.com", password = HarmoniaApiFactory.Password, roleName = RoleNames.ParishPriest },
             _ct);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var first = await factory.LoginAsync("users-firstlogin@test.com", cancellationToken: _ct);
+        var client = await factory.CreateClientAsAsync("users-firstlogin@test.com", _ct);
+        var blocked = await client.GetAsync("api/lookups/mass-types", _ct);
+        var me = await client.GetAsync("api/auth/me", _ct);
+        var change = await client.PostAsJsonAsync(
+            "api/auth/change-password", new { currentPassword = HarmoniaApiFactory.Password, newPassword = "BrandNew123" }, _ct);
+        var second = await factory.LoginAsync("users-firstlogin@test.com", "BrandNew123", _ct);
+        client.DefaultRequestHeaders.Authorization = new("Bearer", second.AccessToken);
+        var unblocked = await client.GetAsync("api/lookups/mass-types", _ct);
+
+        Assert.True(first.User.IsPasswordChangeRequired);
+        Assert.Equal(HttpStatusCode.Forbidden, blocked.StatusCode);
+        Assert.Contains(ErrorCodes.AuthPasswordChangeRequired, await blocked.Content.ReadAsStringAsync(_ct));
+        Assert.Equal(HttpStatusCode.OK, me.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, change.StatusCode);
+        Assert.False(second.User.IsPasswordChangeRequired);
+        Assert.Equal(HttpStatusCode.OK, unblocked.StatusCode);
+    }
+
+    [Fact]
+    public async Task Me_AnyRole_ReadsAndUpdatesOwnNameAndPhone_Async()
+    {
+        var priest = await factory.CreateClientAsAsync("priest@test.com", _ct);
+
+        var update = await priest.PutAsJsonAsync("api/auth/me", new { fullName = " Father Joseph ", phone = "0911222333" }, _ct);
+        var me = (await priest.GetFromJsonAsync<UserDto>("api/auth/me", TestJson.Options, _ct))!;
+
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+        Assert.Equal("priest@test.com", me.Email);
+        Assert.Equal("Father Joseph", me.FullName);
+        Assert.Equal("0911222333", me.Phone);
+        Assert.Equal(RoleNames.ParishPriest, me.RoleName);
+    }
+
+    [Fact]
+    public async Task Me_Anonymous_Returns401_Async()
+    {
+        var response = await factory.CreateClient().GetAsync("api/auth/me", _ct);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
