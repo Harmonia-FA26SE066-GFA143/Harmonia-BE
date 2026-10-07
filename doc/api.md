@@ -61,6 +61,7 @@ FE hiển thị theo `code`, **không** hiển thị `message`. Bản dịch và
 | Thiếu / sai access token | 401 | `AUTH_TOKEN_INVALID` |
 | Access token hết hạn | 401 | `AUTH_TOKEN_EXPIRED` → gọi refresh |
 | Sai role | 403 | *(body rỗng)* |
+| Chưa đổi mật khẩu lần đầu (tài khoản Admin vừa tạo) | 403 | `AUTH_PASSWORD_CHANGE_REQUIRED` → màn đổi mật khẩu |
 | Body JSON hỏng / sai kiểu | 400 | `VALIDATION_FAILED`, `errors.request` hoặc `errors.<field>` |
 | Lỗi không lường trước | 500 | `INTERNAL_ERROR` |
 
@@ -84,7 +85,7 @@ giá trị ngoài khoảng tự kẹp lại, không báo lỗi). Trả về:
 ### Mật khẩu mạnh
 
 Ít nhất 8 ký tự, có ít nhất một chữ cái và một chữ số. Áp cho `change-password`,
-`reset-password`. (`POST /api/users` hiện chỉ kiểm tối thiểu 8 ký tự.)
+`reset-password`. Mật khẩu đầu tiên do server sinh khi Admin tạo tài khoản (`POST /api/users`).
 
 ---
 
