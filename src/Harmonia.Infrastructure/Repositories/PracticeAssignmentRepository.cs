@@ -1,0 +1,60 @@
+using Harmonia.Application.Common.Models;
+using Harmonia.Application.DTOs;
+using Harmonia.Application.Interfaces.IRepositories;
+using Harmonia.Domain.Entities;
+using Harmonia.Domain.Enums;
+using Harmonia.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
+
+namespace Harmonia.Infrastructure.Repositories;
+
+public class PracticeAssignmentRepository(HarmoniaDbContext dbContext)
+    : GenericRepository<PracticeAssignment>(dbContext), IPracticeAssignmentRepository
+{
+    public async Task<PagedList<PracticeAssignment>> GetForMemberAsync(
+        Guid memberId, SearchMyPracticeAssignmentsRequest filter, CancellationToken cancellationToken)
+    {
+        var query = VisibleToMember(memberId);
+
+        if (filter.IsOpen is { } isOpen)
+        {
+            var now = DateTime.UtcNow;
+            query = isOpen ? query.Where(x => x.DueDate >= now) : query.Where(x => x.DueDate < now);
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await WithDetails(query, memberId)
+            .OrderBy(x => x.DueDate)
+            .ThenBy(x => x.Id)
+            .Skip((filter.PageNumber - 1) * filter.PageSize)
+            .Take(filter.PageSize)
+            .ToListAsync(cancellationToken);
+
+        return new PagedList<PracticeAssignment>(items, filter.PageNumber, filter.PageSize, totalCount);
+    }
+
+    public Task<PracticeAssignment?> GetByIdForMemberAsync(Guid id, Guid memberId, CancellationToken cancellationToken) =>
+        WithDetails(VisibleToMember(memberId), memberId).FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+    /// <summary>
+    /// Scope All, a target naming the member, or a target skill the member holds approved today. Skill targets
+    /// follow the member's current skills, so a newly approved skill also brings its earlier assignments.
+    /// </summary>
+    private IQueryable<PracticeAssignment> VisibleToMember(Guid memberId) =>
+        DbContext.PracticeAssignments
+            .AsNoTracking()
+            .Where(x => x.Scope == AssignmentScope.All
+                || x.Targets.Any(t => t.MemberId == memberId
+                    || DbContext.MemberSkills.Any(ms => ms.MemberId == memberId
+                        && ms.SkillId == t.SkillId
+                        && ms.Status == ApprovalStatus.Approved)));
+
+    private static IQueryable<PracticeAssignment> WithDetails(IQueryable<PracticeAssignment> query, Guid memberId) =>
+        query
+            .Include(x => x.LiturgicalEvent)
+            .Include(x => x.Song)
+            .Include(x => x.Material)
+            .Include(x => x.Submissions.Where(s => s.MemberId == memberId).OrderByDescending(s => s.AttemptNo).Take(1))
+            .AsSplitQuery();
+}

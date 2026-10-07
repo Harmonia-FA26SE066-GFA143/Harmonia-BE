@@ -803,7 +803,7 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 
 ---
 
-## 7c. Practice assignments — `api/practice-assignments` · role `ChoirDirector` (UC-28)
+## 7c. Practice assignments — `api/practice-assignments` · tạo: `ChoirDirector` (UC-28) · nhận bài: `ChoirMember` (UC-09)
 
 ### `PracticeAssignmentDto`
 
@@ -835,6 +835,43 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
   không thuộc `songId` khi gửi cả hai → 404 `MATERIAL_NOT_FOUND`.
 - Tạo xong, mỗi ca viên được giao nhận một thông báo `AssignmentNotice`, `referenceType = "PracticeAssignment"`,
   `referenceId` = id bài tập.
+
+### Ca viên nhận bài tập — `ChoirMember` (UC-09 / FE-10)
+
+`PracticeAssignmentDetailDto`:
+
+```json
+{
+  "id": "guid",
+  "title": "Tập bài Nhập lễ",
+  "instruction": "Thu âm bè Soprano, đoạn điệp khúc | null",
+  "scope": "SkillGroup",
+  "dueDate": "2026-10-12T15:00:00Z",
+  "eventId": "guid | null",
+  "eventDate": "2026-10-13 | null",
+  "eventTime": "08:00:00 | null",
+  "eventTitle": "string | null",
+  "songId": "guid | null",
+  "songTitle": "string | null",
+  "materialId": "guid | null",
+  "materialTitle": "string | null",
+  "materialType": "SheetMusic | null",
+  "latestSubmissionStatus": "Submitted | null",
+  "latestSubmittedAt": "2026-10-10T09:00:00Z | null"
+}
+```
+
+| Method | Path | Thành công | Lỗi |
+|---|---|---|---|
+| GET | `/api/practice-assignments/mine?isOpen=&pageNumber=&pageSize=` | 200 `PagedList<PracticeAssignmentDetailDto>` | 404 `MEMBER_NOT_FOUND` |
+| GET | `/api/practice-assignments/mine/{id}` | 200 `PracticeAssignmentDetailDto` | 404 `MEMBER_NOT_FOUND`, `PRACTICE_ASSIGNMENT_NOT_FOUND` |
+
+- Ca viên thấy bài tập khi: scope `All`; có tên trong target; hoặc **hiện đang** được duyệt một skill của target.
+  Skill được duyệt sau vẫn thấy bài giao trước đó; ca viên vào đoàn sau thấy cả bài `All` cũ.
+- Bài không dành cho ca viên → 404 `PRACTICE_ASSIGNMENT_NOT_FOUND` (không trả 403).
+- `isOpen`: `true` = chưa tới hạn, `false` = đã quá hạn, bỏ trống = tất cả. Sắp theo `dueDate` tăng dần.
+- `latestSubmissionStatus` / `latestSubmittedAt` là lần nộp mới nhất **của chính ca viên**; `null` = chưa nộp.
+- Mở file tư liệu qua `api/music-materials` bằng `materialId`.
 
 ---
 

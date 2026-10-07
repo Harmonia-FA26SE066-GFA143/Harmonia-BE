@@ -10,7 +10,7 @@ using Harmonia.Domain.Enums;
 namespace Harmonia.Application.Services;
 
 public class PracticeAssignmentService(
-    IGenericRepository<PracticeAssignment> practiceAssignmentRepository,
+    IPracticeAssignmentRepository practiceAssignmentRepository,
     ILiturgicalEventRepository liturgicalEventRepository,
     ISongRepository songRepository,
     IMusicMaterialRepository musicMaterialRepository,
@@ -106,6 +106,29 @@ public class PracticeAssignmentService(
             cancellationToken);
 
         return Result<PracticeAssignmentDto>.Success(mapper.Map<PracticeAssignmentDto>(assignment));
+    }
+
+    public async Task<Result<PagedList<PracticeAssignmentDetailDto>>> GetMineAsync(
+        Guid userId, SearchMyPracticeAssignmentsRequest request, CancellationToken cancellationToken)
+    {
+        var member = await memberProfileRepository.GetByUserIdAsync(userId, cancellationToken);
+        if (member is null) return Result<PagedList<PracticeAssignmentDetailDto>>.Failure(ErrorCodes.MemberNotFound);
+
+        var page = await practiceAssignmentRepository.GetForMemberAsync(member.Id, request, cancellationToken);
+        return Result<PagedList<PracticeAssignmentDetailDto>>.Success(new PagedList<PracticeAssignmentDetailDto>(
+            mapper.Map<List<PracticeAssignmentDetailDto>>(page.Items), page.PageNumber, page.PageSize, page.TotalCount));
+    }
+
+    public async Task<Result<PracticeAssignmentDetailDto>> GetMineByIdAsync(
+        Guid userId, Guid id, CancellationToken cancellationToken)
+    {
+        var member = await memberProfileRepository.GetByUserIdAsync(userId, cancellationToken);
+        if (member is null) return Result<PracticeAssignmentDetailDto>.Failure(ErrorCodes.MemberNotFound);
+
+        var assignment = await practiceAssignmentRepository.GetByIdForMemberAsync(id, member.Id, cancellationToken);
+        return assignment is null
+            ? Result<PracticeAssignmentDetailDto>.Failure(ErrorCodes.PracticeAssignmentNotFound)
+            : Result<PracticeAssignmentDetailDto>.Success(mapper.Map<PracticeAssignmentDetailDto>(assignment));
     }
 
     /// <summary>Returns the error code of the first optional reference that is missing or unusable, or null.</summary>

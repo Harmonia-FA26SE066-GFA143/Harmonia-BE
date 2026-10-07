@@ -11,4 +11,12 @@ public interface IPracticeAssignmentService
     /// </summary>
     Task<Result<PracticeAssignmentDto>> CreateAsync(
         CreatePracticeAssignmentRequest request, CancellationToken cancellationToken);
+
+    /// <summary>Assignments the calling member currently receives (UC-09 / FE-10), with their own newest submission.</summary>
+    Task<Result<PagedList<PracticeAssignmentDetailDto>>> GetMineAsync(
+        Guid userId, SearchMyPracticeAssignmentsRequest request, CancellationToken cancellationToken);
+
+    /// <summary>One assignment of the calling member; one they do not receive is reported as missing, not forbidden.</summary>
+    Task<Result<PracticeAssignmentDetailDto>> GetMineByIdAsync(
+        Guid userId, Guid id, CancellationToken cancellationToken);
 }

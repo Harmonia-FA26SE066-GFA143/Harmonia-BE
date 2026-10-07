@@ -827,6 +827,110 @@ public sealed class RepositoryTests : IDisposable
         Assert.Null(saved.RejectReason);
     }
 
+    // ---- PracticeAssignmentRepository ----
+
+    private sealed record PracticeSeed(
+        Guid MemberId, Guid ForAll, Guid ForMember, Guid ForApprovedSkill, Guid ForPendingSkill, Guid ForOtherMember, Guid Overdue);
+
+    /// <summary>
+    /// One member who holds Soprano approved and Alto pending. Of six assignments the member receives four:
+    /// everyone, named directly, Soprano, and an overdue one for everyone; not Alto or another member's.
+    /// </summary>
+    private async Task<PracticeSeed> SeedPracticeAsync()
+    {
+        var soprano = new Skill { Id = Guid.NewGuid(), CategoryId = SkillCategoryIds.Vocal, Name = "Soprano" };
+        var alto = new Skill { Id = Guid.NewGuid(), CategoryId = SkillCategoryIds.Vocal, Name = "Alto" };
+        var user = await _db.AddUserAsync("member@test.com", cancellationToken: _ct);
+        var otherUser = await _db.AddUserAsync("other@test.com", cancellationToken: _ct);
+        var member = new MemberProfile { Id = Guid.NewGuid(), UserId = user.Id, Status = MemberStatus.Active };
+        var other = new MemberProfile { Id = Guid.NewGuid(), UserId = otherUser.Id, Status = MemberStatus.Active };
+        member.MemberSkills.Add(new MemberSkill { Id = Guid.NewGuid(), SkillId = soprano.Id, Status = ApprovalStatus.Approved });
+        member.MemberSkills.Add(new MemberSkill { Id = Guid.NewGuid(), SkillId = alto.Id, Status = ApprovalStatus.Pending });
+
+        PracticeAssignment Assignment(int dueInDays, AssignmentScope scope, params PracticeAssignmentTarget[] targets) => new()
+        {
+            Id = Guid.NewGuid(), Title = $"due {dueInDays}", Scope = scope,
+            DueDate = DateTime.UtcNow.AddDays(dueInDays), Targets = [.. targets],
+        };
+        PracticeAssignmentTarget SkillTarget(Guid skillId) => new() { Id = Guid.NewGuid(), TargetType = TargetType.Skill, SkillId = skillId };
+        PracticeAssignmentTarget MemberTarget(Guid memberId) => new() { Id = Guid.NewGuid(), TargetType = TargetType.Member, MemberId = memberId };
+
+        var forAll = Assignment(3, AssignmentScope.All);
+        var forMember = Assignment(1, AssignmentScope.Individual, MemberTarget(member.Id));
+        var forApprovedSkill = Assignment(2, AssignmentScope.SkillGroup, SkillTarget(soprano.Id));
+        var forPendingSkill = Assignment(2, AssignmentScope.SkillGroup, SkillTarget(alto.Id));
+        var forOtherMember = Assignment(2, AssignmentScope.Individual, MemberTarget(other.Id));
+        var overdue = Assignment(-1, AssignmentScope.All);
+
+        SubmissionStatus[] attempts = [SubmissionStatus.NeedsRevision, SubmissionStatus.Submitted];
+        forAll.Submissions = attempts
+            .Select((status, i) => new PracticeSubmission
+            {
+                Id = Guid.NewGuid(), MemberId = member.Id, AttemptNo = i + 1, Status = status, AudioPublicId = "a",
+            })
+            .Append(new PracticeSubmission { Id = Guid.NewGuid(), MemberId = other.Id, AttemptNo = 5, AudioPublicId = "b" })
+            .ToList();
+
+        await using var context = _db.NewContext();
+        context.AddRange(soprano, alto, member, other, forAll, forMember, forApprovedSkill, forPendingSkill, forOtherMember, overdue);
+        await context.SaveChangesAsync(_ct);
+
+        return new PracticeSeed(member.Id, forAll.Id, forMember.Id, forApprovedSkill.Id, forPendingSkill.Id, forOtherMember.Id, overdue.Id);
+    }
+
+    [Fact]
+    public async Task PracticeAssignment_GetForMember_ReturnsReceivedAssignmentsByDueDate_Async()
+    {
+        var seed = await SeedPracticeAsync();
+        await using var context = _db.NewContext();
+
+        var page = await new PracticeAssignmentRepository(context)
+            .GetForMemberAsync(seed.MemberId, new SearchMyPracticeAssignmentsRequest(), _ct);
+
+        Assert.Equal([seed.Overdue, seed.ForMember, seed.ForApprovedSkill, seed.ForAll], page.Items.Select(x => x.Id));
+        Assert.Equal(4, page.TotalCount);
+    }
+
+    [Fact]
+    public async Task PracticeAssignment_GetForMember_LoadsOnlyMembersNewestSubmission_Async()
+    {
+        var seed = await SeedPracticeAsync();
+        await using var context = _db.NewContext();
+
+        var page = await new PracticeAssignmentRepository(context)
+            .GetForMemberAsync(seed.MemberId, new SearchMyPracticeAssignmentsRequest(), _ct);
+
+        var submission = Assert.Single(page.Items.Single(x => x.Id == seed.ForAll).Submissions);
+        Assert.Equal(seed.MemberId, submission.MemberId);
+        Assert.Equal(2, submission.AttemptNo);
+    }
+
+    [Theory]
+    [InlineData(true, 3)]
+    [InlineData(false, 1)]
+    public async Task PracticeAssignment_GetForMember_IsOpenFiltersByDueDate_Async(bool isOpen, int expected)
+    {
+        var seed = await SeedPracticeAsync();
+        await using var context = _db.NewContext();
+
+        var page = await new PracticeAssignmentRepository(context)
+            .GetForMemberAsync(seed.MemberId, new SearchMyPracticeAssignmentsRequest { IsOpen = isOpen }, _ct);
+
+        Assert.Equal(expected, page.TotalCount);
+    }
+
+    [Fact]
+    public async Task PracticeAssignment_GetByIdForMember_NotReceived_ReturnsNull_Async()
+    {
+        var seed = await SeedPracticeAsync();
+        await using var context = _db.NewContext();
+        var repository = new PracticeAssignmentRepository(context);
+
+        Assert.NotNull(await repository.GetByIdForMemberAsync(seed.ForApprovedSkill, seed.MemberId, _ct));
+        Assert.Null(await repository.GetByIdForMemberAsync(seed.ForPendingSkill, seed.MemberId, _ct));
+        Assert.Null(await repository.GetByIdForMemberAsync(seed.ForOtherMember, seed.MemberId, _ct));
+    }
+
     // ---- GenericRepository ----
 
     [Fact]

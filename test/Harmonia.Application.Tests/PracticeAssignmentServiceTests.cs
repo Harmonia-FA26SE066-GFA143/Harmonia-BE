@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using AutoMapper;
+using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IRepositories;
 using Harmonia.Application.Interfaces.IServices;
@@ -15,7 +16,7 @@ namespace Harmonia.Application.Tests;
 
 public class PracticeAssignmentServiceTests
 {
-    private readonly IGenericRepository<PracticeAssignment> _assignments = Substitute.For<IGenericRepository<PracticeAssignment>>();
+    private readonly IPracticeAssignmentRepository _assignments = Substitute.For<IPracticeAssignmentRepository>();
     private readonly ILiturgicalEventRepository _events = Substitute.For<ILiturgicalEventRepository>();
     private readonly ISongRepository _songs = Substitute.For<ISongRepository>();
     private readonly IMusicMaterialRepository _materials = Substitute.For<IMusicMaterialRepository>();
@@ -199,5 +200,55 @@ public class PracticeAssignmentServiceTests
 
         Assert.Equal(ErrorCodes.MaterialNotFound, result.Code);
         await AssertNothingSavedAsync();
+    }
+
+    // ---- Member's own assignments (UC-09) ----
+
+    [Fact]
+    public async Task GetMine_ReturnsMemberAssignmentsWithNewestSubmission_Async()
+    {
+        _members.GetByUserIdAsync(_activeMember.UserId, _ct).Returns(_activeMember);
+        var request = new SearchMyPracticeAssignmentsRequest();
+        var submittedAt = DateTime.UtcNow.AddHours(-1);
+        var assignment = new PracticeAssignment
+        {
+            Id = Guid.NewGuid(),
+            Title = "Learn the entrance hymn",
+            Song = new Song { Title = "Entrance hymn" },
+            Submissions =
+            [
+                new PracticeSubmission { AttemptNo = 1, Status = SubmissionStatus.NeedsRevision },
+                new PracticeSubmission { AttemptNo = 2, Status = SubmissionStatus.Submitted, SubmittedAt = submittedAt },
+            ],
+        };
+        _assignments.GetForMemberAsync(_activeMember.Id, request, _ct)
+            .Returns(new PagedList<PracticeAssignment>([assignment], 1, 20, 1));
+
+        var result = await _sut.GetMineAsync(_activeMember.UserId, request, _ct);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        Assert.Equal("Entrance hymn", item.SongTitle);
+        Assert.Null(item.EventDate);
+        Assert.Equal(SubmissionStatus.Submitted, item.LatestSubmissionStatus);
+        Assert.Equal(submittedAt, item.LatestSubmittedAt);
+    }
+
+    [Fact]
+    public async Task GetMine_NoMemberProfile_ReturnsMemberNotFound_Async()
+    {
+        var result = await _sut.GetMineAsync(Guid.NewGuid(), new SearchMyPracticeAssignmentsRequest(), _ct);
+
+        Assert.Equal(ErrorCodes.MemberNotFound, result.Code);
+    }
+
+    [Fact]
+    public async Task GetMineById_AssignmentNotReceived_ReturnsPracticeAssignmentNotFound_Async()
+    {
+        _members.GetByUserIdAsync(_activeMember.UserId, _ct).Returns(_activeMember);
+
+        var result = await _sut.GetMineByIdAsync(_activeMember.UserId, Guid.NewGuid(), _ct);
+
+        Assert.Equal(ErrorCodes.PracticeAssignmentNotFound, result.Code);
     }
 }
