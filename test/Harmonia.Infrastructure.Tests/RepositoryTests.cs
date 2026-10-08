@@ -827,6 +827,431 @@ public sealed class RepositoryTests : IDisposable
         Assert.Null(saved.RejectReason);
     }
 
+    // ---- PracticeAssignmentRepository ----
+
+    private sealed record PracticeSeed(
+        Guid MemberId, Guid ForAll, Guid ForMember, Guid ForApprovedSkill, Guid ForPendingSkill, Guid ForOtherMember, Guid Overdue);
+
+    /// <summary>
+    /// One member who holds Soprano approved and Alto pending. Of six assignments the member receives four:
+    /// everyone, named directly, Soprano, and an overdue one for everyone; not Alto or another member's.
+    /// </summary>
+    private async Task<PracticeSeed> SeedPracticeAsync()
+    {
+        var soprano = new Skill { Id = Guid.NewGuid(), CategoryId = SkillCategoryIds.Vocal, Name = "Soprano" };
+        var alto = new Skill { Id = Guid.NewGuid(), CategoryId = SkillCategoryIds.Vocal, Name = "Alto" };
+        var user = await _db.AddUserAsync("member@test.com", cancellationToken: _ct);
+        var otherUser = await _db.AddUserAsync("other@test.com", cancellationToken: _ct);
+        var member = new MemberProfile { Id = Guid.NewGuid(), UserId = user.Id, Status = MemberStatus.Active };
+        var other = new MemberProfile { Id = Guid.NewGuid(), UserId = otherUser.Id, Status = MemberStatus.Active };
+        member.MemberSkills.Add(new MemberSkill { Id = Guid.NewGuid(), SkillId = soprano.Id, Status = ApprovalStatus.Approved });
+        member.MemberSkills.Add(new MemberSkill { Id = Guid.NewGuid(), SkillId = alto.Id, Status = ApprovalStatus.Pending });
+
+        PracticeAssignment Assignment(int dueInDays, AssignmentScope scope, params PracticeAssignmentTarget[] targets) => new()
+        {
+            Id = Guid.NewGuid(), Title = $"due {dueInDays}", Scope = scope,
+            DueDate = DateTime.UtcNow.AddDays(dueInDays), Targets = [.. targets],
+        };
+        PracticeAssignmentTarget SkillTarget(Guid skillId) => new() { Id = Guid.NewGuid(), TargetType = TargetType.Skill, SkillId = skillId };
+        PracticeAssignmentTarget MemberTarget(Guid memberId) => new() { Id = Guid.NewGuid(), TargetType = TargetType.Member, MemberId = memberId };
+
+        var forAll = Assignment(3, AssignmentScope.All);
+        var forMember = Assignment(1, AssignmentScope.Individual, MemberTarget(member.Id));
+        var forApprovedSkill = Assignment(2, AssignmentScope.SkillGroup, SkillTarget(soprano.Id));
+        var forPendingSkill = Assignment(2, AssignmentScope.SkillGroup, SkillTarget(alto.Id));
+        var forOtherMember = Assignment(2, AssignmentScope.Individual, MemberTarget(other.Id));
+        var overdue = Assignment(-1, AssignmentScope.All);
+
+        SubmissionStatus[] attempts = [SubmissionStatus.NeedsRevision, SubmissionStatus.Submitted];
+        forAll.Submissions = attempts
+            .Select((status, i) => new PracticeSubmission
+            {
+                Id = Guid.NewGuid(), MemberId = member.Id, AttemptNo = i + 1, Status = status, AudioPublicId = "a",
+            })
+            .Append(new PracticeSubmission { Id = Guid.NewGuid(), MemberId = other.Id, AttemptNo = 5, AudioPublicId = "b" })
+            .ToList();
+
+        await using var context = _db.NewContext();
+        context.AddRange(soprano, alto, member, other, forAll, forMember, forApprovedSkill, forPendingSkill, forOtherMember, overdue);
+        await context.SaveChangesAsync(_ct);
+
+        return new PracticeSeed(member.Id, forAll.Id, forMember.Id, forApprovedSkill.Id, forPendingSkill.Id, forOtherMember.Id, overdue.Id);
+    }
+
+    [Fact]
+    public async Task PracticeAssignment_GetForMember_ReturnsReceivedAssignmentsByDueDate_Async()
+    {
+        var seed = await SeedPracticeAsync();
+        await using var context = _db.NewContext();
+
+        var page = await new PracticeAssignmentRepository(context)
+            .GetForMemberAsync(seed.MemberId, new SearchMyPracticeAssignmentsRequest(), _ct);
+
+        Assert.Equal([seed.Overdue, seed.ForMember, seed.ForApprovedSkill, seed.ForAll], page.Items.Select(x => x.Id));
+        Assert.Equal(4, page.TotalCount);
+    }
+
+    [Fact]
+    public async Task PracticeAssignment_GetForMember_LoadsOnlyMembersNewestSubmission_Async()
+    {
+        var seed = await SeedPracticeAsync();
+        await using var context = _db.NewContext();
+
+        var page = await new PracticeAssignmentRepository(context)
+            .GetForMemberAsync(seed.MemberId, new SearchMyPracticeAssignmentsRequest(), _ct);
+
+        var submission = Assert.Single(page.Items.Single(x => x.Id == seed.ForAll).Submissions);
+        Assert.Equal(seed.MemberId, submission.MemberId);
+        Assert.Equal(2, submission.AttemptNo);
+    }
+
+    [Theory]
+    [InlineData(true, 3)]
+    [InlineData(false, 1)]
+    public async Task PracticeAssignment_GetForMember_IsOpenFiltersByDueDate_Async(bool isOpen, int expected)
+    {
+        var seed = await SeedPracticeAsync();
+        await using var context = _db.NewContext();
+
+        var page = await new PracticeAssignmentRepository(context)
+            .GetForMemberAsync(seed.MemberId, new SearchMyPracticeAssignmentsRequest { IsOpen = isOpen }, _ct);
+
+        Assert.Equal(expected, page.TotalCount);
+    }
+
+    [Fact]
+    public async Task PracticeAssignment_GetByIdForMember_NotReceived_ReturnsNull_Async()
+    {
+        var seed = await SeedPracticeAsync();
+        await using var context = _db.NewContext();
+        var repository = new PracticeAssignmentRepository(context);
+
+        Assert.NotNull(await repository.GetByIdForMemberAsync(seed.ForApprovedSkill, seed.MemberId, _ct));
+        Assert.Null(await repository.GetByIdForMemberAsync(seed.ForPendingSkill, seed.MemberId, _ct));
+        Assert.Null(await repository.GetByIdForMemberAsync(seed.ForOtherMember, seed.MemberId, _ct));
+    }
+
+    private sealed record ProgressSeed(
+        Guid MemberId, Guid OpenNotSubmitted, Guid OverdueNotSubmitted, Guid OverdueNeedsRevision,
+        Guid LatePassed, Guid OpenSubmitted, Guid OnlyOtherMemberSubmitted);
+
+    /// <summary>
+    /// Six assignments for everyone, seen by one member. "Late" ones are past due. OverdueNeedsRevision went
+    /// Submitted then NeedsRevision; LatePassed went NeedsRevision then Passed, so only the newest attempt counts.
+    /// OnlyOtherMemberSubmitted has a Passed attempt from someone else, which must not count for this member.
+    /// </summary>
+    private async Task<ProgressSeed> SeedProgressAsync()
+    {
+        var user = await _db.AddUserAsync("progress@test.com", cancellationToken: _ct);
+        var otherUser = await _db.AddUserAsync("progress-other@test.com", cancellationToken: _ct);
+        var member = new MemberProfile { Id = Guid.NewGuid(), UserId = user.Id };
+        var other = new MemberProfile { Id = Guid.NewGuid(), UserId = otherUser.Id };
+
+        PracticeAssignment Assignment(int dueInDays, params (MemberProfile By, SubmissionStatus Status)[] attempts) => new()
+        {
+            Id = Guid.NewGuid(), Title = "t", Scope = AssignmentScope.All, DueDate = DateTime.UtcNow.AddDays(dueInDays),
+            Submissions = attempts.Select((a, i) => new PracticeSubmission
+            {
+                Id = Guid.NewGuid(), MemberId = a.By.Id, AttemptNo = i + 1, Status = a.Status, AudioPublicId = "audio",
+            }).ToList(),
+        };
+
+        var openNotSubmitted = Assignment(2);
+        var overdueNotSubmitted = Assignment(-1);
+        var overdueNeedsRevision = Assignment(-1, (member, SubmissionStatus.Submitted), (member, SubmissionStatus.NeedsRevision));
+        var latePassed = Assignment(-1, (member, SubmissionStatus.NeedsRevision), (member, SubmissionStatus.Passed));
+        var openSubmitted = Assignment(2, (member, SubmissionStatus.Submitted));
+        var onlyOther = Assignment(2, (other, SubmissionStatus.Passed));
+
+        await using var context = _db.NewContext();
+        context.AddRange(member, other, openNotSubmitted, overdueNotSubmitted, overdueNeedsRevision, latePassed, openSubmitted, onlyOther);
+        await context.SaveChangesAsync(_ct);
+
+        return new ProgressSeed(member.Id, openNotSubmitted.Id, overdueNotSubmitted.Id, overdueNeedsRevision.Id,
+            latePassed.Id, openSubmitted.Id, onlyOther.Id);
+    }
+
+    private async Task<Guid[]> FilterAsync(Guid memberId, SearchMyPracticeAssignmentsRequest filter)
+    {
+        await using var context = _db.NewContext();
+        var page = await new PracticeAssignmentRepository(context).GetForMemberAsync(memberId, filter, _ct);
+        return page.Items.Select(x => x.Id).Order().ToArray();
+    }
+
+    [Fact]
+    public async Task PracticeAssignment_FilterByStatus_MatchesNewestAttemptOfThisMember_Async()
+    {
+        var seed = await SeedProgressAsync();
+
+        Assert.Equal([seed.OpenSubmitted], await FilterAsync(seed.MemberId, new() { Status = SubmissionStatus.Submitted }));
+        Assert.Equal([seed.OverdueNeedsRevision], await FilterAsync(seed.MemberId, new() { Status = SubmissionStatus.NeedsRevision }));
+        Assert.Equal([seed.LatePassed], await FilterAsync(seed.MemberId, new() { Status = SubmissionStatus.Passed }));
+    }
+
+    [Fact]
+    public async Task PracticeAssignment_FilterByHasSubmission_CombinesWithIsOpen_Async()
+    {
+        var seed = await SeedProgressAsync();
+
+        Assert.Equal(
+            new[] { seed.OpenNotSubmitted, seed.OverdueNotSubmitted, seed.OnlyOtherMemberSubmitted }.Order(),
+            await FilterAsync(seed.MemberId, new() { HasSubmission = false }));
+        Assert.Equal(
+            new[] { seed.OpenNotSubmitted, seed.OnlyOtherMemberSubmitted }.Order(),
+            await FilterAsync(seed.MemberId, new() { HasSubmission = false, IsOpen = true }));
+    }
+
+    [Fact]
+    public async Task PracticeAssignment_OverdueFilter_AgreesWithDomainRule_Async()
+    {
+        var seed = await SeedProgressAsync();
+        await using var context = _db.NewContext();
+        var repository = new PracticeAssignmentRepository(context);
+
+        // The SQL filter and PracticeAssignment.IsOverdue must pick the same assignments from the same data.
+        var filtered = await FilterAsync(seed.MemberId, new() { Status = SubmissionStatus.Overdue });
+        var progress = await repository.GetProgressForMemberAsync(seed.MemberId, _ct);
+        var now = DateTime.UtcNow;
+
+        Assert.Equal(new[] { seed.OverdueNotSubmitted, seed.OverdueNeedsRevision }.Order(), filtered);
+        Assert.Equal(filtered.Length, progress.Count(x => PracticeAssignment.IsOverdue(x.DueDate, x.LatestStatus, now)));
+    }
+
+    [Fact]
+    public async Task PracticeAssignment_GetProgressForMember_OneRowPerAssignmentWithNewestStatus_Async()
+    {
+        var seed = await SeedProgressAsync();
+        await using var context = _db.NewContext();
+
+        var progress = await new PracticeAssignmentRepository(context).GetProgressForMemberAsync(seed.MemberId, _ct);
+
+        Assert.Equal(
+            // Enum order: Submitted, Passed, NeedsRevision.
+            new SubmissionStatus?[] { null, null, null, SubmissionStatus.Submitted, SubmissionStatus.Passed, SubmissionStatus.NeedsRevision },
+            progress.Select(x => x.LatestStatus).OrderBy(x => x.HasValue).ThenBy(x => x));
+    }
+
+    // ---- PracticeSubmissionRepository ----
+
+    [Fact]
+    public async Task PracticeSubmission_TryAdd_SameAttemptTwice_SecondReturnsFalse_Async()
+    {
+        var seed = await SeedPracticeAsync();
+        PracticeSubmission Attempt(int attemptNo) => new()
+        {
+            Id = Guid.NewGuid(), PracticeAssignmentId = seed.ForMember, MemberId = seed.MemberId,
+            AttemptNo = attemptNo, AudioPublicId = "audio", SubmittedAt = DateTime.UtcNow,
+        };
+
+        await using (var first = _db.NewContext())
+        {
+            Assert.True(await new PracticeSubmissionRepository(first).TryAddAsync(Attempt(1), _ct));
+        }
+
+        await using var second = _db.NewContext();
+        var repository = new PracticeSubmissionRepository(second);
+        Assert.False(await repository.TryAddAsync(Attempt(1), _ct));
+        Assert.True(await repository.TryAddAsync(Attempt(2), _ct));
+    }
+
+    private sealed record SubmissionSeed(
+        Guid AssignmentId, Guid BinhOld, Guid BinhNewest, Guid AnNewest, Guid OtherAssignmentSubmission);
+
+    /// <summary>
+    /// Assignment A: Binh submitted twice (attempt 1 NeedsRevision, attempt 2 Submitted), An once (Passed).
+    /// Assignment B: An submitted once (Submitted), earliest of all. Submission times go up in seeding order,
+    /// except B's which is the oldest.
+    /// </summary>
+    private async Task<SubmissionSeed> SeedSubmissionsAsync()
+    {
+        var anUser = await _db.AddUserAsync("an@test.com", fullName: "An", cancellationToken: _ct);
+        var binhUser = await _db.AddUserAsync("binh@test.com", fullName: "Binh", cancellationToken: _ct);
+        var an = new MemberProfile { Id = Guid.NewGuid(), UserId = anUser.Id };
+        var binh = new MemberProfile { Id = Guid.NewGuid(), UserId = binhUser.Id };
+        var due = DateTime.UtcNow.AddDays(2);
+        var a = new PracticeAssignment { Id = Guid.NewGuid(), Title = "A", Scope = AssignmentScope.All, DueDate = due };
+        var b = new PracticeAssignment { Id = Guid.NewGuid(), Title = "B", Scope = AssignmentScope.All, DueDate = due };
+        var start = DateTime.UtcNow.AddHours(-10);
+
+        PracticeSubmission Submission(PracticeAssignment assignment, MemberProfile member, int attemptNo, SubmissionStatus status, int hour) => new()
+        {
+            Id = Guid.NewGuid(), PracticeAssignmentId = assignment.Id, MemberId = member.Id, AttemptNo = attemptNo,
+            Status = status, AudioPublicId = "audio", SubmittedAt = start.AddHours(hour),
+        };
+
+        var binhOld = Submission(a, binh, 1, SubmissionStatus.NeedsRevision, 1);
+        var binhNewest = Submission(a, binh, 2, SubmissionStatus.Submitted, 2);
+        var anNewest = Submission(a, an, 1, SubmissionStatus.Passed, 3);
+        var other = Submission(b, an, 1, SubmissionStatus.Submitted, 0);
+
+        await using var context = _db.NewContext();
+        context.AddRange(an, binh, a, b, binhOld, binhNewest, anNewest, other);
+        await context.SaveChangesAsync(_ct);
+
+        return new SubmissionSeed(a.Id, binhOld.Id, binhNewest.Id, anNewest.Id, other.Id);
+    }
+
+    [Fact]
+    public async Task PracticeSubmission_SearchByAssignment_NewestPerMemberOrderedByName_Async()
+    {
+        var seed = await SeedSubmissionsAsync();
+        await using var context = _db.NewContext();
+
+        var page = await new PracticeSubmissionRepository(context)
+            .SearchAsync(seed.AssignmentId, new SearchPracticeSubmissionsRequest(), _ct);
+
+        Assert.Equal([seed.AnNewest, seed.BinhNewest], page.Items.Select(x => x.Id));
+        Assert.Equal("An", page.Items[0].Member.User.FullName);
+        Assert.Equal("A", page.Items[0].PracticeAssignment.Title);
+    }
+
+    [Fact]
+    public async Task PracticeSubmission_SearchByAssignment_AllAttemptsNewestFirstPerMember_Async()
+    {
+        var seed = await SeedSubmissionsAsync();
+        await using var context = _db.NewContext();
+
+        var page = await new PracticeSubmissionRepository(context)
+            .SearchAsync(seed.AssignmentId, new SearchPracticeSubmissionsRequest { AllAttempts = true }, _ct);
+
+        Assert.Equal([seed.AnNewest, seed.BinhNewest, seed.BinhOld], page.Items.Select(x => x.Id));
+    }
+
+    [Fact]
+    public async Task PracticeSubmission_ReviewQueue_FiltersNewestByStatusOldestFirst_Async()
+    {
+        var seed = await SeedSubmissionsAsync();
+        await using var context = _db.NewContext();
+
+        var page = await new PracticeSubmissionRepository(context)
+            .SearchAsync(null, new SearchPracticeSubmissionsRequest { Status = SubmissionStatus.Submitted }, _ct);
+
+        Assert.Equal([seed.OtherAssignmentSubmission, seed.BinhNewest], page.Items.Select(x => x.Id));
+        Assert.Equal(2, page.TotalCount);
+    }
+
+    [Fact]
+    public async Task PracticeSubmission_ReviewQueue_StatusOfOlderAttemptDoesNotMatch_Async()
+    {
+        await SeedSubmissionsAsync();
+        await using var context = _db.NewContext();
+
+        // Binh's attempt 1 is NeedsRevision but attempt 2 supersedes it.
+        var page = await new PracticeSubmissionRepository(context)
+            .SearchAsync(null, new SearchPracticeSubmissionsRequest { Status = SubmissionStatus.NeedsRevision }, _ct);
+
+        Assert.Empty(page.Items);
+    }
+
+    [Fact]
+    public async Task PracticeSubmission_GetWithMember_LoadsMemberAndAssignment_Async()
+    {
+        var seed = await SeedSubmissionsAsync();
+        await using var context = _db.NewContext();
+        var repository = new PracticeSubmissionRepository(context);
+
+        var submission = await repository.GetWithMemberAsync(seed.BinhOld, _ct);
+
+        Assert.NotNull(submission);
+        Assert.Equal("Binh", submission.Member.User.FullName);
+        Assert.Equal("A", submission.PracticeAssignment.Title);
+        Assert.Null(await repository.GetWithMemberAsync(Guid.NewGuid(), _ct));
+    }
+
+    [Fact]
+    public async Task PracticeSubmission_GetWithMember_LoadsFeedbacksWithReviewer_Async()
+    {
+        var seed = await SeedSubmissionsAsync();
+        var director = await _db.AddUserAsync("director@test.com", RoleNames.ChoirDirector, _ct, fullName: "Director");
+        await using (var seedContext = _db.NewContext())
+        {
+            seedContext.PracticeFeedbacks.AddRange(
+                new PracticeFeedback
+                {
+                    Id = Guid.NewGuid(), SubmissionId = seed.BinhOld, ReviewerId = director.Id,
+                    Result = SubmissionStatus.NeedsRevision, Comment = "Breathe earlier", ReviewedAt = DateTime.UtcNow.AddHours(-1),
+                },
+                new PracticeFeedback
+                {
+                    Id = Guid.NewGuid(), SubmissionId = seed.BinhOld, ReviewerId = director.Id,
+                    Result = SubmissionStatus.NeedsRevision, Comment = "And slower", ReviewedAt = DateTime.UtcNow,
+                });
+            await seedContext.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var submission = await new PracticeSubmissionRepository(context).GetWithMemberAsync(seed.BinhOld, _ct);
+
+        Assert.Equal(2, submission!.Feedbacks.Count);
+        Assert.All(submission.Feedbacks, f => Assert.Equal("Director", f.Reviewer.FullName));
+    }
+
+    [Fact]
+    public async Task PracticeSubmission_SearchForMember_OnlyOwnAttemptsNewestFirst_Async()
+    {
+        var seed = await SeedSubmissionsAsync();
+        await using var context = _db.NewContext();
+        var repository = new PracticeSubmissionRepository(context);
+        var binhId = (await context.PracticeSubmissions.SingleAsync(x => x.Id == seed.BinhOld, _ct)).MemberId;
+
+        var all = await repository.SearchForMemberAsync(binhId, new SearchMyPracticeSubmissionsRequest(), _ct);
+        var otherAssignment = await repository.SearchForMemberAsync(
+            binhId, new SearchMyPracticeSubmissionsRequest { AssignmentId = Guid.NewGuid() }, _ct);
+
+        Assert.Equal([seed.BinhNewest, seed.BinhOld], all.Items.Select(x => x.Id));
+        Assert.Equal("A", all.Items[0].PracticeAssignment.Title);
+        Assert.Empty(otherAssignment.Items);
+    }
+
+    [Fact]
+    public async Task PracticeSubmission_IsLatestAttempt_FalseWhenMemberSubmittedAgain_Async()
+    {
+        var seed = await SeedSubmissionsAsync();
+        await using var context = _db.NewContext();
+        var repository = new PracticeSubmissionRepository(context);
+
+        var old = await repository.GetForReviewAsync(seed.BinhOld, _ct);
+        var newest = await repository.GetForReviewAsync(seed.BinhNewest, _ct);
+
+        Assert.False(await repository.IsLatestAttemptAsync(old!, _ct));
+        Assert.True(await repository.IsLatestAttemptAsync(newest!, _ct));
+    }
+
+    [Fact]
+    public async Task PracticeSubmission_TrySaveReview_ConcurrentReview_SecondReturnsFalseAndFirstStands_Async()
+    {
+        var seed = await SeedSubmissionsAsync();
+        var directorId = (await _db.AddUserAsync("director@test.com", RoleNames.ChoirDirector, _ct)).Id;
+        await using var firstContext = _db.NewContext();
+        await using var secondContext = _db.NewContext();
+        var first = new PracticeSubmissionRepository(firstContext);
+        var second = new PracticeSubmissionRepository(secondContext);
+
+        // Both directors read the row while it is still Submitted.
+        var firstRead = await first.GetForReviewAsync(seed.BinhNewest, _ct);
+        var secondRead = await second.GetForReviewAsync(seed.BinhNewest, _ct);
+
+        PracticeFeedback Review(PracticeSubmission submission, SubmissionStatus result)
+        {
+            submission.Status = result;
+            return new PracticeFeedback
+            {
+                Id = Guid.NewGuid(), SubmissionId = submission.Id, ReviewerId = directorId, Result = result,
+                ReviewedAt = DateTime.UtcNow,
+            };
+        }
+
+        Assert.True(await first.TrySaveReviewAsync(firstRead!, Review(firstRead!, SubmissionStatus.Passed), _ct));
+        Assert.False(await second.TrySaveReviewAsync(secondRead!, Review(secondRead!, SubmissionStatus.NeedsRevision), _ct));
+
+        await using var check = _db.NewContext();
+        var saved = await check.PracticeSubmissions.Include(x => x.Feedbacks).SingleAsync(x => x.Id == seed.BinhNewest, _ct);
+        Assert.Equal(SubmissionStatus.Passed, saved.Status);
+        Assert.Equal(SubmissionStatus.Passed, Assert.Single(saved.Feedbacks).Result);
+        // Nothing of the losing review is left pending for a later save in the same request.
+        Assert.DoesNotContain(secondContext.ChangeTracker.Entries(), e => e.State != EntityState.Unchanged);
+    }
+
     // ---- GenericRepository ----
 
     [Fact]

@@ -48,4 +48,8 @@ public interface IMemberSkillRepository : IGenericRepository<MemberSkill>
     /// request changed the row's status after it was read, so nothing is saved.
     /// </summary>
     Task<bool> TrySaveReviewAsync(MemberSkill memberSkill, CancellationToken cancellationToken);
+
+    /// <summary>Distinct user ids of active members holding an approved declaration of any of the skills.</summary>
+    Task<List<Guid>> GetActiveMemberUserIdsBySkillsAsync(
+        IReadOnlyCollection<Guid> skillIds, CancellationToken cancellationToken);
 }

@@ -104,6 +104,8 @@ public static class DependencyInjection
         services.AddScoped<ILiturgicalDayRepository, LiturgicalDayRepository>();
         services.AddScoped<ILiturgicalEventRepository, LiturgicalEventRepository>();
         services.AddScoped<IRehearsalRepository, RehearsalRepository>();
+        services.AddScoped<IPracticeAssignmentRepository, PracticeAssignmentRepository>();
+        services.AddScoped<IPracticeSubmissionRepository, PracticeSubmissionRepository>();
 
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IPasswordHasherService, PasswordHasherService>();

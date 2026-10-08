@@ -286,4 +286,5 @@ Written once here instead of repeated 43 times:
 - 2026-10-05: `NotificationType.SkillReview` added — member is notified when the Choir Director approves or rejects a declared skill (UC-19). Appended last, stored as int, no migration.
 - 2026-10-06: UC-25b — `RosterAssignment` gains `status` (enum `RosterAssignmentStatus`, 20 → 21) and `replacedByAssignmentId`: replacing a member keeps the old line as Replaced, linked to the new line.
 - 2026-10-07: `NotificationType.EventCancelled` added — Choir Directors and members are notified when the priest cancels a published event (UC-12). Appended last, stored as int, no migration.
+- 2026-10-07: `PracticeSubmission.status` becomes a concurrency token (UC-29): a review saves only while the row is still Submitted, so two directors cannot both grade it. No column change; needs an empty migration that updates the model snapshot.
 - 2026-10-07: `phone` moves from `MemberProfile` to `User` so every role has one; `User` gains `isPasswordChangeRequired` (set when the Admin creates the account and emails the password, cleared on change / reset). Needs a migration that copies existing phones.

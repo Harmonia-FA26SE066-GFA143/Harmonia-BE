@@ -266,6 +266,17 @@ public static class ErrorCodes
 
     public const string PracticeSubmissionAlreadyReviewed = "PRACTICE_SUBMISSION_ALREADY_REVIEWED";
 
+    public const string PracticeSubmissionAlreadyPassed = "PRACTICE_SUBMISSION_ALREADY_PASSED";
+
+    // The member submitted a newer attempt; only the newest attempt of an assignment is reviewed.
+    public const string PracticeSubmissionSuperseded = "PRACTICE_SUBMISSION_SUPERSEDED";
+
+    // Extra feedback needs a first review: grade the submission through its feedback endpoint first.
+    public const string PracticeSubmissionNotReviewed = "PRACTICE_SUBMISSION_NOT_REVIEWED";
+
+    // Two submissions of the same assignment raced for the same attempt number; the client reloads and retries.
+    public const string PracticeSubmissionConflict = "PRACTICE_SUBMISSION_CONFLICT";
+
     public const string PracticeAudioRequired = "PRACTICE_AUDIO_REQUIRED";
 
     public const string PracticeAudioTypeNotAllowed = "PRACTICE_AUDIO_TYPE_NOT_ALLOWED";
