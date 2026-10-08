@@ -152,6 +152,7 @@ public static class ErrorStatusMap
         [ErrorCodes.PracticeSubmissionAlreadyReviewed] = StatusCodes.Status409Conflict,
         [ErrorCodes.PracticeSubmissionAlreadyPassed] = StatusCodes.Status409Conflict,
         [ErrorCodes.PracticeSubmissionSuperseded] = StatusCodes.Status409Conflict,
+        [ErrorCodes.PracticeSubmissionNotReviewed] = StatusCodes.Status409Conflict,
         [ErrorCodes.PracticeSubmissionConflict] = StatusCodes.Status409Conflict,
         [ErrorCodes.PracticeAudioRequired] = StatusCodes.Status400BadRequest,
         [ErrorCodes.PracticeAudioTypeNotAllowed] = StatusCodes.Status400BadRequest,

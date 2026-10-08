@@ -65,7 +65,7 @@ namespace Harmonia.Infrastructure.Migrations
 
                     b.HasIndex("EntityType", "EntityId");
 
-                    b.ToTable("AuditLogs");
+                    b.ToTable("AuditLogs", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.CeremonyType", b =>
@@ -91,7 +91,7 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("CeremonyTypes");
+                    b.ToTable("CeremonyTypes", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.DirectorNote", b =>
@@ -128,7 +128,7 @@ namespace Harmonia.Infrastructure.Migrations
 
                     b.HasIndex("ToUserId");
 
-                    b.ToTable("DirectorNotes");
+                    b.ToTable("DirectorNotes", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.EventCategory", b =>
@@ -154,7 +154,7 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("EventCategories");
+                    b.ToTable("EventCategories", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.EventParticipation", b =>
@@ -189,7 +189,7 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("EventId", "MemberId")
                         .IsUnique();
 
-                    b.ToTable("EventParticipations");
+                    b.ToTable("EventParticipations", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.LiturgicalDay", b =>
@@ -222,7 +222,7 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("Date")
                         .IsUnique();
 
-                    b.ToTable("LiturgicalDays");
+                    b.ToTable("LiturgicalDays", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.LiturgicalEvent", b =>
@@ -293,7 +293,7 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("EventDate", "Time", "LocationId")
                         .IsUnique();
 
-                    b.ToTable("LiturgicalEvents");
+                    b.ToTable("LiturgicalEvents", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.LiturgicalSeason", b =>
@@ -322,7 +322,7 @@ namespace Harmonia.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("LiturgicalSeasons");
+                    b.ToTable("LiturgicalSeasons", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.LiturgicalSlot", b =>
@@ -347,7 +347,7 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("LiturgicalSlots");
+                    b.ToTable("LiturgicalSlots", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.MassType", b =>
@@ -373,7 +373,7 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("MassTypes");
+                    b.ToTable("MassTypes", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.MaterialLearningProgress", b =>
@@ -401,7 +401,7 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("MemberId", "MaterialId")
                         .IsUnique();
 
-                    b.ToTable("MaterialLearningProgresses");
+                    b.ToTable("MaterialLearningProgresses", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.MemberProfile", b =>
@@ -439,7 +439,7 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("MemberProfiles");
+                    b.ToTable("MemberProfiles", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.MemberSkill", b =>
@@ -484,7 +484,7 @@ namespace Harmonia.Infrastructure.Migrations
                         .IsUnique()
                         .HasFilter("[Status] <> 2");
 
-                    b.ToTable("MemberSkills");
+                    b.ToTable("MemberSkills", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.MusicMaterial", b =>
@@ -541,7 +541,7 @@ namespace Harmonia.Infrastructure.Migrations
 
                     b.HasIndex("TargetSkillId");
 
-                    b.ToTable("MusicMaterials");
+                    b.ToTable("MusicMaterials", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.Notification", b =>
@@ -577,7 +577,7 @@ namespace Harmonia.Infrastructure.Migrations
 
                     b.HasIndex("ReferenceType", "ReferenceId");
 
-                    b.ToTable("Notifications");
+                    b.ToTable("Notifications", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.NotificationRecipient", b =>
@@ -605,7 +605,7 @@ namespace Harmonia.Infrastructure.Migrations
 
                     b.HasIndex("UserId", "IsRead");
 
-                    b.ToTable("NotificationRecipients");
+                    b.ToTable("NotificationRecipients", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.PasswordResetToken", b =>
@@ -635,7 +635,7 @@ namespace Harmonia.Infrastructure.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("PasswordResetTokens");
+                    b.ToTable("PasswordResetTokens", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.PracticeAssignment", b =>
@@ -688,7 +688,7 @@ namespace Harmonia.Infrastructure.Migrations
 
                     b.HasIndex("SongId");
 
-                    b.ToTable("PracticeAssignments");
+                    b.ToTable("PracticeAssignments", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.PracticeAssignmentTarget", b =>
@@ -717,7 +717,7 @@ namespace Harmonia.Infrastructure.Migrations
 
                     b.HasIndex("SkillId");
 
-                    b.ToTable("PracticeAssignmentTargets");
+                    b.ToTable("PracticeAssignmentTargets", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.PracticeFeedback", b =>
@@ -748,7 +748,7 @@ namespace Harmonia.Infrastructure.Migrations
 
                     b.HasIndex("SubmissionId");
 
-                    b.ToTable("PracticeFeedbacks");
+                    b.ToTable("PracticeFeedbacks", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.PracticeSubmission", b =>
@@ -788,7 +788,7 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("PracticeAssignmentId", "MemberId", "AttemptNo")
                         .IsUnique();
 
-                    b.ToTable("PracticeSubmissions");
+                    b.ToTable("PracticeSubmissions", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.RefreshToken", b =>
@@ -825,7 +825,7 @@ namespace Harmonia.Infrastructure.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("RefreshTokens");
+                    b.ToTable("RefreshTokens", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.Rehearsal", b =>
@@ -868,7 +868,7 @@ namespace Harmonia.Infrastructure.Migrations
 
                     b.HasIndex("LocationId");
 
-                    b.ToTable("Rehearsals");
+                    b.ToTable("Rehearsals", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.RehearsalAttendance", b =>
@@ -901,7 +901,7 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("RehearsalId", "MemberId")
                         .IsUnique();
 
-                    b.ToTable("RehearsalAttendances");
+                    b.ToTable("RehearsalAttendances", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.ReportExport", b =>
@@ -933,7 +933,7 @@ namespace Harmonia.Infrastructure.Migrations
 
                     b.HasIndex("ExportedBy");
 
-                    b.ToTable("ReportExports");
+                    b.ToTable("ReportExports", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.Role", b =>
@@ -956,7 +956,7 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Roles");
+                    b.ToTable("Roles", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.RosterAssignment", b =>
@@ -1001,7 +1001,7 @@ namespace Harmonia.Infrastructure.Migrations
 
                     b.HasIndex("SongListItemId");
 
-                    b.ToTable("RosterAssignments");
+                    b.ToTable("RosterAssignments", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.RosterShortage", b =>
@@ -1031,7 +1031,7 @@ namespace Harmonia.Infrastructure.Migrations
 
                     b.HasIndex("SkillId");
 
-                    b.ToTable("RosterShortages");
+                    b.ToTable("RosterShortages", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.ServiceRoster", b =>
@@ -1079,7 +1079,7 @@ namespace Harmonia.Infrastructure.Migrations
 
                     b.HasIndex("GeneratedBy");
 
-                    b.ToTable("ServiceRosters");
+                    b.ToTable("ServiceRosters", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.Skill", b =>
@@ -1108,7 +1108,7 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("CategoryId", "Name")
                         .IsUnique();
 
-                    b.ToTable("Skills");
+                    b.ToTable("Skills", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.SkillCategory", b =>
@@ -1134,7 +1134,7 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("SkillCategories");
+                    b.ToTable("SkillCategories", (string)null);
 
                     b.HasData(
                         new
@@ -1219,7 +1219,7 @@ namespace Harmonia.Infrastructure.Migrations
 
                     b.HasIndex("Title");
 
-                    b.ToTable("Songs");
+                    b.ToTable("Songs", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.SongClassification", b =>
@@ -1244,7 +1244,7 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("SongId", "TargetType", "TargetId")
                         .IsUnique();
 
-                    b.ToTable("SongClassifications");
+                    b.ToTable("SongClassifications", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.SongInstrumentRequirement", b =>
@@ -1269,7 +1269,7 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("SongId", "SkillId")
                         .IsUnique();
 
-                    b.ToTable("SongInstrumentRequirements");
+                    b.ToTable("SongInstrumentRequirements", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.SongList", b =>
@@ -1320,7 +1320,7 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("EventId", "Version")
                         .IsUnique();
 
-                    b.ToTable("SongLists");
+                    b.ToTable("SongLists", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.SongListItem", b =>
@@ -1353,7 +1353,7 @@ namespace Harmonia.Infrastructure.Migrations
 
                     b.HasIndex("SongListId");
 
-                    b.ToTable("SongListItems");
+                    b.ToTable("SongListItems", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.SongListReview", b =>
@@ -1384,7 +1384,7 @@ namespace Harmonia.Infrastructure.Migrations
 
                     b.HasIndex("SongListId");
 
-                    b.ToTable("SongListReviews");
+                    b.ToTable("SongListReviews", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.SongPersonnelRequirement", b =>
@@ -1409,7 +1409,7 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("SongListItemId", "SkillId")
                         .IsUnique();
 
-                    b.ToTable("SongPersonnelRequirements");
+                    b.ToTable("SongPersonnelRequirements", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.SongTheme", b =>
@@ -1435,7 +1435,7 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("SongThemes");
+                    b.ToTable("SongThemes", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.SongVocalRequirement", b =>
@@ -1460,7 +1460,7 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("SongId", "SkillId")
                         .IsUnique();
 
-                    b.ToTable("SongVocalRequirements");
+                    b.ToTable("SongVocalRequirements", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.SystemSetting", b =>
@@ -1491,7 +1491,7 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("Key")
                         .IsUnique();
 
-                    b.ToTable("SystemSettings");
+                    b.ToTable("SystemSettings", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.User", b =>
@@ -1558,7 +1558,7 @@ namespace Harmonia.Infrastructure.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.WorshipLocation", b =>
@@ -1584,7 +1584,7 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("WorshipLocations");
+                    b.ToTable("WorshipLocations", (string)null);
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.AuditLog", b =>

@@ -27,6 +27,12 @@ public class PracticeAssignmentsController(
         [FromQuery] SearchMyPracticeAssignmentsRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await practiceAssignmentService.GetMineAsync(User.GetUserId(), request, cancellationToken));
 
+    /// <summary>How many of the calling member's assignments are in each state (UC-10 / FE-12).</summary>
+    [HttpGet("mine/counts")]
+    [Authorize(Roles = RoleNames.ChoirMember)]
+    public async Task<IActionResult> GetMyCountsAsync(CancellationToken cancellationToken) =>
+        ToActionResult(await practiceAssignmentService.GetMyCountsAsync(User.GetUserId(), cancellationToken));
+
     [HttpGet("mine/{id:guid}")]
     [Authorize(Roles = RoleNames.ChoirMember)]
     public async Task<IActionResult> GetMineByIdAsync(Guid id, CancellationToken cancellationToken) =>

@@ -248,6 +248,62 @@ public class PracticeAssignmentServiceTests
     }
 
     [Fact]
+    public async Task GetMyCounts_SplitsByNewestAttemptAndCountsOverdueOnTop_Async()
+    {
+        _members.GetByUserIdAsync(_activeMember.UserId, _ct).Returns(_activeMember);
+        var past = DateTime.UtcNow.AddDays(-1);
+        var future = DateTime.UtcNow.AddDays(1);
+        _assignments.GetProgressForMemberAsync(_activeMember.Id, _ct).Returns(
+        [
+            (future, null),
+            (past, null),
+            (future, SubmissionStatus.Submitted),
+            (past, SubmissionStatus.NeedsRevision),
+            (past, SubmissionStatus.Passed),
+            (future, SubmissionStatus.Passed),
+        ]);
+
+        var result = await _sut.GetMyCountsAsync(_activeMember.UserId, _ct);
+
+        Assert.Equal(new MyPracticeAssignmentCountsResponse(
+            Total: 6, NotSubmitted: 2, Submitted: 1, NeedsRevision: 1, Passed: 2, Overdue: 2), result.Value);
+    }
+
+    [Fact]
+    public async Task GetMyCounts_NoMemberProfile_ReturnsMemberNotFound_Async()
+    {
+        var result = await _sut.GetMyCountsAsync(Guid.NewGuid(), _ct);
+
+        Assert.Equal(ErrorCodes.MemberNotFound, result.Code);
+    }
+
+    [Theory]
+    [InlineData(-1, null, true)]
+    [InlineData(-1, SubmissionStatus.Submitted, true)]
+    [InlineData(-1, SubmissionStatus.NeedsRevision, true)]
+    [InlineData(-1, SubmissionStatus.Passed, false)]
+    [InlineData(1, null, false)]
+    [InlineData(1, SubmissionStatus.NeedsRevision, false)]
+    public async Task GetMine_IsOverdue_DuePassedWithoutPassedAttempt_Async(
+        int dueInDays, SubmissionStatus? latestStatus, bool expected)
+    {
+        _members.GetByUserIdAsync(_activeMember.UserId, _ct).Returns(_activeMember);
+        var request = new SearchMyPracticeAssignmentsRequest();
+        var assignment = new PracticeAssignment
+        {
+            Id = Guid.NewGuid(),
+            DueDate = DateTime.UtcNow.AddDays(dueInDays),
+            Submissions = latestStatus is { } status ? [new PracticeSubmission { AttemptNo = 1, Status = status }] : [],
+        };
+        _assignments.GetForMemberAsync(_activeMember.Id, request, _ct)
+            .Returns(new PagedList<PracticeAssignment>([assignment], 1, 20, 1));
+
+        var result = await _sut.GetMineAsync(_activeMember.UserId, request, _ct);
+
+        Assert.Equal(expected, Assert.Single(result.Value!.Items).IsOverdue);
+    }
+
+    [Fact]
     public async Task GetMine_NoMemberProfile_ReturnsMemberNotFound_Async()
     {
         var result = await _sut.GetMineAsync(Guid.NewGuid(), new SearchMyPracticeAssignmentsRequest(), _ct);

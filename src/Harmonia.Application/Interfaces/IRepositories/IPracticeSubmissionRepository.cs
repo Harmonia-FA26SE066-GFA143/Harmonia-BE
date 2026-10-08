@@ -14,7 +14,8 @@ public interface IPracticeSubmissionRepository : IGenericRepository<PracticeSubm
 
     /// <summary>
     /// Read-only page of submissions with <see cref="PracticeSubmission.Member"/> and its User, and
-    /// <see cref="PracticeSubmission.PracticeAssignment"/> loaded. Only each member's newest attempt per assignment
+    /// <see cref="PracticeSubmission.PracticeAssignment"/> loaded, plus <see cref="PracticeSubmission.Feedbacks"/>
+    /// with each Reviewer. Only each member's newest attempt per assignment
     /// unless <see cref="SearchPracticeSubmissionsRequest.AllAttempts"/> is set; the status filter applies after that.
     /// With <paramref name="assignmentId"/>: that assignment only, ordered by member name then newest attempt first.
     /// Without it: every assignment, oldest submission first (the review queue).
@@ -22,10 +23,17 @@ public interface IPracticeSubmissionRepository : IGenericRepository<PracticeSubm
     Task<PagedList<PracticeSubmission>> SearchAsync(
         Guid? assignmentId, SearchPracticeSubmissionsRequest filter, CancellationToken cancellationToken);
 
-    /// <summary>Read-only, with <see cref="PracticeSubmission.Member"/> and its User, and the assignment loaded.</summary>
+    /// <summary>
+    /// Read-only page of every attempt of one member, newest submission first, optionally for one assignment.
+    /// Loaded like <see cref="SearchAsync"/>.
+    /// </summary>
+    Task<PagedList<PracticeSubmission>> SearchForMemberAsync(
+        Guid memberId, SearchMyPracticeSubmissionsRequest filter, CancellationToken cancellationToken);
+
+    /// <summary>Read-only, with Member and its User, the assignment, and Feedbacks with each Reviewer loaded.</summary>
     Task<PracticeSubmission?> GetWithMemberAsync(Guid id, CancellationToken cancellationToken);
 
-    /// <summary>Tracked, with <see cref="PracticeSubmission.Member"/> and its User, and the assignment loaded.</summary>
+    /// <summary>Tracked, with Member and its User, the assignment, and Feedbacks with each Reviewer loaded.</summary>
     Task<PracticeSubmission?> GetForReviewAsync(Guid id, CancellationToken cancellationToken);
 
     /// <summary>True when the member has no later attempt of the same assignment.</summary>

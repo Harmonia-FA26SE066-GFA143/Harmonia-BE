@@ -1,6 +1,7 @@
 using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
 using Harmonia.Domain.Entities;
+using Harmonia.Domain.Enums;
 
 namespace Harmonia.Application.Interfaces.IRepositories;
 
@@ -15,6 +16,10 @@ public interface IPracticeAssignmentRepository : IGenericRepository<PracticeAssi
     /// </summary>
     Task<PagedList<PracticeAssignment>> GetForMemberAsync(
         Guid memberId, SearchMyPracticeAssignmentsRequest filter, CancellationToken cancellationToken);
+
+    /// <summary>Due date and the member's newest attempt status of every assignment the member receives.</summary>
+    Task<List<(DateTime DueDate, SubmissionStatus? LatestStatus)>> GetProgressForMemberAsync(
+        Guid memberId, CancellationToken cancellationToken);
 
     /// <summary>Same scope and loading as <see cref="GetForMemberAsync"/>; null when the member does not receive it.</summary>
     Task<PracticeAssignment?> GetByIdForMemberAsync(Guid id, Guid memberId, CancellationToken cancellationToken);

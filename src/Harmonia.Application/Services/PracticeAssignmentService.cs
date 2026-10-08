@@ -137,6 +137,25 @@ public class PracticeAssignmentService(
             : Result<PracticeAssignmentDetailDto>.Success(mapper.Map<PracticeAssignmentDetailDto>(assignment));
     }
 
+    public async Task<Result<MyPracticeAssignmentCountsResponse>> GetMyCountsAsync(
+        Guid userId, CancellationToken cancellationToken)
+    {
+        var member = await memberProfileRepository.GetByUserIdAsync(userId, cancellationToken);
+        if (member is null) return Result<MyPracticeAssignmentCountsResponse>.Failure(ErrorCodes.MemberNotFound);
+
+        // ponytail: counts in memory over one row per assignment; move to SQL GROUP BY if a member ever gets thousands.
+        var progress = await practiceAssignmentRepository.GetProgressForMemberAsync(member.Id, cancellationToken);
+        var now = DateTime.UtcNow;
+
+        return Result<MyPracticeAssignmentCountsResponse>.Success(new MyPracticeAssignmentCountsResponse(
+            Total: progress.Count,
+            NotSubmitted: progress.Count(x => x.LatestStatus is null),
+            Submitted: progress.Count(x => x.LatestStatus == SubmissionStatus.Submitted),
+            NeedsRevision: progress.Count(x => x.LatestStatus == SubmissionStatus.NeedsRevision),
+            Passed: progress.Count(x => x.LatestStatus == SubmissionStatus.Passed),
+            Overdue: progress.Count(x => PracticeAssignment.IsOverdue(x.DueDate, x.LatestStatus, now))));
+    }
+
     public async Task<Result<PracticeSubmissionDto>> SubmitAsync(
         Guid userId, Guid assignmentId, CreatePracticeSubmissionRequest request, FileContent? file,
         CancellationToken cancellationToken)

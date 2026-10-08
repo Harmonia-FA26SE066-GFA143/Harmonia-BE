@@ -22,6 +22,24 @@ public class PracticeAssignmentRepository(HarmoniaDbContext dbContext)
             query = isOpen ? query.Where(x => x.DueDate >= now) : query.Where(x => x.DueDate < now);
         }
 
+        if (filter.HasSubmission is { } hasSubmission)
+            query = query.Where(x => x.Submissions.Any(s => s.MemberId == memberId) == hasSubmission);
+
+        // "Newest attempt" is spelled out in each Where: EF cannot inline a shared C# helper into SQL.
+        if (filter.Status == SubmissionStatus.Overdue)
+        {
+            // SQL copy of PracticeAssignment.IsOverdue; a repository test keeps the two in step.
+            var now = DateTime.UtcNow;
+            query = query.Where(x => x.DueDate < now
+                && x.Submissions.Where(s => s.MemberId == memberId).OrderByDescending(s => s.AttemptNo)
+                    .Select(s => (SubmissionStatus?)s.Status).FirstOrDefault() != SubmissionStatus.Passed);
+        }
+        else if (filter.Status is { } status)
+        {
+            query = query.Where(x => x.Submissions.Where(s => s.MemberId == memberId).OrderByDescending(s => s.AttemptNo)
+                .Select(s => (SubmissionStatus?)s.Status).FirstOrDefault() == status);
+        }
+
         var totalCount = await query.CountAsync(cancellationToken);
 
         var items = await WithDetails(query, memberId)
@@ -32,6 +50,21 @@ public class PracticeAssignmentRepository(HarmoniaDbContext dbContext)
             .ToListAsync(cancellationToken);
 
         return new PagedList<PracticeAssignment>(items, filter.PageNumber, filter.PageSize, totalCount);
+    }
+
+    public async Task<List<(DateTime DueDate, SubmissionStatus? LatestStatus)>> GetProgressForMemberAsync(
+        Guid memberId, CancellationToken cancellationToken)
+    {
+        var rows = await VisibleToMember(memberId)
+            .Select(x => new
+            {
+                x.DueDate,
+                LatestStatus = x.Submissions.Where(s => s.MemberId == memberId).OrderByDescending(s => s.AttemptNo)
+                    .Select(s => (SubmissionStatus?)s.Status).FirstOrDefault(),
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows.Select(x => (x.DueDate, x.LatestStatus)).ToList();
     }
 
     public Task<PracticeAssignment?> GetByIdForMemberAsync(Guid id, Guid memberId, CancellationToken cancellationToken) =>

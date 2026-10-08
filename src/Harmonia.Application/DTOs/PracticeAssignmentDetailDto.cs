@@ -37,4 +37,10 @@ public class PracticeAssignmentDetailDto
     public SubmissionStatus? LatestSubmissionStatus { get; set; }
 
     public DateTime? LatestSubmittedAt { get; set; }
+
+    /// <summary>
+    /// The due date has passed without a Passed attempt: never submitted, or the newest attempt is still
+    /// Submitted or NeedsRevision. Computed on read; no submission row is ever stored as Overdue.
+    /// </summary>
+    public bool IsOverdue { get; set; }
 }

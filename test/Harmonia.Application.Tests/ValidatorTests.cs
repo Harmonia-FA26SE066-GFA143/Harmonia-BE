@@ -322,6 +322,33 @@ public class ValidatorTests
         Assert.False(validation.IsValid);
     }
 
+    // ---- Practice extra feedback ----
+
+    [Theory]
+    [InlineData("Nice", null, true)]
+    [InlineData("Nice", SubmissionStatus.Passed, true)]
+    [InlineData("Redo bar 4", SubmissionStatus.NeedsRevision, true)]
+    [InlineData("", null, false)]
+    [InlineData("   ", SubmissionStatus.Passed, false)]
+    [InlineData("Nice", SubmissionStatus.Submitted, false)]
+    [InlineData("Nice", SubmissionStatus.Overdue, false)]
+    public void AddPracticeFeedback_CommentAndResult(string comment, SubmissionStatus? result, bool isValid)
+    {
+        var validation = new AddPracticeFeedbackRequestValidator().Validate(
+            new AddPracticeFeedbackRequest { Comment = comment, Result = result });
+
+        Assert.Equal(isValid, validation.IsValid);
+    }
+
+    [Fact]
+    public void AddPracticeFeedback_CommentTooLong_IsInvalid()
+    {
+        var validation = new AddPracticeFeedbackRequestValidator().Validate(
+            new AddPracticeFeedbackRequest { Comment = new string('a', 1001) });
+
+        Assert.False(validation.IsValid);
+    }
+
     // ---- Practice submission ----
 
     [Theory]

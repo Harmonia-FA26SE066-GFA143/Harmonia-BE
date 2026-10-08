@@ -1,8 +1,11 @@
 namespace Harmonia.Application.DTOs;
 
-/// <summary>A submission as the Choir Director reviews it: who sent it and for which assignment.</summary>
+/// <summary>A submission with who sent it, for which assignment, and every review so far.</summary>
 public class PracticeSubmissionDetailDto : PracticeSubmissionDto
 {
+    /// <summary>Oldest first; the last one carries the current result.</summary>
+    public List<PracticeFeedbackDto> Feedbacks { get; set; } = [];
+
     public Guid MemberId { get; set; }
 
     public string MemberName { get; set; } = string.Empty;

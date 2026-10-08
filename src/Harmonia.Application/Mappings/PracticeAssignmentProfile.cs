@@ -32,6 +32,10 @@ public class PracticeAssignmentProfile : Profile
             .ForMember(dest => dest.LatestSubmissionStatus, opt => opt.MapFrom(src => src.Submissions
                 .OrderByDescending(s => s.AttemptNo).Select(s => (SubmissionStatus?)s.Status).FirstOrDefault()))
             .ForMember(dest => dest.LatestSubmittedAt, opt => opt.MapFrom(src => src.Submissions
-                .OrderByDescending(s => s.AttemptNo).Select(s => (DateTime?)s.SubmittedAt).FirstOrDefault()));
+                .OrderByDescending(s => s.AttemptNo).Select(s => (DateTime?)s.SubmittedAt).FirstOrDefault()))
+            .ForMember(dest => dest.IsOverdue, opt => opt.MapFrom(src => PracticeAssignment.IsOverdue(
+                src.DueDate,
+                src.Submissions.OrderByDescending(s => s.AttemptNo).Select(s => (SubmissionStatus?)s.Status).FirstOrDefault(),
+                DateTime.UtcNow)));
     }
 }

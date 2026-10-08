@@ -23,4 +23,19 @@ public interface IPracticeSubmissionService
     /// </summary>
     Task<Result<PracticeSubmissionReviewDto>> ReviewAsync(
         Guid directorUserId, Guid id, ReviewPracticeSubmissionRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Adds a comment to a reviewed submission, optionally changing its result (FE-44). A result change is
+    /// allowed only on the member's newest attempt. Each call is a new feedback entry; the member is notified.
+    /// </summary>
+    Task<Result<PracticeSubmissionDetailDto>> AddFeedbackAsync(
+        Guid directorUserId, Guid id, AddPracticeFeedbackRequest request, CancellationToken cancellationToken);
+
+    /// <summary>Every attempt of the calling member with its feedback, newest first (UC-10 / FE-12, FE-13).</summary>
+    Task<Result<PagedList<PracticeSubmissionDetailDto>>> GetMineAsync(
+        Guid userId, SearchMyPracticeSubmissionsRequest request, CancellationToken cancellationToken);
+
+    /// <summary>One submission of the calling member; another member's is reported as missing, not forbidden.</summary>
+    Task<Result<PracticeSubmissionDetailDto>> GetMineByIdAsync(
+        Guid userId, Guid id, CancellationToken cancellationToken);
 }

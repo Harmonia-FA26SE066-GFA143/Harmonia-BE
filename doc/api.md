@@ -857,21 +857,42 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
   "materialTitle": "string | null",
   "materialType": "SheetMusic | null",
   "latestSubmissionStatus": "Submitted | null",
-  "latestSubmittedAt": "2026-10-10T09:00:00Z | null"
+  "latestSubmittedAt": "2026-10-10T09:00:00Z | null",
+  "isOverdue": false
 }
 ```
 
 | Method | Path | Thành công | Lỗi |
 |---|---|---|---|
-| GET | `/api/practice-assignments/mine?isOpen=&pageNumber=&pageSize=` | 200 `PagedList<PracticeAssignmentDetailDto>` | 404 `MEMBER_NOT_FOUND` |
+| GET | `/api/practice-assignments/mine?isOpen=&status=&hasSubmission=&pageNumber=&pageSize=` | 200 `PagedList<PracticeAssignmentDetailDto>` | 404 `MEMBER_NOT_FOUND` |
+| GET | `/api/practice-assignments/mine/counts` | 200 `MyPracticeAssignmentCountsResponse` | 404 `MEMBER_NOT_FOUND` |
 | GET | `/api/practice-assignments/mine/{id}` | 200 `PracticeAssignmentDetailDto` | 404 `MEMBER_NOT_FOUND`, `PRACTICE_ASSIGNMENT_NOT_FOUND` |
 
 - Ca viên thấy bài tập khi: scope `All`; có tên trong target; hoặc **hiện đang** được duyệt một skill của target.
   Skill được duyệt sau vẫn thấy bài giao trước đó; ca viên vào đoàn sau thấy cả bài `All` cũ.
 - Bài không dành cho ca viên → 404 `PRACTICE_ASSIGNMENT_NOT_FOUND` (không trả 403).
-- `isOpen`: `true` = chưa tới hạn, `false` = đã quá hạn, bỏ trống = tất cả. Sắp theo `dueDate` tăng dần.
+- Bộ lọc (kết hợp kiểu AND, bỏ trống = không lọc). Sắp theo `dueDate` tăng dần.
+  - `isOpen`: `true` = chưa tới hạn, `false` = đã qua hạn.
+  - `status`: `Submitted` / `Passed` / `NeedsRevision` = lần nộp **mới nhất** của ca viên có trạng thái đó;
+    `Overdue` = bài đang quá hạn (cùng luật với `isOverdue`).
+  - `hasSubmission`: `false` = chưa nộp lần nào, `true` = đã nộp ít nhất một lần.
+  - Ví dụ tab: "Cần làm" `hasSubmission=false&isOpen=true` · "Cần nộp lại" `status=NeedsRevision` ·
+    "Chờ chấm" `status=Submitted` · "Quá hạn" `status=Overdue`.
 - `latestSubmissionStatus` / `latestSubmittedAt` là lần nộp mới nhất **của chính ca viên**; `null` = chưa nộp.
+- `isOverdue` (UC-10 / FE-12): đã qua `dueDate` mà chưa có lần nộp `Passed` — chưa nộp, hoặc lần mới nhất còn
+  `Submitted` / `NeedsRevision`. Server tính lúc đọc; FE hiển thị "Quá hạn" theo field này, không tự tính.
+  Không bản thu nào mang `status = Overdue` (nộp sau hạn bị chặn).
 - Mở file tư liệu qua `api/music-materials` bằng `materialId`.
+
+`MyPracticeAssignmentCountsResponse` (`GET mine/counts`) — số bài tập ca viên đang nhận, theo lần nộp mới nhất:
+
+```json
+{ "total": 12, "notSubmitted": 3, "submitted": 2, "needsRevision": 1, "passed": 6, "overdue": 2 }
+```
+
+- `notSubmitted + submitted + needsRevision + passed = total` — mỗi bài đúng một nhóm.
+- `overdue` **chồng lên** các nhóm trên (bài quá hạn vẫn nằm trong `notSubmitted` / `submitted` / `needsRevision`),
+  khớp với `status=Overdue` của danh sách.
 
 ### Ca viên nộp bản thu — `ChoirMember` (UC-09 / FE-11)
 
@@ -903,9 +924,9 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 
 ---
 
-## 7d. Practice submissions — `api/practice-submissions` · role `ChoirDirector` (UC-29 / FE-42)
+## 7d. Practice submissions — `api/practice-submissions` · nghe / chấm / nhận xét: `ChoirDirector` (UC-29) · bản thu của tôi: `ChoirMember` (UC-10)
 
-`PracticeSubmissionDetailDto`: đủ các field của `PracticeSubmissionDto`, thêm người nộp và bài tập:
+`PracticeSubmissionDetailDto`: đủ các field của `PracticeSubmissionDto`, thêm người nộp, bài tập và các lần nhận xét:
 
 ```json
 {
@@ -914,7 +935,21 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
   "memberName": "Nguyễn Văn An",
   "memberAvatarUrl": "string | null",
   "assignmentTitle": "Tập bài Nhập lễ",
-  "assignmentDueDate": "2026-10-12T15:00:00Z"
+  "assignmentDueDate": "2026-10-12T15:00:00Z",
+  "feedbacks": [ /* PracticeFeedbackDto, cũ nhất trước */ ]
+}
+```
+
+`PracticeFeedbackDto` — mỗi lần chấm / nhận xét là một dòng; dòng **cuối** mang kết quả hiện tại (trùng `status`):
+
+```json
+{
+  "id": "guid",
+  "result": "NeedsRevision",
+  "comment": "Giữ nốt cuối dài hơn | null",
+  "reviewerId": "guid",
+  "reviewerName": "string | null",
+  "reviewedAt": "2026-10-10T10:00:00Z"
 }
 ```
 
@@ -937,13 +972,7 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 ```json
 {
   "...": "các field của PracticeSubmissionDetailDto",
-  "feedback": {
-    "id": "guid",
-    "result": "NeedsRevision",
-    "comment": "Giữ nốt cuối dài hơn | null",
-    "reviewerId": "guid",
-    "reviewedAt": "2026-10-10T10:00:00Z"
-  }
+  "feedback": { /* PracticeFeedbackDto vừa tạo — cũng là phần tử cuối của feedbacks */ }
 }
 ```
 
@@ -954,11 +983,40 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 - `result`: chỉ `Passed` hoặc `NeedsRevision`. `comment` tối đa 1000 ký tự, **bắt buộc khi `NeedsRevision`**.
 - Chỉ chấm được **lần nộp mới nhất** của ca viên cho bài đó; lần cũ → 409 `PRACTICE_SUBMISSION_SUPERSEDED`.
 - Mỗi bản thu chấm **một lần**: `status` khác `Submitted` → 409 `PRACTICE_SUBMISSION_ALREADY_REVIEWED`. Hai ca trưởng
-  chấm cùng lúc thì người sau cũng nhận mã này, kết quả của người trước được giữ. Chưa có API sửa kết quả đã chấm.
+  chấm cùng lúc thì người sau cũng nhận mã này, kết quả của người trước được giữ. Đổi kết quả sau đó: dùng `/comments`.
 - Quá hạn nộp vẫn chấm được.
 - Chấm xong, ca viên nhận thông báo `PracticeFeedback`, `referenceType = "PracticeSubmission"`, `referenceId` = id bản thu.
   Nội dung thông báo không chứa nhận xét; ca viên mở bản thu để đọc.
 - `NeedsRevision` → ca viên nộp lại được (lần nộp mới). `Passed` → không nộp thêm cho bài đó.
+
+### Ca trưởng nhận xét thêm / đổi kết quả (UC-29 / FE-44)
+
+| Method | Path | Body | Thành công | Lỗi |
+|---|---|---|---|---|
+| POST | `/api/practice-submissions/{id}/comments` | `{ "comment", "result?" }` | 200 `PracticeSubmissionDetailDto` | 400 `VALIDATION_FAILED` · 404 `PRACTICE_SUBMISSION_NOT_FOUND` · 409 `PRACTICE_SUBMISSION_NOT_REVIEWED`, `PRACTICE_SUBMISSION_SUPERSEDED`, `PRACTICE_SUBMISSION_ALREADY_REVIEWED` |
+
+- Chỉ cho bản thu **đã chấm** (`Passed` / `NeedsRevision`); còn `Submitted` → 409 `PRACTICE_SUBMISSION_NOT_REVIEWED`,
+  chấm qua `/feedback` trước.
+- `comment` **bắt buộc**, tối đa 1000 ký tự. Mỗi lần gọi thêm **một dòng** vào `feedbacks`, không sửa dòng cũ.
+- `result` bỏ trống (hoặc bằng kết quả hiện tại) = chỉ nhận xét thêm; được trên **mọi** lần nộp đã chấm.
+- `result` khác kết quả hiện tại = **đổi kết quả** (`Passed` ↔ `NeedsRevision`); chỉ trên **lần nộp mới nhất**,
+  lần cũ → 409 `PRACTICE_SUBMISSION_SUPERSEDED`. Hai ca trưởng đổi cùng lúc → người sau 409 `PRACTICE_SUBMISSION_ALREADY_REVIEWED`.
+- Đổi `Passed` → `NeedsRevision` mở lại việc nộp, nhưng nếu đã quá `dueDate` thì ca viên vẫn không nộp được
+  (chưa có chức năng gia hạn bài tập).
+- Ca viên nhận thông báo `PracticeFeedback` ("New practice feedback" hoặc "Practice result changed"),
+  `referenceId` = id bản thu.
+
+### Ca viên xem bản thu & nhận xét (UC-10 / FE-12, FE-13)
+
+| Method | Path | Thành công | Lỗi |
+|---|---|---|---|
+| GET | `/api/practice-submissions/mine?assignmentId=&pageNumber=&pageSize=` | 200 `PagedList<PracticeSubmissionDetailDto>` | 404 `MEMBER_NOT_FOUND` |
+| GET | `/api/practice-submissions/mine/{id}` | 200 `PracticeSubmissionDetailDto` | 404 `MEMBER_NOT_FOUND`, `PRACTICE_SUBMISSION_NOT_FOUND` |
+
+- Chỉ bản thu **của chính ca viên**, mọi lần nộp, `submittedAt` mới nhất trước; `assignmentId` lọc theo một bài tập.
+- Bản thu của người khác → 404 `PRACTICE_SUBMISSION_NOT_FOUND` (không trả 403).
+- Mở từ thông báo `PracticeFeedback`: gọi `GET /api/practice-submissions/mine/{referenceId}`.
+- Trạng thái "Quá hạn" của **bài tập** xem ở `isOverdue` của `GET /api/practice-assignments/mine`.
 
 ---
 

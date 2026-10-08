@@ -66,6 +66,23 @@ public class PracticeSubmissionRepository(HarmoniaDbContext dbContext)
         return new PagedList<PracticeSubmission>(items, filter.PageNumber, filter.PageSize, totalCount);
     }
 
+    public async Task<PagedList<PracticeSubmission>> SearchForMemberAsync(
+        Guid memberId, SearchMyPracticeSubmissionsRequest filter, CancellationToken cancellationToken)
+    {
+        var query = DbContext.PracticeSubmissions.AsNoTracking().Where(x => x.MemberId == memberId);
+
+        if (filter.AssignmentId is { } assignmentId) query = query.Where(x => x.PracticeAssignmentId == assignmentId);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await WithMemberAndAssignment(query.OrderByDescending(x => x.SubmittedAt).ThenBy(x => x.Id))
+            .Skip((filter.PageNumber - 1) * filter.PageSize)
+            .Take(filter.PageSize)
+            .ToListAsync(cancellationToken);
+
+        return new PagedList<PracticeSubmission>(items, filter.PageNumber, filter.PageSize, totalCount);
+    }
+
     public Task<PracticeSubmission?> GetWithMemberAsync(Guid id, CancellationToken cancellationToken) =>
         WithMemberAndAssignment(DbContext.PracticeSubmissions.AsNoTracking())
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -107,5 +124,9 @@ public class PracticeSubmissionRepository(HarmoniaDbContext dbContext)
         query
             .Include(x => x.Member)
                 .ThenInclude(m => m.User)
-            .Include(x => x.PracticeAssignment);
+            .Include(x => x.PracticeAssignment)
+            .Include(x => x.Feedbacks)
+                .ThenInclude(f => f.Reviewer)
+            // Feedbacks is a collection: one query per include keeps paging from multiplying rows.
+            .AsSplitQuery();
 }

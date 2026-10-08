@@ -19,6 +19,7 @@ public class PracticeSubmissionServiceTests
     private readonly IPracticeAssignmentRepository _assignments = Substitute.For<IPracticeAssignmentRepository>();
     private readonly IFileStorageService _storage = Substitute.For<IFileStorageService>();
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
+    private readonly IMemberProfileRepository _members = Substitute.For<IMemberProfileRepository>();
     private readonly PracticeSubmissionService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
 
@@ -33,7 +34,7 @@ public class PracticeSubmissionServiceTests
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<PracticeSubmissionProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new PracticeSubmissionService(_submissions, _assignments, _notifications, _storage, mapper);
+        _sut = new PracticeSubmissionService(_submissions, _assignments, _members, _notifications, _storage, mapper);
         _storage.GetSignedUrl(Arg.Any<string>()).Returns(call => $"signed:{call.Arg<string>()}");
 
         _submission = new PracticeSubmission
@@ -119,11 +120,23 @@ public class PracticeSubmissionServiceTests
 
     private PracticeFeedback? _savedFeedback;
 
+    /// <summary>
+    /// A saved review shows up in the submission's Feedbacks with its reviewer, as the service's reload after
+    /// saving would find it in the database.
+    /// </summary>
     private void ReviewableSubmission(bool isLatest = true, bool saves = true)
     {
         _submissions.GetForReviewAsync(_submission.Id, _ct).Returns(_submission);
+        _submissions.GetWithMemberAsync(_submission.Id, _ct).Returns(_submission);
         _submissions.IsLatestAttemptAsync(_submission, _ct).Returns(isLatest);
-        _submissions.TrySaveReviewAsync(_submission, Arg.Do<PracticeFeedback>(f => _savedFeedback = f), _ct).Returns(saves);
+        _submissions.TrySaveReviewAsync(_submission, Arg.Do<PracticeFeedback>(f =>
+            {
+                _savedFeedback = f;
+                if (!saves) return;
+                f.Reviewer = new User { FullName = "Director" };
+                _submission.Feedbacks.Add(f);
+            }), _ct)
+            .Returns(saves);
     }
 
     private Task<Result<PracticeSubmissionReviewDto>> ReviewAsync(SubmissionStatus result, string? comment = null) =>
@@ -156,6 +169,8 @@ public class PracticeSubmissionServiceTests
         Assert.Equal(decision, result.Value!.Status);
         Assert.Equal(decision, result.Value.Feedback.Result);
         Assert.Equal(comment?.Trim(), result.Value.Feedback.Comment);
+        Assert.Equal("Director", result.Value.Feedback.ReviewerName);
+        Assert.Equal(feedback.Id, Assert.Single(result.Value.Feedbacks).Id);
         Assert.Equal($"signed:{_submission.AudioPublicId}", result.Value.AudioUrl);
         await _notifications.Received(1).SendAsync(
             Arg.Is<SendNotificationRequest>(x =>
@@ -212,5 +227,172 @@ public class PracticeSubmissionServiceTests
 
         Assert.Equal(ErrorCodes.PracticeSubmissionAlreadyReviewed, result.Code);
         await _notifications.DidNotReceiveWithAnyArgs().SendAsync(default!, default);
+    }
+
+    // ---- Extra feedback and result change (FE-44) ----
+
+    private Task<Result<PracticeSubmissionDetailDto>> AddFeedbackAsync(string comment, SubmissionStatus? result = null) =>
+        _sut.AddFeedbackAsync(_directorId, _submission.Id, new AddPracticeFeedbackRequest { Comment = comment, Result = result }, _ct);
+
+    private Task AssertNotifiedAsync(string expectedTitle) =>
+        _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(x =>
+                x.Type == NotificationType.PracticeFeedback
+                && x.Title == expectedTitle
+                && x.ReferenceId == _submission.Id
+                && x.RecipientUserIds.SequenceEqual(new[] { _submission.Member.UserId })),
+            _ct);
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(SubmissionStatus.Passed)]
+    public async Task AddFeedback_CommentOnly_KeepsResultAndAppendsFeedback_Async(SubmissionStatus? sameResult)
+    {
+        _submission.Status = SubmissionStatus.Passed;
+        ReviewableSubmission();
+
+        var result = await AddFeedbackAsync("  Nice phrasing  ", sameResult);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(SubmissionStatus.Passed, _submission.Status);
+        Assert.Equal(SubmissionStatus.Passed, _savedFeedback!.Result);
+        Assert.Equal("Nice phrasing", _savedFeedback.Comment);
+        Assert.Equal("Director", Assert.Single(result.Value!.Feedbacks).ReviewerName);
+        // A plain comment never asks whether the attempt is the newest.
+        await _submissions.DidNotReceiveWithAnyArgs().IsLatestAttemptAsync(default!, default);
+        await AssertNotifiedAsync("New practice feedback");
+    }
+
+    [Theory]
+    [InlineData(SubmissionStatus.NeedsRevision, SubmissionStatus.Passed)]
+    [InlineData(SubmissionStatus.Passed, SubmissionStatus.NeedsRevision)]
+    public async Task AddFeedback_ResultChangeOnNewestAttempt_ChangesStatusAndNotifies_Async(
+        SubmissionStatus from, SubmissionStatus to)
+    {
+        _submission.Status = from;
+        ReviewableSubmission();
+
+        var result = await AddFeedbackAsync("Listened again", to);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(to, _submission.Status);
+        Assert.Equal(to, _savedFeedback!.Result);
+        Assert.Equal(to, result.Value!.Status);
+        await AssertNotifiedAsync("Practice result changed");
+    }
+
+    [Fact]
+    public async Task AddFeedback_ResultChangeOnOlderAttempt_ReturnsSuperseded_Async()
+    {
+        _submission.Status = SubmissionStatus.NeedsRevision;
+        ReviewableSubmission(isLatest: false);
+
+        var result = await AddFeedbackAsync("Actually fine", SubmissionStatus.Passed);
+
+        Assert.Equal(ErrorCodes.PracticeSubmissionSuperseded, result.Code);
+        Assert.Equal(SubmissionStatus.NeedsRevision, _submission.Status);
+        await _submissions.DidNotReceiveWithAnyArgs().TrySaveReviewAsync(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task AddFeedback_CommentOnOlderAttempt_IsAllowed_Async()
+    {
+        _submission.Status = SubmissionStatus.NeedsRevision;
+        ReviewableSubmission(isLatest: false);
+
+        var result = await AddFeedbackAsync("For the record");
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task AddFeedback_NotYetGraded_ReturnsNotReviewed_Async()
+    {
+        ReviewableSubmission();
+
+        var result = await AddFeedbackAsync("Too early");
+
+        Assert.Equal(ErrorCodes.PracticeSubmissionNotReviewed, result.Code);
+        await AssertNotReviewedAsync();
+    }
+
+    [Fact]
+    public async Task AddFeedback_UnknownSubmission_ReturnsPracticeSubmissionNotFound_Async()
+    {
+        var result = await AddFeedbackAsync("Hello");
+
+        Assert.Equal(ErrorCodes.PracticeSubmissionNotFound, result.Code);
+    }
+
+    [Fact]
+    public async Task AddFeedback_ConcurrentResultChange_ReturnsAlreadyReviewedWithoutNotifying_Async()
+    {
+        _submission.Status = SubmissionStatus.NeedsRevision;
+        ReviewableSubmission(saves: false);
+
+        var result = await AddFeedbackAsync("Changed my mind", SubmissionStatus.Passed);
+
+        Assert.Equal(ErrorCodes.PracticeSubmissionAlreadyReviewed, result.Code);
+        await _notifications.DidNotReceiveWithAnyArgs().SendAsync(default!, default);
+    }
+
+    // ---- Member's own submissions (UC-10) ----
+
+    private readonly MemberProfile _caller = new() { Id = Guid.NewGuid(), UserId = Guid.NewGuid() };
+
+    [Fact]
+    public async Task GetMine_ReturnsOwnSubmissionsWithFeedback_Async()
+    {
+        _members.GetByUserIdAsync(_caller.UserId, _ct).Returns(_caller);
+        _submission.Status = SubmissionStatus.NeedsRevision;
+        _submission.Feedbacks.Add(new PracticeFeedback
+        {
+            Result = SubmissionStatus.NeedsRevision, Comment = "Breathe earlier", ReviewedAt = DateTime.UtcNow,
+            Reviewer = new User { FullName = "Director" },
+        });
+        var request = new SearchMyPracticeSubmissionsRequest { AssignmentId = _assignment.Id };
+        _submissions.SearchForMemberAsync(_caller.Id, request, _ct)
+            .Returns(new PagedList<PracticeSubmission>([_submission], 1, 20, 1));
+
+        var result = await _sut.GetMineAsync(_caller.UserId, request, _ct);
+
+        var item = Assert.Single(result.Value!.Items);
+        Assert.Equal(SubmissionStatus.NeedsRevision, item.Status);
+        Assert.Equal($"signed:{_submission.AudioPublicId}", item.AudioUrl);
+        var feedback = Assert.Single(item.Feedbacks);
+        Assert.Equal("Breathe earlier", feedback.Comment);
+        Assert.Equal("Director", feedback.ReviewerName);
+    }
+
+    [Fact]
+    public async Task GetMine_NoMemberProfile_ReturnsMemberNotFound_Async()
+    {
+        var result = await _sut.GetMineAsync(Guid.NewGuid(), new SearchMyPracticeSubmissionsRequest(), _ct);
+
+        Assert.Equal(ErrorCodes.MemberNotFound, result.Code);
+    }
+
+    [Fact]
+    public async Task GetMineById_OwnSubmission_ReturnsIt_Async()
+    {
+        _members.GetByUserIdAsync(_caller.UserId, _ct).Returns(_caller);
+        _submission.MemberId = _caller.Id;
+        _submissions.GetWithMemberAsync(_submission.Id, _ct).Returns(_submission);
+
+        var result = await _sut.GetMineByIdAsync(_caller.UserId, _submission.Id, _ct);
+
+        Assert.Equal(_submission.Id, result.Value!.Id);
+    }
+
+    [Fact]
+    public async Task GetMineById_AnotherMembersSubmission_ReturnsNotFound_Async()
+    {
+        _members.GetByUserIdAsync(_caller.UserId, _ct).Returns(_caller);
+        _submissions.GetWithMemberAsync(_submission.Id, _ct).Returns(_submission);
+
+        var result = await _sut.GetMineByIdAsync(_caller.UserId, _submission.Id, _ct);
+
+        Assert.Equal(ErrorCodes.PracticeSubmissionNotFound, result.Code);
+        _storage.DidNotReceiveWithAnyArgs().GetSignedUrl(default!);
     }
 }

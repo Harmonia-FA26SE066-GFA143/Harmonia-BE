@@ -16,6 +16,9 @@ public interface IPracticeAssignmentService
     Task<Result<PagedList<PracticeAssignmentDetailDto>>> GetMineAsync(
         Guid userId, SearchMyPracticeAssignmentsRequest request, CancellationToken cancellationToken);
 
+    /// <summary>How many of the calling member's assignments are in each state, for a badge or overview (UC-10 / FE-12).</summary>
+    Task<Result<MyPracticeAssignmentCountsResponse>> GetMyCountsAsync(Guid userId, CancellationToken cancellationToken);
+
     /// <summary>One assignment of the calling member; one they do not receive is reported as missing, not forbidden.</summary>
     Task<Result<PracticeAssignmentDetailDto>> GetMineByIdAsync(
         Guid userId, Guid id, CancellationToken cancellationToken);
