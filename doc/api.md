@@ -364,7 +364,7 @@ Chỉ thao tác trên thông báo **của chính người gọi**.
 ```
 
 `type`: `EventPublished` | `SongListDecision` | `ParticipationRequest` | `AssignmentNotice` |
-`PracticeFeedback` | `DirectorNote` | `SkillReview`. `referenceType` + `referenceId` (nullable) cho biết bấm vào
+`PracticeFeedback` | `DirectorNote` | `SkillReview` | `SongListSubmitted`. `referenceType` + `referenceId` (nullable) cho biết bấm vào
 thì mở màn nào.
 
 | Method | Route | Thành công | Lỗi |

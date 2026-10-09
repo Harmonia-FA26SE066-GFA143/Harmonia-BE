@@ -8,5 +8,6 @@ public enum NotificationType
     AssignmentNotice,
     PracticeFeedback,
     DirectorNote,
-    SkillReview
+    SkillReview,
+    SongListSubmitted
 }

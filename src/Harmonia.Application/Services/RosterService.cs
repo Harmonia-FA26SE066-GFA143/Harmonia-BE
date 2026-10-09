@@ -55,7 +55,7 @@ public class RosterService(
         }
 
         roster.Status = RosterStatus.Suggested;
-        roster.GeneratedAt = DateTime.UtcNow;
+        roster.GeneratedAt = DateTime.Now;
         roster.GeneratedBy = currentUser.UserId;
 
         // Replaced lines stay as history even when they came from a suggestion.
@@ -137,7 +137,7 @@ public class RosterService(
         }
 
         roster.Status = RosterStatus.Finalized;
-        roster.FinalizedAt = DateTime.UtcNow;
+        roster.FinalizedAt = DateTime.Now;
         roster.FinalizedBy = currentUser.UserId;
         await rosterRepository.SaveChangesAsync(cancellationToken);
 
@@ -171,7 +171,7 @@ public class RosterService(
         foreach (var memberId in memberIds)
         {
             var lines = linesByMember[memberId];
-            var notifiedAt = DateTime.UtcNow;
+            var notifiedAt = DateTime.Now;
             foreach (var line in lines) line.NotifiedAt = notifiedAt;
 
             // SendAsync saves through the same scoped DbContext, so each member's NotifiedAt is stored with their notification.
@@ -279,7 +279,7 @@ public class RosterService(
         if (liturgicalEvent.Status == EventStatus.Cancelled) return ErrorCodes.EventCancelled;
 
         // ponytail: compares UTC date with the event's local date, so an event stays editable up to 7 hours past midnight in Vietnam.
-        return liturgicalEvent.EventDate < DateOnly.FromDateTime(DateTime.UtcNow) ? ErrorCodes.EventAlreadyPassed : null;
+        return liturgicalEvent.EventDate < DateOnly.FromDateTime(DateTime.Now) ? ErrorCodes.EventAlreadyPassed : null;
     }
 
     private static string? RosterNotEditableCode(ServiceRoster roster) =>

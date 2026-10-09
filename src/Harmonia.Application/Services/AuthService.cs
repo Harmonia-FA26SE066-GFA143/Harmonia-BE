@@ -36,7 +36,7 @@ public class AuthService(
         }
 
         var response = await IssueTokensAsync(user, request.DeviceId, request.Platform, cancellationToken);
-        user.LastLoginAt = DateTime.UtcNow;
+        user.LastLoginAt = DateTime.Now;
         await userRepository.SaveChangesAsync(cancellationToken);
 
         return Result<LoginResponse>.Success(response);
@@ -64,7 +64,7 @@ public class AuthService(
         }
 
         var response = await IssueTokensAsync(user, request.DeviceId, request.Platform, cancellationToken);
-        user.LastLoginAt = DateTime.UtcNow;
+        user.LastLoginAt = DateTime.Now;
         await userRepository.SaveChangesAsync(cancellationToken);
 
         return Result<LoginResponse>.Success(response);
@@ -156,7 +156,7 @@ public class AuthService(
                 Id = Guid.NewGuid(),
                 UserId = user.Id,
                 TokenHash = jwtTokenService.HashRefreshToken(rawToken),
-                ExpiresAt = DateTime.UtcNow.Add(PasswordResetTokenLifetime),
+                ExpiresAt = DateTime.Now.Add(PasswordResetTokenLifetime),
             },
             cancellationToken);
         await userRepository.SaveChangesAsync(cancellationToken);
@@ -189,7 +189,7 @@ public class AuthService(
             return Result.Failure(ErrorCodes.AuthResetTokenInvalid);
         }
 
-        var now = DateTime.UtcNow;
+        var now = DateTime.Now;
         resetToken.EnsureUsable(now);
         resetToken.MarkUsed(now);
 
