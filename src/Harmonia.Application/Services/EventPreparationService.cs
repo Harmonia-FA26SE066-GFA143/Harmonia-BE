@@ -12,8 +12,54 @@ public class EventPreparationService(
     ILiturgicalEventRepository liturgicalEventRepository,
     IMemberProfileRepository memberProfileRepository,
     IRehearsalRepository rehearsalRepository,
-    IPracticeAssignmentRepository practiceAssignmentRepository) : IEventPreparationService
+    IPracticeAssignmentRepository practiceAssignmentRepository,
+    IRosterService rosterService) : IEventPreparationService
 {
+    public async Task<Result<EventPreparationStatusDto>> GetStatusAsync(Guid eventId, CancellationToken cancellationToken)
+    {
+        var liturgicalEvent = await liturgicalEventRepository.GetWithPreparationAsync(eventId, cancellationToken);
+        if (liturgicalEvent is null) return Result<EventPreparationStatusDto>.Failure(ErrorCodes.EventNotFound);
+
+        var progress = await GetProgressAsync(eventId, cancellationToken);
+        if (!progress.IsSuccess) return Result<EventPreparationStatusDto>.Failure(progress.Code!);
+        var rows = progress.Value!;
+
+        // Without an approved song list the staffing needs are unknown, which is not an error here.
+        var shortages = await rosterService.GetShortagesAsync(eventId, cancellationToken);
+        if (!shortages.IsSuccess && shortages.Code != ErrorCodes.RosterSongListNotApproved)
+        {
+            return Result<EventPreparationStatusDto>.Failure(shortages.Code!);
+        }
+
+        var participations = liturgicalEvent.EventParticipations;
+        var roster = liturgicalEvent.ServiceRoster;
+        var rehearsalsHeld = liturgicalEvent.Rehearsals.Count(r => r.StartTime <= DateTime.UtcNow);
+
+        return Result<EventPreparationStatusDto>.Success(new EventPreparationStatusDto
+        {
+            EventId = liturgicalEvent.Id,
+            Title = liturgicalEvent.Title,
+            EventDate = liturgicalEvent.EventDate,
+            EventStatus = liturgicalEvent.Status,
+            SongListStatus = liturgicalEvent.SongLists
+                .OrderByDescending(s => s.Version).Select(s => (SongListStatus?)s.Status).FirstOrDefault(),
+            ParticipationInvited = participations.Count(p => p.Status == ParticipationStatus.Invited),
+            ParticipationConfirmed = participations.Count(p => p.Status == ParticipationStatus.Confirmed),
+            ParticipationDeclined = participations.Count(p => p.Status == ParticipationStatus.Declined),
+            ParticipationUnsure = participations.Count(p => p.Status == ParticipationStatus.Unsure),
+            RosterStatus = roster?.Status,
+            RosterActiveAssignments = roster?.Assignments.Count(a => a.Status == RosterAssignmentStatus.Active) ?? 0,
+            RosterShortages = shortages.IsSuccess ? shortages.Value : null,
+            RehearsalsTotal = liturgicalEvent.Rehearsals.Count,
+            RehearsalsHeld = rehearsalsHeld,
+            AttendanceExpected = rehearsalsHeld * rows.Count,
+            AttendancePresent = rows.Sum(r => r.RehearsalsAttended),
+            PracticeExpected = rows.Sum(r => r.AssignmentsTotal),
+            PracticePassed = rows.Sum(r => r.AssignmentsPassed),
+            PracticeOverdue = rows.Sum(r => r.AssignmentsOverdue),
+        });
+    }
+
     public async Task<Result<List<EventPreparationProgressDto>>> GetProgressAsync(
         Guid eventId, CancellationToken cancellationToken)
     {

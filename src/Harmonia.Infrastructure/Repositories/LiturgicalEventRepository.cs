@@ -68,4 +68,14 @@ public class LiturgicalEventRepository(HarmoniaDbContext dbContext)
         DbContext.LiturgicalEvents
             .Include(x => x.Location)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+    public Task<LiturgicalEvent?> GetWithPreparationAsync(Guid id, CancellationToken cancellationToken) =>
+        DbContext.LiturgicalEvents
+            .AsNoTracking()
+            .Include(x => x.SongLists)
+            .Include(x => x.EventParticipations)
+            .Include(x => x.Rehearsals)
+            .Include(x => x.ServiceRoster).ThenInclude(x => x!.Assignments)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 }

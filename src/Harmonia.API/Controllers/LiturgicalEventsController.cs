@@ -52,4 +52,9 @@ public class LiturgicalEventsController(
     [Authorize(Roles = RoleNames.ChoirDirector)]
     public async Task<IActionResult> GetPreparationProgressAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await eventPreparationService.GetProgressAsync(id, cancellationToken));
+
+    [HttpGet("{id:guid}/preparation-status")]
+    [Authorize(Roles = RoleNames.ParishPriest)]
+    public async Task<IActionResult> GetPreparationStatusAsync(Guid id, CancellationToken cancellationToken) =>
+        ToActionResult(await eventPreparationService.GetStatusAsync(id, cancellationToken));
 }

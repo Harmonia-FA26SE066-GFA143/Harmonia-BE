@@ -21,4 +21,10 @@ public interface ILiturgicalEventRepository : IGenericRepository<LiturgicalEvent
 
     /// <summary>Tracked event with its Location loaded.</summary>
     Task<LiturgicalEvent?> GetWithLocationAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Read-only event with every SongLists version, EventParticipations, Rehearsals and
+    /// ServiceRoster (with its Assignments) loaded.
+    /// </summary>
+    Task<LiturgicalEvent?> GetWithPreparationAsync(Guid id, CancellationToken cancellationToken);
 }

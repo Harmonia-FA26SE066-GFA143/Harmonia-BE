@@ -374,7 +374,7 @@ Chưa có kỹ năng nào → `[]`.
 
 ---
 
-## 4b. Lịch phụng vụ & sự kiện — `api/liturgical-days`, `api/liturgical-events` · role `ParishPriest` · tiến độ chuẩn bị: `ChoirDirector` · lịch sắp tới `api/schedule`: mọi role (UC-12 / UC-04 / UC-30)
+## 4b. Lịch phụng vụ & sự kiện — `api/liturgical-days`, `api/liturgical-events` · role `ParishPriest` · tiến độ chuẩn bị: `ChoirDirector` · lịch sắp tới `api/schedule`: mọi role (UC-12 / UC-04 / UC-15 / UC-30)
 
 ### `LiturgicalDayDto`
 
@@ -418,6 +418,7 @@ Chưa có kỹ năng nào → `[]`.
 | GET | `/api/schedule/events` · mọi role | — | 200 `LiturgicalEventSummaryDto[]` | — |
 | GET | `/api/schedule/rehearsals` · mọi role | — | 200 `RehearsalSummaryDto[]` | — |
 | GET | `/api/liturgical-events/{id}/preparation-progress` · `ChoirDirector` | — | 200 `EventPreparationProgressDto[]` | 404 `EVENT_NOT_FOUND` |
+| GET | `/api/liturgical-events/{id}/preparation-status` | — | 200 `EventPreparationStatusDto` | 404 `EVENT_NOT_FOUND` |
 
 **Ngày phụng vụ (UC-12 / FE-15)**
 
@@ -463,6 +464,29 @@ Chưa có kỹ năng nào → `[]`.
 - `assignmentsTotal`: số bài tập gắn với sự kiện mà ca viên nhận (cùng luật với `GET /api/practice-assignments/mine`);
   `assignmentsPassed` / `assignmentsOverdue` xét theo bản thu mới nhất, luật quá hạn giống `isOverdue`.
 - Trả số thô; FE tự tính phần trăm (cẩn thận chia cho 0 khi `rehearsalsHeld` hoặc `assignmentsTotal` = 0).
+
+**Tình trạng chuẩn bị của ca đoàn (UC-15 / FE-21) — cha xứ**
+
+```json
+{
+  "eventId": "guid", "title": "Thánh lễ Giáng Sinh", "eventDate": "2026-12-24", "eventStatus": "Published",
+  "songListStatus": "Approved",
+  "participationInvited": 3, "participationConfirmed": 25, "participationDeclined": 2, "participationUnsure": 1,
+  "rosterStatus": "Finalized", "rosterActiveAssignments": 18,
+  "rosterShortages": [{ "songListItemId": "guid", "songTitle": "...", "skillId": "guid", "skillName": "Tenor", "requiredCount": 3, "assignedCount": 2 }],
+  "rehearsalsTotal": 4, "rehearsalsHeld": 2,
+  "attendanceExpected": 60, "attendancePresent": 51,
+  "practiceExpected": 90, "practicePassed": 70, "practiceOverdue": 6
+}
+```
+
+- Xem được mọi sự kiện, kể cả đã qua. Chỉ trả số tổng của cả ca đoàn; bảng từng ca viên là `preparation-progress` của ca trưởng.
+- `songListStatus`: trạng thái phiên bản danh sách bài hát **mới nhất**; `null` nếu chưa đề xuất.
+- `participation*`: đếm `EventParticipation` theo trạng thái; `participationInvited` = đã mời nhưng chưa trả lời.
+- `rosterStatus`: `Draft` | `Suggested` | `Finalized`, `null` nếu chưa có phân công; `rosterActiveAssignments` không tính dòng đã bị thay.
+- `rosterShortages`: giống `GET /api/service-rosters/shortages?eventId=`; `null` khi chưa có danh sách bài hát được duyệt (chưa biết cần bao nhiêu người), `[]` khi đủ người.
+- `attendanceExpected` = `rehearsalsHeld` × số ca viên đang hoạt động; `attendancePresent` = tổng lượt `Present` + `Late`.
+- `practice*`: cộng dồn các cột `assignments*` của `preparation-progress` trên mọi ca viên đang hoạt động.
 
 ---
 
