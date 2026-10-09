@@ -18,4 +18,7 @@ public interface IRehearsalRepository : IGenericRepository<Rehearsal>
     /// first (unique (RehearsalId, MemberId)); nothing is saved then.
     /// </summary>
     Task<bool> TrySaveAttendancesAsync(Rehearsal rehearsal, CancellationToken cancellationToken);
+
+    /// <summary>Read-only rehearsals of the event, with <see cref="Rehearsal.Attendances"/> loaded.</summary>
+    Task<List<Rehearsal>> GetByEventWithAttendancesAsync(Guid eventId, CancellationToken cancellationToken);
 }

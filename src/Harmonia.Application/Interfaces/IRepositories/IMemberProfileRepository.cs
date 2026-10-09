@@ -44,4 +44,11 @@ public interface IMemberProfileRepository : IGenericRepository<MemberProfile>
     /// <see cref="MemberProfile.RehearsalAttendances"/> holds only the row for this rehearsal, if any.
     /// </summary>
     Task<List<MemberProfile>> GetAttendanceRosterAsync(Guid rehearsalId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Read-only active members, ordered by name, with <see cref="MemberProfile.User"/> loaded.
+    /// <see cref="MemberProfile.MemberSkills"/> holds only approved skills and
+    /// <see cref="MemberProfile.EventParticipations"/> only the row for this event, if any.
+    /// </summary>
+    Task<List<MemberProfile>> GetActiveForEventAsync(Guid eventId, CancellationToken cancellationToken);
 }

@@ -118,4 +118,16 @@ public class MemberProfileRepository(HarmoniaDbContext dbContext)
             .OrderBy(x => x.User.FullName)
             .ThenBy(x => x.Id)
             .ToListAsync(cancellationToken);
+
+    public Task<List<MemberProfile>> GetActiveForEventAsync(Guid eventId, CancellationToken cancellationToken) =>
+        DbContext.MemberProfiles
+            .AsNoTracking()
+            .Where(x => x.Status == MemberStatus.Active)
+            .Include(x => x.User)
+            .Include(x => x.MemberSkills.Where(s => s.Status == ApprovalStatus.Approved))
+            .Include(x => x.EventParticipations.Where(p => p.EventId == eventId))
+            .OrderBy(x => x.User.FullName)
+            .ThenBy(x => x.Id)
+            .AsSplitQuery()
+            .ToListAsync(cancellationToken);
 }

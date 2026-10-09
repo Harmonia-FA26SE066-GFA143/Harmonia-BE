@@ -23,4 +23,10 @@ public interface IPracticeAssignmentRepository : IGenericRepository<PracticeAssi
 
     /// <summary>Same scope and loading as <see cref="GetForMemberAsync"/>; null when the member does not receive it.</summary>
     Task<PracticeAssignment?> GetByIdForMemberAsync(Guid id, Guid memberId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Read-only assignments of the event, with <see cref="PracticeAssignment.Targets"/> and every member's
+    /// <see cref="PracticeAssignment.Submissions"/> loaded.
+    /// </summary>
+    Task<List<PracticeAssignment>> GetByEventWithSubmissionsAsync(Guid eventId, CancellationToken cancellationToken);
 }

@@ -374,7 +374,7 @@ Chưa có kỹ năng nào → `[]`.
 
 ---
 
-## 4b. Lịch phụng vụ & sự kiện — `api/liturgical-days`, `api/liturgical-events` · role `ParishPriest` · lịch sắp tới `api/schedule`: mọi role (UC-12 / UC-04)
+## 4b. Lịch phụng vụ & sự kiện — `api/liturgical-days`, `api/liturgical-events` · role `ParishPriest` · tiến độ chuẩn bị: `ChoirDirector` · lịch sắp tới `api/schedule`: mọi role (UC-12 / UC-04 / UC-30)
 
 ### `LiturgicalDayDto`
 
@@ -417,6 +417,7 @@ Chưa có kỹ năng nào → `[]`.
 | PATCH | `/api/liturgical-events/{id}/cancel` | — | 200 `LiturgicalEventDto` | 404 `EVENT_NOT_FOUND` · 409 `EVENT_CANCELLED`, `EVENT_ALREADY_PASSED` |
 | GET | `/api/schedule/events` · mọi role | — | 200 `LiturgicalEventSummaryDto[]` | — |
 | GET | `/api/schedule/rehearsals` · mọi role | — | 200 `RehearsalSummaryDto[]` | — |
+| GET | `/api/liturgical-events/{id}/preparation-progress` · `ChoirDirector` | — | 200 `EventPreparationProgressDto[]` | 404 `EVENT_NOT_FOUND` |
 
 **Ngày phụng vụ (UC-12 / FE-15)**
 
@@ -450,6 +451,18 @@ Chưa có kỹ năng nào → `[]`.
 - `events`: sự kiện `Published` từ hôm nay trở đi, sắp theo ngày rồi giờ.
 - `rehearsals`: buổi tập bắt đầu từ thời điểm gọi trở đi, sắp theo giờ bắt đầu. `locationName`, `note` có thể `null`.
 - Không phân trang — trả mảng; không có gì → `[]`.
+
+**Tiến độ chuẩn bị cho sự kiện (UC-30 / FE-46)**
+
+`EventPreparationProgressDto` = `{ memberId, fullName, participationStatus, rehearsalsHeld, rehearsalsAttended, assignmentsTotal, assignmentsPassed, assignmentsOverdue }`.
+
+- Mỗi dòng một ca viên đang hoạt động, sắp theo tên. Không phân trang. Xem được cả sự kiện đã qua.
+- `participationStatus`: `Invited` | `Confirmed` | `Declined` | `Unsure`, hoặc `null` khi ca viên chưa được mời.
+- `rehearsalsHeld`: số buổi tập / buổi chuẩn bị gắn với sự kiện **đã bắt đầu** (giống nhau ở mọi dòng);
+  `rehearsalsAttended`: trong số đó, buổi ca viên được điểm danh `Present` hoặc `Late`.
+- `assignmentsTotal`: số bài tập gắn với sự kiện mà ca viên nhận (cùng luật với `GET /api/practice-assignments/mine`);
+  `assignmentsPassed` / `assignmentsOverdue` xét theo bản thu mới nhất, luật quá hạn giống `isOverdue`.
+- Trả số thô; FE tự tính phần trăm (cẩn thận chia cho 0 khi `rehearsalsHeld` hoặc `assignmentsTotal` = 0).
 
 ---
 
