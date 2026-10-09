@@ -1365,6 +1365,163 @@ public sealed class RepositoryTests : IDisposable
         Assert.NotEqual(seed.EventId, recentEventId);
     }
 
+    // ---- Participation history (UC-11) & attendance (UC-30) ----
+
+    private sealed record HistorySeed(
+        Guid MemberId, Guid OtherId, Guid InvitedEventId, Guid ServedEventId, Guid SeasonId, Guid SkillId, Guid[] ExcludedEventIds);
+
+    /// <summary>
+    /// Past Published events: "invited" (member has a participation row, two rehearsals), "served" (member only on a
+    /// Finalized roster), "draft" (member only on a Draft roster) and "other" (only another member involved).
+    /// Plus a Cancelled past event and an upcoming one, both with the member invited.
+    /// </summary>
+    private async Task<HistorySeed> SeedHistoryAsync()
+    {
+        var location = new WorshipLocation { Id = Guid.NewGuid(), Name = "Main church" };
+        var season = new LiturgicalSeason { Id = Guid.NewGuid(), Name = "Advent" };
+        var tenor = new Skill { Id = Guid.NewGuid(), CategoryId = SkillCategoryIds.Vocal, Name = "Tenor" };
+        var member = new MemberProfile { Id = Guid.NewGuid(), UserId = (await _db.AddUserAsync("m@test.com", cancellationToken: _ct)).Id };
+        var other = new MemberProfile { Id = Guid.NewGuid(), UserId = (await _db.AddUserAsync("o@test.com", cancellationToken: _ct)).Id };
+        var today = VietnamTime.Today;
+        LiturgicalEvent NewEvent(int days, EventStatus status = EventStatus.Published) =>
+            new() { Id = Guid.NewGuid(), EventDate = today.AddDays(days), LocationId = location.Id, Status = status };
+        EventParticipation Invite(Guid memberId) => new() { Id = Guid.NewGuid(), MemberId = memberId, Status = ParticipationStatus.Confirmed };
+        ServiceRoster Roster(RosterStatus status, Guid memberId) => new()
+        {
+            Id = Guid.NewGuid(), Status = status,
+            Assignments = [new RosterAssignment { Id = Guid.NewGuid(), MemberId = memberId, SkillId = tenor.Id }],
+        };
+
+        var invited = NewEvent(-3);
+        invited.LiturgicalSeasonId = season.Id;
+        invited.EventParticipations = [Invite(member.Id), Invite(other.Id)];
+        invited.Rehearsals = new[] { 1, 2 }.Select(i => new Rehearsal
+        {
+            Id = Guid.NewGuid(), StartTime = DateTime.UtcNow.AddDays(-4 - i), EndTime = DateTime.UtcNow.AddDays(-4 - i).AddHours(2),
+            Attendances =
+            [
+                new RehearsalAttendance { Id = Guid.NewGuid(), MemberId = member.Id, CheckedBy = member.UserId, Status = AttendanceStatus.Present },
+                new RehearsalAttendance { Id = Guid.NewGuid(), MemberId = other.Id, CheckedBy = member.UserId, Status = AttendanceStatus.Absent },
+            ],
+        }).ToList();
+        var served = NewEvent(-10);
+        served.ServiceRoster = Roster(RosterStatus.Finalized, member.Id);
+        var draft = NewEvent(-20);
+        draft.ServiceRoster = Roster(RosterStatus.Draft, member.Id);
+        var otherOnly = NewEvent(-5);
+        otherOnly.EventParticipations = [Invite(other.Id)];
+        var cancelled = NewEvent(-7, EventStatus.Cancelled);
+        cancelled.EventParticipations = [Invite(member.Id)];
+        var upcoming = NewEvent(3);
+        upcoming.EventParticipations = [Invite(member.Id)];
+
+        await using var context = _db.NewContext();
+        context.AddRange(location, season, tenor, member, other, invited, served, draft, otherOnly, cancelled, upcoming);
+        await context.SaveChangesAsync(_ct);
+
+        return new HistorySeed(member.Id, other.Id, invited.Id, served.Id, season.Id, tenor.Id,
+            [draft.Id, otherOnly.Id, cancelled.Id, upcoming.Id]);
+    }
+
+    [Fact]
+    public async Task GetHistoryForMember_ReturnsPastPublishedInvolvedEvents_WithOnlyTheMembersRows_Async()
+    {
+        var seed = await SeedHistoryAsync();
+        await using var context = _db.NewContext();
+
+        var page = await new LiturgicalEventRepository(context).GetHistoryForMemberAsync(
+            seed.MemberId, new SearchMyParticipationHistoryRequest(), VietnamTime.Today, _ct);
+
+        Assert.Equal([seed.InvitedEventId, seed.ServedEventId], page.Items.Select(e => e.Id));
+        Assert.Equal(2, page.TotalCount);
+        var invited = page.Items[0];
+        Assert.Equal("Advent", invited.LiturgicalSeason!.Name);
+        Assert.Equal(seed.MemberId, Assert.Single(invited.EventParticipations).MemberId);
+        Assert.Equal(2, invited.Rehearsals.Count);
+        Assert.All(invited.Rehearsals, r => Assert.Equal(seed.MemberId, Assert.Single(r.Attendances).MemberId));
+        Assert.Equal("Tenor", Assert.Single(page.Items[1].ServiceRoster!.Assignments).Skill.Name);
+    }
+
+    [Fact]
+    public async Task GetHistoryForMember_FiltersBySeason_Async()
+    {
+        var seed = await SeedHistoryAsync();
+        await using var context = _db.NewContext();
+
+        var page = await new LiturgicalEventRepository(context).GetHistoryForMemberAsync(
+            seed.MemberId, new SearchMyParticipationHistoryRequest { LiturgicalSeasonId = seed.SeasonId }, VietnamTime.Today, _ct);
+
+        Assert.Equal(seed.InvitedEventId, Assert.Single(page.Items).Id);
+    }
+
+    [Fact]
+    public async Task GetForMemberByEvents_ReturnsReceivedAssignmentsOfThoseEvents_WithNewestSubmission_Async()
+    {
+        var seed = await SeedHistoryAsync();
+        PracticeAssignment Assignment(Guid eventId, AssignmentScope scope) => new()
+        {
+            Id = Guid.NewGuid(), EventId = eventId, Title = "t", Scope = scope, DueDate = DateTime.UtcNow.AddDays(-1),
+        };
+        var all = Assignment(seed.InvitedEventId, AssignmentScope.All);
+        all.Submissions =
+        [
+            new PracticeSubmission { Id = Guid.NewGuid(), MemberId = seed.MemberId, AudioPublicId = "a1", AttemptNo = 1, Status = SubmissionStatus.NeedsRevision },
+            new PracticeSubmission { Id = Guid.NewGuid(), MemberId = seed.MemberId, AudioPublicId = "a2", AttemptNo = 2, Status = SubmissionStatus.Passed },
+            new PracticeSubmission { Id = Guid.NewGuid(), MemberId = seed.OtherId, AudioPublicId = "a3", AttemptNo = 1, Status = SubmissionStatus.Submitted },
+        ];
+        var forOther = Assignment(seed.InvitedEventId, AssignmentScope.Individual);
+        forOther.Targets = [new PracticeAssignmentTarget { Id = Guid.NewGuid(), TargetType = TargetType.Member, MemberId = seed.OtherId }];
+        var otherEvent = Assignment(seed.ServedEventId, AssignmentScope.All);
+        await using (var seedContext = _db.NewContext())
+        {
+            seedContext.AddRange(all, forOther, otherEvent);
+            await seedContext.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var assignments = await new PracticeAssignmentRepository(context).GetForMemberByEventsAsync(
+            seed.MemberId, [seed.InvitedEventId], _ct);
+
+        var received = Assert.Single(assignments);
+        Assert.Equal(all.Id, received.Id);
+        Assert.Equal(SubmissionStatus.Passed, Assert.Single(received.Submissions).Status);
+    }
+
+    [Fact]
+    public async Task TrySaveAttendances_InsertsNewRowsAndUpdatesExistingOnes_Async()
+    {
+        var seed = await SeedHistoryAsync();
+        Guid rehearsalId;
+        await using (var lookup = _db.NewContext())
+            rehearsalId = (await lookup.Rehearsals.FirstAsync(_ct)).Id;
+        var newcomer = new MemberProfile { Id = Guid.NewGuid(), UserId = (await _db.AddUserAsync("n@test.com", cancellationToken: _ct)).Id };
+        await using (var seedContext = _db.NewContext())
+        {
+            seedContext.Add(newcomer);
+            await seedContext.SaveChangesAsync(_ct);
+        }
+
+        await using (var context = _db.NewContext())
+        {
+            var repository = new RehearsalRepository(context);
+            var rehearsal = await repository.GetWithAttendancesForUpdateAsync(rehearsalId, _ct);
+            rehearsal!.Attendances.Single(a => a.MemberId == seed.MemberId).Status = AttendanceStatus.Late;
+            // Id left unset, exactly as RehearsalAttendanceService adds it.
+            rehearsal.Attendances.Add(new RehearsalAttendance
+            {
+                RehearsalId = rehearsalId, MemberId = newcomer.Id, CheckedBy = newcomer.UserId, Status = AttendanceStatus.Excused,
+            });
+
+            Assert.True(await repository.TrySaveAttendancesAsync(rehearsal, _ct));
+        }
+
+        await using var check = _db.NewContext();
+        var saved = await check.RehearsalAttendances.Where(a => a.RehearsalId == rehearsalId).ToListAsync(_ct);
+        Assert.Equal(3, saved.Count);
+        Assert.Equal(AttendanceStatus.Late, saved.Single(a => a.MemberId == seed.MemberId).Status);
+        Assert.NotEqual(Guid.Empty, saved.Single(a => a.MemberId == newcomer.Id).Id);
+    }
+
     private static RefreshToken NewRefreshToken(Guid userId, string hash, DateTime? revokedAt = null) =>
         new()
         {

@@ -304,6 +304,7 @@ Chưa có kỹ năng nào → `[]`.
 | GET | `/api/member-profiles` | `ChoirDirector` | query `keyword`, `status`, `skillId`, `pageNumber`, `pageSize` | 200 `PagedList<MemberProfileSummaryDto>` | — |
 | GET | `/api/member-profiles/{id}` | `ChoirDirector` | — | 200 `MemberProfileDto` | 404 `MEMBER_NOT_FOUND` |
 | PUT | `/api/member-profiles/{id}` | `ChoirDirector` | `{ "phone", "dateOfBirth", "joinedDate", "status" }` | 200 `MemberProfileDto` | 400 `VALIDATION_FAILED`, `MEMBER_JOINED_DATE_IN_FUTURE` · 404 `MEMBER_NOT_FOUND` |
+| GET | `/api/member-profiles/me/history` | `ChoirMember` | query `liturgicalSeasonId`, `fromDate`, `toDate`, `pageNumber`, `pageSize` | 200 `PagedList<ParticipationHistoryDto>` | 404 `MEMBER_NOT_FOUND` |
 
 - `PUT` thay **toàn bộ** các field trong body: field bỏ trống / `null` sẽ bị xoá giá trị
   (`phone`, `dateOfBirth`). Gửi lại giá trị cũ nếu không muốn đổi.
@@ -315,6 +316,30 @@ Chưa có kỹ năng nào → `[]`.
   được **duyệt** kỹ năng đó (lấy id từ `GET /api/lookups/skills`; skill đã tắt → danh sách rỗng); các bộ lọc kết hợp AND; sắp theo tên.
   Dùng để chọn người khi phân công theo bè / nhạc cụ.
 - Role khác gọi vào → `403` body rỗng.
+
+### Lịch sử tham gia & luyện tập của tôi — `ChoirMember` (UC-11 / FE-14)
+
+`ParticipationHistoryDto`:
+
+```json
+{
+  "eventId": "guid", "eventDate": "2026-09-27", "title": "Chúa nhật XXVI Thường niên",
+  "liturgicalSeasonName": "Mùa Thường niên",
+  "participationStatus": "Confirmed",
+  "servedSkills": ["Tenor"],
+  "rehearsalsHeld": 2, "rehearsalsAttended": 1,
+  "assignmentsTotal": 3, "assignmentsPassed": 2
+}
+```
+
+- Chỉ gồm sự kiện `Published` **trước hôm nay** (giờ Việt Nam) mà ca viên có liên quan: được mời xác nhận tham gia,
+  hoặc có tên trên phân công đã chốt. Sắp mới nhất trước.
+- Bộ lọc tuỳ chọn, kết hợp AND: `liturgicalSeasonId` (id từ `GET /api/lookups/liturgical-seasons`), `fromDate`, `toDate`
+  (`yyyy-MM-dd`, bao gồm hai đầu).
+- `participationStatus` `null` khi ca viên không được mời. `servedSkills`: kỹ năng phục vụ trên phân công **đã chốt**
+  (không trùng tên); `[]` nếu không phục vụ.
+- `rehearsalsAttended` tính `Present` + `Late`. `assignmentsPassed` xét bản thu **mới nhất** của từng bài.
+  Chi tiết từng bản thu: `GET /api/practice-submissions/mine`.
 
 ---
 

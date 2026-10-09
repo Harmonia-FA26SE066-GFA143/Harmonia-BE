@@ -29,4 +29,11 @@ public interface IPracticeAssignmentRepository : IGenericRepository<PracticeAssi
     /// <see cref="PracticeAssignment.Submissions"/> loaded.
     /// </summary>
     Task<List<PracticeAssignment>> GetByEventWithSubmissionsAsync(Guid eventId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Read-only assignments of the given events that the member receives (same scope as <see cref="GetForMemberAsync"/>).
+    /// <see cref="PracticeAssignment.Submissions"/> holds only the member's newest submission, if any.
+    /// </summary>
+    Task<List<PracticeAssignment>> GetForMemberByEventsAsync(
+        Guid memberId, IReadOnlyCollection<Guid> eventIds, CancellationToken cancellationToken);
 }

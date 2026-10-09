@@ -79,6 +79,13 @@ public class PracticeAssignmentRepository(HarmoniaDbContext dbContext)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
 
+    public Task<List<PracticeAssignment>> GetForMemberByEventsAsync(
+        Guid memberId, IReadOnlyCollection<Guid> eventIds, CancellationToken cancellationToken) =>
+        VisibleToMember(memberId)
+            .Where(x => x.EventId != null && eventIds.Contains(x.EventId.Value))
+            .Include(x => x.Submissions.Where(s => s.MemberId == memberId).OrderByDescending(s => s.AttemptNo).Take(1))
+            .ToListAsync(cancellationToken);
+
     /// <summary>
     /// Scope All, a target naming the member, or a target skill the member holds approved today. Skill targets
     /// follow the member's current skills, so a newly approved skill also brings its earlier assignments.

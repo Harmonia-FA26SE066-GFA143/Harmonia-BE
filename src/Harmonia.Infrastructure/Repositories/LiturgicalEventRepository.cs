@@ -78,4 +78,49 @@ public class LiturgicalEventRepository(HarmoniaDbContext dbContext)
             .Include(x => x.ServiceRoster).ThenInclude(x => x!.Assignments)
             .AsSplitQuery()
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+    public async Task<PagedList<LiturgicalEvent>> GetHistoryForMemberAsync(
+        Guid memberId, SearchMyParticipationHistoryRequest filter, DateOnly today, CancellationToken cancellationToken)
+    {
+        var query = DbContext.LiturgicalEvents
+            .AsNoTracking()
+            .Where(x => x.Status == EventStatus.Published && x.EventDate < today)
+            .Where(x => x.EventParticipations.Any(p => p.MemberId == memberId)
+                || (x.ServiceRoster != null && x.ServiceRoster.Status == RosterStatus.Finalized
+                    && x.ServiceRoster.Assignments.Any(a => a.MemberId == memberId && a.Status == RosterAssignmentStatus.Active)));
+
+        if (filter.LiturgicalSeasonId is { } seasonId)
+        {
+            query = query.Where(x => x.LiturgicalSeasonId == seasonId);
+        }
+
+        if (filter.FromDate is { } fromDate)
+        {
+            query = query.Where(x => x.EventDate >= fromDate);
+        }
+
+        if (filter.ToDate is { } toDate)
+        {
+            query = query.Where(x => x.EventDate <= toDate);
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .Include(x => x.LiturgicalSeason)
+            .Include(x => x.EventParticipations.Where(p => p.MemberId == memberId))
+            .Include(x => x.ServiceRoster)
+                .ThenInclude(x => x!.Assignments.Where(a => a.MemberId == memberId && a.Status == RosterAssignmentStatus.Active))
+                .ThenInclude(x => x.Skill)
+            .Include(x => x.Rehearsals).ThenInclude(x => x.Attendances.Where(a => a.MemberId == memberId))
+            .OrderByDescending(x => x.EventDate)
+            .ThenByDescending(x => x.Time)
+            .ThenBy(x => x.Id)
+            .Skip((filter.PageNumber - 1) * filter.PageSize)
+            .Take(filter.PageSize)
+            .AsSplitQuery()
+            .ToListAsync(cancellationToken);
+
+        return new PagedList<LiturgicalEvent>(items, filter.PageNumber, filter.PageSize, totalCount);
+    }
 }
