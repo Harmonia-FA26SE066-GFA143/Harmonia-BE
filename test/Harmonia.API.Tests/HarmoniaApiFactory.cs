@@ -82,6 +82,8 @@ public sealed class HarmoniaApiFactory : WebApplicationFactory<AuthController>
         builder.UseSetting("Google:ClientIds", "test-client-id.apps.googleusercontent.com");
         builder.UseSetting("Gemini:ApiKey", "test");
         builder.UseSetting("Gemini:Model", "test-model");
+        // Pinned empty so a machine-level variable never sends tests through a real Azure SignalR resource.
+        builder.UseSetting("Azure:SignalR:ConnectionString", "");
 
         builder.ConfigureTestServices(services =>
         {

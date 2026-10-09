@@ -541,9 +541,49 @@ thì mở màn nào.
 
 | Method | Route | Thành công | Lỗi |
 |---|---|---|---|
-| GET | `/api/notifications?pageNumber=1&pageSize=20` | 200 `PagedList<NotificationDto>` | — |
+| GET | `/api/notifications?isRead=&pageNumber=1&pageSize=20` | 200 `PagedList<NotificationDto>` | — |
 | GET | `/api/notifications/unread-count` | 200, body là số nguyên (`3`) | — |
 | PUT | `/api/notifications/{id}/read` | 204 | 404 `NOTIFICATION_NOT_FOUND` |
+| PUT | `/api/notifications/read-all` | 204 | — |
+
+- `isRead` tuỳ chọn: `false` chỉ lấy thông báo chưa đọc, `true` chỉ lấy đã đọc, bỏ trống lấy tất cả.
+- `read-all` đánh dấu mọi thông báo chưa đọc của người gọi là đã đọc (`readAt` = lúc gọi); thông báo đã đọc
+  giữ nguyên `readAt` cũ. Không còn gì chưa đọc thì vẫn trả 204.
+
+---
+
+## 5a. Director notes — `api/director-notes` · gửi: `ParishPriest` · đọc: `ParishPriest`, `ChoirDirector` (UC-17 / FE-23)
+
+### `DirectorNoteDto`
+
+```json
+{
+  "id": "guid",
+  "noteDate": "2026-12-24",
+  "eventId": "guid",
+  "eventTitle": "Thánh lễ Giáng Sinh",
+  "fromUserId": "guid", "fromUserName": "Cha Giuse",
+  "toUserId": "guid", "toUserName": "Anh Phêrô",
+  "content": "Xin ca đoàn chuẩn bị thêm bài Đáp ca...",
+  "sentAt": "2026-10-09T08:00:00Z"
+}
+```
+
+| Method | Route | Role | Body / Query | Thành công | Lỗi |
+|---|---|---|---|---|---|
+| GET | `/api/director-notes/recipients` | `ParishPriest` | — | 200 `UserSummaryDto[]` (ca trưởng đang hoạt động) | — |
+| POST | `/api/director-notes` | `ParishPriest` | `{ "noteDate?", "eventId?", "toUserIds": ["guid"], "content" }` | 200 `DirectorNoteDto[]` | 400 `VALIDATION_FAILED` (`DIRECTOR_NOTE_TARGET_REQUIRED`, `DIRECTOR_NOTE_RECIPIENT_INVALID`), `DIRECTOR_NOTE_RECIPIENT_INVALID` · 404 `EVENT_NOT_FOUND` |
+| GET | `/api/director-notes?eventId=&pageNumber=&pageSize=` | cả hai | — | 200 `PagedList<DirectorNoteDto>` | — |
+| GET | `/api/director-notes/{id}` | cả hai | — | 200 `DirectorNoteDto` | 404 `DIRECTOR_NOTE_NOT_FOUND` |
+
+- Phải có `noteDate` **hoặc** `eventId` (có cả hai cũng được). `content` bắt buộc, ≤ 2000 ký tự.
+- `toUserIds`: chọn một hoặc nhiều ca trưởng từ `recipients`; id trùng tự loại. Người nhận nào không phải ca trưởng
+  đang hoạt động → 400 `DIRECTOR_NOTE_RECIPIENT_INVALID`, không lưu gì.
+- Mỗi ca trưởng nhận **một bản ghi chú riêng** (kết quả `POST` là mảng, mỗi phần tử một người) và một notification
+  `type = DirectorNote`, `referenceType = "DirectorNote"`, `referenceId` = id bản ghi chú của chính người đó;
+  `content` của notification là 200 ký tự đầu, đọc đủ bằng `GET /api/director-notes/{referenceId}`.
+- `GET` danh sách: cha xứ thấy ghi chú **đã gửi**, ca trưởng thấy ghi chú **nhận được**; mới nhất trước.
+  Ghi chú giữa người khác → 404 `DIRECTOR_NOTE_NOT_FOUND`.
 
 ---
 

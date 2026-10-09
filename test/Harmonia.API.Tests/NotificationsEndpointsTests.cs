@@ -47,6 +47,26 @@ public class NotificationsEndpointsTests(HarmoniaApiFactory factory) : IClassFix
     }
 
     [Fact]
+    public async Task MarkAllAsRead_ClearsOnlyTheCallersUnread_Async()
+    {
+        var user = await factory.AddUserAsync("notif-readall@test.com", cancellationToken: _ct);
+        var other = await factory.AddUserAsync("notif-readall-other@test.com", cancellationToken: _ct);
+        await SeedNotificationAsync(user.Email, "One", _ct);
+        await SeedNotificationAsync(user.Email, "Two", _ct);
+        await SeedNotificationAsync(other.Email, "Theirs", _ct);
+        var client = await factory.CreateClientAsAsync(user.Email, _ct);
+        var otherClient = await factory.CreateClientAsAsync(other.Email, _ct);
+
+        var response = await client.PutAsync("api/notifications/read-all", null, _ct);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(0, await UnreadCountAsync(client, _ct));
+        Assert.Equal(1, await UnreadCountAsync(otherClient, _ct));
+        var unread = await client.GetStringAsync("api/notifications?isRead=false", _ct);
+        Assert.Contains("\"totalCount\":0", unread);
+    }
+
+    [Fact]
     public async Task MarkAsRead_AnotherUsersNotification_Returns404Not403_Async()
     {
         var id = await SeedNotificationAsync("member@test.com", "Private", _ct);
