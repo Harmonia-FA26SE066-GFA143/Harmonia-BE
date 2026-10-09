@@ -364,4 +364,28 @@ public class ValidatorTests
 
         Assert.Equal(isValid, result.IsValid);
     }
+
+    // ---- Rehearsal attendance ----
+
+    [Fact]
+    public void RecordAttendances_DuplicateMember_ReturnsDuplicate()
+    {
+        var id = Guid.NewGuid();
+        var codes = ErrorCodesOf(new RecordRehearsalAttendancesRequestValidator(),
+            new RecordRehearsalAttendancesRequest { Items = [new() { MemberId = id, Status = AttendanceStatus.Present }, new() { MemberId = id, Status = AttendanceStatus.Late }] });
+
+        Assert.Equal([ErrorCodes.AttendanceMemberDuplicate], codes);
+    }
+
+    [Fact]
+    public void RecordAttendances_EmptyOrUnknownStatus_IsInvalid()
+    {
+        var validator = new RecordRehearsalAttendancesRequestValidator();
+
+        Assert.False(validator.Validate(new RecordRehearsalAttendancesRequest()).IsValid);
+        Assert.False(validator.Validate(new RecordRehearsalAttendancesRequest
+        {
+            Items = [new() { MemberId = Guid.NewGuid(), Status = (AttendanceStatus)99 }]
+        }).IsValid);
+    }
 }

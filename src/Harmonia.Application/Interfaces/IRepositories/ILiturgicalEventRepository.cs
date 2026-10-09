@@ -21,4 +21,20 @@ public interface ILiturgicalEventRepository : IGenericRepository<LiturgicalEvent
 
     /// <summary>Tracked event with its Location loaded.</summary>
     Task<LiturgicalEvent?> GetWithLocationAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Read-only event with every SongLists version, EventParticipations, Rehearsals and
+    /// ServiceRoster (with its Assignments) loaded.
+    /// </summary>
+    Task<LiturgicalEvent?> GetWithPreparationAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Read-only page of Published events before <paramref name="today"/> that involve the member (a participation
+    /// row or an Active line on a Finalized roster), newest first, narrowed by the season and date range of
+    /// <paramref name="filter"/>. LiturgicalSeason is loaded; EventParticipations, ServiceRoster.Assignments
+    /// (Active only, with Skill) and Rehearsals.Attendances hold only the member's rows. ServiceRoster is
+    /// loaded whatever its status; the caller checks for Finalized.
+    /// </summary>
+    Task<PagedList<LiturgicalEvent>> GetHistoryForMemberAsync(
+        Guid memberId, SearchMyParticipationHistoryRequest filter, DateOnly today, CancellationToken cancellationToken);
 }

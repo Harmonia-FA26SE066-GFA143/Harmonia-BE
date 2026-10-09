@@ -304,6 +304,7 @@ Chưa có kỹ năng nào → `[]`.
 | GET | `/api/member-profiles` | `ChoirDirector` | query `keyword`, `status`, `skillId`, `pageNumber`, `pageSize` | 200 `PagedList<MemberProfileSummaryDto>` | — |
 | GET | `/api/member-profiles/{id}` | `ChoirDirector` | — | 200 `MemberProfileDto` | 404 `MEMBER_NOT_FOUND` |
 | PUT | `/api/member-profiles/{id}` | `ChoirDirector` | `{ "phone", "dateOfBirth", "joinedDate", "status" }` | 200 `MemberProfileDto` | 400 `VALIDATION_FAILED`, `MEMBER_JOINED_DATE_IN_FUTURE` · 404 `MEMBER_NOT_FOUND` |
+| GET | `/api/member-profiles/me/history` | `ChoirMember` | query `liturgicalSeasonId`, `fromDate`, `toDate`, `pageNumber`, `pageSize` | 200 `PagedList<ParticipationHistoryDto>` | 404 `MEMBER_NOT_FOUND` |
 
 - `PUT` thay **toàn bộ** các field trong body: field bỏ trống / `null` sẽ bị xoá giá trị
   (`phone`, `dateOfBirth`). Gửi lại giá trị cũ nếu không muốn đổi.
@@ -315,6 +316,30 @@ Chưa có kỹ năng nào → `[]`.
   được **duyệt** kỹ năng đó (lấy id từ `GET /api/lookups/skills`; skill đã tắt → danh sách rỗng); các bộ lọc kết hợp AND; sắp theo tên.
   Dùng để chọn người khi phân công theo bè / nhạc cụ.
 - Role khác gọi vào → `403` body rỗng.
+
+### Lịch sử tham gia & luyện tập của tôi — `ChoirMember` (UC-11 / FE-14)
+
+`ParticipationHistoryDto`:
+
+```json
+{
+  "eventId": "guid", "eventDate": "2026-09-27", "title": "Chúa nhật XXVI Thường niên",
+  "liturgicalSeasonName": "Mùa Thường niên",
+  "participationStatus": "Confirmed",
+  "servedSkills": ["Tenor"],
+  "rehearsalsHeld": 2, "rehearsalsAttended": 1,
+  "assignmentsTotal": 3, "assignmentsPassed": 2
+}
+```
+
+- Chỉ gồm sự kiện `Published` **trước hôm nay** (giờ Việt Nam) mà ca viên có liên quan: được mời xác nhận tham gia,
+  hoặc có tên trên phân công đã chốt. Sắp mới nhất trước.
+- Bộ lọc tuỳ chọn, kết hợp AND: `liturgicalSeasonId` (id từ `GET /api/lookups/liturgical-seasons`), `fromDate`, `toDate`
+  (`yyyy-MM-dd`, bao gồm hai đầu).
+- `participationStatus` `null` khi ca viên không được mời. `servedSkills`: kỹ năng phục vụ trên phân công **đã chốt**
+  (không trùng tên); `[]` nếu không phục vụ.
+- `rehearsalsAttended` tính `Present` + `Late`. `assignmentsPassed` xét bản thu **mới nhất** của từng bài.
+  Chi tiết từng bản thu: `GET /api/practice-submissions/mine`.
 
 ---
 
@@ -374,7 +399,7 @@ Chưa có kỹ năng nào → `[]`.
 
 ---
 
-## 4b. Lịch phụng vụ & sự kiện — `api/liturgical-days`, `api/liturgical-events` · role `ParishPriest` · lịch sắp tới `api/schedule`: mọi role (UC-12 / UC-04)
+## 4b. Lịch phụng vụ & sự kiện — `api/liturgical-days`, `api/liturgical-events` · role `ParishPriest` · tiến độ chuẩn bị: `ChoirDirector` · lịch sắp tới `api/schedule`: mọi role (UC-12 / UC-04 / UC-15 / UC-30)
 
 ### `LiturgicalDayDto`
 
@@ -417,6 +442,8 @@ Chưa có kỹ năng nào → `[]`.
 | PATCH | `/api/liturgical-events/{id}/cancel` | — | 200 `LiturgicalEventDto` | 404 `EVENT_NOT_FOUND` · 409 `EVENT_CANCELLED`, `EVENT_ALREADY_PASSED` |
 | GET | `/api/schedule/events` · mọi role | — | 200 `LiturgicalEventSummaryDto[]` | — |
 | GET | `/api/schedule/rehearsals` · mọi role | — | 200 `RehearsalSummaryDto[]` | — |
+| GET | `/api/liturgical-events/{id}/preparation-progress` · `ChoirDirector` | — | 200 `EventPreparationProgressDto[]` | 404 `EVENT_NOT_FOUND` |
+| GET | `/api/liturgical-events/{id}/preparation-status` | — | 200 `EventPreparationStatusDto` | 404 `EVENT_NOT_FOUND` |
 
 **Ngày phụng vụ (UC-12 / FE-15)**
 
@@ -450,6 +477,41 @@ Chưa có kỹ năng nào → `[]`.
 - `events`: sự kiện `Published` từ hôm nay trở đi, sắp theo ngày rồi giờ.
 - `rehearsals`: buổi tập bắt đầu từ thời điểm gọi trở đi, sắp theo giờ bắt đầu. `locationName`, `note` có thể `null`.
 - Không phân trang — trả mảng; không có gì → `[]`.
+
+**Tiến độ chuẩn bị cho sự kiện (UC-30 / FE-46)**
+
+`EventPreparationProgressDto` = `{ memberId, fullName, participationStatus, rehearsalsHeld, rehearsalsAttended, assignmentsTotal, assignmentsPassed, assignmentsOverdue }`.
+
+- Mỗi dòng một ca viên đang hoạt động, sắp theo tên. Không phân trang. Xem được cả sự kiện đã qua.
+- `participationStatus`: `Invited` | `Confirmed` | `Declined` | `Unsure`, hoặc `null` khi ca viên chưa được mời.
+- `rehearsalsHeld`: số buổi tập / buổi chuẩn bị gắn với sự kiện **đã bắt đầu** (giống nhau ở mọi dòng);
+  `rehearsalsAttended`: trong số đó, buổi ca viên được điểm danh `Present` hoặc `Late`.
+- `assignmentsTotal`: số bài tập gắn với sự kiện mà ca viên nhận (cùng luật với `GET /api/practice-assignments/mine`);
+  `assignmentsPassed` / `assignmentsOverdue` xét theo bản thu mới nhất, luật quá hạn giống `isOverdue`.
+- Trả số thô; FE tự tính phần trăm (cẩn thận chia cho 0 khi `rehearsalsHeld` hoặc `assignmentsTotal` = 0).
+
+**Tình trạng chuẩn bị của ca đoàn (UC-15 / FE-21) — cha xứ**
+
+```json
+{
+  "eventId": "guid", "title": "Thánh lễ Giáng Sinh", "eventDate": "2026-12-24", "eventStatus": "Published",
+  "songListStatus": "Approved",
+  "participationInvited": 3, "participationConfirmed": 25, "participationDeclined": 2, "participationUnsure": 1,
+  "rosterStatus": "Finalized", "rosterActiveAssignments": 18,
+  "rosterShortages": [{ "songListItemId": "guid", "songTitle": "...", "skillId": "guid", "skillName": "Tenor", "requiredCount": 3, "assignedCount": 2 }],
+  "rehearsalsTotal": 4, "rehearsalsHeld": 2,
+  "attendanceExpected": 60, "attendancePresent": 51,
+  "practiceExpected": 90, "practicePassed": 70, "practiceOverdue": 6
+}
+```
+
+- Xem được mọi sự kiện, kể cả đã qua. Chỉ trả số tổng của cả ca đoàn; bảng từng ca viên là `preparation-progress` của ca trưởng.
+- `songListStatus`: trạng thái phiên bản danh sách bài hát **mới nhất**; `null` nếu chưa đề xuất.
+- `participation*`: đếm `EventParticipation` theo trạng thái; `participationInvited` = đã mời nhưng chưa trả lời.
+- `rosterStatus`: `Draft` | `Suggested` | `Finalized`, `null` nếu chưa có phân công; `rosterActiveAssignments` không tính dòng đã bị thay.
+- `rosterShortages`: giống `GET /api/service-rosters/shortages?eventId=`; `null` khi chưa có danh sách bài hát được duyệt (chưa biết cần bao nhiêu người), `[]` khi đủ người.
+- `attendanceExpected` = `rehearsalsHeld` × số ca viên đang hoạt động; `attendancePresent` = tổng lượt `Present` + `Late`.
+- `practice*`: cộng dồn các cột `assignments*` của `preparation-progress` trên mọi ca viên đang hoạt động.
 
 ---
 
@@ -1017,6 +1079,32 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 - Bản thu của người khác → 404 `PRACTICE_SUBMISSION_NOT_FOUND` (không trả 403).
 - Mở từ thông báo `PracticeFeedback`: gọi `GET /api/practice-submissions/mine/{referenceId}`.
 - Trạng thái "Quá hạn" của **bài tập** xem ở `isOverdue` của `GET /api/practice-assignments/mine`.
+
+---
+
+## 7e. Rehearsals — `api/rehearsals` · role `ChoirDirector` (UC-30 / FE-45)
+
+### `RehearsalAttendanceDto`
+
+```json
+{ "memberId": "guid", "fullName": "Nguyễn Văn A", "status": "Present", "checkedAt": "2026-10-09T12:00:00Z" }
+```
+
+`status`: `Present` | `Absent` | `Late` | `Excused`, hoặc `null` khi chưa điểm danh (khi đó `checkedAt` cũng `null`).
+
+| Method | Route | Body | Thành công | Lỗi |
+|---|---|---|---|---|
+| GET | `/api/rehearsals/{id}/attendances` | — | 200 `RehearsalAttendanceDto[]` | 404 `REHEARSAL_NOT_FOUND` |
+| PUT | `/api/rehearsals/{id}/attendances` | `{ "items": [{ "memberId", "status" }] }` | 204 | 400 `VALIDATION_FAILED` (`ATTENDANCE_MEMBER_DUPLICATE`) · 404 `REHEARSAL_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `REHEARSAL_NOT_STARTED`, `MEMBER_NOT_ACTIVE`, `ATTENDANCE_ALREADY_RECORDED` |
+
+- Buổi chuẩn bị cho sự kiện cũng là một buổi tập (`Rehearsal` có gắn sự kiện), điểm danh giống hệt.
+- `GET` trả mọi ca viên đang hoạt động, cộng những người đã được điểm danh ở buổi này nhưng nay không còn
+  hoạt động; sắp theo tên. Không phân trang.
+- `PUT` ghi hoặc sửa điểm danh cho từng ca viên trong `items`; ca viên không có trong `items` giữ nguyên.
+  Ghi lại `checkedAt` = lúc gọi và người điểm danh là ca trưởng đang gọi.
+- Chỉ điểm danh được từ giờ bắt đầu buổi tập trở đi (sửa sau khi kết thúc vẫn được); trước đó → 409 `REHEARSAL_NOT_STARTED`.
+- Ca viên trong `items` phải đang hoạt động; mọi lỗi đều chặn cả lô, không ghi dòng nào.
+- 409 `ATTENDANCE_ALREADY_RECORDED`: ca trưởng khác vừa điểm danh cùng ca viên — tải lại danh sách rồi gửi lại.
 
 ---
 

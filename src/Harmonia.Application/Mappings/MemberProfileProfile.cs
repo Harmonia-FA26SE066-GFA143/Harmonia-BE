@@ -40,5 +40,14 @@ public class MemberProfileProfile : Profile
                 src.LearningProgresses.Select(p => (LearningStatus?)p.Status).FirstOrDefault() ?? LearningStatus.NotStarted))
             .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src =>
                 src.LearningProgresses.Select(p => (DateTime?)p.UpdatedAt).FirstOrDefault()));
+
+        // RehearsalAttendances must hold only the row of one rehearsal (see GetAttendanceRosterAsync).
+        CreateMap<MemberProfile, RehearsalAttendanceDto>()
+            .ForMember(dest => dest.MemberId, opt => opt.MapFrom(src => src.Id))
+            .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => src.User.FullName))
+            .ForMember(dest => dest.Status, opt => opt.MapFrom(src =>
+                src.RehearsalAttendances.Select(a => (AttendanceStatus?)a.Status).FirstOrDefault()))
+            .ForMember(dest => dest.CheckedAt, opt => opt.MapFrom(src =>
+                src.RehearsalAttendances.Select(a => (DateTime?)a.CheckedAt).FirstOrDefault()));
     }
 }
