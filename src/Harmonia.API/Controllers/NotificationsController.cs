@@ -12,8 +12,8 @@ public class NotificationsController(INotificationService notificationService) :
 {
     [HttpGet]
     public async Task<IActionResult> GetMineAsync(
-        [FromQuery] PagingRequest paging, CancellationToken cancellationToken) =>
-        ToActionResult(await notificationService.GetForUserAsync(User.GetUserId(), paging, cancellationToken));
+        [FromQuery] bool? isRead, [FromQuery] PagingRequest paging, CancellationToken cancellationToken) =>
+        ToActionResult(await notificationService.GetForUserAsync(User.GetUserId(), isRead, paging, cancellationToken));
 
     [HttpGet("unread-count")]
     public async Task<IActionResult> CountUnreadAsync(CancellationToken cancellationToken) =>
@@ -22,4 +22,8 @@ public class NotificationsController(INotificationService notificationService) :
     [HttpPut("{id:guid}/read")]
     public async Task<IActionResult> MarkAsReadAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await notificationService.MarkAsReadAsync(User.GetUserId(), id, cancellationToken));
+
+    [HttpPut("read-all")]
+    public async Task<IActionResult> MarkAllAsReadAsync(CancellationToken cancellationToken) =>
+        ToActionResult(await notificationService.MarkAllAsReadAsync(User.GetUserId(), cancellationToken));
 }

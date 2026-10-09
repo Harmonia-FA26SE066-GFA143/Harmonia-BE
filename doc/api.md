@@ -541,9 +541,14 @@ thì mở màn nào.
 
 | Method | Route | Thành công | Lỗi |
 |---|---|---|---|
-| GET | `/api/notifications?pageNumber=1&pageSize=20` | 200 `PagedList<NotificationDto>` | — |
+| GET | `/api/notifications?isRead=&pageNumber=1&pageSize=20` | 200 `PagedList<NotificationDto>` | — |
 | GET | `/api/notifications/unread-count` | 200, body là số nguyên (`3`) | — |
 | PUT | `/api/notifications/{id}/read` | 204 | 404 `NOTIFICATION_NOT_FOUND` |
+| PUT | `/api/notifications/read-all` | 204 | — |
+
+- `isRead` tuỳ chọn: `false` chỉ lấy thông báo chưa đọc, `true` chỉ lấy đã đọc, bỏ trống lấy tất cả.
+- `read-all` đánh dấu mọi thông báo chưa đọc của người gọi là đã đọc (`readAt` = lúc gọi); thông báo đã đọc
+  giữ nguyên `readAt` cũ. Không còn gì chưa đọc thì vẫn trả 204.
 
 ---
 

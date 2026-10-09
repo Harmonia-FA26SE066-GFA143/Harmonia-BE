@@ -160,11 +160,60 @@ public sealed class RepositoryTests : IDisposable
 
         await using var context = _db.NewContext();
         var page = await new NotificationRepository(context)
-            .GetForUserAsync(user.Id, new PagingRequest { PageNumber = 2, PageSize = 2 }, _ct);
+            .GetForUserAsync(user.Id, null, new PagingRequest { PageNumber = 2, PageSize = 2 }, _ct);
 
         Assert.Equal(5, page.TotalCount);
         Assert.Equal(["mine-2", "mine-1"], page.Items.Select(r => r.Notification.Title));
         Assert.All(page.Items, r => Assert.Equal(user.Id, r.UserId));
+    }
+
+    [Fact]
+    public async Task GetForUserAsync_FiltersByReadState_Async()
+    {
+        var user = await _db.AddUserAsync("a@test.com", cancellationToken: _ct);
+        await using (var seed = _db.NewContext())
+        {
+            seed.Notifications.AddRange(
+                NewNotification("read", DateTime.UtcNow, user.Id, isRead: true),
+                NewNotification("unread", DateTime.UtcNow, user.Id));
+            await seed.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var repository = new NotificationRepository(context);
+
+        Assert.Equal("unread", Assert.Single((await repository.GetForUserAsync(user.Id, false, new PagingRequest(), _ct)).Items).Notification.Title);
+        Assert.Equal("read", Assert.Single((await repository.GetForUserAsync(user.Id, true, new PagingRequest(), _ct)).Items).Notification.Title);
+    }
+
+    [Fact]
+    public async Task MarkAllAsReadAsync_MarksOnlyTheUsersUnreadRows_Async()
+    {
+        var user = await _db.AddUserAsync("a@test.com", cancellationToken: _ct);
+        var other = await _db.AddUserAsync("b@test.com", cancellationToken: _ct);
+        var earlier = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc);
+        await using (var seed = _db.NewContext())
+        {
+            var alreadyRead = NewNotification("old", DateTime.UtcNow, user.Id, isRead: true);
+            alreadyRead.Recipients.Single().ReadAt = earlier;
+            seed.Notifications.AddRange(
+                alreadyRead,
+                NewNotification("a", DateTime.UtcNow, user.Id),
+                NewNotification("b", DateTime.UtcNow, user.Id),
+                NewNotification("theirs", DateTime.UtcNow, other.Id));
+            await seed.SaveChangesAsync(_ct);
+        }
+
+        var readAt = new DateTime(2026, 10, 9, 0, 0, 0, DateTimeKind.Utc);
+        await using (var context = _db.NewContext())
+            await new NotificationRepository(context).MarkAllAsReadAsync(user.Id, readAt, _ct);
+
+        await using var check = _db.NewContext();
+        var rows = await check.NotificationRecipients.Include(x => x.Notification).ToListAsync(_ct);
+        Assert.All(rows.Where(r => r.UserId == user.Id), r => Assert.True(r.IsRead));
+        Assert.Equal(earlier, rows.Single(r => r.Notification.Title == "old").ReadAt);
+        Assert.Equal(readAt, rows.Single(r => r.Notification.Title == "a").ReadAt);
+        Assert.False(rows.Single(r => r.UserId == other.Id).IsRead);
     }
 
     [Fact]
