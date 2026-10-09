@@ -107,4 +107,13 @@ public class UserRepository(HarmoniaDbContext dbContext)
             .Select(x => x.Id)
             .ToListAsync(cancellationToken);
     }
+
+    public Task<List<User>> GetActiveByRoleAsync(string roleName, CancellationToken cancellationToken) =>
+        DbContext.Users
+            .AsNoTracking()
+            .Include(x => x.Role)
+            .Where(x => x.Role.Name == roleName && x.IsActive)
+            .OrderBy(x => x.FullName)
+            .ThenBy(x => x.Id)
+            .ToListAsync(cancellationToken);
 }

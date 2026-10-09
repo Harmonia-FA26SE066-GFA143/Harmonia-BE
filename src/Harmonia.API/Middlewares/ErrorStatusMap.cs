@@ -163,6 +163,8 @@ public static class ErrorStatusMap
         // 12. Notification.
         [ErrorCodes.NotificationNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.DirectorNoteTargetRequired] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.DirectorNoteNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.DirectorNoteRecipientInvalid] = StatusCodes.Status400BadRequest,
 
         // 13. System settings & reports.
         [ErrorCodes.SettingNotFound] = StatusCodes.Status404NotFound,

@@ -552,6 +552,41 @@ thì mở màn nào.
 
 ---
 
+## 5a. Director notes — `api/director-notes` · gửi: `ParishPriest` · đọc: `ParishPriest`, `ChoirDirector` (UC-17 / FE-23)
+
+### `DirectorNoteDto`
+
+```json
+{
+  "id": "guid",
+  "noteDate": "2026-12-24",
+  "eventId": "guid",
+  "eventTitle": "Thánh lễ Giáng Sinh",
+  "fromUserId": "guid", "fromUserName": "Cha Giuse",
+  "toUserId": "guid", "toUserName": "Anh Phêrô",
+  "content": "Xin ca đoàn chuẩn bị thêm bài Đáp ca...",
+  "sentAt": "2026-10-09T08:00:00Z"
+}
+```
+
+| Method | Route | Role | Body / Query | Thành công | Lỗi |
+|---|---|---|---|---|---|
+| GET | `/api/director-notes/recipients` | `ParishPriest` | — | 200 `UserSummaryDto[]` (ca trưởng đang hoạt động) | — |
+| POST | `/api/director-notes` | `ParishPriest` | `{ "noteDate?", "eventId?", "toUserIds": ["guid"], "content" }` | 200 `DirectorNoteDto[]` | 400 `VALIDATION_FAILED` (`DIRECTOR_NOTE_TARGET_REQUIRED`, `DIRECTOR_NOTE_RECIPIENT_INVALID`), `DIRECTOR_NOTE_RECIPIENT_INVALID` · 404 `EVENT_NOT_FOUND` |
+| GET | `/api/director-notes?eventId=&pageNumber=&pageSize=` | cả hai | — | 200 `PagedList<DirectorNoteDto>` | — |
+| GET | `/api/director-notes/{id}` | cả hai | — | 200 `DirectorNoteDto` | 404 `DIRECTOR_NOTE_NOT_FOUND` |
+
+- Phải có `noteDate` **hoặc** `eventId` (có cả hai cũng được). `content` bắt buộc, ≤ 2000 ký tự.
+- `toUserIds`: chọn một hoặc nhiều ca trưởng từ `recipients`; id trùng tự loại. Người nhận nào không phải ca trưởng
+  đang hoạt động → 400 `DIRECTOR_NOTE_RECIPIENT_INVALID`, không lưu gì.
+- Mỗi ca trưởng nhận **một bản ghi chú riêng** (kết quả `POST` là mảng, mỗi phần tử một người) và một notification
+  `type = DirectorNote`, `referenceType = "DirectorNote"`, `referenceId` = id bản ghi chú của chính người đó;
+  `content` của notification là 200 ký tự đầu, đọc đủ bằng `GET /api/director-notes/{referenceId}`.
+- `GET` danh sách: cha xứ thấy ghi chú **đã gửi**, ca trưởng thấy ghi chú **nhận được**; mới nhất trước.
+  Ghi chú giữa người khác → 404 `DIRECTOR_NOTE_NOT_FOUND`.
+
+---
+
 ## 6. Songs — `api/songs` · xem: mọi role · sửa: `ChoirDirector`
 
 Thư viện bài hát và phân loại bài hát (UC-21 / FE-27, FE-29).

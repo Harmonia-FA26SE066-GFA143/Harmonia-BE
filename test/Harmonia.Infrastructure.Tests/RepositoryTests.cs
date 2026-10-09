@@ -1571,6 +1571,58 @@ public sealed class RepositoryTests : IDisposable
         Assert.NotEqual(Guid.Empty, saved.Single(a => a.MemberId == newcomer.Id).Id);
     }
 
+    // ---- DirectorNoteRepository & UserRepository.GetActiveByRoleAsync (UC-17) ----
+
+    [Fact]
+    public async Task DirectorNotes_SearchForUser_ReturnsOnlySentOrReceived_NewestFirst_WithDetails_Async()
+    {
+        var priest = await _db.AddUserAsync("priest@test.com", RoleNames.ParishPriest, _ct, "Priest");
+        var directorA = await _db.AddUserAsync("a@test.com", RoleNames.ChoirDirector, _ct, "A");
+        var directorB = await _db.AddUserAsync("b@test.com", RoleNames.ChoirDirector, _ct, "B");
+        var start = new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc);
+        DirectorNote Note(Guid to, int hours) => new()
+        {
+            Id = Guid.NewGuid(), FromUserId = priest.Id, ToUserId = to, Content = $"to-{to}-{hours}",
+            NoteDate = new DateOnly(2026, 10, 1), SentAt = start.AddHours(hours),
+        };
+        var older = Note(directorA.Id, 1);
+        var newer = Note(directorA.Id, 2);
+        await using (var seed = _db.NewContext())
+        {
+            seed.DirectorNotes.AddRange(older, newer, Note(directorB.Id, 3));
+            await seed.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var repository = new DirectorNoteRepository(context);
+        var received = await repository.SearchForUserAsync(directorA.Id, new SearchDirectorNotesRequest(), _ct);
+        var sent = await repository.SearchForUserAsync(priest.Id, new SearchDirectorNotesRequest(), _ct);
+
+        Assert.Equal([newer.Id, older.Id], received.Items.Select(n => n.Id));
+        Assert.All(received.Items, n => Assert.Equal(("Priest", "A"), (n.FromUser.FullName, n.ToUser.FullName)));
+        Assert.Equal(3, sent.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetActiveByRole_ReturnsOnlyActiveUsersOfThatRole_OrderedByName_Async()
+    {
+        await _db.AddUserAsync("z@test.com", RoleNames.ChoirDirector, _ct, "Zeta");
+        await _db.AddUserAsync("a@test.com", RoleNames.ChoirDirector, _ct, "Alpha");
+        var inactive = await _db.AddUserAsync("off@test.com", RoleNames.ChoirDirector, _ct, "Off");
+        await _db.AddUserAsync("m@test.com", RoleNames.ChoirMember, _ct, "Member");
+        await using (var seed = _db.NewContext())
+        {
+            (await seed.Users.SingleAsync(u => u.Id == inactive.Id, _ct)).IsActive = false;
+            await seed.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var directors = await new UserRepository(context).GetActiveByRoleAsync(RoleNames.ChoirDirector, _ct);
+
+        Assert.Equal(["Alpha", "Zeta"], directors.Select(u => u.FullName));
+        Assert.All(directors, u => Assert.Equal(RoleNames.ChoirDirector, u.Role.Name));
+    }
+
     private static RefreshToken NewRefreshToken(Guid userId, string hash, DateTime? revokedAt = null) =>
         new()
         {

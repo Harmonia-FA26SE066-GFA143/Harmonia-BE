@@ -268,6 +268,8 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 |---|---|---|
 | `NOTIFICATION_NOT_FOUND` | 404 | Không tìm thấy thông báo |
 | `DIRECTOR_NOTE_TARGET_REQUIRED` | 400 | Phải chọn ngày hoặc sự kiện để gửi ghi chú |
+| `DIRECTOR_NOTE_NOT_FOUND` | 404 | Không tìm thấy ghi chú |
+| `DIRECTOR_NOTE_RECIPIENT_INVALID` | 400 | Người nhận phải là ca trưởng đang hoạt động |
 
 **Không có mã "thông báo không dành cho bạn".** Thông báo của người khác trả
 `NOTIFICATION_NOT_FOUND` (404), vì 403 sẽ xác nhận bản ghi đó có thật. Truy vấn luôn

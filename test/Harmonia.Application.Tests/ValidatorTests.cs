@@ -388,4 +388,50 @@ public class ValidatorTests
             Items = [new() { MemberId = Guid.NewGuid(), Status = (AttendanceStatus)99 }]
         }).IsValid);
     }
+
+    // ---- Director note ----
+
+    private static CreateDirectorNoteRequest ValidNote() =>
+        new() { EventId = Guid.NewGuid(), ToUserIds = [Guid.NewGuid()], Content = "Note" };
+
+    [Fact]
+    public void DirectorNote_Valid_HasNoErrors()
+    {
+        Assert.Empty(ErrorCodesOf(new CreateDirectorNoteRequestValidator(), ValidNote()));
+        var byDate = ValidNote();
+        byDate.EventId = null;
+        byDate.NoteDate = new DateOnly(2026, 12, 24);
+        Assert.Empty(ErrorCodesOf(new CreateDirectorNoteRequestValidator(), byDate));
+    }
+
+    [Fact]
+    public void DirectorNote_NoDateNorEvent_ReturnsTargetRequired()
+    {
+        var request = ValidNote();
+        request.EventId = null;
+
+        Assert.Equal([ErrorCodes.DirectorNoteTargetRequired], ErrorCodesOf(new CreateDirectorNoteRequestValidator(), request));
+    }
+
+    [Fact]
+    public void DirectorNote_NoRecipient_ReturnsRecipientInvalid()
+    {
+        var request = ValidNote();
+        request.ToUserIds = [];
+
+        Assert.Equal([ErrorCodes.DirectorNoteRecipientInvalid], ErrorCodesOf(new CreateDirectorNoteRequestValidator(), request));
+    }
+
+    [Fact]
+    public void DirectorNote_EmptyOrTooLongContent_IsInvalid()
+    {
+        var validator = new CreateDirectorNoteRequestValidator();
+        var empty = ValidNote();
+        empty.Content = " ";
+        var tooLong = ValidNote();
+        tooLong.Content = new string('a', 2001);
+
+        Assert.False(validator.Validate(empty).IsValid);
+        Assert.False(validator.Validate(tooLong).IsValid);
+    }
 }

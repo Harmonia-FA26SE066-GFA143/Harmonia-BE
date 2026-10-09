@@ -294,6 +294,11 @@ public static class ErrorCodes
 
     public const string DirectorNoteTargetRequired = "DIRECTOR_NOTE_TARGET_REQUIRED";
 
+    // A note the caller neither sent nor received is reported as not found, for the same reason as above.
+    public const string DirectorNoteNotFound = "DIRECTOR_NOTE_NOT_FOUND";
+
+    public const string DirectorNoteRecipientInvalid = "DIRECTOR_NOTE_RECIPIENT_INVALID";
+
     // 13. System settings & reports.
     public const string SettingNotFound = "SETTING_NOT_FOUND";
 
