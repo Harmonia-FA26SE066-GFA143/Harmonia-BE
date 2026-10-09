@@ -37,4 +37,11 @@ public interface IMemberProfileRepository : IGenericRepository<MemberProfile>
     /// </summary>
     Task<PagedList<MemberProfile>> GetLearnersOfMaterialAsync(
         Guid materialId, Guid? targetSkillId, SearchMaterialLearningProgressRequest filter, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Read-only, ordered by name: active members plus anyone already recorded at the rehearsal, so
+    /// history survives a member leaving. <see cref="MemberProfile.User"/> is loaded and
+    /// <see cref="MemberProfile.RehearsalAttendances"/> holds only the row for this rehearsal, if any.
+    /// </summary>
+    Task<List<MemberProfile>> GetAttendanceRosterAsync(Guid rehearsalId, CancellationToken cancellationToken);
 }

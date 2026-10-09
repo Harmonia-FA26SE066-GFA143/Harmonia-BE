@@ -108,4 +108,14 @@ public class MemberProfileRepository(HarmoniaDbContext dbContext)
 
         return new PagedList<MemberProfile>(items, filter.PageNumber, filter.PageSize, totalCount);
     }
+
+    public Task<List<MemberProfile>> GetAttendanceRosterAsync(Guid rehearsalId, CancellationToken cancellationToken) =>
+        DbContext.MemberProfiles
+            .AsNoTracking()
+            .Where(x => x.Status == MemberStatus.Active || x.RehearsalAttendances.Any(a => a.RehearsalId == rehearsalId))
+            .Include(x => x.User)
+            .Include(x => x.RehearsalAttendances.Where(a => a.RehearsalId == rehearsalId))
+            .OrderBy(x => x.User.FullName)
+            .ThenBy(x => x.Id)
+            .ToListAsync(cancellationToken);
 }

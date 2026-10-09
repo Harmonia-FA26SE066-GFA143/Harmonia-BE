@@ -251,6 +251,10 @@ public static class ErrorCodes
 
     public const string AttendanceAlreadyRecorded = "ATTENDANCE_ALREADY_RECORDED";
 
+    public const string RehearsalNotStarted = "REHEARSAL_NOT_STARTED";
+
+    public const string AttendanceMemberDuplicate = "ATTENDANCE_MEMBER_DUPLICATE";
+
     // 11. Practice assignment & submission.
     public const string PracticeAssignmentNotFound = "PRACTICE_ASSIGNMENT_NOT_FOUND";
 

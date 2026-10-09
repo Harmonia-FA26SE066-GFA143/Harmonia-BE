@@ -240,6 +240,8 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 | `REHEARSAL_ALREADY_PASSED` | 409 | Buổi tập đã diễn ra |
 | `ATTENDANCE_NOT_FOUND` | 404 | Không tìm thấy bản ghi điểm danh |
 | `ATTENDANCE_ALREADY_RECORDED` | 409 | Ca viên này đã được điểm danh |
+| `REHEARSAL_NOT_STARTED` | 409 | Buổi tập chưa bắt đầu, chưa thể điểm danh |
+| `ATTENDANCE_MEMBER_DUPLICATE` | 400 | Một ca viên xuất hiện nhiều lần trong danh sách điểm danh |
 
 ## 11. Bài tập & bản thu
 
