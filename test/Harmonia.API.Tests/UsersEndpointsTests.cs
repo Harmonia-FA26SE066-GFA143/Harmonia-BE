@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Harmonia.Application.DTOs;
 using Harmonia.Domain.Common;
+using NSubstitute;
 
 namespace Harmonia.API.Tests;
 
@@ -10,6 +11,15 @@ public class UsersEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<Har
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
 
     private sealed record Page(List<UserDto> Items, int TotalCount);
+
+    /// <summary>The generated first password, read back from the welcome email the server sent.</summary>
+    private string EmailedPassword(string email)
+    {
+        var body = factory.EmailSender.ReceivedCalls()
+            .Select(c => c.GetArguments())
+            .Last(a => (string)a[0]! == email)[2] as string;
+        return System.Text.RegularExpressions.Regex.Match(body!, "Password: <b>([^<]+)</b>").Groups[1].Value;
+    }
 
     [Fact]
     public async Task Search_AsAdmin_FiltersByRoleAndActive_Async()
@@ -56,9 +66,10 @@ public class UsersEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<Har
 
         var created = await admin.PostAsJsonAsync(
             "api/users",
-            new { email = "users-named@test.com", fullName = " Maria Nguyen ", password = HarmoniaApiFactory.Password, roleName = RoleNames.ChoirDirector },
+            new { email = "users-named@test.com", fullName = " Maria Nguyen ", roleName = RoleNames.ChoirDirector },
             _ct);
         var id = (await created.Content.ReadFromJsonAsync<UserDto>(TestJson.Options, _ct))!.Id;
+        await factory.CompleteFirstSignInAsync("users-named@test.com", _ct);
         var fetched = (await admin.GetFromJsonAsync<UserDto>($"api/users/{id}", TestJson.Options, _ct))!;
         var login = await factory.LoginAsync("users-named@test.com", cancellationToken: _ct);
 
@@ -68,16 +79,74 @@ public class UsersEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<Har
     }
 
     [Fact]
-    public async Task Create_WithoutFullName_Returns400_Async()
+    public async Task Create_WithoutFullName_StoresEmptyNameAndPhone_EmailsPassword_Async()
     {
         var admin = await factory.CreateClientAsAsync("admin@test.com", _ct);
 
         var response = await admin.PostAsJsonAsync(
             "api/users",
-            new { email = "users-noname@test.com", password = HarmoniaApiFactory.Password, roleName = RoleNames.ChoirMember },
+            new { email = "users-noname@test.com", phone = " 0901234567 ", roleName = RoleNames.ChoirMember },
+            _ct);
+        var created = (await response.Content.ReadFromJsonAsync<UserDto>(TestJson.Options, _ct))!;
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(string.Empty, created.FullName);
+        Assert.Equal("0901234567", created.Phone);
+        Assert.True(created.IsPasswordChangeRequired);
+        Assert.Matches("^[A-Za-z2-9]{12}$", EmailedPassword("users-noname@test.com"));
+    }
+
+    [Fact]
+    public async Task Create_BlocksUntilPasswordChanged_Async()
+    {
+        var admin = await factory.CreateClientAsAsync("admin@test.com", _ct);
+        await admin.PostAsJsonAsync(
+            "api/users",
+            new { email = "users-firstlogin@test.com", roleName = RoleNames.ParishPriest },
             _ct);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var emailed = EmailedPassword("users-firstlogin@test.com");
+        var first = await factory.LoginAsync("users-firstlogin@test.com", emailed, _ct);
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new("Bearer", first.AccessToken);
+        var blocked = await client.GetAsync("api/lookups/mass-types", _ct);
+        var me = await client.GetAsync("api/auth/me", _ct);
+        var change = await client.PostAsJsonAsync(
+            "api/auth/change-password", new { currentPassword = emailed, newPassword = "BrandNew123" }, _ct);
+        var second = await factory.LoginAsync("users-firstlogin@test.com", "BrandNew123", _ct);
+        client.DefaultRequestHeaders.Authorization = new("Bearer", second.AccessToken);
+        var unblocked = await client.GetAsync("api/lookups/mass-types", _ct);
+
+        Assert.True(first.User.IsPasswordChangeRequired);
+        Assert.Equal(HttpStatusCode.Forbidden, blocked.StatusCode);
+        Assert.Contains(ErrorCodes.AuthPasswordChangeRequired, await blocked.Content.ReadAsStringAsync(_ct));
+        Assert.Equal(HttpStatusCode.OK, me.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, change.StatusCode);
+        Assert.False(second.User.IsPasswordChangeRequired);
+        Assert.Equal(HttpStatusCode.OK, unblocked.StatusCode);
+    }
+
+    [Fact]
+    public async Task Me_AnyRole_ReadsAndUpdatesOwnNameAndPhone_Async()
+    {
+        var priest = await factory.CreateClientAsAsync("priest@test.com", _ct);
+
+        var update = await priest.PutAsJsonAsync("api/auth/me", new { fullName = " Father Joseph ", phone = "0911222333" }, _ct);
+        var me = (await priest.GetFromJsonAsync<UserDto>("api/auth/me", TestJson.Options, _ct))!;
+
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+        Assert.Equal("priest@test.com", me.Email);
+        Assert.Equal("Father Joseph", me.FullName);
+        Assert.Equal("0911222333", me.Phone);
+        Assert.Equal(RoleNames.ParishPriest, me.RoleName);
+    }
+
+    [Fact]
+    public async Task Me_Anonymous_Returns401_Async()
+    {
+        var response = await factory.CreateClient().GetAsync("api/auth/me", _ct);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]

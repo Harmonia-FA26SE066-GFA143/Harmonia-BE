@@ -20,8 +20,9 @@ public class MemberProfilesEndpointsTests(HarmoniaApiFactory factory) : IClassFi
     {
         var admin = await factory.CreateClientAsAsync("admin@test.com", cancellationToken);
         var response = await admin.PostAsJsonAsync(
-            "api/users", new { email, fullName, password = HarmoniaApiFactory.Password, roleName }, cancellationToken);
+            "api/users", new { email, fullName, roleName }, cancellationToken);
         response.EnsureSuccessStatusCode();
+        await factory.CompleteFirstSignInAsync(email, cancellationToken);
         return (await response.Content.ReadFromJsonAsync<UserDto>(TestJson.Options, cancellationToken))!;
     }
 
@@ -84,7 +85,7 @@ public class MemberProfilesEndpointsTests(HarmoniaApiFactory factory) : IClassFi
         var director = await factory.CreateClientAsAsync("director@test.com", _ct);
         var id = Assert.Single((await director.GetFromJsonAsync<Page>(
             "api/member-profiles?keyword=mp-future", TestJson.Options, _ct))!.Items).Id;
-        var tomorrow = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
+        var tomorrow = VietnamTime.Today.AddDays(1);
 
         var response = await director.PutAsJsonAsync(
             $"api/member-profiles/{id}", new { joinedDate = tomorrow, status = "Active" }, _ct);

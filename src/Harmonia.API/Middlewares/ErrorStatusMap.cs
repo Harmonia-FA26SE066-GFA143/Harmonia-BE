@@ -29,6 +29,7 @@ public static class ErrorStatusMap
         // 1. Auth.
         [ErrorCodes.AuthInvalidCredentials] = StatusCodes.Status401Unauthorized,
         [ErrorCodes.AuthAccountInactive] = StatusCodes.Status403Forbidden,
+        [ErrorCodes.AuthPasswordChangeRequired] = StatusCodes.Status403Forbidden,
         [ErrorCodes.AuthTokenInvalid] = StatusCodes.Status401Unauthorized,
         [ErrorCodes.AuthTokenExpired] = StatusCodes.Status401Unauthorized,
         [ErrorCodes.AuthRefreshTokenNotFound] = StatusCodes.Status401Unauthorized,
@@ -150,6 +151,8 @@ public static class ErrorStatusMap
         [ErrorCodes.RehearsalAlreadyPassed] = StatusCodes.Status409Conflict,
         [ErrorCodes.AttendanceNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.AttendanceAlreadyRecorded] = StatusCodes.Status409Conflict,
+        [ErrorCodes.RehearsalNotStarted] = StatusCodes.Status409Conflict,
+        [ErrorCodes.AttendanceMemberDuplicate] = StatusCodes.Status400BadRequest,
 
         // 11. Practice assignment & submission.
         [ErrorCodes.PracticeAssignmentNotFound] = StatusCodes.Status404NotFound,
@@ -159,6 +162,10 @@ public static class ErrorStatusMap
         [ErrorCodes.PracticeSubmissionNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.PracticeSubmissionPastDue] = StatusCodes.Status409Conflict,
         [ErrorCodes.PracticeSubmissionAlreadyReviewed] = StatusCodes.Status409Conflict,
+        [ErrorCodes.PracticeSubmissionAlreadyPassed] = StatusCodes.Status409Conflict,
+        [ErrorCodes.PracticeSubmissionSuperseded] = StatusCodes.Status409Conflict,
+        [ErrorCodes.PracticeSubmissionNotReviewed] = StatusCodes.Status409Conflict,
+        [ErrorCodes.PracticeSubmissionConflict] = StatusCodes.Status409Conflict,
         [ErrorCodes.PracticeAudioRequired] = StatusCodes.Status400BadRequest,
         [ErrorCodes.PracticeAudioTypeNotAllowed] = StatusCodes.Status400BadRequest,
         [ErrorCodes.PracticeAudioTooLarge] = StatusCodes.Status413PayloadTooLarge,
@@ -166,6 +173,8 @@ public static class ErrorStatusMap
         // 12. Notification.
         [ErrorCodes.NotificationNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.DirectorNoteTargetRequired] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.DirectorNoteNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.DirectorNoteRecipientInvalid] = StatusCodes.Status400BadRequest,
 
         // 13. System settings & reports.
         [ErrorCodes.SettingNotFound] = StatusCodes.Status404NotFound,

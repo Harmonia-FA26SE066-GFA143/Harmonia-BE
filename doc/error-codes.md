@@ -82,6 +82,7 @@ Bốn mã lookup dùng chung cho 9 bảng danh mục (`Role`, `SkillCategory`,
 |---|---|---|
 | `AUTH_INVALID_CREDENTIALS` | 401 | Sai tài khoản hoặc mật khẩu |
 | `AUTH_ACCOUNT_INACTIVE` | 403 | Tài khoản đã bị vô hiệu hoá |
+| `AUTH_PASSWORD_CHANGE_REQUIRED` | 403 | Bạn cần đổi mật khẩu trước khi tiếp tục |
 | `AUTH_TOKEN_INVALID` | 401 | Phiên đăng nhập không hợp lệ |
 | `AUTH_TOKEN_EXPIRED` | 401 | Phiên đăng nhập đã hết hạn |
 | `AUTH_REFRESH_TOKEN_NOT_FOUND` | 401 | Phiên đăng nhập không tồn tại |
@@ -147,6 +148,11 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 
 | Mã | HTTP | Tiếng Việt |
 |---|---|---|
+| `CALENDAR_DAY_NOT_FOUND` | 404 | Không tìm thấy ngày phụng vụ |
+| `CALENDAR_FILE_REQUIRED` | 400 | Vui lòng chọn tệp lịch phụng vụ (.ics) |
+| `CALENDAR_FILE_TYPE_NOT_ALLOWED` | 400 | Chỉ hỗ trợ tệp lịch định dạng .ics |
+| `CALENDAR_FILE_TOO_LARGE` | 413 | Tệp lịch vượt quá dung lượng cho phép |
+| `CALENDAR_FILE_INVALID` | 400 | Tệp lịch không hợp lệ hoặc không có ngày phụng vụ nào |
 | `EVENT_NOT_FOUND` | 404 | Không tìm thấy sự kiện |
 | `EVENT_SLOT_TAKEN` | 409 | Đã có sự kiện khác vào giờ này tại địa điểm này |
 | `EVENT_ALREADY_PUBLISHED` | 409 | Sự kiện đã công bố, không thể sửa |
@@ -234,6 +240,8 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 | `REHEARSAL_ALREADY_PASSED` | 409 | Buổi tập đã diễn ra |
 | `ATTENDANCE_NOT_FOUND` | 404 | Không tìm thấy bản ghi điểm danh |
 | `ATTENDANCE_ALREADY_RECORDED` | 409 | Ca viên này đã được điểm danh |
+| `REHEARSAL_NOT_STARTED` | 409 | Buổi tập chưa bắt đầu, chưa thể điểm danh |
+| `ATTENDANCE_MEMBER_DUPLICATE` | 400 | Một ca viên xuất hiện nhiều lần trong danh sách điểm danh |
 
 ## 11. Bài tập & bản thu
 
@@ -246,6 +254,10 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 | `PRACTICE_SUBMISSION_NOT_FOUND` | 404 | Không tìm thấy bản thu |
 | `PRACTICE_SUBMISSION_PAST_DUE` | 409 | Đã quá hạn nộp |
 | `PRACTICE_SUBMISSION_ALREADY_REVIEWED` | 409 | Bản thu này đã được nhận xét |
+| `PRACTICE_SUBMISSION_ALREADY_PASSED` | 409 | Bài tập này đã đạt, không cần nộp lại |
+| `PRACTICE_SUBMISSION_SUPERSEDED` | 409 | Ca viên đã nộp bản thu mới hơn, vui lòng chấm bản mới nhất |
+| `PRACTICE_SUBMISSION_NOT_REVIEWED` | 409 | Bản thu chưa được chấm, vui lòng chấm trước khi nhận xét thêm |
+| `PRACTICE_SUBMISSION_CONFLICT` | 409 | Bản thu vừa được nộp từ thao tác khác, vui lòng tải lại |
 | `PRACTICE_AUDIO_REQUIRED` | 400 | Vui lòng chọn tệp ghi âm |
 | `PRACTICE_AUDIO_TYPE_NOT_ALLOWED` | 400 | Định dạng ghi âm không được hỗ trợ |
 | `PRACTICE_AUDIO_TOO_LARGE` | 413 | Tệp ghi âm vượt quá dung lượng cho phép |
@@ -256,6 +268,8 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 |---|---|---|
 | `NOTIFICATION_NOT_FOUND` | 404 | Không tìm thấy thông báo |
 | `DIRECTOR_NOTE_TARGET_REQUIRED` | 400 | Phải chọn ngày hoặc sự kiện để gửi ghi chú |
+| `DIRECTOR_NOTE_NOT_FOUND` | 404 | Không tìm thấy ghi chú |
+| `DIRECTOR_NOTE_RECIPIENT_INVALID` | 400 | Người nhận phải là ca trưởng đang hoạt động |
 
 **Không có mã "thông báo không dành cho bạn".** Thông báo của người khác trả
 `NOTIFICATION_NOT_FOUND` (404), vì 403 sẽ xác nhận bản ghi đó có thật. Truy vấn luôn

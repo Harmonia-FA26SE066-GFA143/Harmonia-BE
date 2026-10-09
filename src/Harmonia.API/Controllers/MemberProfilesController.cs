@@ -23,6 +23,12 @@ public class MemberProfilesController(IMemberProfileService memberProfileService
         [FromBody] UpdateMyMemberProfileRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await memberProfileService.UpdateMineAsync(User.GetUserId(), request, cancellationToken));
 
+    [HttpGet("me/history")]
+    [Authorize(Roles = RoleNames.ChoirMember)]
+    public async Task<IActionResult> GetMyHistoryAsync(
+        [FromQuery] SearchMyParticipationHistoryRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await memberProfileService.GetMyHistoryAsync(User.GetUserId(), request, cancellationToken));
+
     [HttpGet]
     [Authorize(Roles = RoleNames.ChoirDirector)]
     public async Task<IActionResult> SearchAsync(

@@ -16,6 +16,12 @@ public class ServiceRostersController(IRosterService rosterService) : ApiControl
         [FromBody] SuggestServiceRosterRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await rosterService.SuggestAsync(request, cancellationToken));
 
+    /// <summary>Current roster of the event, to reopen a saved roster (UC-25b / FE-38).</summary>
+    [HttpGet]
+    public async Task<IActionResult> GetByEventAsync(
+        [FromQuery] Guid eventId, CancellationToken cancellationToken) =>
+        ToActionResult(await rosterService.GetByEventAsync(eventId, cancellationToken));
+
     /// <summary>Shortage warnings of the event's current roster (UC-25a / FE-37).</summary>
     [HttpGet("shortages")]
     public async Task<IActionResult> GetShortagesAsync(

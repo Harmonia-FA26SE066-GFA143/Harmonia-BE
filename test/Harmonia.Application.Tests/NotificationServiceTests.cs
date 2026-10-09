@@ -72,11 +72,11 @@ public class NotificationServiceTests
     {
         var userId = Guid.NewGuid();
         var paging = new PagingRequest { PageNumber = 2, PageSize = 10 };
-        _repository.GetForUserAsync(userId, paging, _ct)
+        _repository.GetForUserAsync(userId, null, paging, _ct)
             .Returns(new PagedList<NotificationRecipient>([], 2, 10, 25));
         _mapper.Map<List<NotificationDto>>(Arg.Any<object>()).Returns([]);
 
-        var result = await _sut.GetForUserAsync(userId, paging, _ct);
+        var result = await _sut.GetForUserAsync(userId, null, paging, _ct);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(2, result.Value!.PageNumber);

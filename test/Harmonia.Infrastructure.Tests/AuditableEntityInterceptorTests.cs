@@ -43,6 +43,16 @@ public sealed class AuditableEntityInterceptorTests : IDisposable
     }
 
     [Fact]
+    public async Task ReadBack_DateTimeIsMarkedUtc_Async()
+    {
+        var user = await _db.AddUserAsync("a@test.com", cancellationToken: _ct);
+
+        await using var context = _db.NewContext();
+        var saved = await context.Users.SingleAsync(u => u.Id == user.Id, _ct);
+        Assert.Equal(DateTimeKind.Utc, saved.CreatedAt.Kind);
+    }
+
+    [Fact]
     public async Task Modified_StampsUpdatedAndKeepsCreated_Async()
     {
         var user = await _db.AddUserAsync("a@test.com", cancellationToken: _ct);

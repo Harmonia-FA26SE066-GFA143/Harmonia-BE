@@ -31,13 +31,13 @@ Written once here instead of repeated 43 times:
 ## A. Identity & Access
 
 **1. `User`** — login account, exactly one role (D2) ***auditable***
-`email` string(256) unique · `fullName` string(100) · `passwordHash` string · `roleId` Guid → Role · `isActive` bool = true · `lastLoginAt` DateTime? · `avatarUrl` string(500)? · `avatarPublicId` string(255)?
+`email` string(256) unique · `fullName` string(100) · `phone` string(20)? · `passwordHash` string · `roleId` Guid → Role · `isActive` bool = true · `isPasswordChangeRequired` bool = false · `lastLoginAt` DateTime? · `avatarUrl` string(500)? · `avatarPublicId` string(255)?
 
 **2. `Role`** — 4 seeded roles: Admin, ParishPriest, ChoirDirector, ChoirMember (D1)
 `name` string(50) unique · `description` string(300)?
 
 **3. ⚪ `MemberProfile`** — choir member record ***auditable***
-`userId` Guid → User (unique, 1–1) · `phone` string(20)? · `dateOfBirth` DateOnly? · `joinedDate` DateOnly · `status` MemberStatus
+`userId` Guid → User (unique, 1–1) · `dateOfBirth` DateOnly? · `joinedDate` DateOnly · `status` MemberStatus
 
 **4. ⚪ `RefreshToken`** — session refresh + mobile push token
 `userId` Guid → User · `tokenHash` string(500) unique · `expiresAt` DateTime · `revokedAt` DateTime? · `deviceId` string(100)? · `platform` DevicePlatform?
@@ -210,7 +210,7 @@ Written once here instead of repeated 43 times:
 | `AssignmentScope` | All, SkillGroup, Individual |
 | `TargetType` | Member, Skill |
 | `SubmissionStatus` | Submitted, Passed, NeedsRevision, Overdue |
-| `NotificationType` | EventPublished, SongListDecision, ParticipationRequest, AssignmentNotice, PracticeFeedback, DirectorNote, SkillReview |
+| `NotificationType` | EventPublished, SongListDecision, ParticipationRequest, AssignmentNotice, PracticeFeedback, DirectorNote, SkillReview, EventCancelled |
 | `SettingDataType` | String, Int, Bool, Json |
 | `ReportType` | UserActivity, RehearsalAttendance, Participation, AssignmentCompletion, SongUsage, ServiceHistory |
 
@@ -285,3 +285,6 @@ Written once here instead of repeated 43 times:
 - 2026-10-05: `MemberSkill` unique `(memberId, skillId)` becomes a filtered index (`status ≠ Rejected`), so a member can re-declare a rejected skill (UC-03).
 - 2026-10-05: `NotificationType.SkillReview` added — member is notified when the Choir Director approves or rejects a declared skill (UC-19). Appended last, stored as int, no migration.
 - 2026-10-06: UC-25b — `RosterAssignment` gains `status` (enum `RosterAssignmentStatus`, 20 → 21) and `replacedByAssignmentId`: replacing a member keeps the old line as Replaced, linked to the new line.
+- 2026-10-07: `NotificationType.EventCancelled` added — Choir Directors and members are notified when the priest cancels a published event (UC-12). Appended last, stored as int, no migration.
+- 2026-10-07: `PracticeSubmission.status` becomes a concurrency token (UC-29): a review saves only while the row is still Submitted, so two directors cannot both grade it. No column change; needs an empty migration that updates the model snapshot.
+- 2026-10-07: `phone` moves from `MemberProfile` to `User` so every role has one; `User` gains `isPasswordChangeRequired` (set when the Admin creates the account and emails the password, cleared on change / reset). Needs a migration that copies existing phones.

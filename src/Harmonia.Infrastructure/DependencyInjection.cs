@@ -115,6 +115,13 @@ public static class DependencyInjection
         services.AddScoped<IRehearsalRepository, RehearsalRepository>();
         services.AddScoped<ISongListRepository, SongListRepository>();
 
+        services.AddScoped<ILiturgicalDayRepository, LiturgicalDayRepository>();
+        services.AddScoped<ILiturgicalEventRepository, LiturgicalEventRepository>();
+        services.AddScoped<IRehearsalRepository, RehearsalRepository>();
+        services.AddScoped<IPracticeAssignmentRepository, PracticeAssignmentRepository>();
+        services.AddScoped<IPracticeSubmissionRepository, PracticeSubmissionRepository>();
+        services.AddScoped<IDirectorNoteRepository, DirectorNoteRepository>();
+
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IPasswordHasherService, PasswordHasherService>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
@@ -122,6 +129,7 @@ public static class DependencyInjection
         services.AddSingleton<IEmailSender, BrevoEmailSender>();
         services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
         services.AddScoped<DataSeeder>();
+        services.AddSingleton<ICatholicCalendarParser, CatholicCalendarParser>();
 
         return services;
     }

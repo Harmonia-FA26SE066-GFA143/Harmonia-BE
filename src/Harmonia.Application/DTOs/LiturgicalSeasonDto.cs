@@ -11,4 +11,6 @@ public class LiturgicalSeasonDto
     public DateOnly EndDate { get; set; }
 
     public string? ColorHex { get; set; }
+
+    public bool IsActive { get; set; }
 }

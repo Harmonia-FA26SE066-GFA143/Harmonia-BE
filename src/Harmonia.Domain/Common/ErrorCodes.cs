@@ -36,6 +36,8 @@ public static class ErrorCodes
 
     public const string AuthAccountInactive = "AUTH_ACCOUNT_INACTIVE";
 
+    public const string AuthPasswordChangeRequired = "AUTH_PASSWORD_CHANGE_REQUIRED";
+
     public const string AuthTokenInvalid = "AUTH_TOKEN_INVALID";
 
     public const string AuthTokenExpired = "AUTH_TOKEN_EXPIRED";
@@ -83,6 +85,8 @@ public static class ErrorCodes
 
     public const string RoleNotFound = "ROLE_NOT_FOUND";
 
+    public const string UserAlreadyActive = "USER_ALREADY_ACTIVE";
+
     // 3. MemberProfile.
     public const string MemberNotFound = "MEMBER_NOT_FOUND";
 
@@ -112,6 +116,16 @@ public static class ErrorCodes
     public const string MemberSkillNotApproved = "MEMBER_SKILL_NOT_APPROVED";
 
     // 5. Liturgical calendar.
+    public const string CalendarDayNotFound = "CALENDAR_DAY_NOT_FOUND";
+
+    public const string CalendarFileRequired = "CALENDAR_FILE_REQUIRED";
+
+    public const string CalendarFileTypeNotAllowed = "CALENDAR_FILE_TYPE_NOT_ALLOWED";
+
+    public const string CalendarFileTooLarge = "CALENDAR_FILE_TOO_LARGE";
+
+    public const string CalendarFileInvalid = "CALENDAR_FILE_INVALID";
+
     public const string EventNotFound = "EVENT_NOT_FOUND";
 
     public const string EventSlotTaken = "EVENT_SLOT_TAKEN";
@@ -233,6 +247,10 @@ public static class ErrorCodes
 
     public const string AttendanceAlreadyRecorded = "ATTENDANCE_ALREADY_RECORDED";
 
+    public const string RehearsalNotStarted = "REHEARSAL_NOT_STARTED";
+
+    public const string AttendanceMemberDuplicate = "ATTENDANCE_MEMBER_DUPLICATE";
+
     // 11. Practice assignment & submission.
     public const string PracticeAssignmentNotFound = "PRACTICE_ASSIGNMENT_NOT_FOUND";
 
@@ -248,6 +266,17 @@ public static class ErrorCodes
 
     public const string PracticeSubmissionAlreadyReviewed = "PRACTICE_SUBMISSION_ALREADY_REVIEWED";
 
+    public const string PracticeSubmissionAlreadyPassed = "PRACTICE_SUBMISSION_ALREADY_PASSED";
+
+    // The member submitted a newer attempt; only the newest attempt of an assignment is reviewed.
+    public const string PracticeSubmissionSuperseded = "PRACTICE_SUBMISSION_SUPERSEDED";
+
+    // Extra feedback needs a first review: grade the submission through its feedback endpoint first.
+    public const string PracticeSubmissionNotReviewed = "PRACTICE_SUBMISSION_NOT_REVIEWED";
+
+    // Two submissions of the same assignment raced for the same attempt number; the client reloads and retries.
+    public const string PracticeSubmissionConflict = "PRACTICE_SUBMISSION_CONFLICT";
+
     public const string PracticeAudioRequired = "PRACTICE_AUDIO_REQUIRED";
 
     public const string PracticeAudioTypeNotAllowed = "PRACTICE_AUDIO_TYPE_NOT_ALLOWED";
@@ -260,6 +289,11 @@ public static class ErrorCodes
     public const string NotificationNotFound = "NOTIFICATION_NOT_FOUND";
 
     public const string DirectorNoteTargetRequired = "DIRECTOR_NOTE_TARGET_REQUIRED";
+
+    // A note the caller neither sent nor received is reported as not found, for the same reason as above.
+    public const string DirectorNoteNotFound = "DIRECTOR_NOTE_NOT_FOUND";
+
+    public const string DirectorNoteRecipientInvalid = "DIRECTOR_NOTE_RECIPIENT_INVALID";
 
     // 13. System settings & reports.
     public const string SettingNotFound = "SETTING_NOT_FOUND";

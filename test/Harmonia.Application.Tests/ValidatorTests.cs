@@ -256,4 +256,182 @@ public class ValidatorTests
 
         Assert.Equal(nameof(DeclareMemberSkillRequest.Level), Assert.Single(result.Errors).PropertyName);
     }
+
+    // ---- Practice assignment ----
+
+    private static CreatePracticeAssignmentRequest PracticeAssignment(AssignmentScope scope) => new()
+    {
+        Title = "Learn the entrance hymn",
+        Scope = scope,
+        DueDate = DateTime.UtcNow.AddDays(3),
+    };
+
+    [Fact]
+    public void CreatePracticeAssignment_AllScopeWithoutTargets_HasNoErrors()
+    {
+        var codes = ErrorCodesOf(new CreatePracticeAssignmentRequestValidator(), PracticeAssignment(AssignmentScope.All));
+
+        Assert.Empty(codes);
+    }
+
+    [Fact]
+    public void CreatePracticeAssignment_DueDateInPast_ReturnsDueDateInPast()
+    {
+        var request = PracticeAssignment(AssignmentScope.All);
+        request.DueDate = DateTime.UtcNow.AddMinutes(-1);
+
+        var codes = ErrorCodesOf(new CreatePracticeAssignmentRequestValidator(), request);
+
+        Assert.Equal([ErrorCodes.PracticeDueDateInPast], codes);
+    }
+
+    [Theory]
+    [InlineData(AssignmentScope.SkillGroup)]
+    [InlineData(AssignmentScope.Individual)]
+    public void CreatePracticeAssignment_TargetedScopeWithoutTargets_ReturnsTargetRequired(AssignmentScope scope)
+    {
+        var codes = ErrorCodesOf(new CreatePracticeAssignmentRequestValidator(), PracticeAssignment(scope));
+
+        Assert.Equal([ErrorCodes.PracticeTargetRequired], codes);
+    }
+
+    // ---- Practice review ----
+
+    [Theory]
+    [InlineData(SubmissionStatus.Passed, null, true)]
+    [InlineData(SubmissionStatus.Passed, "Well done", true)]
+    [InlineData(SubmissionStatus.NeedsRevision, "Hold the last note", true)]
+    [InlineData(SubmissionStatus.NeedsRevision, null, false)]
+    [InlineData(SubmissionStatus.NeedsRevision, "   ", false)]
+    [InlineData(SubmissionStatus.Submitted, null, false)]
+    [InlineData(SubmissionStatus.Overdue, null, false)]
+    public void ReviewPracticeSubmission_ResultAndComment(SubmissionStatus result, string? comment, bool isValid)
+    {
+        var validation = new ReviewPracticeSubmissionRequestValidator().Validate(
+            new ReviewPracticeSubmissionRequest { Result = result, Comment = comment });
+
+        Assert.Equal(isValid, validation.IsValid);
+    }
+
+    [Fact]
+    public void ReviewPracticeSubmission_CommentTooLong_IsInvalid()
+    {
+        var validation = new ReviewPracticeSubmissionRequestValidator().Validate(
+            new ReviewPracticeSubmissionRequest { Result = SubmissionStatus.Passed, Comment = new string('a', 1001) });
+
+        Assert.False(validation.IsValid);
+    }
+
+    // ---- Practice extra feedback ----
+
+    [Theory]
+    [InlineData("Nice", null, true)]
+    [InlineData("Nice", SubmissionStatus.Passed, true)]
+    [InlineData("Redo bar 4", SubmissionStatus.NeedsRevision, true)]
+    [InlineData("", null, false)]
+    [InlineData("   ", SubmissionStatus.Passed, false)]
+    [InlineData("Nice", SubmissionStatus.Submitted, false)]
+    [InlineData("Nice", SubmissionStatus.Overdue, false)]
+    public void AddPracticeFeedback_CommentAndResult(string comment, SubmissionStatus? result, bool isValid)
+    {
+        var validation = new AddPracticeFeedbackRequestValidator().Validate(
+            new AddPracticeFeedbackRequest { Comment = comment, Result = result });
+
+        Assert.Equal(isValid, validation.IsValid);
+    }
+
+    [Fact]
+    public void AddPracticeFeedback_CommentTooLong_IsInvalid()
+    {
+        var validation = new AddPracticeFeedbackRequestValidator().Validate(
+            new AddPracticeFeedbackRequest { Comment = new string('a', 1001) });
+
+        Assert.False(validation.IsValid);
+    }
+
+    // ---- Practice submission ----
+
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData(1, true)]
+    [InlineData(3600, true)]
+    [InlineData(0, false)]
+    [InlineData(3601, false)]
+    public void CreatePracticeSubmission_DurationSeconds_IsValidOnlyInRange(int? durationSeconds, bool isValid)
+    {
+        var result = new CreatePracticeSubmissionRequestValidator().Validate(
+            new CreatePracticeSubmissionRequest { DurationSeconds = durationSeconds });
+
+        Assert.Equal(isValid, result.IsValid);
+    }
+
+    // ---- Rehearsal attendance ----
+
+    [Fact]
+    public void RecordAttendances_DuplicateMember_ReturnsDuplicate()
+    {
+        var id = Guid.NewGuid();
+        var codes = ErrorCodesOf(new RecordRehearsalAttendancesRequestValidator(),
+            new RecordRehearsalAttendancesRequest { Items = [new() { MemberId = id, Status = AttendanceStatus.Present }, new() { MemberId = id, Status = AttendanceStatus.Late }] });
+
+        Assert.Equal([ErrorCodes.AttendanceMemberDuplicate], codes);
+    }
+
+    [Fact]
+    public void RecordAttendances_EmptyOrUnknownStatus_IsInvalid()
+    {
+        var validator = new RecordRehearsalAttendancesRequestValidator();
+
+        Assert.False(validator.Validate(new RecordRehearsalAttendancesRequest()).IsValid);
+        Assert.False(validator.Validate(new RecordRehearsalAttendancesRequest
+        {
+            Items = [new() { MemberId = Guid.NewGuid(), Status = (AttendanceStatus)99 }]
+        }).IsValid);
+    }
+
+    // ---- Director note ----
+
+    private static CreateDirectorNoteRequest ValidNote() =>
+        new() { EventId = Guid.NewGuid(), ToUserIds = [Guid.NewGuid()], Content = "Note" };
+
+    [Fact]
+    public void DirectorNote_Valid_HasNoErrors()
+    {
+        Assert.Empty(ErrorCodesOf(new CreateDirectorNoteRequestValidator(), ValidNote()));
+        var byDate = ValidNote();
+        byDate.EventId = null;
+        byDate.NoteDate = new DateOnly(2026, 12, 24);
+        Assert.Empty(ErrorCodesOf(new CreateDirectorNoteRequestValidator(), byDate));
+    }
+
+    [Fact]
+    public void DirectorNote_NoDateNorEvent_ReturnsTargetRequired()
+    {
+        var request = ValidNote();
+        request.EventId = null;
+
+        Assert.Equal([ErrorCodes.DirectorNoteTargetRequired], ErrorCodesOf(new CreateDirectorNoteRequestValidator(), request));
+    }
+
+    [Fact]
+    public void DirectorNote_NoRecipient_ReturnsRecipientInvalid()
+    {
+        var request = ValidNote();
+        request.ToUserIds = [];
+
+        Assert.Equal([ErrorCodes.DirectorNoteRecipientInvalid], ErrorCodesOf(new CreateDirectorNoteRequestValidator(), request));
+    }
+
+    [Fact]
+    public void DirectorNote_EmptyOrTooLongContent_IsInvalid()
+    {
+        var validator = new CreateDirectorNoteRequestValidator();
+        var empty = ValidNote();
+        empty.Content = " ";
+        var tooLong = ValidNote();
+        tooLong.Content = new string('a', 2001);
+
+        Assert.False(validator.Validate(empty).IsValid);
+        Assert.False(validator.Validate(tooLong).IsValid);
+    }
 }

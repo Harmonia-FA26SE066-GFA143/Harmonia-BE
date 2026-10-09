@@ -68,6 +68,8 @@ móc vào chúng.
 
 - Mọi chuỗi trong `.cs` là tiếng Anh — comment, XML doc, message exception, message log.
   Không có ngoại lệ: message cho người dùng đi bằng mã lỗi, không bằng câu tiếng Việt.
+  Riêng `CatholicCalendarParser.cs` được giữ emoji màu và tên mùa phụng vụ tiếng Việt — đó là
+  chuỗi để so khớp dữ liệu từ API lịch Công giáo, không phải câu hiển thị (chốt 2026-10-06).
 
 ## Domain
 

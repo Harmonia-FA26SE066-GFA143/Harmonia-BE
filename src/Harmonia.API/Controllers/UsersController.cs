@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Domain.Common;
 
 namespace Harmonia.API.Controllers;

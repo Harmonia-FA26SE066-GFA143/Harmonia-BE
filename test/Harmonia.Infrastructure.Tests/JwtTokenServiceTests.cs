@@ -59,7 +59,7 @@ public class JwtTokenServiceTests
 
         Assert.InRange(expiresAt, before.AddMinutes(30), DateTime.UtcNow.AddMinutes(30));
         // JWT "exp" has second precision.
-        Assert.True(Math.Abs((jwt.ValidTo - expiresAt).TotalSeconds) < 1);
+        Assert.True(Math.Abs((jwt.ValidTo - expiresAt.ToUniversalTime()).TotalSeconds) < 1);
     }
 
     [Fact]

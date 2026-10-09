@@ -115,6 +115,21 @@ public class RosterService(
         return Result<List<RosterShortageDto>>.Success(ComputeShortages(songList, assignments));
     }
 
+    public async Task<Result<ServiceRosterDto>> GetByEventAsync(Guid eventId, CancellationToken cancellationToken)
+    {
+        var liturgicalEvent = await rosterRepository.GetEventWithRosterAsync(eventId, cancellationToken);
+        if (liturgicalEvent is null) return Result<ServiceRosterDto>.Failure(ErrorCodes.EventNotFound);
+        if (liturgicalEvent.ServiceRoster is not { } roster) return Result<ServiceRosterDto>.Failure(ErrorCodes.RosterNotFound);
+
+        var assignments = await rosterRepository.GetAssignmentsAsync(roster.Id, cancellationToken);
+        var songList = await rosterRepository.GetApprovedSongListAsync(eventId, cancellationToken);
+
+        var dto = mapper.Map<ServiceRosterDto>(roster);
+        dto.Assignments = mapper.Map<List<RosterAssignmentDto>>(assignments);
+        dto.Shortages = songList is null ? [] : ComputeShortages(songList, assignments);
+        return Result<ServiceRosterDto>.Success(dto);
+    }
+
     public async Task<Result<ServiceRosterDto>> FinalizeAsync(Guid rosterId, CancellationToken cancellationToken)
     {
         var roster = await rosterRepository.GetRosterWithEventAsync(rosterId, cancellationToken);
@@ -278,8 +293,7 @@ public class RosterService(
     {
         if (liturgicalEvent.Status == EventStatus.Cancelled) return ErrorCodes.EventCancelled;
 
-        // ponytail: compares UTC date with the event's local date, so an event stays editable up to 7 hours past midnight in Vietnam.
-        return liturgicalEvent.EventDate < DateOnly.FromDateTime(DateTime.Now) ? ErrorCodes.EventAlreadyPassed : null;
+        return liturgicalEvent.EventDate < VietnamTime.Today ? ErrorCodes.EventAlreadyPassed : null;
     }
 
     private static string? RosterNotEditableCode(ServiceRoster roster) =>
