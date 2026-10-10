@@ -1,6 +1,6 @@
 # Từ điển nghiệp vụ — dùng đúng tên, không tự đặt từ đồng nghĩa
 
-Nguồn chuẩn: `doc/harmonia-domain-entity-list.md` (43 entity, 21 enum).
+Nguồn chuẩn: `doc/harmonia-domain-entity-list.md` (44 entity, 21 enum).
 Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 
 | Tiếng Việt | Tên trong code |
@@ -38,6 +38,7 @@ Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 | cảnh báo thiếu người | `RosterShortage` |
 | buổi tập | `Rehearsal` |
 | điểm danh | `RehearsalAttendance` — KHÔNG dùng `Attendance` trần |
+| bài hát của buổi tập | `RehearsalSong` — KHÔNG phải `SongList` (không phiên bản, không duyệt) |
 | bài tập về nhà | `PracticeAssignment` |
 | bản thu nộp | `PracticeSubmission` |
 | nhận xét của ca trưởng | `PracticeFeedback` — KHÔNG dùng `Feedback` trần |

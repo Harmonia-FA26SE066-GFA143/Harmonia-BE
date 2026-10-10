@@ -73,6 +73,8 @@ public class HarmoniaDbContext(DbContextOptions<HarmoniaDbContext> options) : Db
 
     public DbSet<RehearsalAttendance> RehearsalAttendances => Set<RehearsalAttendance>();
 
+    public DbSet<RehearsalSong> RehearsalSongs => Set<RehearsalSong>();
+
     public DbSet<PracticeAssignment> PracticeAssignments => Set<PracticeAssignment>();
 
     public DbSet<PracticeAssignmentTarget> PracticeAssignmentTargets => Set<PracticeAssignmentTarget>();

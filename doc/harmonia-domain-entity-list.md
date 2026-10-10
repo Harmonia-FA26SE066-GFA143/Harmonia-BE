@@ -1,6 +1,6 @@
 # Harmonia – Domain Entity List & Attributes (for ERD, Report 3/4)
 
-43 entities derived from FE-01→FE-54 (`claude/functional-requirements-by-actor.md`), the canonical use cases (`claude/use-case-list.md`) and the daily liturgical program model (D6). Diagram: `harmonia-erd.mmd`.
+44 entities derived from FE-01→FE-54 (`claude/functional-requirements-by-actor.md`), the canonical use cases (`claude/use-case-list.md`) and the daily liturgical program model (D6). Diagram: `harmonia-erd.mmd`.
 
 Conceptual/logical level: attribute names, types and constraints. No indexes, no migration syntax.
 
@@ -144,6 +144,10 @@ Written once here instead of repeated 43 times:
 **32. `RehearsalAttendance`** — attendance record (FE-45/46)
 `rehearsalId` Guid → Rehearsal · `memberId` Guid → MemberProfile · `status` AttendanceStatus · `checkedBy` Guid → User · `checkedAt` DateTime · unique `(rehearsalId, memberId)`
 
+**44. `RehearsalSong`** — one song on the programme of a rehearsal
+`rehearsalId` Guid → Rehearsal · `songId` Guid → Song · `displayOrder` int · `note` string(500)? · unique `(rehearsalId, songId)`
+Not a `SongList`: no version, no review, no liturgical slot. The director edits it freely.
+
 **33. `PracticeAssignment`** — practice task from the director (FE-41) ***auditable***
 `eventId` Guid? → LiturgicalEvent · `songId` Guid? → Song · `materialId` Guid? → MusicMaterial · `title` string(200) · `instruction` string(1000)? · `scope` AssignmentScope · `dueDate` DateTime
 
@@ -210,7 +214,7 @@ Written once here instead of repeated 43 times:
 | `AssignmentScope` | All, SkillGroup, Individual |
 | `TargetType` | Member, Skill |
 | `SubmissionStatus` | Submitted, Passed, NeedsRevision, Overdue |
-| `NotificationType` | EventPublished, SongListDecision, ParticipationRequest, AssignmentNotice, PracticeFeedback, DirectorNote, SkillReview, EventCancelled |
+| `NotificationType` | EventPublished, SongListDecision, ParticipationRequest, AssignmentNotice, PracticeFeedback, DirectorNote, SkillReview, EventCancelled, SongListSubmitted |
 | `SettingDataType` | String, Int, Bool, Json |
 | `ReportType` | UserActivity, RehearsalAttendance, Participation, AssignmentCompletion, SongUsage, ServiceHistory |
 
@@ -257,6 +261,7 @@ Written once here instead of repeated 43 times:
 **Rehearsal & practice**
 - `LiturgicalEvent` 1 — n `Rehearsal` n — 1 `WorshipLocation`
 - `Rehearsal` 1 — n `RehearsalAttendance` n — 1 `MemberProfile`
+- `Rehearsal` 1 — n `RehearsalSong` n — 1 `Song`
 - `PracticeAssignment` n — 0..1 `LiturgicalEvent` / `Song` / `MusicMaterial`
 - `PracticeAssignment` 1 — n `PracticeAssignmentTarget` → `MemberProfile` | `Skill`
 - `PracticeAssignment` 1 — n `PracticeSubmission` n — 1 `MemberProfile`
@@ -288,3 +293,5 @@ Written once here instead of repeated 43 times:
 - 2026-10-07: `NotificationType.EventCancelled` added — Choir Directors and members are notified when the priest cancels a published event (UC-12). Appended last, stored as int, no migration.
 - 2026-10-07: `PracticeSubmission.status` becomes a concurrency token (UC-29): a review saves only while the row is still Submitted, so two directors cannot both grade it. No column change; needs an empty migration that updates the model snapshot.
 - 2026-10-07: `phone` moves from `MemberProfile` to `User` so every role has one; `User` gains `isPasswordChangeRequired` (set when the Admin creates the account and emails the password, cleared on change / reset). Needs a migration that copies existing phones.
+- 2026-10-10: `RehearsalSong` added — the songs a rehearsal will practise (43 → 44).
+- 2026-10-10: `NotificationType.SongListSubmitted` added — Parish Priests are notified when a song list is submitted for review (F6). Appended last, stored as int, no migration.

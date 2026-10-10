@@ -19,6 +19,12 @@ public interface IRehearsalRepository : IGenericRepository<Rehearsal>
     /// </summary>
     Task<bool> TrySaveAttendancesAsync(Rehearsal rehearsal, CancellationToken cancellationToken);
 
+    /// <summary>Tracked, with <see cref="Rehearsal.Songs"/> loaded.</summary>
+    Task<Rehearsal?> GetWithSongsForUpdateAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Read-only programme of the rehearsal in display order, each with its <see cref="RehearsalSong.Song"/>.</summary>
+    Task<List<RehearsalSong>> GetSongsAsync(Guid rehearsalId, CancellationToken cancellationToken);
+
     /// <summary>Read-only rehearsals of the event, with <see cref="Rehearsal.Attendances"/> loaded.</summary>
     Task<List<Rehearsal>> GetByEventWithAttendancesAsync(Guid eventId, CancellationToken cancellationToken);
 }

@@ -143,6 +143,7 @@ public static class ErrorStatusMap
         [ErrorCodes.AttendanceAlreadyRecorded] = StatusCodes.Status409Conflict,
         [ErrorCodes.RehearsalNotStarted] = StatusCodes.Status409Conflict,
         [ErrorCodes.AttendanceMemberDuplicate] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.RehearsalSongDuplicate] = StatusCodes.Status400BadRequest,
 
         // 11. Practice assignment & submission.
         [ErrorCodes.PracticeAssignmentNotFound] = StatusCodes.Status404NotFound,
