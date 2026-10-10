@@ -130,6 +130,10 @@ public static class ErrorCodes
 
     public const string EventSlotTaken = "EVENT_SLOT_TAKEN";
 
+    public const string EventAlreadyPublished = "EVENT_ALREADY_PUBLISHED";
+
+    public const string EventNotPublished = "EVENT_NOT_PUBLISHED";
+
     public const string EventCancelled = "EVENT_CANCELLED";
 
     public const string EventAlreadyPassed = "EVENT_ALREADY_PASSED";
@@ -316,5 +320,4 @@ public static class ErrorCodes
     public const string ExternalAiFailed = "EXTERNAL_AI_FAILED";
 
     public const string ExternalCalendarFailed = "EXTERNAL_CALENDAR_FAILED";
-
 }

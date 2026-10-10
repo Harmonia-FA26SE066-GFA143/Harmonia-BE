@@ -58,7 +58,7 @@ public class DirectorNoteService(
         await directorNoteRepository.SaveChangesAsync(cancellationToken);
 
         // One notification per director: each points at that director's own copy of the note.
-        var preview = content.Length <= NotificationPreviewLength ? content : content[..NotificationPreviewLength] + "…";
+        var preview = content.Length <= NotificationPreviewLength ? content : content[..NotificationPreviewLength] + "...";
         foreach (var note in notes)
         {
             await notificationService.SendAsync(

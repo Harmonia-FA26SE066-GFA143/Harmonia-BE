@@ -434,4 +434,64 @@ public class ValidatorTests
         Assert.False(validator.Validate(empty).IsValid);
         Assert.False(validator.Validate(tooLong).IsValid);
     }
+
+    // ---- Song list ----
+
+    private static UpdateSongListItemRequest SongListItem(Guid? slotId = null) =>
+        new() { SongId = Guid.NewGuid(), SlotId = slotId ?? Guid.NewGuid(), DisplayOrder = 1 };
+
+    [Fact]
+    public void CreateSongList_Valid_HasNoErrors()
+    {
+        var request = new CreateSongListRequest { EventId = Guid.NewGuid(), Items = [SongListItem(), SongListItem()] };
+
+        Assert.Empty(ErrorCodesOf(new CreateSongListRequestValidator(), request));
+    }
+
+    [Fact]
+    public void CreateSongList_NoItems_ReturnsEmpty()
+    {
+        var request = new CreateSongListRequest { EventId = Guid.NewGuid() };
+
+        Assert.Contains(ErrorCodes.SongListEmpty, ErrorCodesOf(new CreateSongListRequestValidator(), request));
+    }
+
+    [Fact]
+    public void CreateSongList_SameSlotTwice_ReturnsSlotDuplicate()
+    {
+        var slotId = Guid.NewGuid();
+        var request = new CreateSongListRequest { EventId = Guid.NewGuid(), Items = [SongListItem(slotId), SongListItem(slotId)] };
+
+        Assert.Equal([ErrorCodes.SongListSlotDuplicate], ErrorCodesOf(new CreateSongListRequestValidator(), request));
+    }
+
+    [Fact]
+    public void UpdateSongListItems_NoItemsOrSameSlotTwice_ReturnsCode()
+    {
+        var slotId = Guid.NewGuid();
+        var validator = new UpdateSongListItemsRequestValidator();
+
+        Assert.Contains(ErrorCodes.SongListEmpty, ErrorCodesOf(validator, new UpdateSongListItemsRequest()));
+        Assert.Equal(
+            [ErrorCodes.SongListSlotDuplicate],
+            ErrorCodesOf(validator, new UpdateSongListItemsRequest { Items = [SongListItem(slotId), SongListItem(slotId)] }));
+    }
+
+    [Theory]
+    [InlineData(ReviewDecision.Reject)]
+    [InlineData(ReviewDecision.RequestRevision)]
+    public void ReviewSongList_RejectOrRevisionWithoutNotes_ReturnsNotesRequired(ReviewDecision decision)
+    {
+        var codes = ErrorCodesOf(new ReviewSongListRequestValidator(), new ReviewSongListRequest { Decision = decision });
+
+        Assert.Equal([ErrorCodes.ReviewNotesRequired], codes);
+    }
+
+    [Fact]
+    public void ReviewSongList_ApproveWithoutNotes_HasNoErrors()
+    {
+        var codes = ErrorCodesOf(new ReviewSongListRequestValidator(), new ReviewSongListRequest { Decision = ReviewDecision.Approve });
+
+        Assert.Empty(codes);
+    }
 }

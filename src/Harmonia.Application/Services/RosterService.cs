@@ -55,7 +55,7 @@ public class RosterService(
         }
 
         roster.Status = RosterStatus.Suggested;
-        roster.GeneratedAt = DateTime.Now;
+        roster.GeneratedAt = DateTime.UtcNow;
         roster.GeneratedBy = currentUser.UserId;
 
         // Replaced lines stay as history even when they came from a suggestion.
@@ -152,7 +152,7 @@ public class RosterService(
         }
 
         roster.Status = RosterStatus.Finalized;
-        roster.FinalizedAt = DateTime.Now;
+        roster.FinalizedAt = DateTime.UtcNow;
         roster.FinalizedBy = currentUser.UserId;
         await rosterRepository.SaveChangesAsync(cancellationToken);
 
@@ -186,7 +186,7 @@ public class RosterService(
         foreach (var memberId in memberIds)
         {
             var lines = linesByMember[memberId];
-            var notifiedAt = DateTime.Now;
+            var notifiedAt = DateTime.UtcNow;
             foreach (var line in lines) line.NotifiedAt = notifiedAt;
 
             // SendAsync saves through the same scoped DbContext, so each member's NotifiedAt is stored with their notification.

@@ -2,7 +2,7 @@ using System;
 
 namespace Harmonia.Application.DTOs;
 
-public class SongListItemRequest
+public class UpdateSongListItemRequest
 {
     public Guid SongId { get; set; }
 

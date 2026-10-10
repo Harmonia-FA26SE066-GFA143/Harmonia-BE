@@ -84,7 +84,7 @@ public class DirectorNoteServiceTests
         await _sut.CreateAsync(_priestId, request, _ct);
 
         await _notifications.Received(1).SendAsync(
-            Arg.Is<SendNotificationRequest>(r => r.Content.Length == 201 && r.Content.EndsWith('…')), _ct);
+            Arg.Is<SendNotificationRequest>(r => r.Content.Length == 203 && r.Content.EndsWith("...")), _ct);
         Assert.Equal(500, Assert.Single(_added).Content.Length);
     }
 

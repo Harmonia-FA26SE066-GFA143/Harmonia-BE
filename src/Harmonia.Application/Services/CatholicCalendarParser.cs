@@ -11,7 +11,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Harmonia.Infrastructure.ExternalServices;
+namespace Harmonia.Application.Services;
 
 public class CatholicCalendarParser : ICatholicCalendarParser
 {

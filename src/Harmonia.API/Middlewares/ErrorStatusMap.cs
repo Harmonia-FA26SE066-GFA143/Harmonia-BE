@@ -74,16 +74,6 @@ public static class ErrorStatusMap
         [ErrorCodes.CalendarFileTypeNotAllowed] = StatusCodes.Status400BadRequest,
         [ErrorCodes.CalendarFileTooLarge] = StatusCodes.Status413PayloadTooLarge,
         [ErrorCodes.CalendarFileInvalid] = StatusCodes.Status400BadRequest,
-        [ErrorCodes.EventAlreadyPublished] = StatusCodes.Status409Conflict,
-        [ErrorCodes.EventNotPublished] = StatusCodes.Status409Conflict,
-        [ErrorCodes.EventNotPublished] = StatusCodes.Status409Conflict,
-        [ErrorCodes.WeekNotFound] = StatusCodes.Status404NotFound,
-        [ErrorCodes.WeekAlreadyExists] = StatusCodes.Status409Conflict,
-        [ErrorCodes.WeekStartNotMonday] = StatusCodes.Status400BadRequest,
-        [ErrorCodes.WeekAlreadyPublished] = StatusCodes.Status409Conflict,
-        [ErrorCodes.WeekNotPublished] = StatusCodes.Status409Conflict,
-=======
->>>>>>> origin/main
         [ErrorCodes.EventNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.EventSlotTaken] = StatusCodes.Status409Conflict,
         [ErrorCodes.EventAlreadyPublished] = StatusCodes.Status409Conflict,

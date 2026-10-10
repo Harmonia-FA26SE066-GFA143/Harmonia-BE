@@ -4,5 +4,5 @@ namespace Harmonia.Application.DTOs;
 
 public class UpdateSongListItemsRequest
 {
-    public List<SongListItemRequest> Items { get; set; } = [];
+    public List<UpdateSongListItemRequest> Items { get; set; } = [];
 }

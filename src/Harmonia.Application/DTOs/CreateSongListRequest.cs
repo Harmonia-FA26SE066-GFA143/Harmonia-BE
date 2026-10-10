@@ -7,5 +7,5 @@ public class CreateSongListRequest
 {
     public Guid EventId { get; set; }
 
-    public List<SongListItemRequest> Items { get; set; } = [];
+    public List<UpdateSongListItemRequest> Items { get; set; } = [];
 }

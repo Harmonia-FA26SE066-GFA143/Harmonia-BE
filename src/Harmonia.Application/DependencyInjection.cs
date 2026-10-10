@@ -16,11 +16,6 @@ public static class DependencyInjection
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IMemberProfileService, MemberProfileService>();
-
-        services.AddScoped<ILiturgicalDayService, LiturgicalDayService>();
-        services.AddScoped<IUpcomingScheduleService, UpcomingScheduleService>();
-        services.AddScoped<ILiturgicalEventService, LiturgicalEventService>();
-
         services.AddScoped<IMemberSkillService, MemberSkillService>();
         services.AddScoped<ISongService, SongService>();
         services.AddScoped<IMusicMaterialService, MusicMaterialService>();
@@ -35,7 +30,6 @@ public static class DependencyInjection
         services.AddScoped<IRehearsalAttendanceService, RehearsalAttendanceService>();
         services.AddScoped<IEventPreparationService, EventPreparationService>();
         services.AddScoped<IDirectorNoteService, DirectorNoteService>();
-
         services.AddScoped<ISongListService, SongListService>();
 
         return services;

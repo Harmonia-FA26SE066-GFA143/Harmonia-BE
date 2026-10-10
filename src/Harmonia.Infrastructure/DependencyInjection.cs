@@ -2,6 +2,7 @@ using System.Text;
 using Harmonia.Application.Common.Models;
 using Harmonia.Application.Interfaces.IRepositories;
 using Harmonia.Application.Interfaces.IServices;
+using Harmonia.Application.Services;
 using Harmonia.Infrastructure.Data;
 using Harmonia.Infrastructure.Data.Interceptors;
 using Harmonia.Infrastructure.ExternalServices;
@@ -21,20 +22,12 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException(
                 "Missing ConnectionStrings__DefaultConnection. See src/Harmonia.API/.env.example.");
 
-        var compatibilityLevel = configuration.GetValue<int?>("Database:CompatibilityLevel");
-
         // Scoped: it reads the caller through ICurrentUserService, which is per request.
         services.AddScoped<AuditableEntityInterceptor>();
 
         services.AddDbContext<HarmoniaDbContext>((serviceProvider, options) =>
-    options.UseSqlServer(connectionString, sqlOptions =>
-    {
-        if (compatibilityLevel is { } level)
-        {
-            sqlOptions.UseCompatibilityLevel(level);
-        }
-    })
-        .AddInterceptors(serviceProvider.GetRequiredService<AuditableEntityInterceptor>()));
+            options.UseSqlServer(connectionString)
+                .AddInterceptors(serviceProvider.GetRequiredService<AuditableEntityInterceptor>()));
 
         services.AddOptions<JwtOptions>()
             .Bind(configuration.GetSection(JwtOptions.SectionName))
@@ -103,6 +96,7 @@ public static class DependencyInjection
         services.AddScoped<IMusicMaterialRepository, MusicMaterialRepository>();
         services.AddScoped<IMaterialLearningProgressRepository, MaterialLearningProgressRepository>();
         services.AddScoped<ISongListItemRepository, SongListItemRepository>();
+        services.AddScoped<ISongListRepository, SongListRepository>();
         services.AddScoped<IServiceRosterRepository, ServiceRosterRepository>();
         services.AddHttpClient<IRosterSuggestionGenerator, GeminiRosterSuggestionGenerator>(client =>
         {
@@ -110,11 +104,6 @@ public static class DependencyInjection
             // Short on purpose: RosterService falls back to rules, so a slow model only delays the answer.
             client.Timeout = TimeSpan.FromSeconds(20);
         });
-        services.AddScoped<ILiturgicalDayRepository, LiturgicalDayRepository>();
-        services.AddScoped<ILiturgicalEventRepository, LiturgicalEventRepository>();
-        services.AddScoped<IRehearsalRepository, RehearsalRepository>();
-        services.AddScoped<ISongListRepository, SongListRepository>();
-
         services.AddScoped<ILiturgicalDayRepository, LiturgicalDayRepository>();
         services.AddScoped<ILiturgicalEventRepository, LiturgicalEventRepository>();
         services.AddScoped<IRehearsalRepository, RehearsalRepository>();

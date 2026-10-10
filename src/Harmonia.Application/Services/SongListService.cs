@@ -25,6 +25,13 @@ public class SongListService(
 {
     public async Task<Result<SongListDto>> GetApprovedForEventAsync(Guid eventId, CancellationToken cancellationToken)
     {
+        // Every role can call this, so a list must not outlive the visibility of its event (e.g. cancelled later).
+        var liturgicalEvent = await liturgicalEventRepository.GetByIdAsync(eventId, cancellationToken);
+        if (liturgicalEvent is null || liturgicalEvent.Status != EventStatus.Published)
+        {
+            return Result<SongListDto>.Failure(ErrorCodes.SongListNotFound);
+        }
+
         var songList = await songListRepository.GetApprovedForEventAsync(eventId, cancellationToken);
 
         return songList is null
@@ -97,22 +104,18 @@ public class SongListService(
             Status = SongListStatus.Draft,
             ProposedBy = proposedBy,
             PreviousVersionId = latest?.Id,
+            // Saved together with the list: one transaction, so a failure cannot leave an empty draft behind.
+            Items = request.Items.Select(i => new SongListItem
+            {
+                Id = Guid.NewGuid(),
+                SongId = i.SongId,
+                SlotId = i.SlotId,
+                DisplayOrder = i.DisplayOrder,
+                Note = i.Note,
+            }).ToList(),
         };
 
         await songListRepository.AddAsync(songList, cancellationToken);
-        await songListRepository.SaveChangesAsync(cancellationToken);
-
-        var items = request.Items.Select(i => new SongListItem
-        {
-            Id = Guid.NewGuid(),
-            SongListId = songList.Id,
-            SongId = i.SongId,
-            SlotId = i.SlotId,
-            DisplayOrder = i.DisplayOrder,
-            Note = i.Note,
-        });
-
-        await songListRepository.AddItemsAsync(items, cancellationToken);
         await songListRepository.SaveChangesAsync(cancellationToken);
 
         var created = await songListRepository.GetByIdWithDetailsAsync(songList.Id, cancellationToken);
@@ -206,8 +209,8 @@ public class SongListService(
             await notificationService.SendAsync(
                 new SendNotificationRequest(
                     Type: NotificationType.SongListSubmitted,
-                    Title: "Danh sách bài hát cần duyệt",
-                    Content: $"Danh sách bài hát phiên bản {songList.Version} đã được gửi lên để duyệt.",
+                    Title: "Song list awaiting review",
+                    Content: $"Song list version {songList.Version} has been submitted for review.",
                     RecipientUserIds: parishPriestIds,
                     ReferenceType: nameof(SongList),
                     ReferenceId: songList.Id),
@@ -254,17 +257,17 @@ public class SongListService(
 
         var decisionText = request.Decision switch
         {
-            ReviewDecision.Approve => "đã được phê duyệt",
-            ReviewDecision.Reject => "đã bị từ chối",
-            ReviewDecision.RequestRevision => "cần được sửa lại",
-            _ => "đã có quyết định",
+            ReviewDecision.Approve => "has been approved",
+            ReviewDecision.Reject => "has been rejected",
+            ReviewDecision.RequestRevision => "needs revision",
+            _ => "has been reviewed",
         };
 
         await notificationService.SendAsync(
             new SendNotificationRequest(
                 Type: NotificationType.SongListDecision,
-                Title: "Danh sách bài hát có kết quả duyệt",
-                Content: $"Danh sách bài hát phiên bản {songList.Version} {decisionText}.",
+                Title: "Song list reviewed",
+                Content: $"Song list version {songList.Version} {decisionText}.",
                 RecipientUserIds: [songList.ProposedBy],
                 ReferenceType: nameof(SongList),
                 ReferenceId: songList.Id),
@@ -275,7 +278,7 @@ public class SongListService(
     }
 
     private async Task<string?> ValidateItemReferencesAsync(
-        List<SongListItemRequest> items, CancellationToken cancellationToken)
+        List<UpdateSongListItemRequest> items, CancellationToken cancellationToken)
     {
         foreach (var songId in items.Select(i => i.SongId).Distinct())
         {
