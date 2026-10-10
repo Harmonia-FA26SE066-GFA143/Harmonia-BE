@@ -1,6 +1,6 @@
 # Harmonia – Domain Exception Catalogue
 
-Suy ra từ `harmonia-domain-entity-list.md` (42 entity, 21 enum) và `error-codes.md`.
+Suy ra từ `harmonia-domain-entity-list.md` (44 entity, 21 enum) và `error-codes.md`.
 
 **Tiêu chí:** domain exception chỉ gồm những luật mà entity **tự kiểm tra được bằng dữ
 liệu của chính nó** (hoặc của aggregate nó đang giữ), không cần truy vấn DB. Lỗi cần DB
@@ -37,6 +37,9 @@ Phương án A (đã chốt 2026-09-21): entity ném, Service **không** bắt,
 | Exception | Khi nào ném | Mã | HTTP |
 |---|---|---|---|
 | `UserAlreadyInactiveException` | `User.Deactivate()` khi đã vô hiệu | `USER_ALREADY_INACTIVE` | 409 |
+| `UserAlreadyActiveException` | Kích hoạt lại tài khoản đang hoạt động | `USER_ALREADY_ACTIVE` | 409 |
+| `PasswordResetTokenExpiredException` | Dùng token đặt lại mật khẩu khi `now > ExpiresAt` | `AUTH_RESET_TOKEN_EXPIRED` | 400 |
+| `PasswordResetTokenUsedException` | Dùng token đặt lại mật khẩu đã có `UsedAt` | `AUTH_RESET_TOKEN_USED` | 400 |
 | `RefreshTokenRevokedException` | Dùng token đã có `RevokedAt` | `AUTH_REFRESH_TOKEN_REVOKED` | 401 |
 | `RefreshTokenExpiredException` | `now > ExpiresAt` | `AUTH_REFRESH_TOKEN_EXPIRED` | 401 |
 | `MemberNotActiveException` | Thao tác trên ca viên `Status ≠ Active` | `MEMBER_NOT_ACTIVE` | 409 |

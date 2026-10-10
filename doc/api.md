@@ -769,6 +769,73 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 
 ---
 
+## 6a. Song lists — `api/song-lists` · đề xuất: `ChoirDirector` · duyệt: `ParishPriest` · xem bản đã duyệt: mọi role (F6)
+
+### `SongListDto`
+
+```json
+{
+  "id": "guid", "eventId": "guid", "version": 2, "status": "Submitted",
+  "proposedBy": "guid", "previousVersionId": "guid",
+  "submittedAt": "2026-10-10T08:00:00Z", "decidedAt": null,
+  "items": [
+    { "id": "guid", "songId": "guid", "songTitle": "Kinh Hòa Bình", "slotId": "guid", "slotName": "Nhập lễ", "displayOrder": 1, "note": null }
+  ],
+  "reviews": [
+    { "id": "guid", "reviewerId": "guid", "decision": "RequestRevision", "notes": "Đổi bài hiệp lễ", "reviewedAt": "2026-10-09T10:00:00Z" }
+  ]
+}
+```
+
+- `status`: `Draft` | `Submitted` | `Approved` | `Rejected` | `NeedsRevision`.
+- `decision`: `Approve` | `Reject` | `RequestRevision`.
+- `previousVersionId`, `submittedAt`, `decidedAt`, `note`, `notes` có thể `null`.
+
+### `CreateSongListRequest` / `UpdateSongListItemsRequest` / `ReviewSongListRequest`
+
+```json
+{ "eventId": "guid", "items": [{ "songId": "guid", "slotId": "guid", "displayOrder": 1, "note": null }] }
+```
+
+```json
+{ "items": [{ "songId": "guid", "slotId": "guid", "displayOrder": 1, "note": null }] }
+```
+
+```json
+{ "decision": "Reject", "notes": "Lý do" }
+```
+
+| Method | Route | Body | Thành công | Lỗi |
+|---|---|---|---|---|
+| GET | `/api/song-lists/event/{eventId}/approved` · mọi role | — | 200 `SongListDto` | 404 `SONG_LIST_NOT_FOUND` |
+| GET | `/api/song-lists/{id}` · `ChoirDirector`, `ParishPriest` | — | 200 `SongListDto` | 404 `SONG_LIST_NOT_FOUND` |
+| GET | `/api/song-lists/pending` · `ParishPriest` | — | 200 `SongListDto[]` | — |
+| POST | `/api/song-lists` · `ChoirDirector` | `CreateSongListRequest` | 200 `SongListDto` | 400 `VALIDATION_FAILED` (`SONG_LIST_EMPTY`, `SONG_LIST_SLOT_DUPLICATE`) · 404 `EVENT_NOT_FOUND`, `SONG_NOT_FOUND`, `SLOT_NOT_FOUND` · 409 `EVENT_CANCELLED`, `EVENT_NOT_PUBLISHED`, `SONG_LIST_EVENT_HAS_APPROVED_VERSION`, `SONG_LIST_CANNOT_BE_REVISED`, `SONG_INACTIVE`, `LOOKUP_INACTIVE` |
+| PUT | `/api/song-lists/{id}/items` · `ChoirDirector` | `UpdateSongListItemsRequest` | 200 `SongListDto` | 400 `VALIDATION_FAILED` (`SONG_LIST_EMPTY`, `SONG_LIST_SLOT_DUPLICATE`) · 404 `SONG_LIST_NOT_FOUND`, `SONG_NOT_FOUND`, `SLOT_NOT_FOUND` · 409 `SONG_LIST_NOT_LATEST_VERSION`, `SONG_LIST_NOT_EDITABLE`, `SONG_INACTIVE`, `LOOKUP_INACTIVE` |
+| POST | `/api/song-lists/{id}/submit` · `ChoirDirector` | — | 200 `SongListDto` | 400 `SONG_LIST_EMPTY` · 404 `SONG_LIST_NOT_FOUND` · 409 `SONG_LIST_NOT_LATEST_VERSION`, `SONG_LIST_ALREADY_SUBMITTED`, `SONG_LIST_NOT_EDITABLE` |
+| POST | `/api/song-lists/{id}/review` · `ParishPriest` | `ReviewSongListRequest` | 200 `SongListDto` | 400 `VALIDATION_FAILED` (`REVIEW_NOTES_REQUIRED`) · 404 `SONG_LIST_NOT_FOUND` · 409 `SONG_LIST_NOT_SUBMITTED` |
+
+**Vòng đời:** `Draft` → (`submit`) `Submitted` → (`review`) `Approved` | `Rejected` | `NeedsRevision`.
+
+- **Mỗi phiên bản là một bản ghi riêng.** `POST` tạo `version = 1` ở trạng thái `Draft` khi sự kiện chưa có danh sách nào.
+  Khi bản mới nhất đang `Rejected` hoặc `NeedsRevision`, `POST` tạo `version + 1` với `previousVersionId` trỏ về bản cũ.
+  Bản mới nhất đang `Draft` / `Submitted` → `SONG_LIST_CANNOT_BE_REVISED`; đã `Approved` → `SONG_LIST_EVENT_HAS_APPROVED_VERSION`.
+- Chỉ tạo được cho sự kiện `Published`. Sự kiện `Draft` → `EVENT_NOT_PUBLISHED`, đã huỷ → `EVENT_CANCELLED`.
+- `PUT …/items` **thay cả bộ** bài, chỉ khi danh sách là phiên bản mới nhất và còn `Draft`.
+- Mỗi `slotId` chỉ xuất hiện một lần trong một danh sách (`SONG_LIST_SLOT_DUPLICATE`); `items` không được rỗng
+  (`SONG_LIST_EMPTY`). Cả hai bắt ở validator, trả 400 `VALIDATION_FAILED`. `slotId` lấy từ `GET /api/lookups/liturgical-slots`.
+- Bài hát và vị trí phụng vụ phải đang hoạt động: bài đã tắt → `SONG_INACTIVE`, vị trí đã tắt → `LOOKUP_INACTIVE`.
+- `review`: `notes` bắt buộc khi `decision` là `Reject` hoặc `RequestRevision`; `Approve` thì tuỳ chọn.
+- `GET …/approved` chỉ trả danh sách `Approved` của sự kiện đang `Published`. Sự kiện còn `Draft`, đã huỷ hoặc không tồn tại
+  → 404 `SONG_LIST_NOT_FOUND`, với mọi role. Cha xứ và ca trưởng vẫn xem được bằng `GET /api/song-lists/{id}`.
+- `GET …/pending`: các danh sách đang `Submitted`, bản gửi sớm nhất trước. **`items` và `reviews` ở đây luôn rỗng** —
+  gọi `GET /api/song-lists/{id}` để lấy chi tiết.
+- `submit` xong, mọi `ParishPriest` đang hoạt động nhận thông báo `SongListSubmitted`; `review` xong, ca trưởng đề xuất
+  nhận thông báo `SongListDecision`. Cả hai có `referenceType = "SongList"`, `referenceId` = id danh sách (S-05).
+- Nhân sự cần cho từng bài: xem mục 7a, dùng `items[].id`.
+
+---
+
 ## 7a. Song list items — `api/song-list-items` · xem: mọi role · sửa: `ChoirDirector` (UC-24)
 
 ### Nhân sự cần cho mỗi bài — `SongPersonnelRequirementDto` / `UpdateSongPersonnelRequirementsRequest`
