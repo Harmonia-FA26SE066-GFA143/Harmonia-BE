@@ -10,13 +10,14 @@ using System.Threading.Tasks;
 namespace Harmonia.API.Controllers;
 
 [Route("api/liturgical-days")]
-[Authorize(Roles = RoleNames.ParishPriest)]
+[Authorize]
 public class LiturgicalDaysController(ILiturgicalDayService liturgicalDayService) : ApiControllerBase
 {
     [HttpGet("{date}")]
     public async Task<IActionResult> GetByDateAsync(DateOnly date, CancellationToken cancellationToken) =>
         ToActionResult(await liturgicalDayService.GetByDateAsync(date, cancellationToken));
 
+    [Authorize(Roles = RoleNames.ParishPriest)]
     [HttpPost("import")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> ImportAsync(IFormFile? file, CancellationToken cancellationToken)
