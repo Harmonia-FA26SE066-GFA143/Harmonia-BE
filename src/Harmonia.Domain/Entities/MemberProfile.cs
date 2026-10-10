@@ -7,10 +7,6 @@ public class MemberProfile : BaseAuditableEntity
 {
     public Guid UserId { get; set; }
 
-    public string FullName { get; set; } = string.Empty;
-
-    public string? Phone { get; set; }
-
     public DateOnly? DateOfBirth { get; set; }
 
     public DateOnly JoinedDate { get; set; }

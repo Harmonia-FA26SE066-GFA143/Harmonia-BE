@@ -11,11 +11,11 @@ dựng tính năng mới: cần đọc gì ở READ, nội dung PLAN, và 13 bư
 ## READ — đọc thêm
 
 Ngoài phần READ chung, còn phải đối chiếu use case trong
-`claude/use-case-descriptions.md` — đặc biệt xem có «include» UC-05 Send Notification không.
+`doc/harmonia-use-case-descriptions.md` — đặc biệt xem có «include» S-05 Send Notification không.
 
 ## PLAN — xác định thêm
 
-- Use case nào, actor nào gọi — quyết định `[Authorize(Roles = ...)]`.
+- Use case nào, actor nào gọi — quyết định `[Authorize]` (mọi role) hay `[Authorize(Roles = ...)]` (một phần role).
 - Tên nghiệp vụ tiếng Anh lấy từ `.claude/rules/02-naming.md`.
   Không có trong bảng thì hỏi, đừng tự dịch.
 - Chức năng **ghi dữ liệu** hay **chỉ đọc**.
@@ -69,7 +69,7 @@ Chỉ **DTO** được phép sinh thêm. Mọi thứ khác là mở file cũ ra 
 11. **EF configuration** — `Infrastructure/Data/Configurations/`, thêm `DbSet` số nhiều
     vào `HarmoniaDbContext`. **Luôn cần migration** — báo, không tự chạy `dotnet ef`.
 12. **Controller** — `API/Controllers/`. Route kebab-case số nhiều.
-    Bắt buộc `[Authorize(Roles = ...)]`. Nhận `Request`, trả `Dto`.
+    Bắt buộc `[Authorize]`; mọi role thì để trần, không liệt kê đủ 4 role. Nhận `Request`, trả `Dto`.
 13. **Unit test cho service** — `tests/Harmonia.Application.UnitTests/`.
     Tối thiểu: một case thành công, một case sai quyền `Choir`, một case không tìm thấy.
 

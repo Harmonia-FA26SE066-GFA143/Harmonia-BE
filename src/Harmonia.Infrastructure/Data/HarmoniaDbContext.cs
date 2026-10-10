@@ -1,6 +1,7 @@
 using System.Reflection;
 using Harmonia.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Harmonia.Infrastructure.Data;
 
@@ -14,13 +15,15 @@ public class HarmoniaDbContext(DbContextOptions<HarmoniaDbContext> options) : Db
 
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+
     public DbSet<SkillCategory> SkillCategories => Set<SkillCategory>();
 
     public DbSet<Skill> Skills => Set<Skill>();
 
     public DbSet<MemberSkill> MemberSkills => Set<MemberSkill>();
 
-    public DbSet<LiturgicalWeek> LiturgicalWeeks => Set<LiturgicalWeek>();
+    public DbSet<LiturgicalDay> LiturgicalDays => Set<LiturgicalDay>();
 
     public DbSet<LiturgicalEvent> LiturgicalEvents => Set<LiturgicalEvent>();
 
@@ -70,6 +73,8 @@ public class HarmoniaDbContext(DbContextOptions<HarmoniaDbContext> options) : Db
 
     public DbSet<RehearsalAttendance> RehearsalAttendances => Set<RehearsalAttendance>();
 
+    public DbSet<RehearsalSong> RehearsalSongs => Set<RehearsalSong>();
+
     public DbSet<PracticeAssignment> PracticeAssignments => Set<PracticeAssignment>();
 
     public DbSet<PracticeAssignmentTarget> PracticeAssignmentTargets => Set<PracticeAssignmentTarget>();
@@ -93,6 +98,27 @@ public class HarmoniaDbContext(DbContextOptions<HarmoniaDbContext> options) : Db
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
+        ApplyUtcDateTimeConverter(modelBuilder);
         base.OnModelCreating(modelBuilder);
+    }
+
+    /// <summary>
+    /// Every DateTime is stored in UTC. The database keeps no time zone, so values read back are marked
+    /// as UTC; otherwise they would serialize without "Z" and clients could not tell what they mean.
+    /// </summary>
+    private static void ApplyUtcDateTimeConverter(ModelBuilder modelBuilder)
+    {
+        var converter = new ValueConverter<DateTime, DateTime>(
+            v => v.Kind == DateTimeKind.Local ? v.ToUniversalTime() : v,
+            v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+        var properties = modelBuilder.Model.GetEntityTypes()
+            .SelectMany(t => t.GetProperties())
+            .Where(p => p.ClrType == typeof(DateTime) || p.ClrType == typeof(DateTime?));
+
+        foreach (var property in properties)
+        {
+            property.SetValueConverter(converter);
+        }
     }
 }

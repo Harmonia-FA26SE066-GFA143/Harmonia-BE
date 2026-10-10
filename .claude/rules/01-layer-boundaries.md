@@ -6,7 +6,7 @@
 | ca trưởng | `ChoirDirector` — KHÔNG dùng `ChoirLeader` |
 | ca viên | `ChoirMember` (role) · `MemberProfile` (hồ sơ) |
 | nhạc công | KHÔNG có role riêng — là `ChoirMember` có `MemberSkill` thuộc `SkillCategory` nhạc cụ |
-| tuần phụng vụ | `LiturgicalWeek` |
+| ngày phụng vụ (cache lịch Công giáo từ API ngoài) | `LiturgicalDay` — KHÔNG còn `LiturgicalWeek`, lịch lên theo ngày (D6) |
 | sự kiện / thánh lễ | `LiturgicalEvent` — KHÔNG dùng `Event` (trùng từ khoá C#) |
 | mùa phụng vụ | `LiturgicalSeason` — KHÔNG dùng `Season` |
 | loại thánh lễ | `MassType` |
@@ -23,6 +23,7 @@
 | xác nhận tham gia | `EventParticipation` |
 | buổi tập | `Rehearsal` |
 | điểm danh | `RehearsalAttendance` |
+| bài hát của buổi tập | `RehearsalSong` — KHÔNG phải `SongList` (không phiên bản, không duyệt) |
 | bài tập về nhà | `PracticeAssignment` |
 | bản thu nộp | `PracticeSubmission` |
 | nhận xét của ca trưởng | `PracticeFeedback` |
@@ -34,7 +35,7 @@
 `LiturgicalEvent` là entity trung tâm — lịch tập, danh sách bài hát, phân công phục vụ
 và xác nhận tham gia đều móc vào nó. Ba hub còn lại: `MemberProfile`, `Song`, `Skill`.
 
-Nguồn chuẩn đầy đủ 42 entity + 21 enum: `doc/harmonia-domain-entity-list.md`.
+Nguồn chuẩn đầy đủ 44 entity + 21 enum: `doc/harmonia-domain-entity-list.md`.
 Bảng trên chỉ là lối vào nhanh. Gặp thuật ngữ chưa có ở cả hai chỗ: hỏi, đừng tự dịch.
 
 ## Quy ước tên khác
@@ -43,6 +44,7 @@ Bảng trên chỉ là lối vào nhanh. Gặp thuật ngữ chưa có ở cả 
   Ngoại lệ: method có chữ ký do framework quy định (middleware `InvokeAsync`, filter,
   `Hub`, `BackgroundService`) không thêm được token. Lấy token từ `HttpContext.RequestAborted`
   hoặc `stoppingToken` rồi truyền xuống các lời gọi bên trong.
+  Trong `test/`: token lấy từ `TestContext.Current.CancellationToken` (chi tiết ở `02-naming.md`).
 
 - Interface repository: `I<Entity>Repository` — `ISongListRepository`, kế thừa
   `IGenericRepository<Entity>`. CRUD đơn giản thì inject thẳng `IGenericRepository<T>`.

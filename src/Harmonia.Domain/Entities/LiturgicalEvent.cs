@@ -5,9 +5,10 @@ namespace Harmonia.Domain.Entities;
 
 public class LiturgicalEvent : BaseAuditableEntity
 {
-    public Guid WeekId { get; set; }
-
     public DateOnly EventDate { get; set; }
+
+    // Pre-filled from LiturgicalDay.SeasonName; the priest may change it.
+    public Guid? LiturgicalSeasonId { get; set; }
 
     public TimeOnly Time { get; set; }
 
@@ -25,7 +26,9 @@ public class LiturgicalEvent : BaseAuditableEntity
 
     public EventStatus Status { get; set; }
 
-    public LiturgicalWeek Week { get; set; } = null!;
+    public DateTime? PublishedAt { get; set; }
+
+    public LiturgicalSeason? LiturgicalSeason { get; set; }
 
     public MassType? MassType { get; set; }
 

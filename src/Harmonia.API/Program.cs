@@ -20,12 +20,14 @@ builder.Services.AddApiControllers();
 builder.Services.AddApiSwagger();
 builder.Services.AddApiJwtAuthentication(builder.Configuration);
 builder.Services.AddApiCors(builder.Configuration);
-builder.Services.AddApiSignalR();
+builder.Services.AddApiSignalR(builder.Configuration, builder.Environment);
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
+
+await app.Services.SeedDataAsync(app.Lifetime.ApplicationStopping);
 
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 

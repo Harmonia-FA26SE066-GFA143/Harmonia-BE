@@ -15,6 +15,23 @@ public static class DependencyInjection
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IMemberProfileService, MemberProfileService>();
+        services.AddScoped<IMemberSkillService, MemberSkillService>();
+        services.AddScoped<ISongService, SongService>();
+        services.AddScoped<IMusicMaterialService, MusicMaterialService>();
+        services.AddScoped<ILookupService, LookupService>();
+        services.AddScoped<ISongPersonnelRequirementService, SongPersonnelRequirementService>();
+        services.AddScoped<IRosterService, RosterService>();
+        services.AddScoped<ILiturgicalDayService, LiturgicalDayService>();
+        services.AddScoped<IUpcomingScheduleService, UpcomingScheduleService>();
+        services.AddScoped<ILiturgicalEventService, LiturgicalEventService>();
+        services.AddScoped<IPracticeAssignmentService, PracticeAssignmentService>();
+        services.AddScoped<IPracticeSubmissionService, PracticeSubmissionService>();
+        services.AddScoped<IRehearsalAttendanceService, RehearsalAttendanceService>();
+        services.AddScoped<IRehearsalSongService, RehearsalSongService>();
+        services.AddScoped<IEventPreparationService, EventPreparationService>();
+        services.AddScoped<IDirectorNoteService, DirectorNoteService>();
+        services.AddScoped<ISongListService, SongListService>();
 
         return services;
     }

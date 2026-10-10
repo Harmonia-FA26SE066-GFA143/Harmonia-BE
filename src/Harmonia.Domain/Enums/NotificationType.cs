@@ -1,11 +1,15 @@
 namespace Harmonia.Domain.Enums;
 
+// Stored as its number, so new values go at the end; reordering would relabel saved notifications.
 public enum NotificationType
 {
-    WeekPublished,
+    EventPublished,
     SongListDecision,
     ParticipationRequest,
     AssignmentNotice,
     PracticeFeedback,
-    DirectorNote
+    DirectorNote,
+    SkillReview,
+    EventCancelled,
+    SongListSubmitted
 }

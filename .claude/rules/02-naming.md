@@ -1,11 +1,12 @@
 # Từ điển nghiệp vụ — dùng đúng tên, không tự đặt từ đồng nghĩa
 
-Nguồn chuẩn: `doc/harmonia-domain-entity-list.md` (42 entity, 21 enum).
+Nguồn chuẩn: `doc/harmonia-domain-entity-list.md` (44 entity, 21 enum).
 Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 
 | Tiếng Việt | Tên trong code |
 |---|---|
 | tài khoản | `User` |
+| token đặt lại mật khẩu | `PasswordResetToken` |
 | vai trò | `Role` — 4 giá trị: Admin, ParishPriest, ChoirDirector, ChoirMember |
 | cha xứ / ban phụng vụ | `ParishPriest` |
 | ca trưởng | `ChoirDirector` — KHÔNG dùng `ChoirLeader` |
@@ -14,7 +15,7 @@ Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 | nhóm kỹ năng | `SkillCategory` — Vocal, Instrument, Solo, Psalm, Conducting support |
 | kỹ năng | `Skill` — Soprano, Alto, Tenor, Bass, Guitar, Organ, Solo, Psalmist |
 | kỹ năng đã khai báo | `MemberSkill` |
-| tuần phụng vụ | `LiturgicalWeek` |
+| ngày phụng vụ (cache lịch Công giáo từ API ngoài) | `LiturgicalDay` — KHÔNG còn `LiturgicalWeek`, lịch lên theo ngày (D6) |
 | sự kiện / thánh lễ | `LiturgicalEvent` — KHÔNG dùng `Event` (trùng từ khoá C#) |
 | mùa phụng vụ | `LiturgicalSeason` — KHÔNG dùng `Season` |
 | loại thánh lễ | `MassType` |
@@ -37,6 +38,7 @@ Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 | cảnh báo thiếu người | `RosterShortage` |
 | buổi tập | `Rehearsal` |
 | điểm danh | `RehearsalAttendance` — KHÔNG dùng `Attendance` trần |
+| bài hát của buổi tập | `RehearsalSong` — KHÔNG phải `SongList` (không phiên bản, không duyệt) |
 | bài tập về nhà | `PracticeAssignment` |
 | bản thu nộp | `PracticeSubmission` |
 | nhận xét của ca trưởng | `PracticeFeedback` — KHÔNG dùng `Feedback` trần |
@@ -59,9 +61,16 @@ móc vào chúng.
   Ngoại lệ: method có chữ ký do framework quy định (middleware `InvokeAsync`, filter,
   `Hub`, `BackgroundService`) không thêm được token. Lấy token từ `HttpContext.RequestAborted`
   hoặc `stoppingToken` rồi truyền xuống các lời gọi bên trong.
+  Trong `test/` (xUnit v3): method `[Fact]` / `[Theory]` giữ hậu tố `_Async`
+  (`Login_ValidCredentials_ReturnsTokensAndUser_Async`). xUnit không cho method test nhận token
+  làm tham số, nên lấy từ field `_ct = TestContext.Current.CancellationToken` rồi truyền xuống
+  mọi lời gọi — analyzer `xUnit1051` cảnh báo nếu quên. Helper async trong test vẫn phải có
+  `CancellationToken cancellationToken = default` (chốt 2026-09-27).
 
 - Mọi chuỗi trong `.cs` là tiếng Anh — comment, XML doc, message exception, message log.
   Không có ngoại lệ: message cho người dùng đi bằng mã lỗi, không bằng câu tiếng Việt.
+  Riêng `CatholicCalendarParser.cs` được giữ emoji màu và tên mùa phụng vụ tiếng Việt — đó là
+  chuỗi để so khớp dữ liệu từ API lịch Công giáo, không phải câu hiển thị (chốt 2026-10-06).
 
 ## Domain
 

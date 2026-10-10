@@ -1,6 +1,6 @@
 # Harmonia – Domain Exception Catalogue
 
-Suy ra từ `harmonia-domain-entity-list.md` (42 entity, 21 enum) và `error-codes.md`.
+Suy ra từ `harmonia-domain-entity-list.md` (44 entity, 21 enum) và `error-codes.md`.
 
 **Tiêu chí:** domain exception chỉ gồm những luật mà entity **tự kiểm tra được bằng dữ
 liệu của chính nó** (hoặc của aggregate nó đang giữ), không cần truy vấn DB. Lỗi cần DB
@@ -37,6 +37,9 @@ Phương án A (đã chốt 2026-09-21): entity ném, Service **không** bắt,
 | Exception | Khi nào ném | Mã | HTTP |
 |---|---|---|---|
 | `UserAlreadyInactiveException` | `User.Deactivate()` khi đã vô hiệu | `USER_ALREADY_INACTIVE` | 409 |
+| `UserAlreadyActiveException` | Kích hoạt lại tài khoản đang hoạt động | `USER_ALREADY_ACTIVE` | 409 |
+| `PasswordResetTokenExpiredException` | Dùng token đặt lại mật khẩu khi `now > ExpiresAt` | `AUTH_RESET_TOKEN_EXPIRED` | 400 |
+| `PasswordResetTokenUsedException` | Dùng token đặt lại mật khẩu đã có `UsedAt` | `AUTH_RESET_TOKEN_USED` | 400 |
 | `RefreshTokenRevokedException` | Dùng token đã có `RevokedAt` | `AUTH_REFRESH_TOKEN_REVOKED` | 401 |
 | `RefreshTokenExpiredException` | `now > ExpiresAt` | `AUTH_REFRESH_TOKEN_EXPIRED` | 401 |
 | `MemberNotActiveException` | Thao tác trên ca viên `Status ≠ Active` | `MEMBER_NOT_ACTIVE` | 409 |
@@ -55,10 +58,8 @@ Phương án A (đã chốt 2026-09-21): entity ném, Service **không** bắt,
 
 | Exception | Khi nào ném | Mã | HTTP |
 |---|---|---|---|
-| `WeekStartNotMondayException` | `WeekStartDate` không phải thứ Hai | `WEEK_START_NOT_MONDAY` | 400 |
-| `WeekAlreadyPublishedException` | Sửa tuần / thêm-xoá sự kiện sau khi công bố | `WEEK_ALREADY_PUBLISHED` | 409 |
-| `WeekNotPublishedException` | Thao tác đòi hỏi tuần đã công bố | `WEEK_NOT_PUBLISHED` | 409 |
-| `EventDateOutsideWeekException` | `EventDate` ngoài khoảng Start–End của tuần | `EVENT_DATE_OUTSIDE_WEEK` | 400 |
+| `EventAlreadyPublishedException` | Sửa / xoá sự kiện hoặc công bố lại sau khi đã công bố | `EVENT_ALREADY_PUBLISHED` | 409 |
+| `EventNotPublishedException` | Thao tác đòi hỏi sự kiện đã công bố (đề xuất song list, gửi xác nhận tham gia…) | `EVENT_NOT_PUBLISHED` | 409 |
 | `EventTypeRequiredException` | Không có cả `MassTypeId` lẫn `CeremonyTypeId` | `EVENT_TYPE_REQUIRED` | 400 |
 | `EventCancelledException` | Thao tác trên sự kiện đã huỷ | `EVENT_CANCELLED` | 409 |
 | `EventAlreadyPassedException` | Sửa sự kiện đã diễn ra | `EVENT_ALREADY_PASSED` | 409 |
@@ -104,10 +105,10 @@ Phương án A (đã chốt 2026-09-21): entity ném, Service **không** bắt,
 
 | Exception | Khi nào ném | Mã | HTTP |
 |---|---|---|---|
-| `DirectorNoteTargetRequiredException` | Không có cả `WeekId` lẫn `EventId` | `DIRECTOR_NOTE_TARGET_REQUIRED` | 400 |
+| `DirectorNoteTargetRequiredException` | Không có cả `NoteDate` lẫn `EventId` | `DIRECTOR_NOTE_TARGET_REQUIRED` | 400 |
 | `SettingValueTypeMismatchException` | `Value` không parse được theo `DataType` | `SETTING_VALUE_TYPE_MISMATCH` | 400 |
 
-**Tổng: 37 exception** (+ lớp gốc `DomainException`). Mọi mã đều có trong `error-codes.md`.
+**Tổng: 35 exception** (+ lớp gốc `DomainException`). Mọi mã đều có trong `error-codes.md`.
 
 `PracticeFeedback.Result` chỉ nhận Passed/NeedsRevision: API chặn bằng FluentValidation
 (`VALIDATION_FAILED`); trong entity chỉ cần guard `ArgumentException` (lỗi lập trình,

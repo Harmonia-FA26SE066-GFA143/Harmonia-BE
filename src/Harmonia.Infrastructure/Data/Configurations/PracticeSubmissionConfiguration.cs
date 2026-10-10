@@ -10,6 +10,10 @@ public class PracticeSubmissionConfiguration : IEntityTypeConfiguration<Practice
     {
         builder.Property(x => x.AudioPublicId).IsRequired().HasMaxLength(255);
 
+        // A review saves only while the row still holds the status it was read with, so two
+        // directors reviewing the same Submitted row cannot both succeed.
+        builder.Property(x => x.Status).IsConcurrencyToken();
+
         builder.HasIndex(x => new { x.PracticeAssignmentId, x.MemberId, x.AttemptNo }).IsUnique();
 
         builder.HasOne(x => x.PracticeAssignment)

@@ -36,6 +36,8 @@ public static class ErrorCodes
 
     public const string AuthAccountInactive = "AUTH_ACCOUNT_INACTIVE";
 
+    public const string AuthPasswordChangeRequired = "AUTH_PASSWORD_CHANGE_REQUIRED";
+
     public const string AuthTokenInvalid = "AUTH_TOKEN_INVALID";
 
     public const string AuthTokenExpired = "AUTH_TOKEN_EXPIRED";
@@ -56,6 +58,8 @@ public static class ErrorCodes
 
     public const string AuthResetTokenUsed = "AUTH_RESET_TOKEN_USED";
 
+    public const string AuthGoogleTokenInvalid = "AUTH_GOOGLE_TOKEN_INVALID";
+
     // Field-level codes raised by FluentValidation; they always travel inside a 400 response's
     // "errors" map, so they never appear in ErrorStatusMap.
     public const string AuthEmailRequired = "AUTH_EMAIL_REQUIRED";
@@ -65,6 +69,8 @@ public static class ErrorCodes
     public const string AuthPasswordRequired = "AUTH_PASSWORD_REQUIRED";
 
     public const string AuthRefreshTokenRequired = "AUTH_REFRESH_TOKEN_REQUIRED";
+
+    public const string AuthGoogleTokenRequired = "AUTH_GOOGLE_TOKEN_REQUIRED";
 
     // 2. User & Role (Admin).
     public const string UserNotFound = "USER_NOT_FOUND";
@@ -78,6 +84,8 @@ public static class ErrorCodes
     public const string UserLastAdmin = "USER_LAST_ADMIN";
 
     public const string RoleNotFound = "ROLE_NOT_FOUND";
+
+    public const string UserAlreadyActive = "USER_ALREADY_ACTIVE";
 
     // 3. MemberProfile.
     public const string MemberNotFound = "MEMBER_NOT_FOUND";
@@ -108,21 +116,23 @@ public static class ErrorCodes
     public const string MemberSkillNotApproved = "MEMBER_SKILL_NOT_APPROVED";
 
     // 5. Liturgical calendar.
-    public const string WeekNotFound = "WEEK_NOT_FOUND";
+    public const string CalendarDayNotFound = "CALENDAR_DAY_NOT_FOUND";
 
-    public const string WeekAlreadyExists = "WEEK_ALREADY_EXISTS";
+    public const string CalendarFileRequired = "CALENDAR_FILE_REQUIRED";
 
-    public const string WeekStartNotMonday = "WEEK_START_NOT_MONDAY";
+    public const string CalendarFileTypeNotAllowed = "CALENDAR_FILE_TYPE_NOT_ALLOWED";
 
-    public const string WeekAlreadyPublished = "WEEK_ALREADY_PUBLISHED";
+    public const string CalendarFileTooLarge = "CALENDAR_FILE_TOO_LARGE";
 
-    public const string WeekNotPublished = "WEEK_NOT_PUBLISHED";
+    public const string CalendarFileInvalid = "CALENDAR_FILE_INVALID";
 
     public const string EventNotFound = "EVENT_NOT_FOUND";
 
     public const string EventSlotTaken = "EVENT_SLOT_TAKEN";
 
-    public const string EventDateOutsideWeek = "EVENT_DATE_OUTSIDE_WEEK";
+    public const string EventAlreadyPublished = "EVENT_ALREADY_PUBLISHED";
+
+    public const string EventNotPublished = "EVENT_NOT_PUBLISHED";
 
     public const string EventCancelled = "EVENT_CANCELLED";
 
@@ -141,11 +151,15 @@ public static class ErrorCodes
 
     public const string SongTitleDuplicate = "SONG_TITLE_DUPLICATE";
 
+    // Field-level: raised by UpdateSongClassificationRequestValidator, never in ErrorStatusMap.
     public const string SongClassificationDuplicate = "SONG_CLASSIFICATION_DUPLICATE";
 
     public const string SongClassificationTargetInvalid = "SONG_CLASSIFICATION_TARGET_INVALID";
 
+    // Field-level, same as above.
     public const string SongSkillRequirementDuplicate = "SONG_SKILL_REQUIREMENT_DUPLICATE";
+
+    public const string SongSkillRequirementCategoryInvalid = "SONG_SKILL_REQUIREMENT_CATEGORY_INVALID";
 
     public const string MaterialNotFound = "MATERIAL_NOT_FOUND";
 
@@ -202,6 +216,8 @@ public static class ErrorCodes
 
     public const string RosterAlreadyFinalized = "ROSTER_ALREADY_FINALIZED";
 
+    public const string RosterNotFinalized = "ROSTER_NOT_FINALIZED";
+
     public const string RosterSongListNotApproved = "ROSTER_SONG_LIST_NOT_APPROVED";
 
     public const string RosterNoPersonnelRequirement = "ROSTER_NO_PERSONNEL_REQUIREMENT";
@@ -235,6 +251,12 @@ public static class ErrorCodes
 
     public const string AttendanceAlreadyRecorded = "ATTENDANCE_ALREADY_RECORDED";
 
+    public const string RehearsalNotStarted = "REHEARSAL_NOT_STARTED";
+
+    public const string AttendanceMemberDuplicate = "ATTENDANCE_MEMBER_DUPLICATE";
+
+    public const string RehearsalSongDuplicate = "REHEARSAL_SONG_DUPLICATE";
+
     // 11. Practice assignment & submission.
     public const string PracticeAssignmentNotFound = "PRACTICE_ASSIGNMENT_NOT_FOUND";
 
@@ -250,6 +272,17 @@ public static class ErrorCodes
 
     public const string PracticeSubmissionAlreadyReviewed = "PRACTICE_SUBMISSION_ALREADY_REVIEWED";
 
+    public const string PracticeSubmissionAlreadyPassed = "PRACTICE_SUBMISSION_ALREADY_PASSED";
+
+    // The member submitted a newer attempt; only the newest attempt of an assignment is reviewed.
+    public const string PracticeSubmissionSuperseded = "PRACTICE_SUBMISSION_SUPERSEDED";
+
+    // Extra feedback needs a first review: grade the submission through its feedback endpoint first.
+    public const string PracticeSubmissionNotReviewed = "PRACTICE_SUBMISSION_NOT_REVIEWED";
+
+    // Two submissions of the same assignment raced for the same attempt number; the client reloads and retries.
+    public const string PracticeSubmissionConflict = "PRACTICE_SUBMISSION_CONFLICT";
+
     public const string PracticeAudioRequired = "PRACTICE_AUDIO_REQUIRED";
 
     public const string PracticeAudioTypeNotAllowed = "PRACTICE_AUDIO_TYPE_NOT_ALLOWED";
@@ -262,6 +295,11 @@ public static class ErrorCodes
     public const string NotificationNotFound = "NOTIFICATION_NOT_FOUND";
 
     public const string DirectorNoteTargetRequired = "DIRECTOR_NOTE_TARGET_REQUIRED";
+
+    // A note the caller neither sent nor received is reported as not found, for the same reason as above.
+    public const string DirectorNoteNotFound = "DIRECTOR_NOTE_NOT_FOUND";
+
+    public const string DirectorNoteRecipientInvalid = "DIRECTOR_NOTE_RECIPIENT_INVALID";
 
     // 13. System settings & reports.
     public const string SettingNotFound = "SETTING_NOT_FOUND";
@@ -283,6 +321,5 @@ public static class ErrorCodes
 
     public const string ExternalAiFailed = "EXTERNAL_AI_FAILED";
 
-    public const string UserAlreadyActive = "USER_ALREADY_ACTIVE";
-
+    public const string ExternalCalendarFailed = "EXTERNAL_CALENDAR_FAILED";
 }

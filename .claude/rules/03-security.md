@@ -35,11 +35,26 @@
 ## Tài khoản & mật khẩu
 
 - Tài khoản do `Admin` tạo và gán role. **KHÔNG có đăng ký công khai** —
-  chỉ `login`, `refresh` và `forgot-password` là `[AllowAnonymous]`.
+  chỉ `login`, `google`, `refresh`, `forgot-password` và `reset-password` là `[AllowAnonymous]`
+  (`reset-password`: người dùng đã quên mật khẩu, danh tính xác minh bằng token trong email).
+- Đăng nhập Google (`api/auth/google`) chỉ khớp `User` có sẵn theo email đã xác minh —
+  KHÔNG tự tạo tài khoản. Email chưa có tài khoản trả `AUTH_INVALID_CREDENTIALS`.
 - Mật khẩu lưu ở `User.passwordHash`, dùng `PasswordHasher<T>` hoặc BCrypt.
   Không bao giờ lưu plaintext, không bao giờ trả mật khẩu ra response.
 - Token reset mật khẩu: ngẫu nhiên đủ dài, hết hạn trong 1 giờ, dùng một lần.
-- `forgot-password` luôn trả 200 dù email có tồn tại hay không — không tiết lộ
+  Lưu ở `PasswordResetToken.TokenHash` — lưu hash, không lưu token gốc; dùng xong đánh
+  dấu `usedAt`. Link gửi qua email dựng từ `PasswordReset__WebUrl` hoặc
+  `PasswordReset__MobileUrl` tuỳ `Platform` của request.
+  Phát token mới thì xoá mọi token chưa dùng của user — chỉ link mới nhất còn hiệu lực.
+- Đổi hoặc đặt lại mật khẩu thành công → thu hồi toàn bộ `RefreshToken` của user.
+- Admin tạo tài khoản → server tự sinh mật khẩu đầu tiên (Admin không nhập, không thấy) và gửi tới email
+  người dùng (chốt 2026-10-07); mật khẩu không có trong response. Đồng thời
+  `User.IsPasswordChangeRequired = true`; đổi hoặc đặt lại mật khẩu thì về `false`. Không ghi mật khẩu
+  vào log. Gửi mail lỗi thì người dùng vào bằng `forgot-password`. Cờ đi trong access token
+  (claim `pwd_change_required`); `PasswordChangeRequiredFilter` trả
+  403 `AUTH_PASSWORD_CHANGE_REQUIRED` cho mọi action, trừ action gắn `[AllowWhenPasswordChangeRequired]`
+  (change-password, logout, logout-all, me). Thêm action mới cho người chưa đổi mật khẩu thì gắn attribute này.
+- `forgot-password` luôn trả 204 dù email có tồn tại hay không — không tiết lộ
   email nào đã đăng ký. Không có mã lỗi cho trường hợp này.
 - Đăng nhập sai luôn trả `AUTH_INVALID_CREDENTIALS`, không phân biệt sai email hay sai mật khẩu.
 
@@ -57,20 +72,25 @@
 
 ## Phân quyền
 
-- Mọi endpoint PHẢI có `[Authorize(Roles = ...)]`.
+- Mọi endpoint PHẢI có `[Authorize]`. Endpoint cho **mọi role** đã đăng nhập thì dùng
+  `[Authorize]` trần — KHÔNG liệt kê đủ 4 role vào `Roles` (chốt 2026-10-02).
+  Chỉ dùng `[Authorize(Roles = ...)]` khi giới hạn một phần role. Controller mở cho mọi role
+  nhưng có action chỉ dành cho một role: `[Authorize]` ở controller, `[Authorize(Roles = ...)]`
+  ở action (các attribute cộng dồn theo AND).
 - **4 role**: `Admin`, `ParishPriest`, `ChoirDirector`, `ChoirMember`.
   Không có role `Instrumentalist` — nhạc công là `ChoirMember` có `MemberSkill`
   thuộc `SkillCategory` = Instrument.
 - Chỉ `ChoirDirector` duyệt `MemberSkill`, tạo `Rehearsal`, chốt `ServiceRoster`.
   Chỉ `ParishPriest` tạo `SongListReview`. Chỉ `Admin` đụng `User`, `Role`,
-  `SystemSetting` và 9 bảng lookup.
+  `SystemSetting` và 9 bảng lookup. Ngoại lệ: mọi role tự sửa `User.FullName` và `User.Phone`
+  của chính mình qua `PUT api/auth/me` (ca viên còn qua `PUT api/member-profiles/me`) (chốt 2026-10-07).
 - **Kiểm quyền hai tầng**: attribute chặn theo role, service chặn theo quyền sở hữu bản ghi.
   `ICurrentUserService` cho biết ai đang gọi.
 - Ca viên chỉ đọc/sửa bản ghi **của chính mình**: `MemberSkill`, `EventParticipation`,
   `PracticeSubmission`, `MaterialLearningProgress`, `MemberProfile`.
   Truy cập bản ghi của người khác → trả **404**, không trả 403, để không lộ sự tồn tại.
-- Ca viên chỉ xem được `SongList` ở trạng thái `Approved`, và `LiturgicalWeek`
-  ở trạng thái `Published`.
+- Ca viên chỉ xem được `SongList` ở trạng thái `Approved`, và `LiturgicalEvent`
+  ở trạng thái `Published` (mỗi sự kiện publish riêng — D6).
 
 ## SignalR
 
@@ -81,8 +101,11 @@
 
 ## Upload file
 
-- Whitelist phần mở rộng: `MusicMaterial` nhận `.pdf`, `.png`, `.jpg`;
-  `PracticeSubmission` nhận `.mp3`, `.m4a`, `.wav`. Chặn theo whitelist, không blacklist.
+- Whitelist phần mở rộng, chặn theo whitelist, không blacklist:
+  - `MusicMaterial` theo `MaterialType` (chốt 2026-10-02): `SheetMusic`, `Lyrics` nhận
+    `.pdf`, `.png`, `.jpg`; `SampleAudio` nhận `.mp3`, `.m4a`, `.wav`;
+    `RehearsalMaterial` nhận cả hai nhóm. Tối đa 20 MB một file.
+  - `PracticeSubmission` nhận `.mp3`, `.m4a`, `.wav`.
 - Không tin `Content-Type` client gửi — kiểm phần mở rộng lẫn dung lượng ở server.
 - Lưu bằng tên sinh mới (GUID), không dùng tên gốc — tránh path traversal và ghi đè.
   `fileName` gốc chỉ để hiển thị.

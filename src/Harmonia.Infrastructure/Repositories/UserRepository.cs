@@ -1,3 +1,5 @@
+using Harmonia.Application.Common.Models;
+using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IRepositories;
 using Harmonia.Domain.Entities;
 using Harmonia.Infrastructure.Data;
@@ -14,6 +16,39 @@ public class UserRepository(HarmoniaDbContext dbContext)
             .Include(x => x.Role)
             .FirstOrDefaultAsync(x => x.Email == email, cancellationToken);
 
+    public async Task<PagedList<User>> SearchAsync(
+        string? keyword, SearchUsersRequest filter, CancellationToken cancellationToken)
+    {
+        var query = DbContext.Users.AsNoTracking();
+
+        if (keyword is not null)
+        {
+            query = query.Where(x => x.Email.Contains(keyword));
+        }
+
+        if (filter.RoleName is not null)
+        {
+            query = query.Where(x => x.Role.Name == filter.RoleName);
+        }
+
+        if (filter.IsActive is { } isActive)
+        {
+            query = query.Where(x => x.IsActive == isActive);
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .Include(x => x.Role)
+            .OrderBy(x => x.Email)
+            .ThenBy(x => x.Id)
+            .Skip((filter.PageNumber - 1) * filter.PageSize)
+            .Take(filter.PageSize)
+            .ToListAsync(cancellationToken);
+
+        return new PagedList<User>(items, filter.PageNumber, filter.PageSize, totalCount);
+    }
+
     public Task<RefreshToken?> GetRefreshTokenByHashAsync(string tokenHash, CancellationToken cancellationToken) =>
         DbContext.RefreshTokens
             .Include(x => x.User)
@@ -22,6 +57,19 @@ public class UserRepository(HarmoniaDbContext dbContext)
 
     public async Task AddRefreshTokenAsync(RefreshToken refreshToken, CancellationToken cancellationToken) =>
         await DbContext.RefreshTokens.AddAsync(refreshToken, cancellationToken);
+
+    public Task<PasswordResetToken?> GetPasswordResetTokenByHashAsync(string tokenHash, CancellationToken cancellationToken) =>
+        DbContext.PasswordResetTokens
+            .Include(x => x.User)
+            .FirstOrDefaultAsync(x => x.TokenHash == tokenHash, cancellationToken);
+
+    public async Task AddPasswordResetTokenAsync(PasswordResetToken passwordResetToken, CancellationToken cancellationToken) =>
+        await DbContext.PasswordResetTokens.AddAsync(passwordResetToken, cancellationToken);
+
+    public async Task RemoveUnusedPasswordResetTokensAsync(Guid userId, CancellationToken cancellationToken) =>
+        DbContext.PasswordResetTokens.RemoveRange(await DbContext.PasswordResetTokens
+            .Where(x => x.UserId == userId && x.UsedAt == null)
+            .ToListAsync(cancellationToken));
 
     public async Task RevokeAllRefreshTokensAsync(Guid userId, CancellationToken cancellationToken)
     {
@@ -48,4 +96,24 @@ public class UserRepository(HarmoniaDbContext dbContext)
 
     public Task<int> CountActiveAdminsAsync(CancellationToken ct) =>
         DbContext.Users.CountAsync(x => x.Role.Name == RoleNames.Admin && x.IsActive, ct);
+
+    public Task<List<Guid>> GetActiveUserIdsByRolesAsync(
+    IReadOnlyCollection<string> roleNames, CancellationToken cancellationToken)
+    {
+        var roleNamesList = roleNames.ToList();
+
+        return DbContext.Users
+            .Where(x => EF.Constant(roleNamesList).Contains(x.Role.Name) && x.IsActive)
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<List<User>> GetActiveByRoleAsync(string roleName, CancellationToken cancellationToken) =>
+        DbContext.Users
+            .AsNoTracking()
+            .Include(x => x.Role)
+            .Where(x => x.Role.Name == roleName && x.IsActive)
+            .OrderBy(x => x.FullName)
+            .ThenBy(x => x.Id)
+            .ToListAsync(cancellationToken);
 }

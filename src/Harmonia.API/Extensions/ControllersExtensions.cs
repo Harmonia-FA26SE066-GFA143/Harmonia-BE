@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Harmonia.API.Filters;
 
 namespace Harmonia.API.Extensions;
@@ -9,6 +10,7 @@ public static class ControllersExtensions
         services
             .AddControllers(options =>
             {
+                options.Filters.Add<PasswordChangeRequiredFilter>();
                 options.Filters.Add<ValidationFilter>();
 
                 // Required-ness is decided by FluentValidation, which carries our error codes.
@@ -18,7 +20,10 @@ public static class ControllersExtensions
             {
                 // ValidationFilter turns ModelState errors into ValidationException instead.
                 options.SuppressModelStateInvalidFilter = true;
-            });
+            })
+            // Enums travel as names, so reordering an enum never changes what clients read.
+            .AddJsonOptions(options =>
+                options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
         return services;
     }

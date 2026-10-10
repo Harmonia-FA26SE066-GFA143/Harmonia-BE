@@ -29,6 +29,7 @@ public static class ErrorStatusMap
         // 1. Auth.
         [ErrorCodes.AuthInvalidCredentials] = StatusCodes.Status401Unauthorized,
         [ErrorCodes.AuthAccountInactive] = StatusCodes.Status403Forbidden,
+        [ErrorCodes.AuthPasswordChangeRequired] = StatusCodes.Status403Forbidden,
         [ErrorCodes.AuthTokenInvalid] = StatusCodes.Status401Unauthorized,
         [ErrorCodes.AuthTokenExpired] = StatusCodes.Status401Unauthorized,
         [ErrorCodes.AuthRefreshTokenNotFound] = StatusCodes.Status401Unauthorized,
@@ -39,11 +40,13 @@ public static class ErrorStatusMap
         [ErrorCodes.AuthResetTokenInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.AuthResetTokenExpired] = StatusCodes.Status400BadRequest,
         [ErrorCodes.AuthResetTokenUsed] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.AuthGoogleTokenInvalid] = StatusCodes.Status401Unauthorized,
 
         // 2. User & Role.
         [ErrorCodes.UserNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.UserEmailAlreadyExists] = StatusCodes.Status409Conflict,
         [ErrorCodes.UserAlreadyInactive] = StatusCodes.Status409Conflict,
+        [ErrorCodes.UserAlreadyActive] = StatusCodes.Status409Conflict,
         [ErrorCodes.UserCannotModifySelf] = StatusCodes.Status409Conflict,
         [ErrorCodes.UserLastAdmin] = StatusCodes.Status409Conflict,
         [ErrorCodes.RoleNotFound] = StatusCodes.Status404NotFound,
@@ -66,14 +69,15 @@ public static class ErrorStatusMap
         [ErrorCodes.MemberSkillNotApproved] = StatusCodes.Status409Conflict,
 
         // 5. Liturgical calendar.
-        [ErrorCodes.WeekNotFound] = StatusCodes.Status404NotFound,
-        [ErrorCodes.WeekAlreadyExists] = StatusCodes.Status409Conflict,
-        [ErrorCodes.WeekStartNotMonday] = StatusCodes.Status400BadRequest,
-        [ErrorCodes.WeekAlreadyPublished] = StatusCodes.Status409Conflict,
-        [ErrorCodes.WeekNotPublished] = StatusCodes.Status409Conflict,
+        [ErrorCodes.CalendarDayNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.CalendarFileRequired] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.CalendarFileTypeNotAllowed] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.CalendarFileTooLarge] = StatusCodes.Status413PayloadTooLarge,
+        [ErrorCodes.CalendarFileInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.EventNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.EventSlotTaken] = StatusCodes.Status409Conflict,
-        [ErrorCodes.EventDateOutsideWeek] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.EventAlreadyPublished] = StatusCodes.Status409Conflict,
+        [ErrorCodes.EventNotPublished] = StatusCodes.Status409Conflict,
         [ErrorCodes.EventCancelled] = StatusCodes.Status409Conflict,
         [ErrorCodes.EventAlreadyPassed] = StatusCodes.Status409Conflict,
         [ErrorCodes.EventTypeRequired] = StatusCodes.Status400BadRequest,
@@ -84,9 +88,8 @@ public static class ErrorStatusMap
         [ErrorCodes.SongNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.SongInactive] = StatusCodes.Status409Conflict,
         [ErrorCodes.SongTitleDuplicate] = StatusCodes.Status409Conflict,
-        [ErrorCodes.SongClassificationDuplicate] = StatusCodes.Status409Conflict,
         [ErrorCodes.SongClassificationTargetInvalid] = StatusCodes.Status400BadRequest,
-        [ErrorCodes.SongSkillRequirementDuplicate] = StatusCodes.Status409Conflict,
+        [ErrorCodes.SongSkillRequirementCategoryInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.MaterialNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.MaterialFileRequired] = StatusCodes.Status400BadRequest,
         [ErrorCodes.MaterialFileTypeNotAllowed] = StatusCodes.Status400BadRequest,
@@ -119,6 +122,7 @@ public static class ErrorStatusMap
         [ErrorCodes.RosterNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.RosterAlreadyExists] = StatusCodes.Status409Conflict,
         [ErrorCodes.RosterAlreadyFinalized] = StatusCodes.Status409Conflict,
+        [ErrorCodes.RosterNotFinalized] = StatusCodes.Status409Conflict,
         [ErrorCodes.RosterSongListNotApproved] = StatusCodes.Status409Conflict,
         [ErrorCodes.RosterNoPersonnelRequirement] = StatusCodes.Status409Conflict,
         [ErrorCodes.RosterInsufficientMembers] = StatusCodes.Status409Conflict,
@@ -137,6 +141,9 @@ public static class ErrorStatusMap
         [ErrorCodes.RehearsalAlreadyPassed] = StatusCodes.Status409Conflict,
         [ErrorCodes.AttendanceNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.AttendanceAlreadyRecorded] = StatusCodes.Status409Conflict,
+        [ErrorCodes.RehearsalNotStarted] = StatusCodes.Status409Conflict,
+        [ErrorCodes.AttendanceMemberDuplicate] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.RehearsalSongDuplicate] = StatusCodes.Status400BadRequest,
 
         // 11. Practice assignment & submission.
         [ErrorCodes.PracticeAssignmentNotFound] = StatusCodes.Status404NotFound,
@@ -146,6 +153,10 @@ public static class ErrorStatusMap
         [ErrorCodes.PracticeSubmissionNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.PracticeSubmissionPastDue] = StatusCodes.Status409Conflict,
         [ErrorCodes.PracticeSubmissionAlreadyReviewed] = StatusCodes.Status409Conflict,
+        [ErrorCodes.PracticeSubmissionAlreadyPassed] = StatusCodes.Status409Conflict,
+        [ErrorCodes.PracticeSubmissionSuperseded] = StatusCodes.Status409Conflict,
+        [ErrorCodes.PracticeSubmissionNotReviewed] = StatusCodes.Status409Conflict,
+        [ErrorCodes.PracticeSubmissionConflict] = StatusCodes.Status409Conflict,
         [ErrorCodes.PracticeAudioRequired] = StatusCodes.Status400BadRequest,
         [ErrorCodes.PracticeAudioTypeNotAllowed] = StatusCodes.Status400BadRequest,
         [ErrorCodes.PracticeAudioTooLarge] = StatusCodes.Status413PayloadTooLarge,
@@ -153,6 +164,8 @@ public static class ErrorStatusMap
         // 12. Notification.
         [ErrorCodes.NotificationNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.DirectorNoteTargetRequired] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.DirectorNoteNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.DirectorNoteRecipientInvalid] = StatusCodes.Status400BadRequest,
 
         // 13. System settings & reports.
         [ErrorCodes.SettingNotFound] = StatusCodes.Status404NotFound,
@@ -166,6 +179,7 @@ public static class ErrorStatusMap
         [ErrorCodes.ExternalEmailFailed] = StatusCodes.Status502BadGateway,
         [ErrorCodes.ExternalStorageFailed] = StatusCodes.Status502BadGateway,
         [ErrorCodes.ExternalAiFailed] = StatusCodes.Status502BadGateway,
+        [ErrorCodes.ExternalCalendarFailed] = StatusCodes.Status502BadGateway,
     };
 
     public static int StatusFor(string code, int fallback) => StatusByCode.GetValueOrDefault(code, fallback);

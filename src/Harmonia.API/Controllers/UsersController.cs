@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Domain.Common;
 
 namespace Harmonia.API.Controllers;
@@ -15,6 +14,14 @@ namespace Harmonia.API.Controllers;
 [Authorize(Roles = RoleNames.Admin)]
 public class UsersController(IUserService userService) : ApiControllerBase
 {
+    [HttpGet]
+    public async Task<IActionResult> SearchAsync([FromQuery] SearchUsersRequest request, CancellationToken ct) =>
+        ToActionResult(await userService.SearchAsync(request, ct));
+
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> GetByIdAsync(Guid id, CancellationToken ct) =>
+        ToActionResult(await userService.GetByIdAsync(id, ct));
+
     [HttpPost]
     public async Task<IActionResult> CreateAsync([FromBody] CreateUserRequest request, CancellationToken ct) =>
         ToActionResult(await userService.CreateAsync(request, ct));
