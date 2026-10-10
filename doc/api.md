@@ -476,6 +476,7 @@ Chưa có kỹ năng nào → `[]`.
 
 - `events`: sự kiện `Published` từ hôm nay trở đi, sắp theo ngày rồi giờ.
 - `rehearsals`: buổi tập bắt đầu từ thời điểm gọi trở đi, sắp theo giờ bắt đầu. `locationName`, `note` có thể `null`.
+  `songs`: `RehearsalSongDto[]` (xem mục 7e) theo thứ tự hiển thị, `[]` khi ca trưởng chưa chọn bài.
 - Không phân trang — trả mảng; không có gì → `[]`.
 
 **Tiến độ chuẩn bị cho sự kiện (UC-30 / FE-46)**
@@ -1122,7 +1123,9 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 
 ---
 
-## 7e. Rehearsals — `api/rehearsals` · role `ChoirDirector` (UC-30 / FE-45)
+## 7e. Rehearsals — `api/rehearsals` (UC-30 / FE-45)
+
+Điểm danh chỉ dành cho `ChoirDirector`. Danh sách bài của buổi tập: mọi role đọc, `ChoirDirector` sửa.
 
 ### `RehearsalAttendanceDto`
 
@@ -1138,6 +1141,23 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 | PUT | `/api/rehearsals/{id}/attendances` | `{ "items": [{ "memberId", "status" }] }` | 204 | 400 `VALIDATION_FAILED` (`ATTENDANCE_MEMBER_DUPLICATE`) · 404 `REHEARSAL_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `REHEARSAL_NOT_STARTED`, `MEMBER_NOT_ACTIVE`, `ATTENDANCE_ALREADY_RECORDED` |
 
 - Buổi chuẩn bị cho sự kiện cũng là một buổi tập (`Rehearsal` có gắn sự kiện), điểm danh giống hệt.
+
+### Bài hát của buổi tập — `RehearsalSongDto`
+
+```json
+{ "songId": "guid", "songTitle": "Kinh Hòa Bình", "displayOrder": 1, "note": "tập kỹ điệp khúc" }
+```
+
+| Method | Route | Body | Thành công | Lỗi |
+|---|---|---|---|---|
+| GET | `/api/rehearsals/{id}/songs` · mọi role | — | 200 `RehearsalSongDto[]` | 404 `REHEARSAL_NOT_FOUND` |
+| PUT | `/api/rehearsals/{id}/songs` · `ChoirDirector` | `{ "items": [{ "songId", "note" }] }` | 200 `RehearsalSongDto[]` | 400 `VALIDATION_FAILED` (`REHEARSAL_SONG_DUPLICATE`) · 404 `REHEARSAL_NOT_FOUND`, `SONG_NOT_FOUND` · 409 `SONG_INACTIVE` |
+
+- `PUT` **thay toàn bộ** danh sách. Thứ tự trong `items` là thứ tự hiển thị — server tự đánh `displayOrder` từ 1, client không gửi.
+- `items: []` → xoá hết bài của buổi tập. `note` tối đa 500 ký tự, có thể `null`.
+- Bài đã ngừng dùng (`isActive = false`) không thêm mới được (`SONG_INACTIVE`), nhưng bài đã có sẵn trong buổi tập thì được giữ lại.
+- Khác `SongList`: không có phiên bản, không qua cha xứ duyệt, không gắn vị trí phụng vụ. Sửa được cả sau khi buổi tập đã diễn ra.
+- Chưa có bài nào → `[]`.
 - `GET` trả mọi ca viên đang hoạt động, cộng những người đã được điểm danh ở buổi này nhưng nay không còn
   hoạt động; sắp theo tên. Không phân trang.
 - `PUT` ghi hoặc sửa điểm danh cho từng ca viên trong `items`; ca viên không có trong `items` giữ nguyên.

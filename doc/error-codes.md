@@ -242,6 +242,7 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 | `ATTENDANCE_ALREADY_RECORDED` | 409 | Ca viên này đã được điểm danh |
 | `REHEARSAL_NOT_STARTED` | 409 | Buổi tập chưa bắt đầu, chưa thể điểm danh |
 | `ATTENDANCE_MEMBER_DUPLICATE` | 400 | Một ca viên xuất hiện nhiều lần trong danh sách điểm danh |
+| `REHEARSAL_SONG_DUPLICATE` | 400 | Một bài hát xuất hiện nhiều lần trong danh sách bài của buổi tập |
 
 ## 11. Bài tập & bản thu
 
@@ -318,7 +319,7 @@ Không bao giờ trả 403 cho trường hợp tài nguyên tồn tại nhưng n
 xem — trả 404, để không lộ sự tồn tại của bản ghi.
 
 ## Nguồn
-- 2026-09-20: tạo từ `claude/domain-entity-list.md` (42 entity, 21 enum) và các ràng
+- 2026-09-20: tạo từ `harmonia-domain-entity-list.md` (42 entity, 21 enum) và các ràng
   buộc unique / chuyển trạng thái trong đó.
 - 2026-09-21: chốt phương án A (entity ném `DomainException`, middleware bắt). Thêm mục
   "Cách lỗi đi từ BE tới response"; dời `ErrorCodes.cs` sang `Domain/Common`; thêm

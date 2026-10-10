@@ -11,6 +11,7 @@ public class RehearsalProfile : Profile
         CreateMap<Rehearsal, RehearsalSummaryDto>()
             .ForMember(
                 dest => dest.LocationName,
-                opt => opt.MapFrom(src => src.Location == null ? null : src.Location.Name));
+                opt => opt.MapFrom(src => src.Location == null ? null : src.Location.Name))
+            .ForMember(dest => dest.Songs, opt => opt.MapFrom(src => src.Songs.OrderBy(s => s.DisplayOrder)));
     }
 }

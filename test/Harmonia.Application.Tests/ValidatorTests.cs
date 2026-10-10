@@ -494,4 +494,40 @@ public class ValidatorTests
 
         Assert.Empty(codes);
     }
+
+    // ---- Rehearsal songs ----
+
+    [Fact]
+    public void UpdateRehearsalSongs_ValidOrEmpty_HasNoErrors()
+    {
+        var validator = new UpdateRehearsalSongsRequestValidator();
+        var request = new UpdateRehearsalSongsRequest
+        {
+            Items = [new() { SongId = Guid.NewGuid(), Note = "slowly" }, new() { SongId = Guid.NewGuid() }],
+        };
+
+        Assert.Empty(ErrorCodesOf(validator, request));
+        Assert.Empty(ErrorCodesOf(validator, new UpdateRehearsalSongsRequest()));
+    }
+
+    [Fact]
+    public void UpdateRehearsalSongs_SameSongTwice_ReturnsSongDuplicate()
+    {
+        var songId = Guid.NewGuid();
+        var request = new UpdateRehearsalSongsRequest { Items = [new() { SongId = songId }, new() { SongId = songId }] };
+
+        Assert.Equal([ErrorCodes.RehearsalSongDuplicate], ErrorCodesOf(new UpdateRehearsalSongsRequestValidator(), request));
+    }
+
+    [Fact]
+    public void UpdateRehearsalSongs_EmptySongIdOrLongNote_IsInvalid()
+    {
+        var validator = new UpdateRehearsalSongsRequestValidator();
+
+        Assert.False(validator.Validate(new UpdateRehearsalSongsRequest { Items = [new()] }).IsValid);
+        Assert.False(validator.Validate(new UpdateRehearsalSongsRequest
+        {
+            Items = [new() { SongId = Guid.NewGuid(), Note = new string('a', 501) }],
+        }).IsValid);
+    }
 }

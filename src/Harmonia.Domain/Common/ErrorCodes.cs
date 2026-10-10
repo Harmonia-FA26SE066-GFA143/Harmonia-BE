@@ -255,6 +255,8 @@ public static class ErrorCodes
 
     public const string AttendanceMemberDuplicate = "ATTENDANCE_MEMBER_DUPLICATE";
 
+    public const string RehearsalSongDuplicate = "REHEARSAL_SONG_DUPLICATE";
+
     // 11. Practice assignment & submission.
     public const string PracticeAssignmentNotFound = "PRACTICE_ASSIGNMENT_NOT_FOUND";
 

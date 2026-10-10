@@ -13,4 +13,6 @@ public class RehearsalSummaryDto
     public string? LocationName { get; set; }
 
     public string? Note { get; set; }
+
+    public List<RehearsalSongDto> Songs { get; set; } = [];
 }

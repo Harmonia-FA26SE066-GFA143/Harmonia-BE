@@ -15,8 +15,23 @@ public class RehearsalRepository(HarmoniaDbContext dbContext)
     public Task<List<Rehearsal>> GetUpcomingAsync(DateTime fromTime, CancellationToken cancellationToken) =>
         DbContext.Rehearsals
             .Include(x => x.Location)
+            .Include(x => x.Songs).ThenInclude(s => s.Song)
             .Where(x => x.StartTime >= fromTime)
             .OrderBy(x => x.StartTime)
+            .AsSplitQuery()
+            .ToListAsync(cancellationToken);
+
+    public Task<Rehearsal?> GetWithSongsForUpdateAsync(Guid id, CancellationToken cancellationToken) =>
+        DbContext.Rehearsals
+            .Include(x => x.Songs)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+    public Task<List<RehearsalSong>> GetSongsAsync(Guid rehearsalId, CancellationToken cancellationToken) =>
+        DbContext.RehearsalSongs
+            .AsNoTracking()
+            .Include(x => x.Song)
+            .Where(x => x.RehearsalId == rehearsalId)
+            .OrderBy(x => x.DisplayOrder)
             .ToListAsync(cancellationToken);
 
     public Task<List<Rehearsal>> GetByEventWithAttendancesAsync(Guid eventId, CancellationToken cancellationToken) =>

@@ -1571,6 +1571,65 @@ public sealed class RepositoryTests : IDisposable
         Assert.NotEqual(Guid.Empty, saved.Single(a => a.MemberId == newcomer.Id).Id);
     }
 
+    // ---- Rehearsal songs ----
+
+    [Fact]
+    public async Task RehearsalSongs_UpdateThroughService_InsertsKeepsRemovesAndReorders_Async()
+    {
+        var kyrie = new Song { Id = Guid.NewGuid(), Title = "Kyrie" };
+        var gloria = new Song { Id = Guid.NewGuid(), Title = "Gloria" };
+        var sanctus = new Song { Id = Guid.NewGuid(), Title = "Sanctus" };
+        var rehearsal = new Rehearsal
+        {
+            Id = Guid.NewGuid(), StartTime = DateTime.UtcNow.AddDays(1), EndTime = DateTime.UtcNow.AddDays(1).AddHours(2),
+        };
+        await using (var seedContext = _db.NewContext())
+        {
+            seedContext.AddRange(kyrie, gloria, sanctus, rehearsal);
+            await seedContext.SaveChangesAsync(_ct);
+        }
+
+        var mapper = new AutoMapper.MapperConfiguration(
+                cfg =>
+                {
+                    cfg.AddProfile<Harmonia.Application.Mappings.RehearsalSongProfile>();
+                    cfg.AddProfile<Harmonia.Application.Mappings.RehearsalProfile>();
+                },
+                Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance)
+            .CreateMapper();
+
+        async Task<List<RehearsalSongDto>> UpdateAsync(params (Guid SongId, string? Note)[] items)
+        {
+            await using var context = _db.NewContext();
+            var service = new Harmonia.Application.Services.RehearsalSongService(
+                new RehearsalRepository(context), new GenericRepository<Song>(context), mapper);
+            var result = await service.UpdateAsync(
+                rehearsal.Id,
+                new UpdateRehearsalSongsRequest
+                {
+                    Items = items.Select(i => new UpdateRehearsalSongRequest { SongId = i.SongId, Note = i.Note }).ToList(),
+                },
+                _ct);
+            Assert.True(result.IsSuccess);
+            return result.Value!;
+        }
+
+        var first = await UpdateAsync((kyrie.Id, "slowly"), (gloria.Id, null));
+        Assert.Equal(["Kyrie", "Gloria"], first.Select(s => s.SongTitle));
+
+        // Gloria moves first, Kyrie is dropped, Sanctus is new: an update, a delete and an insert in one save.
+        var second = await UpdateAsync((gloria.Id, "verse 2"), (sanctus.Id, null));
+        Assert.Equal(["Gloria", "Sanctus"], second.Select(s => s.SongTitle));
+        Assert.Equal([1, 2], second.Select(s => s.DisplayOrder));
+        Assert.Equal("verse 2", second[0].Note);
+
+        await using var check = _db.NewContext();
+        Assert.Equal(2, await check.RehearsalSongs.CountAsync(x => x.RehearsalId == rehearsal.Id, _ct));
+        var upcoming = Assert.Single(await new RehearsalRepository(check).GetUpcomingAsync(DateTime.UtcNow, _ct));
+        var summary = mapper.Map<RehearsalSummaryDto>(upcoming);
+        Assert.Equal(["Gloria", "Sanctus"], summary.Songs.Select(s => s.SongTitle));
+    }
+
     // ---- DirectorNoteRepository & UserRepository.GetActiveByRoleAsync (UC-17) ----
 
     [Fact]
