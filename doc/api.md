@@ -428,7 +428,7 @@ Chưa có kỹ năng nào → `[]`.
 ```
 
 `status`: `Draft` | `Published` | `Cancelled`. `LiturgicalEventSummaryDto` = `{ id, eventDate, time, title, locationName, status }`.
-`RehearsalSummaryDto` = `{ id, startTime, endTime, locationName, note }`.
+`RehearsalSummaryDto` = `{ id, startTime, endTime, locationName, note, songs }`.
 
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
@@ -1208,6 +1208,13 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 | PUT | `/api/rehearsals/{id}/attendances` | `{ "items": [{ "memberId", "status" }] }` | 204 | 400 `VALIDATION_FAILED` (`ATTENDANCE_MEMBER_DUPLICATE`) · 404 `REHEARSAL_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `REHEARSAL_NOT_STARTED`, `MEMBER_NOT_ACTIVE`, `ATTENDANCE_ALREADY_RECORDED` |
 
 - Buổi chuẩn bị cho sự kiện cũng là một buổi tập (`Rehearsal` có gắn sự kiện), điểm danh giống hệt.
+- `GET` trả mọi ca viên đang hoạt động, cộng những người đã được điểm danh ở buổi này nhưng nay không còn
+  hoạt động; sắp theo tên. Không phân trang.
+- `PUT` ghi hoặc sửa điểm danh cho từng ca viên trong `items`; ca viên không có trong `items` giữ nguyên.
+  Ghi lại `checkedAt` = lúc gọi và người điểm danh là ca trưởng đang gọi.
+- Chỉ điểm danh được từ giờ bắt đầu buổi tập trở đi (sửa sau khi kết thúc vẫn được); trước đó → 409 `REHEARSAL_NOT_STARTED`.
+- Ca viên trong `items` phải đang hoạt động; mọi lỗi đều chặn cả lô, không ghi dòng nào.
+- 409 `ATTENDANCE_ALREADY_RECORDED`: ca trưởng khác vừa điểm danh cùng ca viên — tải lại danh sách rồi gửi lại.
 
 ### Bài hát của buổi tập — `RehearsalSongDto`
 
@@ -1225,13 +1232,6 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 - Bài đã ngừng dùng (`isActive = false`) không thêm mới được (`SONG_INACTIVE`), nhưng bài đã có sẵn trong buổi tập thì được giữ lại.
 - Khác `SongList`: không có phiên bản, không qua cha xứ duyệt, không gắn vị trí phụng vụ. Sửa được cả sau khi buổi tập đã diễn ra.
 - Chưa có bài nào → `[]`.
-- `GET` trả mọi ca viên đang hoạt động, cộng những người đã được điểm danh ở buổi này nhưng nay không còn
-  hoạt động; sắp theo tên. Không phân trang.
-- `PUT` ghi hoặc sửa điểm danh cho từng ca viên trong `items`; ca viên không có trong `items` giữ nguyên.
-  Ghi lại `checkedAt` = lúc gọi và người điểm danh là ca trưởng đang gọi.
-- Chỉ điểm danh được từ giờ bắt đầu buổi tập trở đi (sửa sau khi kết thúc vẫn được); trước đó → 409 `REHEARSAL_NOT_STARTED`.
-- Ca viên trong `items` phải đang hoạt động; mọi lỗi đều chặn cả lô, không ghi dòng nào.
-- 409 `ATTENDANCE_ALREADY_RECORDED`: ca trưởng khác vừa điểm danh cùng ca viên — tải lại danh sách rồi gửi lại.
 
 ---
 
