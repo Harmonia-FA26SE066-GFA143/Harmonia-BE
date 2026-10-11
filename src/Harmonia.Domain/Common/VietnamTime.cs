@@ -11,4 +11,7 @@ public static class VietnamTime
     private static readonly TimeSpan Offset = TimeSpan.FromHours(7);
 
     public static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow + Offset);
+
+    /// <summary>The UTC instant at which <paramref name="date"/> begins at the parish, for filtering UTC timestamps by date.</summary>
+    public static DateTime StartOfDayUtc(DateOnly date) => date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc) - Offset;
 }

@@ -136,6 +136,24 @@ public sealed class AuditableEntityInterceptorTests : IDisposable
     }
 
     [Fact]
+    public async Task PasswordHashChanged_WritesPasswordChangedLogWithoutValues_Async()
+    {
+        var user = await _db.AddUserAsync("a@test.com", cancellationToken: _ct);
+        await using (var context = _db.NewContext())
+        {
+            var tracked = await context.Users.SingleAsync(u => u.Id == user.Id, _ct);
+            tracked.PasswordHash = "new-hash";
+            tracked.FullName = "Renamed";
+            await context.SaveChangesAsync(_ct);
+        }
+
+        var logs = await LogsForAsync(user.Id, _ct);
+        var log = Assert.Single(logs, l => l.Action == Data.Interceptors.AuditableEntityInterceptor.PasswordChangedAction);
+        Assert.Equal((nameof(User), _actorId, null, null), (log.EntityType, log.UserId, log.OldValue, log.NewValue));
+        Assert.DoesNotContain("hash", Assert.Single(logs, l => l.Action == "Updated").NewValue);
+    }
+
+    [Fact]
     public async Task NonAuditedEntity_WritesNoLog_Async()
     {
         var user = await _db.AddUserAsync("a@test.com", cancellationToken: _ct);

@@ -516,16 +516,77 @@ Chưa có kỹ năng nào → `[]`.
 
 ---
 
-## 4c. Reports — `api/reports` · role `ParishPriest`, `Admin` (UC-16 / FE-22)
+## 4c. Reports — `api/reports` · role `ParishPriest`, `Admin` (UC-16 / FE-22) · 4 báo cáo quản trị: chỉ `Admin` (UC-34 / FE-52)
 
-| Method | Route | Query | Thành công | Lỗi |
-|---|---|---|---|---|
-| GET | `/api/reports/service-history` | `liturgicalSeasonId`, `fromDate`, `toDate`, `pageNumber`, `pageSize` | 200 `PagedList<ServiceHistoryDto>` | — |
-| GET | `/api/reports/song-usage` | như trên | 200 `PagedList<SongUsageDto>` | — |
+| Method | Route | Role | Query | Thành công | Lỗi |
+|---|---|---|---|---|---|
+| GET | `/api/reports/service-history` | `ParishPriest`, `Admin` | `liturgicalSeasonId`, `fromDate`, `toDate`, `pageNumber`, `pageSize` | 200 `PagedList<ServiceHistoryDto>` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`) |
+| GET | `/api/reports/song-usage` | `ParishPriest`, `Admin` | như trên | 200 `PagedList<SongUsageDto>` | như trên |
+| GET | `/api/reports/user-activity` | `Admin` | `fromDate`, `toDate`, `pageNumber`, `pageSize` | 200 `PagedList<UserActivityDto>` | như trên |
+| GET | `/api/reports/rehearsal-attendance` | `Admin` | như `service-history` | 200 `PagedList<RehearsalAttendanceReportDto>` | như trên |
+| GET | `/api/reports/participation` | `Admin` | như `service-history` | 200 `PagedList<ParticipationReportDto>` | như trên |
+| GET | `/api/reports/assignment-completion` | `Admin` | như `service-history` | 200 `PagedList<AssignmentCompletionDto>` | như trên |
 
-- Cả hai chỉ xét sự kiện `Published` **trước hôm nay** (giờ Việt Nam). Các bộ lọc đều tuỳ chọn, kết hợp AND;
-  `fromDate`, `toDate` bao gồm hai đầu (`yyyy-MM-dd`). `fromDate` > `toDate` → danh sách rỗng, không lỗi.
+- Các bộ lọc đều tuỳ chọn, kết hợp AND; `fromDate`, `toDate` bao gồm hai đầu (`yyyy-MM-dd`, giờ Việt Nam).
+  `fromDate` > `toDate` → 400, mã `REPORT_DATE_RANGE_INVALID` ở trường `toDate`.
+- `service-history` và `song-usage` chỉ xét sự kiện `Published` **trước hôm nay** (giờ Việt Nam).
 - Role khác gọi vào → `403` body rỗng.
+
+### Báo cáo quản trị (UC-34 / FE-52)
+
+Ba báo cáo theo ca viên (`rehearsal-attendance`, `participation`, `assignment-completion`) liệt kê **mọi ca viên
+`Active`**, sắp theo tên. Bộ lọc chỉ thu hẹp dữ liệu được đếm, không bỏ ca viên khỏi danh sách — ca viên không có
+dữ liệu trong khoảng lọc vẫn hiện với các số bằng 0.
+
+#### `UserActivityDto` — hoạt động tài khoản
+
+```json
+{
+  "userId": "guid", "fullName": "Nguyễn Văn A", "email": "a@example.com", "roleName": "ChoirMember",
+  "isActive": true, "lastLoginAt": "2026-10-10T12:30:00Z",
+  "passwordChangeCount": 1, "passwordResetCount": 0, "accountChangeCount": 2, "actionCount": 5
+}
+```
+
+- Mỗi dòng một tài khoản (kể cả đã khoá), sắp theo email. `liturgicalSeasonId` không áp dụng cho báo cáo này.
+- `lastLoginAt`: giá trị hiện tại, không phụ thuộc khoảng lọc; `null` nếu chưa đăng nhập lần nào.
+- `passwordChangeCount`: số lần tự đổi mật khẩu khi đang đăng nhập. `passwordResetCount`: số lần đặt lại qua link
+  email. Hai số này chỉ có từ khi hệ thống bắt đầu ghi sự kiện đổi mật khẩu (2026-10-11).
+- `accountChangeCount`: số lần tài khoản bị sửa — role, khoá / mở, họ tên, số điện thoại, email.
+- `actionCount`: số dòng nhật ký hoạt động do người này gây ra (duyệt kỹ năng, duyệt danh sách bài hát, chốt phân công…).
+- Hệ thống không lưu từng lần đăng nhập / đăng xuất, nên không có số đếm cho hai việc đó.
+
+#### `RehearsalAttendanceReportDto` — điểm danh buổi tập
+
+```json
+{ "memberId": "guid", "fullName": "Nguyễn Văn A", "presentCount": 6, "lateCount": 1, "absentCount": 1, "excusedCount": 0 }
+```
+
+- Đếm các dòng điểm danh đã ghi ở buổi tập **bắt đầu** trong khoảng lọc. Buổi chưa điểm danh không tính vào số nào.
+- Có `liturgicalSeasonId` thì chỉ tính buổi tập gắn với sự kiện thuộc mùa đó; buổi tập không gắn sự kiện bị bỏ.
+
+#### `ParticipationReportDto` — xác nhận tham gia
+
+```json
+{ "memberId": "guid", "fullName": "Nguyễn Văn A", "invitedCount": 1, "confirmedCount": 7, "declinedCount": 1, "unsureCount": 0 }
+```
+
+- Đếm theo trạng thái xác nhận ở các sự kiện `Published` có ngày trong khoảng lọc, **gồm cả sự kiện sắp tới**.
+  `invitedCount` là số yêu cầu chưa trả lời.
+
+#### `AssignmentCompletionDto` — hoàn thành bài tập
+
+```json
+{
+  "memberId": "guid", "fullName": "Nguyễn Văn A",
+  "assignedCount": 5, "passedCount": 3, "needsRevisionCount": 1, "awaitingReviewCount": 0, "notSubmittedCount": 1
+}
+```
+
+- Xét bài tập có **hạn nộp** trong khoảng lọc mà ca viên nhận (giao cho tất cả, giao đích danh, hoặc giao theo
+  kỹ năng ca viên đang được duyệt). Có `liturgicalSeasonId` thì chỉ tính bài gắn với sự kiện thuộc mùa đó.
+- Mỗi bài rơi vào đúng một trong bốn số sau theo **lần nộp mới nhất**; tổng bốn số bằng `assignedCount`.
+  `awaitingReviewCount`: đã nộp, chưa chấm. `notSubmittedCount`: chưa nộp.
 
 ### `ServiceHistoryDto` — lịch sử phục vụ & kết quả chuẩn bị
 

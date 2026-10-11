@@ -14,6 +14,14 @@ public interface IUserRepository : IGenericRepository<User>
     /// </summary>
     Task<PagedList<User>> SearchAsync(string? keyword, SearchUsersRequest filter, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// One page of every user with their Role, ordered by email, with audit log counts inside the date range
+    /// of <paramref name="filter"/> (its season is ignored): password changes made while signed in, password
+    /// resets through the emailed link, edits of the account itself, and all entries the user caused.
+    /// </summary>
+    Task<PagedList<(User User, int PasswordChangeCount, int PasswordResetCount, int AccountChangeCount, int ActionCount)>>
+        GetActivityAsync(SearchReportsRequest filter, CancellationToken cancellationToken);
+
     Task<RefreshToken?> GetRefreshTokenByHashAsync(string tokenHash, CancellationToken cancellationToken);
 
     Task AddRefreshTokenAsync(RefreshToken refreshToken, CancellationToken cancellationToken);

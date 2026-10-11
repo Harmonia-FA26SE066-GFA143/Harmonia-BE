@@ -3,6 +3,7 @@ using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IRepositories;
 using Harmonia.Domain.Entities;
 using Harmonia.Infrastructure.Data;
+using Harmonia.Infrastructure.Data.Interceptors;
 using Microsoft.EntityFrameworkCore;
 using Harmonia.Domain.Common;
 
@@ -15,6 +16,52 @@ public class UserRepository(HarmoniaDbContext dbContext)
         DbContext.Users
             .Include(x => x.Role)
             .FirstOrDefaultAsync(x => x.Email == email, cancellationToken);
+
+    public async Task<PagedList<(User User, int PasswordChangeCount, int PasswordResetCount, int AccountChangeCount, int ActionCount)>>
+        GetActivityAsync(SearchReportsRequest filter, CancellationToken cancellationToken)
+    {
+        var logs = DbContext.AuditLogs.AsNoTracking();
+
+        if (filter.FromDate is { } fromDate)
+        {
+            var fromUtc = VietnamTime.StartOfDayUtc(fromDate);
+            logs = logs.Where(l => l.CreatedAt >= fromUtc);
+        }
+
+        if (filter.ToDate is { } toDate)
+        {
+            var toUtc = VietnamTime.StartOfDayUtc(toDate.AddDays(1));
+            logs = logs.Where(l => l.CreatedAt < toUtc);
+        }
+
+        var aboutUsers = logs.Where(l => l.EntityType == nameof(User));
+
+        var rows = await DbContext.Users
+            .AsNoTracking()
+            .OrderBy(u => u.Email)
+            .ThenBy(u => u.Id)
+            .Skip((filter.PageNumber - 1) * filter.PageSize)
+            .Take(filter.PageSize)
+            .Select(u => new
+            {
+                User = u,
+                u.Role,
+                PasswordChangeCount = aboutUsers.Count(l => l.EntityId == u.Id
+                    && l.Action == AuditableEntityInterceptor.PasswordChangedAction && l.UserId != null),
+                PasswordResetCount = aboutUsers.Count(l => l.EntityId == u.Id
+                    && l.Action == AuditableEntityInterceptor.PasswordChangedAction && l.UserId == null),
+                AccountChangeCount = aboutUsers.Count(l => l.EntityId == u.Id && l.Action == "Updated"),
+                ActionCount = logs.Count(l => l.UserId == u.Id),
+            })
+            .ToListAsync(cancellationToken);
+
+        // A projection drops Include, so the role is selected beside the user and attached here.
+        foreach (var row in rows) row.User.Role = row.Role;
+
+        return new PagedList<(User, int, int, int, int)>(
+            rows.Select(x => (x.User, x.PasswordChangeCount, x.PasswordResetCount, x.AccountChangeCount, x.ActionCount)).ToList(),
+            filter.PageNumber, filter.PageSize, await DbContext.Users.CountAsync(cancellationToken));
+    }
 
     public async Task<PagedList<User>> SearchAsync(
         string? keyword, SearchUsersRequest filter, CancellationToken cancellationToken)

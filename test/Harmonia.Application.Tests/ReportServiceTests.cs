@@ -12,11 +12,14 @@ public class ReportServiceTests
 {
     private readonly ILiturgicalEventRepository _events = Substitute.For<ILiturgicalEventRepository>();
     private readonly ISongRepository _songs = Substitute.For<ISongRepository>();
+    private readonly IUserRepository _users = Substitute.For<IUserRepository>();
+    private readonly IMemberProfileRepository _members = Substitute.For<IMemberProfileRepository>();
+    private readonly IPracticeAssignmentRepository _assignments = Substitute.For<IPracticeAssignmentRepository>();
     private readonly ReportService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly SearchReportsRequest _request = new();
 
-    public ReportServiceTests() => _sut = new ReportService(_events, _songs);
+    public ReportServiceTests() => _sut = new ReportService(_events, _songs, _users, _members, _assignments);
 
     private void ReturnsEvents(params LiturgicalEvent[] events) =>
         _events.GetServiceHistoryAsync(_request, Arg.Any<DateOnly>(), _ct)
@@ -111,5 +114,106 @@ public class ReportServiceTests
         var row = Assert.Single(page.Items);
         Assert.Equal((song.Id, "Kyrie", "Anon", 3, lastUsed), (row.SongId, row.Title, row.Composer, row.TimesUsed, row.LastUsedDate));
         Assert.Equal((2, 20, 21), (page.PageNumber, page.PageSize, page.TotalCount));
+    }
+
+    // ---- Admin reports (UC-34) ----
+
+    private MemberProfile ReturnsMember(MemberProfile member)
+    {
+        member.User = new User { FullName = "Alice" };
+        _members.GetActiveWithActivityAsync(_request, _ct).Returns(new PagedList<MemberProfile>([member], 1, 20, 1));
+        return member;
+    }
+
+    [Fact]
+    public async Task GetUserActivity_MapsUserAndCounts_Async()
+    {
+        var lastLogin = DateTime.UtcNow.AddHours(-1);
+        var user = new User
+        {
+            Id = Guid.NewGuid(), FullName = "Alice", Email = "a@test.com", IsActive = true, LastLoginAt = lastLogin,
+            Role = new Role { Name = "ChoirMember" },
+        };
+        _users.GetActivityAsync(_request, _ct)
+            .Returns(new PagedList<(User, int, int, int, int)>([(user, 1, 2, 3, 4)], 1, 20, 1));
+
+        var row = Assert.Single((await _sut.GetUserActivityAsync(_request, _ct)).Value!.Items);
+
+        Assert.Equal(
+            (user.Id, "Alice", "a@test.com", "ChoirMember", true, lastLogin),
+            (row.UserId, row.FullName, row.Email, row.RoleName, row.IsActive, row.LastLoginAt!.Value));
+        Assert.Equal((1, 2, 3, 4), (row.PasswordChangeCount, row.PasswordResetCount, row.AccountChangeCount, row.ActionCount));
+    }
+
+    [Fact]
+    public async Task GetRehearsalAttendance_CountsEachStatus_Async()
+    {
+        var member = ReturnsMember(new MemberProfile
+        {
+            Id = Guid.NewGuid(),
+            RehearsalAttendances = new[]
+            {
+                AttendanceStatus.Present, AttendanceStatus.Present, AttendanceStatus.Late, AttendanceStatus.Absent,
+            }.Select(s => new RehearsalAttendance { Status = s }).ToList(),
+        });
+
+        var row = Assert.Single((await _sut.GetRehearsalAttendanceAsync(_request, _ct)).Value!.Items);
+
+        Assert.Equal((member.Id, "Alice"), (row.MemberId, row.FullName));
+        Assert.Equal((2, 1, 1, 0), (row.PresentCount, row.LateCount, row.AbsentCount, row.ExcusedCount));
+    }
+
+    [Fact]
+    public async Task GetParticipation_CountsEachStatus_Async()
+    {
+        ReturnsMember(new MemberProfile
+        {
+            Id = Guid.NewGuid(),
+            EventParticipations = new[]
+            {
+                ParticipationStatus.Confirmed, ParticipationStatus.Confirmed, ParticipationStatus.Declined, ParticipationStatus.Invited,
+            }.Select(s => new EventParticipation { Status = s }).ToList(),
+        });
+
+        var row = Assert.Single((await _sut.GetParticipationAsync(_request, _ct)).Value!.Items);
+
+        Assert.Equal((1, 2, 1, 0), (row.InvitedCount, row.ConfirmedCount, row.DeclinedCount, row.UnsureCount));
+    }
+
+    [Fact]
+    public async Task GetAssignmentCompletion_CountsReceivedAssignmentsByNewestAttempt_Async()
+    {
+        var tenor = Guid.NewGuid();
+        var member = ReturnsMember(new MemberProfile { Id = Guid.NewGuid(), MemberSkills = [new MemberSkill { SkillId = tenor }] });
+        PracticeAssignment ForAll(params SubmissionStatus[] attempts) => new()
+        {
+            Scope = AssignmentScope.All,
+            Submissions = attempts.Select((status, i) => new PracticeSubmission
+            {
+                MemberId = member.Id, AttemptNo = i + 1, Status = status,
+            }).ToList(),
+        };
+        var forTenors = ForAll(SubmissionStatus.Submitted);
+        forTenors.Scope = AssignmentScope.SkillGroup;
+        forTenors.Targets = [new PracticeAssignmentTarget { TargetType = TargetType.Skill, SkillId = tenor }];
+        var forSomeoneElse = ForAll();
+        forSomeoneElse.Scope = AssignmentScope.Individual;
+        forSomeoneElse.Targets = [new PracticeAssignmentTarget { TargetType = TargetType.Member, MemberId = Guid.NewGuid() }];
+        _assignments.GetForReportAsync(
+                _request, Arg.Is<IReadOnlyCollection<Guid>>(ids => ids.SequenceEqual(new[] { member.Id })), _ct)
+            .Returns(
+            [
+                ForAll(SubmissionStatus.NeedsRevision, SubmissionStatus.Passed),
+                ForAll(SubmissionStatus.Passed, SubmissionStatus.NeedsRevision),
+                ForAll(),
+                forTenors,
+                forSomeoneElse,
+            ]);
+
+        var row = Assert.Single((await _sut.GetAssignmentCompletionAsync(_request, _ct)).Value!.Items);
+
+        Assert.Equal(
+            (4, 1, 1, 1, 1),
+            (row.AssignedCount, row.PassedCount, row.NeedsRevisionCount, row.AwaitingReviewCount, row.NotSubmittedCount));
     }
 }

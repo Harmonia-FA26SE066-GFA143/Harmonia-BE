@@ -1,6 +1,7 @@
 using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IRepositories;
+using Harmonia.Domain.Common;
 using Harmonia.Domain.Entities;
 using Harmonia.Domain.Enums;
 using Harmonia.Infrastructure.Data;
@@ -85,6 +86,24 @@ public class PracticeAssignmentRepository(HarmoniaDbContext dbContext)
             .Where(x => x.EventId != null && eventIds.Contains(x.EventId.Value))
             .Include(x => x.Submissions.Where(s => s.MemberId == memberId).OrderByDescending(s => s.AttemptNo).Take(1))
             .ToListAsync(cancellationToken);
+
+    public Task<List<PracticeAssignment>> GetForReportAsync(
+        SearchReportsRequest filter, IReadOnlyCollection<Guid> memberIds, CancellationToken cancellationToken)
+    {
+        var seasonId = filter.LiturgicalSeasonId;
+        DateTime? fromUtc = filter.FromDate is { } from ? VietnamTime.StartOfDayUtc(from) : null;
+        DateTime? toUtc = filter.ToDate is { } to ? VietnamTime.StartOfDayUtc(to.AddDays(1)) : null;
+
+        return DbContext.PracticeAssignments
+            .AsNoTracking()
+            .Where(x => (fromUtc == null || x.DueDate >= fromUtc)
+                && (toUtc == null || x.DueDate < toUtc)
+                && (seasonId == null || x.LiturgicalEvent!.LiturgicalSeasonId == seasonId))
+            .Include(x => x.Targets)
+            .Include(x => x.Submissions.Where(s => memberIds.Contains(s.MemberId)))
+            .AsSplitQuery()
+            .ToListAsync(cancellationToken);
+    }
 
     /// <summary>
     /// Scope All, a target naming the member, or a target skill the member holds approved today. Skill targets

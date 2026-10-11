@@ -530,4 +530,28 @@ public class ValidatorTests
             Items = [new() { SongId = Guid.NewGuid(), Note = new string('a', 501) }],
         }).IsValid);
     }
+
+    // ---- Reports ----
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("2026-10-01", null)]
+    [InlineData("2026-10-01", "2026-10-01")]
+    public void SearchReports_OpenOrOrderedRange_HasNoErrors(string? from, string? to)
+    {
+        var request = new SearchReportsRequest
+        {
+            FromDate = from is null ? null : DateOnly.Parse(from), ToDate = to is null ? null : DateOnly.Parse(to),
+        };
+
+        Assert.Empty(ErrorCodesOf(new SearchReportsRequestValidator(), request));
+    }
+
+    [Fact]
+    public void SearchReports_FromDateAfterToDate_ReturnsDateRangeInvalid()
+    {
+        var request = new SearchReportsRequest { FromDate = new DateOnly(2026, 10, 2), ToDate = new DateOnly(2026, 10, 1) };
+
+        Assert.Equal([ErrorCodes.ReportDateRangeInvalid], ErrorCodesOf(new SearchReportsRequestValidator(), request));
+    }
 }

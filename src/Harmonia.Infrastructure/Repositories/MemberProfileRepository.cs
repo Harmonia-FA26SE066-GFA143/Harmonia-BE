@@ -1,6 +1,7 @@
 using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IRepositories;
+using Harmonia.Domain.Common;
 using Harmonia.Domain.Entities;
 using Harmonia.Domain.Enums;
 using Harmonia.Infrastructure.Data;
@@ -130,4 +131,39 @@ public class MemberProfileRepository(HarmoniaDbContext dbContext)
             .ThenBy(x => x.Id)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
+
+    public async Task<PagedList<MemberProfile>> GetActiveWithActivityAsync(
+        SearchReportsRequest filter, CancellationToken cancellationToken)
+    {
+        var (seasonId, fromDate, toDate) = (filter.LiturgicalSeasonId, filter.FromDate, filter.ToDate);
+        DateTime? fromUtc = fromDate is { } from ? VietnamTime.StartOfDayUtc(from) : null;
+        DateTime? toUtc = toDate is { } to ? VietnamTime.StartOfDayUtc(to.AddDays(1)) : null;
+
+        var query = DbContext.MemberProfiles
+            .AsNoTracking()
+            .Where(x => x.Status == MemberStatus.Active);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .Include(x => x.User)
+            .Include(x => x.MemberSkills.Where(s => s.Status == ApprovalStatus.Approved))
+            .Include(x => x.RehearsalAttendances.Where(a =>
+                (fromUtc == null || a.Rehearsal.StartTime >= fromUtc)
+                && (toUtc == null || a.Rehearsal.StartTime < toUtc)
+                && (seasonId == null || a.Rehearsal.LiturgicalEvent!.LiturgicalSeasonId == seasonId)))
+            .Include(x => x.EventParticipations.Where(p =>
+                p.LiturgicalEvent.Status == EventStatus.Published
+                && (fromDate == null || p.LiturgicalEvent.EventDate >= fromDate)
+                && (toDate == null || p.LiturgicalEvent.EventDate <= toDate)
+                && (seasonId == null || p.LiturgicalEvent.LiturgicalSeasonId == seasonId)))
+            .OrderBy(x => x.User.FullName)
+            .ThenBy(x => x.Id)
+            .Skip((filter.PageNumber - 1) * filter.PageSize)
+            .Take(filter.PageSize)
+            .AsSplitQuery()
+            .ToListAsync(cancellationToken);
+
+        return new PagedList<MemberProfile>(items, filter.PageNumber, filter.PageSize, totalCount);
+    }
 }

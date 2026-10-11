@@ -16,6 +16,9 @@ namespace Harmonia.Infrastructure.Data.Interceptors;
 /// </summary>
 public class AuditableEntityInterceptor(ICurrentUserService currentUser) : SaveChangesInterceptor
 {
+    /// <summary>Action of the row written when a user's password changes. It carries no values.</summary>
+    public const string PasswordChangedAction = "PasswordChanged";
+
     private static readonly HashSet<Type> AuditedTypes =
     [
         typeof(User), typeof(Role), typeof(SystemSetting),
@@ -73,6 +76,21 @@ public class AuditableEntityInterceptor(ICurrentUserService currentUser) : SaveC
             .Where(e => AuditedTypes.Contains(e.Metadata.ClrType))
             .Select(e => BuildLog(e, userId, now))
             .OfType<AuditLog>()
+            // The hash is never logged, so a password change would otherwise leave no trace at all.
+            // UserId is null when it came through the reset link, where nobody is signed in.
+            .Concat(context.ChangeTracker.Entries<User>()
+                .Where(e => e.State == EntityState.Modified
+                    && e.Property(u => u.PasswordHash) is { IsModified: true } hash
+                    && hash.OriginalValue != hash.CurrentValue)
+                .Select(e => new AuditLog
+                {
+                    UserId = userId,
+                    Action = PasswordChangedAction,
+                    EntityType = nameof(User),
+                    EntityId = e.Entity.Id,
+                    IpAddress = currentUser.IpAddress,
+                    CreatedAt = now
+                }))
             .ToList();
 
         foreach (var entry in context.ChangeTracker.Entries<BaseAuditableEntity>())

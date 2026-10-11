@@ -102,7 +102,7 @@ public class EventPreparationService(
 
     // Same rule as PracticeAssignmentRepository.VisibleToMember: scope All, a target naming the member,
     // or a target skill the member holds approved today. MemberSkills holds only approved skills here.
-    private static bool Receives(PracticeAssignment assignment, MemberProfile member) =>
+    internal static bool Receives(PracticeAssignment assignment, MemberProfile member) =>
         assignment.Scope == AssignmentScope.All
         || assignment.Targets.Any(t => t.MemberId == member.Id
             || member.MemberSkills.Any(ms => ms.SkillId == t.SkillId));
