@@ -142,6 +142,8 @@ public static class ErrorCodes
 
     public const string EventTypeRequired = "EVENT_TYPE_REQUIRED";
 
+    public const string EventDateOutsideSeason = "EVENT_DATE_OUTSIDE_SEASON";
+
     public const string SeasonDateOverlap = "SEASON_DATE_OVERLAP";
 
     public const string SeasonDateInvalid = "SEASON_DATE_INVALID";

@@ -161,6 +161,7 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `EVENT_CANCELLED` | 409 | Sự kiện đã bị huỷ |
 | `EVENT_ALREADY_PASSED` | 409 | Sự kiện đã diễn ra |
 | `EVENT_TYPE_REQUIRED` | 400 | Phải chọn loại lễ hoặc loại nghi thức |
+| `EVENT_DATE_OUTSIDE_SEASON` | 400 | Ngày sự kiện không thuộc mùa phụng vụ đã chọn |
 | `SEASON_DATE_OVERLAP` | 409 | Khoảng thời gian trùng với mùa phụng vụ khác |
 | `SEASON_DATE_INVALID` | 400 | Ngày kết thúc phải sau ngày bắt đầu |
 
@@ -344,3 +345,5 @@ xem — trả 404, để không lộ sự tồn tại của bản ghi.
   
 - 2026-10-11: thêm `SKILL_IN_USE` (đổi nhóm của kỹ năng đang được bài hát dùng). `LOOKUP_IN_USE` và
   `LOOKUP_INACTIVE` bắt đầu được dùng cho danh mục kỹ năng (UC-32 / FE-49).
+- 2026-10-11: thêm `EVENT_DATE_OUTSIDE_SEASON`. Tạo / sửa sự kiện bắt đầu trả `LOOKUP_NOT_FOUND`,
+  `LOOKUP_INACTIVE` khi Id danh mục (mùa, loại lễ, nghi thức, loại sự kiện, nơi cử hành) sai hoặc đã tắt.

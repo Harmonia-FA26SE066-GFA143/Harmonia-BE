@@ -134,6 +134,65 @@ public class LookupsEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<H
         await AssertConflictAsync(acrossBoundary, ErrorCodes.SkillInUse, _ct);
     }
 
+    // ---- Admin configures the other catalogs (UC-32 / FE-50) ----
+
+    // Rows are created switched off so the shared database keeps showing the same active rows to the read tests above.
+    public static TheoryData<string, object> CatalogBodies => new()
+    {
+        { "mass-types", new { name = "Write-test mass", isActive = false } },
+        { "ceremony-types", new { name = "Write-test ceremony", isActive = false } },
+        { "event-categories", new { name = "Write-test category", isActive = false } },
+        { "song-themes", new { name = "Write-test theme", isActive = false } },
+        { "liturgical-slots", new { name = "Write-test slot", defaultOrder = 9, isActive = false } },
+        { "worship-locations", new { name = "Write-test location", address = "1 Test St", isActive = false } },
+        { "liturgical-seasons", new { name = "Write-test season", startDate = "2040-01-01", endDate = "2040-02-01", isActive = false } },
+    };
+
+    [Theory]
+    [MemberData(nameof(CatalogBodies))]
+    public async Task Catalog_AdminCreatesUpdatesAndSeesInactiveRows_OtherRolesAreForbidden_Async(string catalog, object body)
+    {
+        var admin = await factory.CreateClientAsAsync("admin@test.com", _ct);
+        var director = await factory.CreateClientAsAsync("director@test.com", _ct);
+
+        var created = await admin.PostAsJsonAsync($"api/lookups/{catalog}", body, _ct);
+        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+        var id = (await created.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(_ct)).GetProperty("id").GetGuid();
+
+        var updated = await admin.PutAsJsonAsync($"api/lookups/{catalog}/{id}", body, _ct);
+        var missing = await admin.PutAsJsonAsync($"api/lookups/{catalog}/{Guid.NewGuid()}", body, _ct);
+        var withInactive = await admin.GetFromJsonAsync<System.Text.Json.JsonElement>($"api/lookups/{catalog}?includeInactive=true", _ct);
+        var asDirector = await director.GetFromJsonAsync<System.Text.Json.JsonElement>($"api/lookups/{catalog}?includeInactive=true", _ct);
+
+        Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+        Assert.Contains(withInactive.EnumerateArray(), x => x.GetProperty("id").GetGuid() == id && !x.GetProperty("isActive").GetBoolean());
+        // The flag is ignored for other roles, so the switched-off row stays hidden.
+        Assert.DoesNotContain(asDirector.EnumerateArray(), x => x.GetProperty("id").GetGuid() == id);
+        Assert.Equal(HttpStatusCode.Forbidden, (await director.PostAsJsonAsync($"api/lookups/{catalog}", body, _ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await director.PutAsJsonAsync($"api/lookups/{catalog}/{id}", body, _ct)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Catalog_DuplicateNameAndOverlappingSeason_ReturnTheirCodes_Async()
+    {
+        var admin = await factory.CreateClientAsAsync("admin@test.com", _ct);
+        var theme = new { name = "Duplicate-test theme", isActive = false };
+        object Season(string start, string end) => new { name = "Overlap-test season", startDate = start, endDate = end };
+
+        await admin.PostAsJsonAsync("api/lookups/song-themes", theme, _ct);
+        var duplicate = await admin.PostAsJsonAsync("api/lookups/song-themes", theme, _ct);
+        var first = await admin.PostAsJsonAsync("api/lookups/liturgical-seasons", Season("2041-03-01", "2041-04-01"), _ct);
+        var overlapping = await admin.PostAsJsonAsync("api/lookups/liturgical-seasons", Season("2041-03-15", "2041-05-01"), _ct);
+        var backwards = await admin.PostAsJsonAsync("api/lookups/liturgical-seasons", Season("2042-03-15", "2042-03-01"), _ct);
+
+        await AssertConflictAsync(duplicate, ErrorCodes.LookupNameDuplicate, _ct);
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        await AssertConflictAsync(overlapping, ErrorCodes.SeasonDateOverlap, _ct);
+        Assert.Equal(HttpStatusCode.BadRequest, backwards.StatusCode);
+        Assert.Contains(ErrorCodes.SeasonDateInvalid, await backwards.Content.ReadAsStringAsync(_ct));
+    }
+
     [Fact]
     public async Task Anonymous_Returns401_Async()
     {

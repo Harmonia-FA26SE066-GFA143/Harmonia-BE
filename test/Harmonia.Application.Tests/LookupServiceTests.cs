@@ -18,6 +18,9 @@ public class LookupServiceTests
     private readonly IGenericRepository<SkillCategory> _skillCategories = Substitute.For<IGenericRepository<SkillCategory>>();
     private readonly IGenericRepository<Skill> _skills = Substitute.For<IGenericRepository<Skill>>();
     private readonly IGenericRepository<LiturgicalSeason> _seasons = Substitute.For<IGenericRepository<LiturgicalSeason>>();
+    private readonly IGenericRepository<SongTheme> _songThemes = Substitute.For<IGenericRepository<SongTheme>>();
+    private readonly IGenericRepository<LiturgicalSlot> _slots = Substitute.For<IGenericRepository<LiturgicalSlot>>();
+    private readonly IGenericRepository<WorshipLocation> _locations = Substitute.For<IGenericRepository<WorshipLocation>>();
     private readonly IGenericRepository<SongVocalRequirement> _vocalRequirements = Substitute.For<IGenericRepository<SongVocalRequirement>>();
     private readonly IGenericRepository<SongInstrumentRequirement> _instrumentRequirements = Substitute.For<IGenericRepository<SongInstrumentRequirement>>();
     private readonly LookupService _sut;
@@ -31,17 +34,20 @@ public class LookupServiceTests
             cfg.AddProfile<SkillProfile>();
             cfg.AddProfile<SkillCategoryProfile>();
             cfg.AddProfile<LiturgicalSeasonProfile>();
+            cfg.AddProfile<SongThemeProfile>();
+            cfg.AddProfile<LiturgicalSlotProfile>();
+            cfg.AddProfile<WorshipLocationProfile>();
         }, NullLoggerFactory.Instance).CreateMapper();
 
         _sut = new LookupService(
             _massTypes,
             Substitute.For<IGenericRepository<CeremonyType>>(),
             Substitute.For<IGenericRepository<EventCategory>>(),
-            Substitute.For<IGenericRepository<SongTheme>>(),
+            _songThemes,
             _skillCategories,
             _seasons,
-            Substitute.For<IGenericRepository<LiturgicalSlot>>(),
-            Substitute.For<IGenericRepository<WorshipLocation>>(),
+            _slots,
+            _locations,
             _skills,
             _vocalRequirements,
             _instrumentRequirements,
@@ -246,6 +252,121 @@ public class LookupServiceTests
         var result = await _sut.SaveSkillAsync(null, new SaveSkillRequest { CategoryId = category.Id, Name = "Solo" }, _ct);
 
         Assert.Equal(ErrorCodes.SkillNameDuplicate, result.Code);
+    }
+
+    // ---- Song themes, liturgical slots, worship locations ----
+
+    [Fact]
+    public async Task SaveSongThemeSlotAndLocation_New_StoreTheirOwnFields_Async()
+    {
+        Rows(_songThemes);
+        Rows(_slots);
+        Rows(_locations);
+
+        var theme = await _sut.SaveSongThemeAsync(null, new SaveCatalogItemRequest { Name = " Marian ", Description = "For Mary" }, _ct);
+        var slot = await _sut.SaveLiturgicalSlotAsync(null, new SaveLiturgicalSlotRequest { Name = " Entrance ", DefaultOrder = 1 }, _ct);
+        var location = await _sut.SaveWorshipLocationAsync(
+            null, new SaveWorshipLocationRequest { Name = " Chapel ", Address = "12 Main St", IsActive = false }, _ct);
+
+        Assert.Equal(("Marian", "For Mary", true), (theme.Value!.Name, theme.Value.Description, theme.Value.IsActive));
+        Assert.Equal(("Entrance", 1, true), (slot.Value!.Name, slot.Value.DefaultOrder, slot.Value.IsActive));
+        Assert.Equal(("Chapel", "12 Main St", false), (location.Value!.Name, location.Value.Address, location.Value.IsActive));
+        await _locations.Received(1).AddAsync(Arg.Is<WorshipLocation>(x => x.Name == "Chapel"), _ct);
+    }
+
+    [Fact]
+    public async Task SaveSongThemeSlotAndLocation_NameTaken_ReturnDuplicate_AndMissingRowReturnsNotFound_Async()
+    {
+        Rows(_songThemes, new SongTheme { Id = Guid.NewGuid(), Name = "Marian" });
+        Rows(_slots, new LiturgicalSlot { Id = Guid.NewGuid(), Name = "Entrance" });
+        Rows(_locations, new WorshipLocation { Id = Guid.NewGuid(), Name = "Chapel" });
+
+        var theme = await _sut.SaveSongThemeAsync(null, new SaveCatalogItemRequest { Name = "Marian" }, _ct);
+        var slot = await _sut.SaveLiturgicalSlotAsync(null, new SaveLiturgicalSlotRequest { Name = "Entrance" }, _ct);
+        var location = await _sut.SaveWorshipLocationAsync(null, new SaveWorshipLocationRequest { Name = "Chapel" }, _ct);
+        var missing = await _sut.SaveWorshipLocationAsync(Guid.NewGuid(), new SaveWorshipLocationRequest { Name = "Other" }, _ct);
+
+        Assert.Equal(
+            [ErrorCodes.LookupNameDuplicate, ErrorCodes.LookupNameDuplicate, ErrorCodes.LookupNameDuplicate, ErrorCodes.LookupNotFound],
+            new[] { theme.Code, slot.Code, location.Code, missing.Code });
+    }
+
+    // ---- Catalog rows an event points at ----
+
+    private readonly DateOnly _eventDate = new(2026, 12, 25);
+
+    private WorshipLocation Location(bool isActive = true)
+    {
+        var location = new WorshipLocation { Id = Guid.NewGuid(), Name = "Main church", IsActive = isActive };
+        _locations.GetByIdAsync(location.Id, _ct).Returns(location);
+        return location;
+    }
+
+    private MassType MassTypeRow(bool isActive = true)
+    {
+        var massType = new MassType { Id = Guid.NewGuid(), Name = "Sunday Mass", IsActive = isActive };
+        _massTypes.GetByIdAsync(massType.Id, _ct).Returns(massType);
+        return massType;
+    }
+
+    private LiturgicalSeason Season(DateOnly start, DateOnly end)
+    {
+        var season = new LiturgicalSeason { Id = Guid.NewGuid(), Name = "Christmas", StartDate = start, EndDate = end };
+        _seasons.GetByIdAsync(season.Id, _ct).Returns(season);
+        return season;
+    }
+
+    [Fact]
+    public async Task CheckEventCatalogs_ActiveRowsAndDateInsideTheSeason_Succeeds_Async()
+    {
+        var season = Season(_eventDate, _eventDate.AddDays(10));
+
+        var result = await _sut.CheckEventCatalogsAsync(
+            _eventDate, season.Id, MassTypeRow().Id, null, null, Location().Id, null, _ct);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task CheckEventCatalogs_UnknownId_ReturnsLookupNotFound_Async()
+    {
+        var unknownMassType = await _sut.CheckEventCatalogsAsync(_eventDate, null, Guid.NewGuid(), null, null, Location().Id, null, _ct);
+        var unknownLocation = await _sut.CheckEventCatalogsAsync(_eventDate, null, MassTypeRow().Id, null, null, Guid.NewGuid(), null, _ct);
+        var unknownSeason = await _sut.CheckEventCatalogsAsync(_eventDate, Guid.NewGuid(), null, null, null, Location().Id, null, _ct);
+
+        Assert.All(
+            new[] { unknownMassType, unknownLocation, unknownSeason }, r => Assert.Equal(ErrorCodes.LookupNotFound, r.Code));
+    }
+
+    [Fact]
+    public async Task CheckEventCatalogs_SwitchedOffRow_ReturnsLookupInactive_UnlessTheEventAlreadyUsesIt_Async()
+    {
+        var retired = MassTypeRow(isActive: false);
+        var closed = Location(isActive: false);
+        var current = new LiturgicalEvent { MassTypeId = retired.Id, LocationId = closed.Id };
+
+        var onCreate = await _sut.CheckEventCatalogsAsync(_eventDate, null, retired.Id, null, null, Location().Id, null, _ct);
+        var newLocation = await _sut.CheckEventCatalogsAsync(_eventDate, null, MassTypeRow().Id, null, null, closed.Id, null, _ct);
+        var unchanged = await _sut.CheckEventCatalogsAsync(_eventDate, null, retired.Id, null, null, closed.Id, current, _ct);
+
+        Assert.Equal(ErrorCodes.LookupInactive, onCreate.Code);
+        Assert.Equal(ErrorCodes.LookupInactive, newLocation.Code);
+        Assert.True(unchanged.IsSuccess);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(11)]
+    public async Task CheckEventCatalogs_DateOutsideTheSeason_ReturnsEventDateOutsideSeason_EvenWhenUnchanged_Async(int offsetDays)
+    {
+        var season = Season(_eventDate, _eventDate.AddDays(10));
+        var location = Location();
+        var current = new LiturgicalEvent { LiturgicalSeasonId = season.Id, LocationId = location.Id };
+
+        var result = await _sut.CheckEventCatalogsAsync(
+            _eventDate.AddDays(offsetDays), season.Id, null, null, null, location.Id, current, _ct);
+
+        Assert.Equal(ErrorCodes.EventDateOutsideSeason, result.Code);
     }
 
     [Fact]

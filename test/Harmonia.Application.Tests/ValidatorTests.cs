@@ -556,6 +556,20 @@ public class ValidatorTests
     }
 
     [Fact]
+    public void SaveLiturgicalSlotAndWorshipLocation_RejectBadShapes_AndAcceptGoodOnes()
+    {
+        var slots = new SaveLiturgicalSlotRequestValidator();
+        var locations = new SaveWorshipLocationRequestValidator();
+
+        Assert.True(slots.Validate(new SaveLiturgicalSlotRequest { Name = "Entrance", DefaultOrder = 0 }).IsValid);
+        Assert.False(slots.Validate(new SaveLiturgicalSlotRequest { Name = "Entrance", DefaultOrder = -1 }).IsValid);
+        Assert.False(slots.Validate(new SaveLiturgicalSlotRequest { Name = " " }).IsValid);
+        Assert.True(locations.Validate(new SaveWorshipLocationRequest { Name = "Chapel" }).IsValid);
+        Assert.False(locations.Validate(new SaveWorshipLocationRequest { Name = "" }).IsValid);
+        Assert.False(locations.Validate(new SaveWorshipLocationRequest { Name = "Chapel", Address = new string('a', 301) }).IsValid);
+    }
+
+    [Fact]
     public void SearchAuditLogs_FromDateAfterToDate_ReturnsDateRangeInvalid_OtherwiseNoErrors()
     {
         var validator = new SearchAuditLogsRequestValidator();

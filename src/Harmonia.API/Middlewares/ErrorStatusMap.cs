@@ -82,6 +82,7 @@ public static class ErrorStatusMap
         [ErrorCodes.EventCancelled] = StatusCodes.Status409Conflict,
         [ErrorCodes.EventAlreadyPassed] = StatusCodes.Status409Conflict,
         [ErrorCodes.EventTypeRequired] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.EventDateOutsideSeason] = StatusCodes.Status400BadRequest,
         [ErrorCodes.SeasonDateOverlap] = StatusCodes.Status409Conflict,
         [ErrorCodes.SeasonDateInvalid] = StatusCodes.Status400BadRequest,
 

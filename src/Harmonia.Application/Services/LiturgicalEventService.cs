@@ -17,6 +17,7 @@ public class LiturgicalEventService(
     ILiturgicalEventRepository liturgicalEventRepository,
     IUserRepository userRepository,
     INotificationService notificationService,
+    ILookupService lookupService,
     IMapper mapper) : ILiturgicalEventService
 {
     public async Task<Result<PagedList<LiturgicalEventDto>>> SearchAsync(
@@ -40,6 +41,14 @@ public class LiturgicalEventService(
     public async Task<Result<LiturgicalEventDto>> CreateAsync(
         CreateLiturgicalEventRequest request, CancellationToken cancellationToken)
     {
+        var catalogs = await lookupService.CheckEventCatalogsAsync(
+            request.EventDate, request.LiturgicalSeasonId, request.MassTypeId, request.CeremonyTypeId,
+            request.CategoryId, request.LocationId, null, cancellationToken);
+        if (!catalogs.IsSuccess)
+        {
+            return Result<LiturgicalEventDto>.Failure(catalogs.Code!);
+        }
+
         if (await liturgicalEventRepository.ExistsBySlotAsync(
                 request.EventDate, request.Time, request.LocationId, null, cancellationToken))
         {
@@ -79,6 +88,14 @@ public class LiturgicalEventService(
         if (liturgicalEvent.Status == EventStatus.Cancelled)
         {
             return Result<LiturgicalEventDto>.Failure(ErrorCodes.EventCancelled);
+        }
+
+        var catalogs = await lookupService.CheckEventCatalogsAsync(
+            request.EventDate, request.LiturgicalSeasonId, request.MassTypeId, request.CeremonyTypeId,
+            request.CategoryId, request.LocationId, liturgicalEvent, cancellationToken);
+        if (!catalogs.IsSuccess)
+        {
+            return Result<LiturgicalEventDto>.Failure(catalogs.Code!);
         }
 
         if (await liturgicalEventRepository.ExistsBySlotAsync(
