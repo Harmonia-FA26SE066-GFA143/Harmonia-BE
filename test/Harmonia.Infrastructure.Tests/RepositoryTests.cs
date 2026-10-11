@@ -1798,6 +1798,60 @@ public sealed class RepositoryTests : IDisposable
         // Rehearsals were 5 and 6 days ago; the invited event 3 days ago, the upcoming one in 3 days.
         var ranged = await MemberAsync(new SearchReportsRequest { FromDate = today.AddDays(-5), ToDate = today });
         Assert.Equal((1, 1), (ranged.RehearsalAttendances.Count, ranged.EventParticipations.Count));
+
+        var ofEvent = await MemberAsync(new SearchReportsRequest { EventId = seed.InvitedEventId });
+        Assert.Equal((2, 1), (ofEvent.RehearsalAttendances.Count, ofEvent.EventParticipations.Count));
+        var ofOtherEvent = await MemberAsync(new SearchReportsRequest { EventId = seed.ServedEventId });
+        Assert.Equal((0, 0), (ofOtherEvent.RehearsalAttendances.Count, ofOtherEvent.EventParticipations.Count));
+    }
+
+    [Fact]
+    public async Task ReportFilters_EventId_NarrowsHistoryUsageAndAssignments_Async()
+    {
+        var seed = await SeedReportsAsync();
+        var filter = new SearchReportsRequest { EventId = seed.OlderEventId };
+        await using (var seedContext = _db.NewContext())
+        {
+            seedContext.AddRange(new[] { seed.OlderEventId, seed.RecentEventId }.Select(eventId => new PracticeAssignment
+            {
+                Id = Guid.NewGuid(), EventId = eventId, Title = "t", Scope = AssignmentScope.All, DueDate = DateTime.UtcNow,
+            }));
+            await seedContext.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var history = await new LiturgicalEventRepository(context).GetServiceHistoryAsync(filter, VietnamTime.Today, _ct);
+        var usage = await new SongRepository(context).GetUsageAsync(filter, VietnamTime.Today, _ct);
+        var assignments = await new PracticeAssignmentRepository(context).GetForReportAsync(filter, [], _ct);
+
+        Assert.Equal(seed.OlderEventId, Assert.Single(history.Items).Id);
+        Assert.Equal(1, usage.Items.Single(x => x.Song.Id == seed.KyrieId).TimesUsed);
+        Assert.Equal(0, usage.Items.Single(x => x.Song.Id == seed.GloriaId).TimesUsed);
+        Assert.Equal(seed.OlderEventId, Assert.Single(assignments).EventId);
+    }
+
+    [Fact]
+    public async Task ReportExports_GetPage_ReturnsNewestFirst_WithExporter_Async()
+    {
+        var admin = await _db.AddUserAsync("exporter@test.com", RoleNames.Admin, _ct, "Admin");
+        ReportExport Export(int hoursAgo) => new()
+        {
+            Id = Guid.NewGuid(), ReportType = ReportType.SongUsage, Parameters = "{}", FileUrl = "f.csv",
+            ExportedBy = admin.Id, ExportedAt = DateTime.UtcNow.AddHours(-hoursAgo),
+        };
+        var (older, newer) = (Export(5), Export(1));
+        await using (var seedContext = _db.NewContext())
+        {
+            seedContext.AddRange(older, newer);
+            await seedContext.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var page = await new ReportExportRepository(context).GetPageAsync(new PagingRequest { PageSize = 1 }, _ct);
+
+        Assert.Equal(2, page.TotalCount);
+        var first = Assert.Single(page.Items);
+        Assert.Equal((newer.Id, "Admin"), (first.Id, first.Exporter.FullName));
     }
 
     [Fact]

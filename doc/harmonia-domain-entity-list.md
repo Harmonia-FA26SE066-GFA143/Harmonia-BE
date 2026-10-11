@@ -185,10 +185,10 @@ Not a `SongList`: no version, no review, no liturgical slot. The director edits 
 **41. `AuditLog`** — important activity history (FE-54)
 `userId` Guid? → User · `action` string(100) · `entityType` string(100) · `entityId` Guid? · `oldValue` string? (JSON) · `newValue` string? (JSON) · `ipAddress` string(45)? · `createdAt` DateTime
 
-**42. ⚪ `ReportExport`** — record of exported report files (FE-53)
+**42. `ReportExport`** — record of exported report files (FE-53)
 `reportType` ReportType · `parameters` string(1000) (JSON) · `fileUrl` string(500) · `exportedBy` Guid → User · `exportedAt` DateTime
 
-⚪ Skip if reports are generated and downloaded on the fly.
+Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl` holds the storage id a signed URL is built from, not a URL; `parameters` holds the `ReportFormat` and the filters.
 
 ---
 
@@ -217,8 +217,9 @@ Not a `SongList`: no version, no review, no liturgical slot. The director edits 
 | `NotificationType` | EventPublished, SongListDecision, ParticipationRequest, AssignmentNotice, PracticeFeedback, DirectorNote, SkillReview, EventCancelled, SongListSubmitted |
 | `SettingDataType` | String, Int, Bool, Json |
 | `ReportType` | UserActivity, RehearsalAttendance, Participation, AssignmentCompletion, SongUsage, ServiceHistory |
+| `ReportFormat` | Csv, Xlsx, Pdf, Xml, Json |
 
-21 enums. `PracticeFeedback.result` reuses `SubmissionStatus` rather than adding a near-duplicate enum.
+22 enums. `PracticeFeedback.result` reuses `SubmissionStatus` rather than adding a near-duplicate enum.
 
 ---
 
@@ -295,3 +296,4 @@ Not a `SongList`: no version, no review, no liturgical slot. The director edits 
 - 2026-10-07: `phone` moves from `MemberProfile` to `User` so every role has one; `User` gains `isPasswordChangeRequired` (set when the Admin creates the account and emails the password, cleared on change / reset). Needs a migration that copies existing phones.
 - 2026-10-10: `RehearsalSong` added — the songs a rehearsal will practise (43 → 44).
 - 2026-10-10: `NotificationType.SongListSubmitted` added — Parish Priests are notified when a song list is submitted for review (F6). Appended last, stored as int, no migration.
+- 2026-10-11: `ReportFormat` enum added (21 → 22) for report export (UC-34E); `ReportExport` is now in use, no column change, no migration.

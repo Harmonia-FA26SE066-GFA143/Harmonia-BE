@@ -131,6 +131,11 @@ public class LiturgicalEventRepository(HarmoniaDbContext dbContext)
             .AsNoTracking()
             .Where(x => x.Status == EventStatus.Published && x.EventDate < today);
 
+        if (filter.EventId is { } eventId)
+        {
+            query = query.Where(x => x.Id == eventId);
+        }
+
         if (filter.LiturgicalSeasonId is { } seasonId)
         {
             query = query.Where(x => x.LiturgicalSeasonId == seasonId);

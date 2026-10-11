@@ -52,6 +52,68 @@ public class ReportsEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<H
     }
 
     [Fact]
+    public async Task Export_AsAdmin_DownloadsTheFile_AndListsItInTheHistory_Async()
+    {
+        var admin = await factory.AddUserAsync("reports-export@test.com", RoleNames.Admin, cancellationToken: _ct);
+        var client = await factory.CreateClientAsAsync(admin.Email, _ct);
+
+        var export = await client.GetAsync("api/reports/export?type=UserActivity&format=Csv", _ct);
+
+        Assert.Equal(HttpStatusCode.OK, export.StatusCode);
+        Assert.Equal("text/csv", export.Content.Headers.ContentType!.MediaType);
+        Assert.Matches(@"^UserActivity-\d{8}-\d{6}\.csv$", export.Content.Headers.ContentDisposition!.FileNameStar);
+        var csv = await export.Content.ReadAsStringAsync(_ct);
+        Assert.Contains("Họ tên,Email,Vai trò", csv);
+        Assert.Contains(admin.Email, csv);
+
+        var history = await client.GetFromJsonAsync<JsonElement>("api/reports/exports", _ct);
+        var row = history.GetProperty("items").EnumerateArray().First();
+        Assert.Equal("UserActivity", row.GetProperty("reportType").GetString());
+        Assert.Equal("Csv", row.GetProperty("format").GetString());
+        Assert.Equal(admin.Id, row.GetProperty("exportedBy").GetGuid());
+        Assert.StartsWith("https://files.test/harmonia/report-exports/", row.GetProperty("downloadUrl").GetString());
+    }
+
+    [Theory]
+    [InlineData("Xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")]
+    [InlineData("Pdf", "application/pdf")]
+    [InlineData("Xml", "text/xml")]
+    [InlineData("Json", "application/json")]
+    public async Task Export_OtherFormats_ReturnTheirContentType_Async(string format, string contentType)
+    {
+        var admin = await factory.AddUserAsync($"reports-{format}@test.com", RoleNames.Admin, cancellationToken: _ct);
+        var client = await factory.CreateClientAsAsync(admin.Email, _ct);
+
+        var export = await client.GetAsync($"api/reports/export?type=UserActivity&format={format}", _ct);
+
+        Assert.Equal(HttpStatusCode.OK, export.StatusCode);
+        Assert.Equal(contentType, export.Content.Headers.ContentType!.MediaType);
+        Assert.NotEmpty(await export.Content.ReadAsByteArrayAsync(_ct));
+    }
+
+    [Fact]
+    public async Task Export_RejectsOtherRolesBadTypesAndEmptyReports_Async()
+    {
+        var admin = await factory.AddUserAsync("reports-export2@test.com", RoleNames.Admin, cancellationToken: _ct);
+        var priest = await factory.AddUserAsync("reports-priest2@test.com", RoleNames.ParishPriest, cancellationToken: _ct);
+        var adminClient = await factory.CreateClientAsAsync(admin.Email, _ct);
+        var priestClient = await factory.CreateClientAsAsync(priest.Email, _ct);
+
+        var asPriest = await priestClient.GetAsync("api/reports/export?type=SongUsage", _ct);
+        var historyAsPriest = await priestClient.GetAsync("api/reports/exports", _ct);
+        var noType = await adminClient.GetAsync("api/reports/export", _ct);
+        // No event exists in this fixture, so the service history has no rows.
+        var empty = await adminClient.GetAsync("api/reports/export?type=ServiceHistory", _ct);
+
+        Assert.Equal(HttpStatusCode.Forbidden, asPriest.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, historyAsPriest.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, noType.StatusCode);
+        Assert.Contains(ErrorCodes.ReportTypeNotSupported, await noType.Content.ReadAsStringAsync(_ct));
+        Assert.Equal(HttpStatusCode.NotFound, empty.StatusCode);
+        Assert.Contains(ErrorCodes.ReportNoData, await empty.Content.ReadAsStringAsync(_ct));
+    }
+
+    [Fact]
     public async Task Reports_FromDateAfterToDate_Returns400_Async()
     {
         var admin = await factory.AddUserAsync("reports-admin3@test.com", RoleNames.Admin, cancellationToken: _ct);

@@ -7,6 +7,9 @@ public class SearchReportsRequest : PagingRequest
 {
     public Guid? LiturgicalSeasonId { get; set; }
 
+    /// <summary>Narrows the report to one event. The user activity report ignores it.</summary>
+    public Guid? EventId { get; set; }
+
     /// <summary>Inclusive.</summary>
     public DateOnly? FromDate { get; set; }
 

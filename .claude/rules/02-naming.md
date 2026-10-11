@@ -1,6 +1,6 @@
 # Từ điển nghiệp vụ — dùng đúng tên, không tự đặt từ đồng nghĩa
 
-Nguồn chuẩn: `doc/harmonia-domain-entity-list.md` (44 entity, 21 enum).
+Nguồn chuẩn: `doc/harmonia-domain-entity-list.md` (44 entity, 22 enum).
 Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 
 | Tiếng Việt | Tên trong code |
@@ -72,6 +72,9 @@ móc vào chúng.
   Ngoại lệ: `Title` / `Content` của `SendNotificationRequest` viết tiếng Việt ngay trong service
   (và chuỗi test so khớp chúng) — thông báo lưu DB rồi hiển thị nguyên văn cho người dùng,
   không có mã để FE dịch (chốt 2026-10-11). Comment, log, exception quanh đó vẫn tiếng Anh.
+  Ngoại lệ: `ReportExportColumns.cs` giữ tên báo cáo và tiêu đề cột tiếng Việt của file xuất
+  (CSV, XLSX, PDF) — file đi thẳng tới Admin, không qua FE (chốt 2026-10-11). Chuỗi tiếng Việt
+  của file xuất chỉ được nằm trong file này.
   Riêng `CatholicCalendarParser.cs` được giữ emoji màu và tên mùa phụng vụ tiếng Việt — đó là
   chuỗi để so khớp dữ liệu từ API lịch Công giáo, không phải câu hiển thị (chốt 2026-10-06).
 

@@ -38,8 +38,8 @@ public interface IPracticeAssignmentRepository : IGenericRepository<PracticeAssi
         Guid memberId, IReadOnlyCollection<Guid> eventIds, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Read-only assignments due inside the date range of <paramref name="filter"/> and, when a season is set,
-    /// attached to an event of that season. <see cref="PracticeAssignment.Targets"/> is loaded;
+    /// Read-only assignments due inside the date range of <paramref name="filter"/> and, when an event or a
+    /// season is set, attached to that event or to an event of that season. <see cref="PracticeAssignment.Targets"/> is loaded;
     /// <see cref="PracticeAssignment.Submissions"/> holds only those of <paramref name="memberIds"/>.
     /// </summary>
     Task<List<PracticeAssignment>> GetForReportAsync(

@@ -35,20 +35,28 @@ public class CloudinaryFileStorageService : IFileStorageService
 
         // Cloudinary keeps the extension out of image/video public ids; we add it back in the
         // returned id so GetSignedUrl/DeleteAsync can recover the resource type and format.
-        var cloudinaryId = $"{RootFolder}/{folder}/{Guid.NewGuid()}";
+        // A raw file's id must carry the extension itself, so it is already there.
+        var isRaw = resourceType == ResourceType.Raw;
+        var cloudinaryId = $"{RootFolder}/{folder}/{Guid.NewGuid()}{(isRaw ? extension : string.Empty)}";
         // The client's original name never reaches Cloudinary; PublicId above decides the stored name.
         var file = new FileDescription("upload" + extension, content);
         var type = isPrivate ? PrivateDeliveryType : PublicDeliveryType;
 
         try
         {
-            UploadResult result = resourceType == ResourceType.Video
-                ? await _cloudinary.UploadAsync(
+            UploadResult result = resourceType switch
+            {
+                ResourceType.Video => await _cloudinary.UploadAsync(
                     new VideoUploadParams { File = file, PublicId = cloudinaryId, Type = type, Overwrite = false },
-                    cancellationToken)
-                : await _cloudinary.UploadAsync(
+                    cancellationToken),
+                ResourceType.Raw => await _cloudinary.UploadAsync(
+                    new RawUploadParams { File = file, PublicId = cloudinaryId, Type = type, Overwrite = false },
+                    "raw",
+                    cancellationToken),
+                _ => await _cloudinary.UploadAsync(
                     new ImageUploadParams { File = file, PublicId = cloudinaryId, Type = type, Overwrite = false },
-                    cancellationToken);
+                    cancellationToken),
+            };
 
             if (result.Error is not null)
             {
@@ -57,7 +65,7 @@ public class CloudinaryFileStorageService : IFileStorageService
             }
 
             return Result<FileUploadResponse>.Success(
-                new FileUploadResponse(result.PublicId + extension, result.SecureUrl.ToString()));
+                new FileUploadResponse(isRaw ? result.PublicId : result.PublicId + extension, result.SecureUrl.ToString()));
         }
         catch (Exception ex) when (IsProviderFailure(ex, cancellationToken))
         {
@@ -68,7 +76,7 @@ public class CloudinaryFileStorageService : IFileStorageService
 
     public string GetSignedUrl(string publicId)
     {
-        var (cloudinaryId, extension) = Split(publicId);
+        var (cloudinaryId, format, resourceType) = Split(publicId);
 
         // A plain signed delivery URL never expires, so use the private download API,
         // which honours expires_at.
@@ -77,22 +85,22 @@ public class CloudinaryFileStorageService : IFileStorageService
         return _cloudinary.DownloadPrivate(
             cloudinaryId,
             attachment: false,
-            format: extension.TrimStart('.'),
+            format: format,
             type: PrivateDeliveryType,
             expiresAt: expiresAt,
-            resourceType: GetResourceType(extension).ToString().ToLowerInvariant());
+            resourceType: resourceType.ToString().ToLowerInvariant());
     }
 
     public async Task<Result> DeleteAsync(string publicId, bool isPrivate, CancellationToken cancellationToken)
     {
-        var (cloudinaryId, extension) = Split(publicId);
+        var (cloudinaryId, _, resourceType) = Split(publicId);
 
         try
         {
             // The SDK's DestroyAsync takes no CancellationToken; WaitAsync stops us waiting, the call itself still completes.
             var result = await _cloudinary.DestroyAsync(new DeletionParams(cloudinaryId)
             {
-                ResourceType = GetResourceType(extension),
+                ResourceType = resourceType,
                 Type = isPrivate ? PrivateDeliveryType : PublicDeliveryType
             }).WaitAsync(cancellationToken);
 
@@ -117,18 +125,25 @@ public class CloudinaryFileStorageService : IFileStorageService
         ex is HttpRequestException
         || (ex is TaskCanceledException && !cancellationToken.IsCancellationRequested);
 
-    private static (string CloudinaryId, string Extension) Split(string publicId)
+    private static (string CloudinaryId, string Format, ResourceType ResourceType) Split(string publicId)
     {
         var extension = Path.GetExtension(publicId).ToLowerInvariant();
-        return (publicId[..^extension.Length], extension);
+        var resourceType = GetResourceType(extension);
+
+        // A raw file's Cloudinary id includes the extension and it has no separate format.
+        return resourceType == ResourceType.Raw
+            ? (publicId, string.Empty, resourceType)
+            : (publicId[..^extension.Length], extension.TrimStart('.'), resourceType);
     }
 
     // Cloudinary files audio under the "video" resource type; PDFs are served as "image".
+    // Exported report files other than PDF are "raw": stored as they are, never transformed.
     // An unsupported extension is a caller bug (callers whitelist first), so it still throws.
     private static ResourceType GetResourceType(string extension) => extension switch
     {
         ".mp3" or ".m4a" or ".wav" => ResourceType.Video,
         ".pdf" or ".png" or ".jpg" or ".jpeg" => ResourceType.Image,
+        ".csv" or ".xlsx" or ".xml" or ".json" => ResourceType.Raw,
         _ => throw new NotSupportedException($"File extension '{extension}' is not supported for storage.")
     };
 }

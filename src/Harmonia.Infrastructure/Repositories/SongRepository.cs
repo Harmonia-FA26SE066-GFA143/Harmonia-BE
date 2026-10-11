@@ -92,6 +92,11 @@ public class SongRepository(HarmoniaDbContext dbContext)
         var events = DbContext.LiturgicalEvents
             .Where(e => e.Status == EventStatus.Published && e.EventDate < today);
 
+        if (filter.EventId is { } eventId)
+        {
+            events = events.Where(e => e.Id == eventId);
+        }
+
         if (filter.LiturgicalSeasonId is { } seasonId)
         {
             events = events.Where(e => e.LiturgicalSeasonId == seasonId);

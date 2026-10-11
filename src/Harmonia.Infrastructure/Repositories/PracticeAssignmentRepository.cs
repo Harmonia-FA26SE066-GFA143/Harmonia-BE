@@ -90,7 +90,7 @@ public class PracticeAssignmentRepository(HarmoniaDbContext dbContext)
     public Task<List<PracticeAssignment>> GetForReportAsync(
         SearchReportsRequest filter, IReadOnlyCollection<Guid> memberIds, CancellationToken cancellationToken)
     {
-        var seasonId = filter.LiturgicalSeasonId;
+        var (eventId, seasonId) = (filter.EventId, filter.LiturgicalSeasonId);
         DateTime? fromUtc = filter.FromDate is { } from ? VietnamTime.StartOfDayUtc(from) : null;
         DateTime? toUtc = filter.ToDate is { } to ? VietnamTime.StartOfDayUtc(to.AddDays(1)) : null;
 
@@ -98,6 +98,7 @@ public class PracticeAssignmentRepository(HarmoniaDbContext dbContext)
             .AsNoTracking()
             .Where(x => (fromUtc == null || x.DueDate >= fromUtc)
                 && (toUtc == null || x.DueDate < toUtc)
+                && (eventId == null || x.EventId == eventId)
                 && (seasonId == null || x.LiturgicalEvent!.LiturgicalSeasonId == seasonId))
             .Include(x => x.Targets)
             .Include(x => x.Submissions.Where(s => memberIds.Contains(s.MemberId)))

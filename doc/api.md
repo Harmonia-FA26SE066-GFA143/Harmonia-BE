@@ -516,21 +516,54 @@ Chưa có kỹ năng nào → `[]`.
 
 ---
 
-## 4c. Reports — `api/reports` · role `ParishPriest`, `Admin` (UC-16 / FE-22) · 4 báo cáo quản trị: chỉ `Admin` (UC-34 / FE-52)
+## 4c. Reports — `api/reports` · role `ParishPriest`, `Admin` (UC-16 / FE-22) · 4 báo cáo quản trị và xuất file: chỉ `Admin` (UC-34 / FE-52, UC-34E / FE-53)
 
 | Method | Route | Role | Query | Thành công | Lỗi |
 |---|---|---|---|---|---|
-| GET | `/api/reports/service-history` | `ParishPriest`, `Admin` | `liturgicalSeasonId`, `fromDate`, `toDate`, `pageNumber`, `pageSize` | 200 `PagedList<ServiceHistoryDto>` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`) |
+| GET | `/api/reports/service-history` | `ParishPriest`, `Admin` | `eventId`, `liturgicalSeasonId`, `fromDate`, `toDate`, `pageNumber`, `pageSize` | 200 `PagedList<ServiceHistoryDto>` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`) |
 | GET | `/api/reports/song-usage` | `ParishPriest`, `Admin` | như trên | 200 `PagedList<SongUsageDto>` | như trên |
 | GET | `/api/reports/user-activity` | `Admin` | `fromDate`, `toDate`, `pageNumber`, `pageSize` | 200 `PagedList<UserActivityDto>` | như trên |
 | GET | `/api/reports/rehearsal-attendance` | `Admin` | như `service-history` | 200 `PagedList<RehearsalAttendanceReportDto>` | như trên |
 | GET | `/api/reports/participation` | `Admin` | như `service-history` | 200 `PagedList<ParticipationReportDto>` | như trên |
 | GET | `/api/reports/assignment-completion` | `Admin` | như `service-history` | 200 `PagedList<AssignmentCompletionDto>` | như trên |
+| GET | `/api/reports/export` | `Admin` | `type`, `format`, `eventId`, `liturgicalSeasonId`, `fromDate`, `toDate` | 200 file tải về | 400 `VALIDATION_FAILED` (`REPORT_TYPE_NOT_SUPPORTED`, `REPORT_DATE_RANGE_INVALID`) · 404 `REPORT_NO_DATA` · 502 `EXTERNAL_STORAGE_FAILED` |
+| GET | `/api/reports/exports` | `Admin` | `pageNumber`, `pageSize` | 200 `PagedList<ReportExportDto>` | — |
 
+- `eventId` thu hẹp báo cáo về một sự kiện; `user-activity` bỏ qua tham số này.
 - Các bộ lọc đều tuỳ chọn, kết hợp AND; `fromDate`, `toDate` bao gồm hai đầu (`yyyy-MM-dd`, giờ Việt Nam).
   `fromDate` > `toDate` → 400, mã `REPORT_DATE_RANGE_INVALID` ở trường `toDate`.
 - `service-history` và `song-usage` chỉ xét sự kiện `Published` **trước hôm nay** (giờ Việt Nam).
 - Role khác gọi vào → `403` body rỗng.
+
+### Xuất báo cáo (UC-34E / FE-53)
+
+- `type` (bắt buộc): `UserActivity`, `RehearsalAttendance`, `Participation`, `AssignmentCompletion`, `SongUsage`,
+  `ServiceHistory`. Thiếu hoặc sai → 400, mã `REPORT_TYPE_NOT_SUPPORTED` ở trường `type`.
+- `format`: `Csv` (mặc định), `Xlsx`, `Pdf`, `Xml`, `Json`. Giá trị lạ → 400 `VALIDATION_FAILED`.
+- Bộ lọc giống báo cáo đang xem. "Theo tháng": gửi `fromDate` / `toDate` là ngày đầu và ngày cuối tháng;
+  "theo sự kiện": `eventId`; "theo mùa phụng vụ": `liturgicalSeasonId`.
+- File chứa **mọi dòng** khớp bộ lọc — `pageNumber`, `pageSize` bị bỏ qua. Báo cáo rỗng → 404 `REPORT_NO_DATA`.
+- Response là file nhị phân, tên trong header `Content-Disposition` dạng `RehearsalAttendance-20261011-153000.csv`
+  (giờ Việt Nam). `Content-Type` theo định dạng: `text/csv`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,
+  `application/pdf`, `text/xml`, `application/json`.
+- CSV, XLSX, PDF có tiêu đề cột tiếng Việt và ngày dạng `dd/MM/yyyy`; XML, JSON dùng tên trường của API và ngày ISO.
+  CSV là UTF-8 có BOM; ô bắt đầu bằng `=`, `+`, `-`, `@` được thêm `'` phía trước.
+- Mỗi lần xuất được lưu lại: file cất riêng tư trên kho lưu trữ, kho lỗi thì cả lần xuất trả `EXTERNAL_STORAGE_FAILED`
+  và không có file nào được phát ra.
+
+#### `ReportExportDto` — lịch sử xuất
+
+```json
+{
+  "id": "guid", "reportType": "RehearsalAttendance", "format": "Xlsx",
+  "eventId": null, "liturgicalSeasonId": "guid", "fromDate": "2026-10-01", "toDate": "2026-10-31",
+  "exportedBy": "guid", "exportedByName": "Quản trị viên", "exportedAt": "2026-10-11T08:30:00Z",
+  "downloadUrl": "https://..."
+}
+```
+
+- Mới nhất trước; mọi Admin thấy lịch sử của nhau. Bốn trường bộ lọc là giá trị đã dùng lúc xuất, có thể `null`.
+- `downloadUrl` là link ký ngắn hạn tới đúng file đã xuất; hết hạn thì gọi lại danh sách để lấy link mới.
 
 ### Báo cáo quản trị (UC-34 / FE-52)
 

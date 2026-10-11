@@ -43,6 +43,8 @@ public sealed class HarmoniaApiFactory : WebApplicationFactory<AuthController>
 
     public IEmailSender EmailSender { get; } = Substitute.For<IEmailSender>();
 
+    public IFileStorageService FileStorage { get; } = Substitute.For<IFileStorageService>();
+
     public HarmoniaApiFactory()
     {
         _connection.Open();
@@ -55,6 +57,12 @@ public sealed class HarmoniaApiFactory : WebApplicationFactory<AuthController>
         }
 
         EmailSender.SendAsync(default!, default!, default!, default).ReturnsForAnyArgs(Result.Success());
+
+        // No test may reach the real Cloudinary; an upload "succeeds" under a made-up id that keeps the extension.
+        FileStorage.UploadAsync(default!, default!, default!, default, default).ReturnsForAnyArgs(call =>
+            Result<FileUploadResponse>.Success(new FileUploadResponse(
+                $"harmonia/{call.ArgAt<string>(2)}/{Guid.NewGuid()}{Path.GetExtension(call.ArgAt<string>(1))}", string.Empty)));
+        FileStorage.GetSignedUrl(default!).ReturnsForAnyArgs(call => $"https://files.test/{call.Arg<string>()}");
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -93,8 +101,9 @@ public sealed class HarmoniaApiFactory : WebApplicationFactory<AuthController>
             services.AddDbContext<HarmoniaDbContext>((sp, options) =>
                 options.UseSqlite(_connection).AddInterceptors(sp.GetRequiredService<AuditableEntityInterceptor>()));
 
-            Remove(services, typeof(IEmailSender));
+            Remove(services, typeof(IEmailSender), typeof(IFileStorageService));
             services.AddSingleton(EmailSender);
+            services.AddSingleton(FileStorage);
         });
     }
 

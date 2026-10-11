@@ -33,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<IDirectorNoteService, DirectorNoteService>();
         services.AddScoped<ISongListService, SongListService>();
         services.AddScoped<IReportService, ReportService>();
+        services.AddScoped<IReportExportService, ReportExportService>();
 
         return services;
     }

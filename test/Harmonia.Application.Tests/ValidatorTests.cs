@@ -554,4 +554,33 @@ public class ValidatorTests
 
         Assert.Equal([ErrorCodes.ReportDateRangeInvalid], ErrorCodesOf(new SearchReportsRequestValidator(), request));
     }
+
+    [Fact]
+    public void ExportReport_KnownTypeAndFormat_HasNoErrors()
+    {
+        var request = new ExportReportRequest { Type = ReportType.SongUsage, Format = ReportFormat.Pdf };
+
+        Assert.Empty(ErrorCodesOf(new ExportReportRequestValidator(), request));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData((ReportType)99)]
+    public void ExportReport_MissingOrUnknownType_ReturnsTypeNotSupported(ReportType? type)
+    {
+        var codes = ErrorCodesOf(new ExportReportRequestValidator(), new ExportReportRequest { Type = type });
+
+        Assert.Equal([ErrorCodes.ReportTypeNotSupported], codes);
+    }
+
+    [Fact]
+    public void ExportReport_FromDateAfterToDate_ReturnsDateRangeInvalid()
+    {
+        var request = new ExportReportRequest
+        {
+            Type = ReportType.SongUsage, FromDate = new DateOnly(2026, 10, 2), ToDate = new DateOnly(2026, 10, 1),
+        };
+
+        Assert.Equal([ErrorCodes.ReportDateRangeInvalid], ErrorCodesOf(new ExportReportRequestValidator(), request));
+    }
 }
