@@ -25,8 +25,13 @@ public class AuditableEntityInterceptor(ICurrentUserService currentUser) : SaveC
         typeof(SongList), typeof(SongListReview),
         typeof(ServiceRoster), typeof(RosterAssignment),
         typeof(MemberSkill),
-        typeof(LiturgicalEvent)
+        typeof(LiturgicalEvent),
+        typeof(MusicMaterial),
+        typeof(RehearsalAttendance)
     ];
+
+    // Taking attendance adds a row per member at every rehearsal; only a later correction is worth an entry.
+    private static readonly HashSet<Type> ChangesOnlyTypes = [typeof(RehearsalAttendance)];
 
     // Stamped by this interceptor, so they add nothing to a diff.
     private static readonly HashSet<string> AuditColumns =
@@ -35,10 +40,13 @@ public class AuditableEntityInterceptor(ICurrentUserService currentUser) : SaveC
         nameof(BaseAuditableEntity.UpdatedAt), nameof(BaseAuditableEntity.UpdatedBy)
     ];
 
-    // Routine bookkeeping that would flood the log (every login touches LastLoginAt).
+    // Routine bookkeeping that would flood the log: every login touches LastLoginAt, and saving an
+    // attendance sheet again re-stamps every row even when no status changed.
     private static readonly HashSet<string> IgnoredProperties =
     [
-        $"{nameof(User)}.{nameof(User.LastLoginAt)}"
+        $"{nameof(User)}.{nameof(User.LastLoginAt)}",
+        $"{nameof(RehearsalAttendance)}.{nameof(RehearsalAttendance.CheckedBy)}",
+        $"{nameof(RehearsalAttendance)}.{nameof(RehearsalAttendance.CheckedAt)}"
     ];
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -114,6 +122,11 @@ public class AuditableEntityInterceptor(ICurrentUserService currentUser) : SaveC
 
     private AuditLog? BuildLog(EntityEntry<BaseEntity> entry, Guid? userId, DateTime now)
     {
+        if (entry.State == EntityState.Added && ChangesOnlyTypes.Contains(entry.Metadata.ClrType))
+        {
+            return null;
+        }
+
         var entityType = entry.Metadata.ClrType.Name;
         var properties = entry.Properties
             .Where(p => !AuditColumns.Contains(p.Metadata.Name)

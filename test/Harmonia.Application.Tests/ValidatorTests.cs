@@ -556,6 +556,16 @@ public class ValidatorTests
     }
 
     [Fact]
+    public void SearchAuditLogs_FromDateAfterToDate_ReturnsDateRangeInvalid_OtherwiseNoErrors()
+    {
+        var validator = new SearchAuditLogsRequestValidator();
+        var backwards = new SearchAuditLogsRequest { FromDate = new DateOnly(2026, 10, 2), ToDate = new DateOnly(2026, 10, 1) };
+
+        Assert.Equal([ErrorCodes.ReportDateRangeInvalid], ErrorCodesOf(validator, backwards));
+        Assert.Empty(ErrorCodesOf(validator, new SearchAuditLogsRequest { FromDate = new DateOnly(2026, 10, 1) }));
+    }
+
+    [Fact]
     public void ExportReport_KnownTypeAndFormat_HasNoErrors()
     {
         var request = new ExportReportRequest { Type = ReportType.SongUsage, Format = ReportFormat.Pdf };

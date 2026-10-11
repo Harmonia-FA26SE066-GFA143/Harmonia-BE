@@ -1937,6 +1937,49 @@ public sealed class RepositoryTests : IDisposable
             page.Items.Select(x => (x.User.Id, x.User.Role.Name, x.PasswordChangeCount, x.PasswordResetCount, x.AccountChangeCount, x.ActionCount)));
     }
 
+    // ---- Audit log (UC-35) ----
+
+    [Fact]
+    public async Task AuditLogs_Search_FiltersAndReturnsNewestFirst_WithUser_Async()
+    {
+        var admin = await _db.AddUserAsync("audit-admin@test.com", RoleNames.Admin, _ct, "Admin");
+        var entityId = Guid.NewGuid();
+        // "Probe" keeps these rows apart from the ones the interceptor wrote while seeding the user.
+        AuditLog Log(string action, int daysAgo, Guid? userId = null, Guid? entity = null) => new()
+        {
+            Id = Guid.NewGuid(), Action = action, EntityType = "Probe", EntityId = entity ?? Guid.NewGuid(),
+            UserId = userId, CreatedAt = DateTime.UtcNow.AddDays(-daysAgo),
+        };
+        var (recent, older, ancient) = (Log("Updated", 1, admin.Id, entityId), Log("Created", 3, entity: entityId), Log("Updated", 40));
+        await using (var seedContext = _db.NewContext())
+        {
+            seedContext.AddRange(recent, older, ancient);
+            await seedContext.SaveChangesAsync(_ct);
+        }
+
+        async Task<PagedList<AuditLog>> SearchAsync(SearchAuditLogsRequest filter)
+        {
+            filter.EntityType = "Probe";
+            await using var context = _db.NewContext();
+            return await new AuditLogRepository(context).SearchAsync(filter, _ct);
+        }
+
+        var all = await SearchAsync(new SearchAuditLogsRequest());
+        Assert.Equal([recent.Id, older.Id, ancient.Id], all.Items.Select(l => l.Id));
+        Assert.Equal(("Admin", null), (all.Items[0].User!.FullName, all.Items[1].User));
+
+        Assert.Equal(recent.Id, Assert.Single((await SearchAsync(new SearchAuditLogsRequest { UserId = admin.Id })).Items).Id);
+        Assert.Equal(older.Id, Assert.Single((await SearchAsync(new SearchAuditLogsRequest { Action = "Created" })).Items).Id);
+        Assert.Equal(2, (await SearchAsync(new SearchAuditLogsRequest { EntityId = entityId })).TotalCount);
+
+        var today = VietnamTime.Today;
+        var ranged = await SearchAsync(new SearchAuditLogsRequest { FromDate = today.AddDays(-7), ToDate = today.AddDays(-2) });
+        Assert.Equal(older.Id, Assert.Single(ranged.Items).Id);
+
+        var paged = await SearchAsync(new SearchAuditLogsRequest { PageSize = 1, PageNumber = 2 });
+        Assert.Equal((older.Id, 3), (Assert.Single(paged.Items).Id, paged.TotalCount));
+    }
+
     private static RefreshToken NewRefreshToken(Guid userId, string hash, DateTime? revokedAt = null) =>
         new()
         {

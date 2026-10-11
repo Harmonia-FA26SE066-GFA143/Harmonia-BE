@@ -652,6 +652,43 @@ dữ liệu trong khoảng lọc vẫn hiện với các số bằng 0.
 
 ---
 
+## 4d. Audit logs — `api/audit-logs` · role `Admin` (UC-35 / FE-54)
+
+| Method | Route | Query | Thành công | Lỗi |
+|---|---|---|---|---|
+| GET | `/api/audit-logs` | `userId`, `entityType`, `entityId`, `action`, `fromDate`, `toDate`, `pageNumber`, `pageSize` | 200 `PagedList<AuditLogDto>` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`) |
+
+- Mới nhất trước. Các bộ lọc đều tuỳ chọn, kết hợp AND, so khớp chính xác. `userId` là **người thực hiện**;
+  `fromDate`, `toDate` bao gồm hai đầu (`yyyy-MM-dd`, giờ Việt Nam). `fromDate` > `toDate` → 400 ở trường `toDate`.
+- Role khác gọi vào → `403` body rỗng.
+
+### `AuditLogDto`
+
+```json
+{
+  "id": "guid", "createdAt": "2026-10-11T08:30:00Z",
+  "userId": "guid", "userFullName": "Quản trị viên", "userEmail": "admin@example.com",
+  "action": "Updated", "entityType": "User", "entityId": "guid",
+  "oldValue": "{\"IsActive\":true}", "newValue": "{\"IsActive\":false}",
+  "ipAddress": "203.0.113.5"
+}
+```
+
+- `action`: `Created`, `Updated`, `Deleted`, `PasswordChanged`.
+- `entityType` đang được ghi: `User`, `Role`, `SystemSetting`, `SongList`, `SongListReview`, `ServiceRoster`,
+  `RosterAssignment`, `MemberSkill`, `LiturgicalEvent`, `MusicMaterial`, `RehearsalAttendance`.
+- `oldValue` / `newValue` là **chuỗi** chứa một object JSON, FE tự parse. `Updated` chỉ gồm các trường đã đổi;
+  `Created` chỉ có `newValue`; `Deleted` chỉ có `oldValue`; `PasswordChanged` không có cả hai.
+  Tên trường là tên property phía server (PascalCase); enum ghi bằng tên.
+- Mật khẩu và token không bao giờ xuất hiện trong hai trường này.
+- `userId`, `userFullName`, `userEmail` là `null` khi không ai đăng nhập lúc thay đổi xảy ra — ví dụ
+  `PasswordChanged` qua link đặt lại mật khẩu. `PasswordChanged` có `userId` là người dùng tự đổi.
+- Xoá tư liệu hiện ra là `MusicMaterial` + `Updated` với `newValue` = `{"IsActive":false}`.
+- `RehearsalAttendance` chỉ được ghi khi **sửa trạng thái** của một dòng đã điểm danh; lần điểm danh đầu không ghi.
+- Đăng nhập, đăng xuất không được ghi.
+
+---
+
 ## 5. Notifications — `api/notifications` · mọi role đã đăng nhập
 
 Chỉ thao tác trên thông báo **của chính người gọi**.
