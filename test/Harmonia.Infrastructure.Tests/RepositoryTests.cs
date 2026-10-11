@@ -1571,6 +1571,96 @@ public sealed class RepositoryTests : IDisposable
         Assert.NotEqual(Guid.Empty, saved.Single(a => a.MemberId == newcomer.Id).Id);
     }
 
+    // ---- Reports ----
+
+    private sealed record ReportSeed(Guid KyrieId, Guid GloriaId, Guid UnusedId, Guid RecentEventId, Guid OlderEventId);
+
+    /// <summary>
+    /// Two past Published events: "recent" (approved list: Kyrie twice + Gloria; a rejected list holding Unused)
+    /// and "older" (approved list: Kyrie). An upcoming and a past Cancelled event both hold Gloria approved.
+    /// Songs: Kyrie, Gloria, Unused (active, never approved) and Deleted (inactive, never used).
+    /// </summary>
+    private async Task<ReportSeed> SeedReportsAsync()
+    {
+        var proposer = await _db.AddUserAsync("d@test.com", RoleNames.ChoirDirector, _ct);
+        var location = new WorshipLocation { Id = Guid.NewGuid(), Name = "Main church" };
+        var slot = new LiturgicalSlot { Id = Guid.NewGuid(), Name = "Report slot" };
+        var kyrie = new Song { Id = Guid.NewGuid(), Title = "Kyrie" };
+        var gloria = new Song { Id = Guid.NewGuid(), Title = "Gloria" };
+        var unused = new Song { Id = Guid.NewGuid(), Title = "Unused" };
+        var deleted = new Song { Id = Guid.NewGuid(), Title = "Deleted", IsActive = false };
+        var today = VietnamTime.Today;
+        LiturgicalEvent NewEvent(int days, EventStatus status = EventStatus.Published) =>
+            new() { Id = Guid.NewGuid(), EventDate = today.AddDays(days), LocationId = location.Id, Status = status };
+        SongList List(int version, SongListStatus status, params Song[] songs) => new()
+        {
+            Id = Guid.NewGuid(), Version = version, Status = status, ProposedBy = proposer.Id,
+            Items = songs.Select((s, i) => new SongListItem
+            {
+                Id = Guid.NewGuid(), SongId = s.Id, SlotId = slot.Id, DisplayOrder = i,
+            }).ToList(),
+        };
+
+        var recent = NewEvent(-3);
+        recent.SongLists = [List(1, SongListStatus.Rejected, unused), List(2, SongListStatus.Approved, kyrie, kyrie, gloria)];
+        var older = NewEvent(-10);
+        older.SongLists = [List(1, SongListStatus.Approved, kyrie)];
+        var upcoming = NewEvent(3);
+        upcoming.SongLists = [List(1, SongListStatus.Approved, gloria)];
+        var cancelled = NewEvent(-5, EventStatus.Cancelled);
+        cancelled.SongLists = [List(1, SongListStatus.Approved, gloria)];
+
+        await using var context = _db.NewContext();
+        context.AddRange(location, slot, kyrie, gloria, unused, deleted, recent, older, upcoming, cancelled);
+        await context.SaveChangesAsync(_ct);
+
+        return new ReportSeed(kyrie.Id, gloria.Id, unused.Id, recent.Id, older.Id);
+    }
+
+    [Fact]
+    public async Task GetUsage_CountsPastPublishedEventsWithApprovedList_AndListsUnusedActiveSongs_Async()
+    {
+        var seed = await SeedReportsAsync();
+        await using var context = _db.NewContext();
+
+        var page = await new SongRepository(context).GetUsageAsync(new SearchReportsRequest(), VietnamTime.Today, _ct);
+
+        Assert.Equal(3, page.TotalCount);
+        Assert.Equal(
+            [(seed.KyrieId, 2, VietnamTime.Today.AddDays(-3)), (seed.GloriaId, 1, VietnamTime.Today.AddDays(-3)), (seed.UnusedId, 0, (DateOnly?)null)],
+            page.Items.Select(x => (x.Song.Id, x.TimesUsed, x.LastUsedDate)));
+    }
+
+    [Fact]
+    public async Task GetUsage_DateRange_CountsOnlyEventsInside_Async()
+    {
+        var seed = await SeedReportsAsync();
+        await using var context = _db.NewContext();
+
+        var page = await new SongRepository(context).GetUsageAsync(
+            new SearchReportsRequest { ToDate = VietnamTime.Today.AddDays(-7) }, VietnamTime.Today, _ct);
+
+        var kyrie = page.Items[0];
+        Assert.Equal((seed.KyrieId, 1, VietnamTime.Today.AddDays(-10)), (kyrie.Song.Id, kyrie.TimesUsed, kyrie.LastUsedDate));
+        Assert.Equal(0, page.Items.Single(x => x.Song.Id == seed.GloriaId).TimesUsed);
+    }
+
+    [Fact]
+    public async Task GetServiceHistory_ReturnsPastPublishedNewestFirst_WithOnlyApprovedLists_Async()
+    {
+        var seed = await SeedReportsAsync();
+        await using var context = _db.NewContext();
+
+        var page = await new LiturgicalEventRepository(context).GetServiceHistoryAsync(
+            new SearchReportsRequest(), VietnamTime.Today, _ct);
+
+        Assert.Equal([seed.RecentEventId, seed.OlderEventId], page.Items.Select(e => e.Id));
+        Assert.Equal(2, page.TotalCount);
+        var approved = Assert.Single(page.Items[0].SongLists);
+        Assert.Equal(3, approved.Items.Count);
+        Assert.Equal("Main church", page.Items[0].Location.Name);
+    }
+
     // ---- Rehearsal songs ----
 
     [Fact]

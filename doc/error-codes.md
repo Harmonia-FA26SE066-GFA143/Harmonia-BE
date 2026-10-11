@@ -340,3 +340,4 @@ xem — trả 404, để không lộ sự tồn tại của bản ghi.
   cùng 4 exception tương ứng; khai `EVENT_ALREADY_PUBLISHED`, `EVENT_NOT_PUBLISHED`,
   `EXTERNAL_CALENDAR_FAILED`. Thêm `SONG_SKILL_REQUIREMENT_CATEGORY_INVALID` (FE-29).
   `SONG_CLASSIFICATION_DUPLICATE`, `SONG_SKILL_REQUIREMENT_DUPLICATE` đổi 409 → 400: là mã validate field.
+  

@@ -104,8 +104,8 @@ public class PracticeAssignmentService(
         await notificationService.SendAsync(
             new SendNotificationRequest(
                 Type: NotificationType.AssignmentNotice,
-                Title: "New practice assignment",
-                Content: $"You have a new practice assignment: {assignment.Title}.",
+                Title: "Bài tập mới",
+                Content: $"Bạn có bài tập mới: {assignment.Title}.",
                 RecipientUserIds: recipientUserIds,
                 ReferenceType: nameof(PracticeAssignment),
                 ReferenceId: assignment.Id),

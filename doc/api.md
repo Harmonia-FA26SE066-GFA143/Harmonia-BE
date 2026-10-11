@@ -516,6 +516,48 @@ Chưa có kỹ năng nào → `[]`.
 
 ---
 
+## 4c. Reports — `api/reports` · role `ParishPriest`, `Admin` (UC-16 / FE-22)
+
+| Method | Route | Query | Thành công | Lỗi |
+|---|---|---|---|---|
+| GET | `/api/reports/service-history` | `liturgicalSeasonId`, `fromDate`, `toDate`, `pageNumber`, `pageSize` | 200 `PagedList<ServiceHistoryDto>` | — |
+| GET | `/api/reports/song-usage` | như trên | 200 `PagedList<SongUsageDto>` | — |
+
+- Cả hai chỉ xét sự kiện `Published` **trước hôm nay** (giờ Việt Nam). Các bộ lọc đều tuỳ chọn, kết hợp AND;
+  `fromDate`, `toDate` bao gồm hai đầu (`yyyy-MM-dd`). `fromDate` > `toDate` → danh sách rỗng, không lỗi.
+- Role khác gọi vào → `403` body rỗng.
+
+### `ServiceHistoryDto` — lịch sử phục vụ & kết quả chuẩn bị
+
+```json
+{
+  "eventId": "guid", "eventDate": "2026-09-27", "time": "07:00:00", "title": "Chúa nhật XXVI Thường niên",
+  "liturgicalSeasonName": "Mùa Thường niên", "locationName": "Nhà thờ chính",
+  "songCount": 5, "membersServed": 18,
+  "participationConfirmed": 25, "participationDeclined": 2,
+  "rehearsalsHeld": 2, "attendancePresent": 51
+}
+```
+
+- Mỗi dòng một sự kiện, mới nhất trước. `title`, `liturgicalSeasonName` có thể `null`.
+- `songCount`: số bài trong danh sách bài hát `Approved`; `0` nếu không có bản nào được duyệt.
+- `membersServed`: số ca viên khác nhau có dòng phân công `Active` trên roster `Finalized`; roster chưa chốt → `0`.
+- `rehearsalsHeld`: buổi tập gắn với sự kiện đã bắt đầu; `attendancePresent`: tổng lượt `Present` + `Late` ở các buổi đó.
+- Số liệu chi tiết của một sự kiện (thiếu người, bài tập đạt / quá hạn): `GET /api/liturgical-events/{id}/preparation-status`.
+
+### `SongUsageDto` — tần suất dùng bài hát
+
+```json
+{ "songId": "guid", "title": "Kinh Hoà Bình", "composer": "Kim Long", "timesUsed": 4, "lastUsedDate": "2026-09-27" }
+```
+
+- `timesUsed`: số **sự kiện** có bài này trong danh sách bài hát `Approved`; một bài hát hai lần trong cùng sự kiện tính 1.
+- Sắp theo `timesUsed` giảm dần rồi theo tên. Bài chưa dùng lần nào vẫn có trong danh sách với `timesUsed = 0`,
+  `lastUsedDate = null`. Bài đã xoá khỏi thư viện chỉ hiện khi từng được dùng trong khoảng lọc.
+- Bộ lọc chỉ thu hẹp tập sự kiện được đếm, không bỏ bài hát khỏi danh sách.
+
+---
+
 ## 5. Notifications — `api/notifications` · mọi role đã đăng nhập
 
 Chỉ thao tác trên thông báo **của chính người gọi**.

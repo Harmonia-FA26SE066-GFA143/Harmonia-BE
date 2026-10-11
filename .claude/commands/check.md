@@ -52,16 +52,23 @@ Kiểm đúng 13 mục dưới đây, không phát sinh thêm. Mỗi phát hiệ
 13. Chạy đúng lệnh này, không tự nghĩ pattern khác:
 
 ```
-    rg -n '[^\x00-\x7F]' --glob '*.cs' --glob '!**/CatholicCalendarParser.cs' src
+    rg -n '[^\x00-\x7F]' --glob '*.cs' --glob '!**/CatholicCalendarParser.cs' src | rg -v -P 'Application.Services.\w+Service\.cs:\d+:(?!.*(//|Log|Exception)).*"'
     rg -n '[^\x00-\x7F]' src/Harmonia.API/.env.example src/Harmonia.API/appsettings*.json
 ```
 
-    Ngoại lệ duy nhất (chốt 2026-10-06): `Application/Services/CatholicCalendarParser.cs` —
+    Ngoại lệ 1 (chốt 2026-10-06): `Application/Services/CatholicCalendarParser.cs` —
     emoji màu và tên mùa phụng vụ tiếng Việt ở đó là chuỗi để so khớp dữ liệu từ API lịch
-    Công giáo, không phải câu hiển thị cho người dùng. Không mở rộng ngoại lệ sang file khác.
+    Công giáo, không phải câu hiển thị cho người dùng.
+    Ngoại lệ 2 (chốt 2026-10-11): chuỗi `Title` / `Content` của `SendNotificationRequest`
+    trong `Application/Services/*Service.cs` — thông báo hiển thị nguyên văn cho người dùng.
+    Vế `rg -v -P` của lệnh đầu đã lọc sẵn loại này: nó bỏ dòng có chuỗi trong
+    `Application/Services/*Service.cs`, trừ dòng chứa `//`, `Log` hoặc `Exception` — nên
+    comment, log, exception tiếng Việt trong cùng file vẫn bị báo. Bộ lọc không phân biệt
+    được chuỗi thông báo với chuỗi khác trong service; nghi ngờ thì chạy lại không có vế lọc.
+    Không mở rộng ngoại lệ sang chỗ khác.
 
-    Báo nguyên văn mọi dòng lệnh này trả về. Mọi chuỗi và comment trong `.cs` và
-    trong file cấu hình phải là ASCII tiếng Anh; thông báo cho người dùng đi qua mã
+    Báo nguyên văn mọi dòng lệnh này trả về. Mọi chuỗi và comment còn lại trong `.cs` và
+    trong file cấu hình phải là ASCII tiếng Anh; thông báo lỗi cho người dùng đi qua mã
     lỗi trong `Application/Common/ErrorCodes.cs`.
     Lệnh trả về rỗng thì ghi "sạch" — đừng tự kết luận khi chưa chạy.
     (Tài liệu trong `doc/` và `.claude/` vẫn viết tiếng Việt, không nằm trong phạm vi.)

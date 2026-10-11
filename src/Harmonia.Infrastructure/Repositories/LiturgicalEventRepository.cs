@@ -123,4 +123,46 @@ public class LiturgicalEventRepository(HarmoniaDbContext dbContext)
 
         return new PagedList<LiturgicalEvent>(items, filter.PageNumber, filter.PageSize, totalCount);
     }
+
+    public async Task<PagedList<LiturgicalEvent>> GetServiceHistoryAsync(
+        SearchReportsRequest filter, DateOnly today, CancellationToken cancellationToken)
+    {
+        var query = DbContext.LiturgicalEvents
+            .AsNoTracking()
+            .Where(x => x.Status == EventStatus.Published && x.EventDate < today);
+
+        if (filter.LiturgicalSeasonId is { } seasonId)
+        {
+            query = query.Where(x => x.LiturgicalSeasonId == seasonId);
+        }
+
+        if (filter.FromDate is { } fromDate)
+        {
+            query = query.Where(x => x.EventDate >= fromDate);
+        }
+
+        if (filter.ToDate is { } toDate)
+        {
+            query = query.Where(x => x.EventDate <= toDate);
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .Include(x => x.LiturgicalSeason)
+            .Include(x => x.Location)
+            .Include(x => x.SongLists.Where(s => s.Status == SongListStatus.Approved)).ThenInclude(x => x.Items)
+            .Include(x => x.EventParticipations)
+            .Include(x => x.ServiceRoster).ThenInclude(x => x!.Assignments)
+            .Include(x => x.Rehearsals).ThenInclude(x => x.Attendances)
+            .OrderByDescending(x => x.EventDate)
+            .ThenByDescending(x => x.Time)
+            .ThenBy(x => x.Id)
+            .Skip((filter.PageNumber - 1) * filter.PageSize)
+            .Take(filter.PageSize)
+            .AsSplitQuery()
+            .ToListAsync(cancellationToken);
+
+        return new PagedList<LiturgicalEvent>(items, filter.PageNumber, filter.PageSize, totalCount);
+    }
 }

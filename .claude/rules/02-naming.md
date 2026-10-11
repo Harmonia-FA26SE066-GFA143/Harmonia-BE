@@ -68,7 +68,10 @@ móc vào chúng.
   `CancellationToken cancellationToken = default` (chốt 2026-09-27).
 
 - Mọi chuỗi trong `.cs` là tiếng Anh — comment, XML doc, message exception, message log.
-  Không có ngoại lệ: message cho người dùng đi bằng mã lỗi, không bằng câu tiếng Việt.
+  Message lỗi cho người dùng đi bằng mã lỗi, không bằng câu tiếng Việt.
+  Ngoại lệ: `Title` / `Content` của `SendNotificationRequest` viết tiếng Việt ngay trong service
+  (và chuỗi test so khớp chúng) — thông báo lưu DB rồi hiển thị nguyên văn cho người dùng,
+  không có mã để FE dịch (chốt 2026-10-11). Comment, log, exception quanh đó vẫn tiếng Anh.
   Riêng `CatholicCalendarParser.cs` được giữ emoji màu và tên mùa phụng vụ tiếng Việt — đó là
   chuỗi để so khớp dữ liệu từ API lịch Công giáo, không phải câu hiển thị (chốt 2026-10-06).
 

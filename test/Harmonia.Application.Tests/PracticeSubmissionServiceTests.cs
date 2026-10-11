@@ -150,8 +150,8 @@ public class PracticeSubmissionServiceTests
     }
 
     [Theory]
-    [InlineData(SubmissionStatus.Passed, null, "Practice passed")]
-    [InlineData(SubmissionStatus.NeedsRevision, "  Hold the last note longer  ", "Practice needs revision")]
+    [InlineData(SubmissionStatus.Passed, null, "Bài tập đạt yêu cầu")]
+    [InlineData(SubmissionStatus.NeedsRevision, "  Hold the last note longer  ", "Bài tập cần chỉnh sửa")]
     public async Task Review_LatestSubmitted_RecordsFeedbackAndNotifiesMember_Async(
         SubmissionStatus decision, string? comment, string expectedTitle)
     {
@@ -260,7 +260,7 @@ public class PracticeSubmissionServiceTests
         Assert.Equal("Director", Assert.Single(result.Value!.Feedbacks).ReviewerName);
         // A plain comment never asks whether the attempt is the newest.
         await _submissions.DidNotReceiveWithAnyArgs().IsLatestAttemptAsync(default!, default);
-        await AssertNotifiedAsync("New practice feedback");
+        await AssertNotifiedAsync("Nhận xét mới cho bài tập");
     }
 
     [Theory]
@@ -278,7 +278,7 @@ public class PracticeSubmissionServiceTests
         Assert.Equal(to, _submission.Status);
         Assert.Equal(to, _savedFeedback!.Result);
         Assert.Equal(to, result.Value!.Status);
-        await AssertNotifiedAsync("Practice result changed");
+        await AssertNotifiedAsync("Kết quả bài tập đã thay đổi");
     }
 
     [Fact]

@@ -128,8 +128,8 @@ public class LiturgicalEventService(
         await NotifyDirectorsAndMembersAsync(
             liturgicalEvent,
             NotificationType.EventPublished,
-            "New event published",
-            $"The event on {liturgicalEvent.EventDate:dd/MM/yyyy} at {liturgicalEvent.Time:HH:mm} has been published.",
+            "Sự kiện mới được công bố",
+            $"Sự kiện ngày {liturgicalEvent.EventDate:dd/MM/yyyy} lúc {liturgicalEvent.Time:HH:mm} đã được công bố.",
             cancellationToken);
 
         return Result<LiturgicalEventDto>.Success(mapper.Map<LiturgicalEventDto>(liturgicalEvent));
@@ -163,8 +163,8 @@ public class LiturgicalEventService(
             await NotifyDirectorsAndMembersAsync(
                 liturgicalEvent,
                 NotificationType.EventCancelled,
-                "Event cancelled",
-                $"The event on {liturgicalEvent.EventDate:dd/MM/yyyy} at {liturgicalEvent.Time:HH:mm} has been cancelled.",
+                "Sự kiện đã bị huỷ",
+                $"Sự kiện ngày {liturgicalEvent.EventDate:dd/MM/yyyy} lúc {liturgicalEvent.Time:HH:mm} đã bị huỷ.",
                 cancellationToken);
         }
 

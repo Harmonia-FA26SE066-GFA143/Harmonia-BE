@@ -65,10 +65,10 @@ public class PracticeSubmissionService(
         var title = submission.PracticeAssignment.Title;
         await NotifyMemberAsync(
             submission,
-            request.Result == SubmissionStatus.Passed ? "Practice passed" : "Practice needs revision",
+            request.Result == SubmissionStatus.Passed ? "Bài tập đạt yêu cầu" : "Bài tập cần chỉnh sửa",
             request.Result == SubmissionStatus.Passed
-                ? $"Your recording for \"{title}\" has passed."
-                : $"Your recording for \"{title}\" needs revision. Open it to read the feedback.",
+                ? $"Bản thu \"{title}\" của bạn đã đạt yêu cầu."
+                : $"Bản thu \"{title}\" của bạn cần chỉnh sửa. Mở để xem nhận xét.",
             cancellationToken);
 
         var dto = await ReloadAsync<PracticeSubmissionReviewDto>(submission.Id, cancellationToken);
@@ -102,10 +102,10 @@ public class PracticeSubmissionService(
         var title = submission.PracticeAssignment.Title;
         await NotifyMemberAsync(
             submission,
-            isResultChange ? "Practice result changed" : "New practice feedback",
+            isResultChange ? "Kết quả bài tập đã thay đổi" : "Nhận xét mới cho bài tập",
             isResultChange
-                ? $"Your recording for \"{title}\" is now {(submission.Status == SubmissionStatus.Passed ? "passed" : "marked as needing revision")}."
-                : $"The Choir Director left new feedback on your recording for \"{title}\".",
+                ? $"Bản thu \"{title}\" của bạn hiện {(submission.Status == SubmissionStatus.Passed ? "đã đạt yêu cầu" : "được đánh dấu cần chỉnh sửa")}."
+                : $"Ca trưởng đã để lại nhận xét mới cho bản thu \"{title}\" của bạn.",
             cancellationToken);
 
         return Result<PracticeSubmissionDetailDto>.Success(

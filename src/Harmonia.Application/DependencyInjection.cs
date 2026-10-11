@@ -32,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<IEventPreparationService, EventPreparationService>();
         services.AddScoped<IDirectorNoteService, DirectorNoteService>();
         services.AddScoped<ISongListService, SongListService>();
+        services.AddScoped<IReportService, ReportService>();
 
         return services;
     }

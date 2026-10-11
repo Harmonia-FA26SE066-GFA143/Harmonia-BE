@@ -209,8 +209,8 @@ public class SongListService(
             await notificationService.SendAsync(
                 new SendNotificationRequest(
                     Type: NotificationType.SongListSubmitted,
-                    Title: "Song list awaiting review",
-                    Content: $"Song list version {songList.Version} has been submitted for review.",
+                    Title: "Danh sách bài hát chờ duyệt",
+                    Content: $"Danh sách bài hát phiên bản {songList.Version} đã được gửi duyệt.",
                     RecipientUserIds: parishPriestIds,
                     ReferenceType: nameof(SongList),
                     ReferenceId: songList.Id),
@@ -257,17 +257,17 @@ public class SongListService(
 
         var decisionText = request.Decision switch
         {
-            ReviewDecision.Approve => "has been approved",
-            ReviewDecision.Reject => "has been rejected",
-            ReviewDecision.RequestRevision => "needs revision",
-            _ => "has been reviewed",
+            ReviewDecision.Approve => "đã được duyệt",
+            ReviewDecision.Reject => "đã bị từ chối",
+            ReviewDecision.RequestRevision => "cần chỉnh sửa",
+            _ => "đã được xét duyệt",
         };
 
         await notificationService.SendAsync(
             new SendNotificationRequest(
                 Type: NotificationType.SongListDecision,
-                Title: "Song list reviewed",
-                Content: $"Song list version {songList.Version} {decisionText}.",
+                Title: "Danh sách bài hát đã được xét duyệt",
+                Content: $"Danh sách bài hát phiên bản {songList.Version} {decisionText}.",
                 RecipientUserIds: [songList.ProposedBy],
                 ReferenceType: nameof(SongList),
                 ReferenceId: songList.Id),

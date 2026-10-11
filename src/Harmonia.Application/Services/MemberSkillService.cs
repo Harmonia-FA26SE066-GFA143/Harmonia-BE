@@ -122,10 +122,10 @@ public class MemberSkillService(
         await notificationService.SendAsync(
             new SendNotificationRequest(
                 NotificationType.SkillReview,
-                decision == ApprovalStatus.Approved ? "Skill approved" : "Skill rejected",
+                decision == ApprovalStatus.Approved ? "Kỹ năng đã được duyệt" : "Kỹ năng bị từ chối",
                 decision == ApprovalStatus.Approved
-                    ? $"Your {skillName} skill has been approved."
-                    : $"Your {skillName} skill has been rejected: {rejectReason}",
+                    ? $"Kỹ năng {skillName} của bạn đã được duyệt."
+                    : $"Kỹ năng {skillName} của bạn đã bị từ chối: {rejectReason}",
                 [memberSkill.Member.UserId],
                 nameof(MemberSkill),
                 memberSkill.Id),

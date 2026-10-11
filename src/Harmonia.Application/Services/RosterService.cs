@@ -181,7 +181,7 @@ public class RosterService(
             memberIds = linesByMember.Where(x => x.Value.Any(a => a.NotifiedAt is null)).Select(x => x.Key).ToList();
 
         var liturgicalEvent = roster.LiturgicalEvent;
-        var eventLabel = $"{liturgicalEvent.Title ?? "the event"} on {liturgicalEvent.EventDate:dd/MM/yyyy} at {liturgicalEvent.Time:HH:mm}";
+        var eventLabel = $"{liturgicalEvent.Title ?? "sự kiện"} ngày {liturgicalEvent.EventDate:dd/MM/yyyy} lúc {liturgicalEvent.Time:HH:mm}";
 
         foreach (var memberId in memberIds)
         {
@@ -193,8 +193,8 @@ public class RosterService(
             await notificationService.SendAsync(
                 new SendNotificationRequest(
                     NotificationType.AssignmentNotice,
-                    "Service assignment",
-                    $"You are assigned to serve at {eventLabel}: "
+                    "Phân công phục vụ",
+                    $"Bạn được phân công phục vụ tại {eventLabel}: "
                         + string.Join("; ", lines.Select(x => x.SongListItem is null ? x.Skill.Name : $"{x.Skill.Name} - {x.SongListItem.Song.Title}"))
                         + ".",
                     [lines[0].Member.UserId],
