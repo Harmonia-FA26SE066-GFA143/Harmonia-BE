@@ -696,6 +696,43 @@ dữ liệu trong khoảng lọc vẫn hiện với các số bằng 0.
 
 ---
 
+## 4e. System settings — `api/system-settings` · sửa: `Admin` · đọc cài đặt công khai: mọi role (UC-33 / FE-51)
+
+| Method | Route | Role | Body | Thành công | Lỗi |
+|---|---|---|---|---|---|
+| GET | `/api/system-settings` | `Admin` | — | 200 `SystemSettingDto[]` | — |
+| GET | `/api/system-settings/public` | mọi role | — | 200 `SystemSettingDto[]` (chỉ key công khai) | — |
+| PUT | `/api/system-settings/{id}` | `Admin` | `{ "value" }` | 200 `SystemSettingDto` | 400 `VALIDATION_FAILED`, `SETTING_VALUE_TYPE_MISMATCH`, `SETTING_VALUE_OUT_OF_RANGE` · 404 `SETTING_NOT_FOUND` |
+
+```json
+{
+  "id": "guid", "key": "Roster.RecentServiceDays", "value": "60", "dataType": "Int",
+  "description": "How many days back a service counts as recent when suggesting a roster.",
+  "isPublic": false, "minValue": 1, "maxValue": 365
+}
+```
+
+- Danh sách sắp theo `key`. **Bộ key do hệ thống định nghĩa**: Admin chỉ sửa `value`, không tạo, không xoá, không đổi kiểu.
+- `value` luôn là **chuỗi**, đọc theo `dataType`: `Int` → `"42"`, `Bool` → `"true"` / `"false"`, `String` → nguyên văn
+  (được để rỗng), `Json` → một giá trị JSON hợp lệ. Server cắt khoảng trắng hai đầu và chuẩn hoá (`" 042 "` → `"42"`,
+  `"True"` → `"true"`). Tối đa 1000 ký tự.
+- Sai kiểu → 400 `SETTING_VALUE_TYPE_MISMATCH`. Số nguyên ngoài `minValue`–`maxValue` → 400 `SETTING_VALUE_OUT_OF_RANGE`.
+  `minValue`, `maxValue` là `null` với key không phải số.
+- `description` là tiếng Anh, chỉ để tham khảo; FE đặt nhãn tiếng Việt theo `key`.
+- Mọi thay đổi được ghi vào nhật ký hoạt động (`entityType` = `SystemSetting`).
+
+| `key` | Kiểu | Mặc định | Công khai | Tác dụng |
+|---|---|---|---|---|
+| `Parish.Name` | String | rỗng | có | Tên giáo xứ để hiển thị |
+| `Choir.Name` | String | rỗng | có | Tên ca đoàn để hiển thị |
+| `System.Announcement` | String | rỗng | có | Thông báo chung cho mọi người dùng; rỗng thì không hiện |
+| `Roster.RecentServiceDays` | Int 1–365 | 60 | không | Số ngày tính "phục vụ gần đây" khi gợi ý phân công |
+| `Roster.AiSuggestionEnabled` | Bool | true | không | Tắt thì gợi ý phân công không gọi AI, chỉ xếp theo luật (`isAiGenerated` = `false`) |
+| `Practice.AllowLateSubmission` | Bool | false | không | Bật thì nộp bản thu sau hạn không còn bị `PRACTICE_SUBMISSION_PAST_DUE`; bài vẫn tính là quá hạn |
+| `Rehearsal.AttendanceOpensMinutesBefore` | Int 0–120 | 0 | không | Cho điểm danh sớm N phút trước giờ bắt đầu; sớm hơn nữa vẫn `REHEARSAL_NOT_STARTED` |
+
+---
+
 ## 5. Notifications — `api/notifications` · mọi role đã đăng nhập
 
 Chỉ thao tác trên thông báo **của chính người gọi**.

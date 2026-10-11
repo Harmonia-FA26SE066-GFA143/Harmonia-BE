@@ -570,6 +570,16 @@ public class ValidatorTests
     }
 
     [Fact]
+    public void UpdateSystemSetting_AllowsAnEmptyValue_ButNotNullOrOverlongOnes()
+    {
+        var validator = new UpdateSystemSettingRequestValidator();
+
+        Assert.True(validator.Validate(new UpdateSystemSettingRequest { Value = string.Empty }).IsValid);
+        Assert.False(validator.Validate(new UpdateSystemSettingRequest { Value = null! }).IsValid);
+        Assert.False(validator.Validate(new UpdateSystemSettingRequest { Value = new string('a', 1001) }).IsValid);
+    }
+
+    [Fact]
     public void SearchAuditLogs_FromDateAfterToDate_ReturnsDateRangeInvalid_OtherwiseNoErrors()
     {
         var validator = new SearchAuditLogsRequestValidator();

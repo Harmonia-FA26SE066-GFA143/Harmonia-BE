@@ -310,6 +310,8 @@ public static class ErrorCodes
 
     public const string SettingValueTypeMismatch = "SETTING_VALUE_TYPE_MISMATCH";
 
+    public const string SettingValueOutOfRange = "SETTING_VALUE_OUT_OF_RANGE";
+
     public const string ReportTypeNotSupported = "REPORT_TYPE_NOT_SUPPORTED";
 
     public const string ReportDateRangeInvalid = "REPORT_DATE_RANGE_INVALID";

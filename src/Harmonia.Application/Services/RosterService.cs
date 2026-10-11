@@ -14,10 +14,9 @@ public class RosterService(
     IRosterSuggestionGenerator suggestionGenerator,
     ICurrentUserService currentUser,
     INotificationService notificationService,
+    ISystemSettingService systemSettingService,
     IMapper mapper) : IRosterService
 {
-    private const int RecentServiceDays = 60;
-
     private sealed record Candidate(Guid MemberId, SkillLevel? Level, int RecentServiceCount);
 
     /// <summary>One song / skill requirement still to be staffed; Candidates are ordered best first for the rule-based fill.</summary>
@@ -348,10 +347,12 @@ public class RosterService(
         var candidateSkills = await rosterRepository.GetCandidateSkillsAsync(liturgicalEvent.Id, skillIds, cancellationToken);
 
         var memberIds = candidateSkills.Select(x => x.MemberId).Distinct().ToList();
+        var recentServiceDays = await systemSettingService.GetIntAsync(
+            SystemSettingKeys.RosterRecentServiceDays, cancellationToken);
         var recent = memberIds.Count == 0
             ? new Dictionary<Guid, int>()
             : await rosterRepository.CountRecentServicesAsync(
-                memberIds, liturgicalEvent.EventDate.AddDays(-RecentServiceDays), liturgicalEvent.EventDate, cancellationToken);
+                memberIds, liturgicalEvent.EventDate.AddDays(-recentServiceDays), liturgicalEvent.EventDate, cancellationToken);
 
         var kept = roster?.Assignments
             .Where(x => x.Source == AssignmentSource.Manual || x.Status == RosterAssignmentStatus.Replaced)
@@ -383,6 +384,12 @@ public class RosterService(
     {
         var open = slots.Where(x => x.NeededCount > 0 && x.Candidates.Count > 0).ToList();
         if (open.Count == 0) return false;
+
+        // Switched off by the Admin: the caller then fills every slot by the built-in rules, as after an AI failure.
+        if (!await systemSettingService.GetBoolAsync(SystemSettingKeys.RosterAiSuggestionEnabled, cancellationToken))
+        {
+            return false;
+        }
 
         // Codes instead of ids, and no names or contact details, ever leave the server.
         var codes = open.SelectMany(x => x.Candidates).Select(x => x.MemberId).Distinct()

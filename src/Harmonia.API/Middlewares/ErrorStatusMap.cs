@@ -172,6 +172,7 @@ public static class ErrorStatusMap
         // 13. System settings & reports.
         [ErrorCodes.SettingNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.SettingValueTypeMismatch] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.SettingValueOutOfRange] = StatusCodes.Status400BadRequest,
         [ErrorCodes.ReportTypeNotSupported] = StatusCodes.Status400BadRequest,
         [ErrorCodes.ReportDateRangeInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.ReportDateRangeTooLarge] = StatusCodes.Status400BadRequest,

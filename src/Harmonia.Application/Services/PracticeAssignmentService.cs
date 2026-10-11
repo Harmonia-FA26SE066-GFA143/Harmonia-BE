@@ -20,6 +20,7 @@ public class PracticeAssignmentService(
     IPracticeSubmissionRepository practiceSubmissionRepository,
     INotificationService notificationService,
     IFileStorageService fileStorageService,
+    ISystemSettingService systemSettingService,
     IMapper mapper) : IPracticeAssignmentService
 {
     public const long MaxAudioSizeBytes = 20 * 1024 * 1024;
@@ -172,7 +173,9 @@ public class PracticeAssignmentService(
         if (latest?.Status == SubmissionStatus.Passed)
             return Result<PracticeSubmissionDto>.Failure(ErrorCodes.PracticeSubmissionAlreadyPassed);
 
-        if (DateTime.UtcNow > assignment.DueDate)
+        // A late recording is still counted as overdue in progress and reports; the setting only lets it in.
+        if (DateTime.UtcNow > assignment.DueDate
+            && !await systemSettingService.GetBoolAsync(SystemSettingKeys.PracticeAllowLateSubmission, cancellationToken))
             return Result<PracticeSubmissionDto>.Failure(ErrorCodes.PracticeSubmissionPastDue);
 
         if (CheckAudio(file) is { } fileError) return Result<PracticeSubmissionDto>.Failure(fileError);

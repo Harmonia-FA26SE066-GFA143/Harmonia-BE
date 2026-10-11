@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using AutoMapper;
 using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IRepositories;
+using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Application.Mappings;
 using Harmonia.Application.Services;
 using Harmonia.Domain.Common;
@@ -16,6 +17,7 @@ public class RehearsalAttendanceServiceTests
 {
     private readonly IRehearsalRepository _rehearsals = Substitute.For<IRehearsalRepository>();
     private readonly IMemberProfileRepository _members = Substitute.For<IMemberProfileRepository>();
+    private readonly ISystemSettingService _settings = Substitute.For<ISystemSettingService>();
     private readonly RehearsalAttendanceService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly Guid _directorUserId = Guid.NewGuid();
@@ -27,7 +29,7 @@ public class RehearsalAttendanceServiceTests
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<MemberProfileProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new RehearsalAttendanceService(_rehearsals, _members, mapper);
+        _sut = new RehearsalAttendanceService(_rehearsals, _members, _settings, mapper);
 
         _rehearsal = new Rehearsal
         {
@@ -86,6 +88,20 @@ public class RehearsalAttendanceServiceTests
 
         Assert.Equal(ErrorCodes.RehearsalNotStarted, result.Code);
         await _rehearsals.DidNotReceive().TrySaveAttendancesAsync(Arg.Any<Rehearsal>(), _ct);
+    }
+
+    [Theory]
+    [InlineData(20, true)]
+    [InlineData(40, false)]
+    public async Task Record_BeforeStart_IsAllowedOnlyInsideTheConfiguredWindow_Async(int minutesToStart, bool isAllowed)
+    {
+        _rehearsal.StartTime = DateTime.UtcNow.AddMinutes(minutesToStart);
+        _settings.GetIntAsync(SystemSettingKeys.RehearsalAttendanceOpensMinutesBefore, _ct).Returns(30);
+        _rehearsals.TrySaveAttendancesAsync(_rehearsal, _ct).Returns(true);
+
+        var result = await _sut.RecordAsync(_directorUserId, _rehearsal.Id, Request((_alice.Id, AttendanceStatus.Present)), _ct);
+
+        Assert.Equal(isAllowed ? null : ErrorCodes.RehearsalNotStarted, result.Code);
     }
 
     [Fact]

@@ -12,6 +12,7 @@ namespace Harmonia.Application.Services;
 public class RehearsalAttendanceService(
     IRehearsalRepository rehearsalRepository,
     IMemberProfileRepository memberProfileRepository,
+    ISystemSettingService systemSettingService,
     IMapper mapper) : IRehearsalAttendanceService
 {
     public async Task<Result<List<RehearsalAttendanceDto>>> GetAttendancesAsync(
@@ -34,7 +35,9 @@ public class RehearsalAttendanceService(
         if (rehearsal is null) return Result.Failure(ErrorCodes.RehearsalNotFound);
 
         var now = DateTime.UtcNow;
-        if (now < rehearsal.StartTime) return Result.Failure(ErrorCodes.RehearsalNotStarted);
+        var opensMinutesBefore = await systemSettingService.GetIntAsync(
+            SystemSettingKeys.RehearsalAttendanceOpensMinutesBefore, cancellationToken);
+        if (now < rehearsal.StartTime.AddMinutes(-opensMinutesBefore)) return Result.Failure(ErrorCodes.RehearsalNotStarted);
 
         var memberIds = request.Items.Select(i => i.MemberId).ToList();
         var members = await memberProfileRepository.ListAsync(x => memberIds.Contains(x.Id), cancellationToken);

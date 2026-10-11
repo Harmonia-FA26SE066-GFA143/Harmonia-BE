@@ -26,6 +26,7 @@ public class PracticeAssignmentServiceTests
     private readonly IPracticeSubmissionRepository _submissions = Substitute.For<IPracticeSubmissionRepository>();
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
     private readonly IFileStorageService _storage = Substitute.For<IFileStorageService>();
+    private readonly ISystemSettingService _settings = Substitute.For<ISystemSettingService>();
     private readonly PracticeAssignmentService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
 
@@ -43,7 +44,7 @@ public class PracticeAssignmentServiceTests
             .CreateMapper();
         _sut = new PracticeAssignmentService(
             _assignments, _events, _songs, _materials, _skills, _members, _memberSkills, _submissions,
-            _notifications, _storage, mapper);
+            _notifications, _storage, _settings, mapper);
 
         _storage.UploadAsync(default!, default!, default!, default, default)
             .ReturnsForAnyArgs(Result<FileUploadResponse>.Success(new FileUploadResponse(StoredAudio, "unused")));
@@ -410,6 +411,18 @@ public class PracticeAssignmentServiceTests
 
         Assert.Equal(ErrorCodes.PracticeSubmissionPastDue, result.Code);
         await AssertNothingUploadedAsync();
+    }
+
+    [Fact]
+    public async Task Submit_PastDueDate_IsAcceptedWhenLateSubmissionIsSwitchedOn_Async()
+    {
+        var assignment = ReceivedAssignment(dueInDays: -1);
+        _settings.GetBoolAsync(SystemSettingKeys.PracticeAllowLateSubmission, _ct).Returns(true);
+
+        var result = await SubmitAsync(assignment, NewAudio());
+
+        Assert.NotEqual(ErrorCodes.PracticeSubmissionPastDue, result.Code);
+        await _storage.ReceivedWithAnyArgs(1).UploadAsync(default!, default!, default!, default, default);
     }
 
     [Theory]

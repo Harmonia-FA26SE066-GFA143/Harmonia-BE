@@ -284,6 +284,7 @@ lọc theo cặp `(NotificationId, UserId)` nên "không tồn tại" và "của
 |---|---|---|
 | `SETTING_NOT_FOUND` | 404 | Không tìm thấy cấu hình |
 | `SETTING_VALUE_TYPE_MISMATCH` | 400 | Giá trị không đúng kiểu dữ liệu đã khai báo |
+| `SETTING_VALUE_OUT_OF_RANGE` | 400 | Giá trị nằm ngoài khoảng cho phép |
 | `REPORT_TYPE_NOT_SUPPORTED` | 400 | Loại báo cáo không được hỗ trợ |
 | `REPORT_DATE_RANGE_INVALID` | 400 | Khoảng thời gian không hợp lệ |
 | `REPORT_DATE_RANGE_TOO_LARGE` | 400 | Khoảng thời gian quá dài |
@@ -347,3 +348,4 @@ xem — trả 404, để không lộ sự tồn tại của bản ghi.
   `LOOKUP_INACTIVE` bắt đầu được dùng cho danh mục kỹ năng (UC-32 / FE-49).
 - 2026-10-11: thêm `EVENT_DATE_OUTSIDE_SEASON`. Tạo / sửa sự kiện bắt đầu trả `LOOKUP_NOT_FOUND`,
   `LOOKUP_INACTIVE` khi Id danh mục (mùa, loại lễ, nghi thức, loại sự kiện, nơi cử hành) sai hoặc đã tắt.
+- 2026-10-11: thêm `SETTING_VALUE_OUT_OF_RANGE` (UC-33 / FE-51).

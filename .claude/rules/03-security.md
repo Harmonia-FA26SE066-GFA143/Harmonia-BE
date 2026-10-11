@@ -84,6 +84,8 @@
   Chỉ `ParishPriest` tạo `SongListReview`. Chỉ `Admin` đụng `User`, `Role`,
   `SystemSetting` và 9 bảng lookup. Ngoại lệ: mọi role tự sửa `User.FullName` và `User.Phone`
   của chính mình qua `PUT api/auth/me` (ca viên còn qua `PUT api/member-profiles/me`) (chốt 2026-10-07).
+  Mọi role **đọc** được các `SystemSetting` công khai qua `GET api/system-settings/public`; key nào công khai
+  do `SystemSettingKeys` trong code quyết định, không phải dữ liệu trong bảng (chốt 2026-10-11).
 - **Kiểm quyền hai tầng**: attribute chặn theo role, service chặn theo quyền sở hữu bản ghi.
   `ICurrentUserService` cho biết ai đang gọi.
 - Ca viên chỉ đọc/sửa bản ghi **của chính mình**: `MemberSkill`, `EventParticipation`,
