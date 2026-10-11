@@ -103,6 +103,8 @@ public static class ErrorCodes
 
     public const string SkillInactive = "SKILL_INACTIVE";
 
+    public const string SkillInUse = "SKILL_IN_USE";
+
     public const string SkillCategoryNotFound = "SKILL_CATEGORY_NOT_FOUND";
 
     public const string MemberSkillNotFound = "MEMBER_SKILL_NOT_FOUND";

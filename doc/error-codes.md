@@ -137,6 +137,7 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `SKILL_NOT_FOUND` | 404 | Không tìm thấy kỹ năng |
 | `SKILL_NAME_DUPLICATE` | 409 | Kỹ năng này đã tồn tại trong nhóm |
 | `SKILL_INACTIVE` | 409 | Kỹ năng đã bị vô hiệu hoá |
+| `SKILL_IN_USE` | 409 | Kỹ năng đang được bài hát sử dụng, không thể đổi nhóm |
 | `SKILL_CATEGORY_NOT_FOUND` | 404 | Không tìm thấy nhóm kỹ năng |
 | `MEMBER_SKILL_NOT_FOUND` | 404 | Không tìm thấy kỹ năng đã khai báo |
 | `MEMBER_SKILL_ALREADY_DECLARED` | 409 | Bạn đã khai báo kỹ năng này rồi |
@@ -341,3 +342,5 @@ xem — trả 404, để không lộ sự tồn tại của bản ghi.
   `EXTERNAL_CALENDAR_FAILED`. Thêm `SONG_SKILL_REQUIREMENT_CATEGORY_INVALID` (FE-29).
   `SONG_CLASSIFICATION_DUPLICATE`, `SONG_SKILL_REQUIREMENT_DUPLICATE` đổi 409 → 400: là mã validate field.
   
+- 2026-10-11: thêm `SKILL_IN_USE` (đổi nhóm của kỹ năng đang được bài hát dùng). `LOOKUP_IN_USE` và
+  `LOOKUP_INACTIVE` bắt đầu được dùng cho danh mục kỹ năng (UC-32 / FE-49).

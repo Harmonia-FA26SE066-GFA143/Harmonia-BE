@@ -676,7 +676,8 @@ dữ liệu trong khoảng lọc vẫn hiện với các số bằng 0.
 
 - `action`: `Created`, `Updated`, `Deleted`, `PasswordChanged`.
 - `entityType` đang được ghi: `User`, `Role`, `SystemSetting`, `SongList`, `SongListReview`, `ServiceRoster`,
-  `RosterAssignment`, `MemberSkill`, `LiturgicalEvent`, `MusicMaterial`, `RehearsalAttendance`.
+  `RosterAssignment`, `MemberSkill`, `LiturgicalEvent`, `MusicMaterial`, `RehearsalAttendance`, `Skill`,
+  `SkillCategory`, `MassType`, `CeremonyType`, `EventCategory`, `LiturgicalSeason`.
 - `oldValue` / `newValue` là **chuỗi** chứa một object JSON, FE tự parse. `Updated` chỉ gồm các trường đã đổi;
   `Created` chỉ có `newValue`; `Deleted` chỉ có `oldValue`; `PasswordChanged` không có cả hai.
   Tên trường là tên property phía server (PascalCase); enum ghi bằng tên.
@@ -1457,8 +1458,8 @@ danh sách (dữ liệu cũ vẫn trỏ tới nó). Không phân trang — trả
 
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
-| POST · PUT `{id}` | `/api/lookups/mass-types` · `ceremony-types` · `event-categories` · `skill-categories` | `{ "name", "description?", "isActive" }` | 200 phần tử như bảng trên | 400 `VALIDATION_FAILED` · 404 `LOOKUP_NOT_FOUND` (PUT) · 409 `LOOKUP_NAME_DUPLICATE` |
-| POST · PUT `{id}` | `/api/lookups/skills` | `{ "categoryId", "name", "description?", "isActive" }` | 200 `SkillDto` | 400 `VALIDATION_FAILED` · 404 `SKILL_CATEGORY_NOT_FOUND`, `SKILL_NOT_FOUND` (PUT) · 409 `SKILL_NAME_DUPLICATE` |
+| POST · PUT `{id}` | `/api/lookups/mass-types` · `ceremony-types` · `event-categories` · `skill-categories` | `{ "name", "description?", "isActive" }` | 200 phần tử như bảng trên | 400 `VALIDATION_FAILED` · 404 `LOOKUP_NOT_FOUND` (PUT) · 409 `LOOKUP_NAME_DUPLICATE`, `LOOKUP_IN_USE` (chỉ `skill-categories`) |
+| POST · PUT `{id}` | `/api/lookups/skills` | `{ "categoryId", "name", "description?", "isActive" }` | 200 `SkillDto` | 400 `VALIDATION_FAILED` · 404 `SKILL_CATEGORY_NOT_FOUND`, `SKILL_NOT_FOUND` (PUT) · 409 `SKILL_NAME_DUPLICATE`, `LOOKUP_INACTIVE`, `SKILL_IN_USE` |
 | POST · PUT `{id}` | `/api/lookups/liturgical-seasons` | `{ "name", "startDate", "endDate", "colorHex?", "isActive" }` | 200 `LiturgicalSeasonDto` | 400 `VALIDATION_FAILED` (`SEASON_DATE_INVALID`) · 404 `LOOKUP_NOT_FOUND` (PUT) · 409 `SEASON_DATE_OVERLAP` |
 
 - `isActive` mặc định `true`. **Không có xoá**: các bảng khác đang trỏ tới danh mục, nên muốn bỏ thì gửi
@@ -1469,6 +1470,13 @@ danh sách (dữ liệu cũ vẫn trỏ tới nó). Không phân trang — trả
 - Mùa phụng vụ: `endDate` phải sau `startDate`, nếu không → `SEASON_DATE_INVALID`; `colorHex` dạng `#RRGGBB`.
   Tên mùa được trùng (mỗi năm một dòng), nhưng một mùa đang hoạt động không được trùng khoảng ngày với mùa
   đang hoạt động khác → 409 `SEASON_DATE_OVERLAP`.
+- **5 nhóm kỹ năng cố định không tắt được**: `PUT skill-categories/{id}` với `isActive: false` trên một trong 5 nhóm
+  dưới đây → 409 `LOOKUP_IN_USE`. Đổi tên, mô tả vẫn được. Nhóm do Admin tự tạo thì tắt bình thường.
+- **Không đưa kỹ năng vào nhóm đã tắt**: tạo kỹ năng, hoặc chuyển kỹ năng sang một nhóm có `isActive: false`
+  → 409 `LOOKUP_INACTIVE`. Sửa tên / mô tả của kỹ năng vốn đã nằm trong nhóm tắt vẫn được.
+- **Chuyển nhóm của kỹ năng đang được bài hát dùng**: nếu việc chuyển đưa kỹ năng vào hoặc ra khỏi nhóm
+  `Instrument` trong khi kỹ năng đang nằm trong yêu cầu bè / nhạc cụ của một bài hát → 409 `SKILL_IN_USE`.
+  Chuyển giữa các nhóm không phải nhạc cụ, hoặc chuyển kỹ năng chưa bài nào dùng, vẫn được.
 - Id của 5 nhóm kỹ năng là cố định trên mọi môi trường:
 
 | Nhóm | Id |

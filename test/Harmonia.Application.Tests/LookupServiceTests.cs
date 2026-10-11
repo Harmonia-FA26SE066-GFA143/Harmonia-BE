@@ -18,6 +18,8 @@ public class LookupServiceTests
     private readonly IGenericRepository<SkillCategory> _skillCategories = Substitute.For<IGenericRepository<SkillCategory>>();
     private readonly IGenericRepository<Skill> _skills = Substitute.For<IGenericRepository<Skill>>();
     private readonly IGenericRepository<LiturgicalSeason> _seasons = Substitute.For<IGenericRepository<LiturgicalSeason>>();
+    private readonly IGenericRepository<SongVocalRequirement> _vocalRequirements = Substitute.For<IGenericRepository<SongVocalRequirement>>();
+    private readonly IGenericRepository<SongInstrumentRequirement> _instrumentRequirements = Substitute.For<IGenericRepository<SongInstrumentRequirement>>();
     private readonly LookupService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
 
@@ -27,6 +29,7 @@ public class LookupServiceTests
         {
             cfg.AddProfile<MassTypeProfile>();
             cfg.AddProfile<SkillProfile>();
+            cfg.AddProfile<SkillCategoryProfile>();
             cfg.AddProfile<LiturgicalSeasonProfile>();
         }, NullLoggerFactory.Instance).CreateMapper();
 
@@ -40,7 +43,12 @@ public class LookupServiceTests
             Substitute.For<IGenericRepository<LiturgicalSlot>>(),
             Substitute.For<IGenericRepository<WorshipLocation>>(),
             _skills,
+            _vocalRequirements,
+            _instrumentRequirements,
             mapper);
+
+        Rows(_vocalRequirements);
+        Rows(_instrumentRequirements);
     }
 
     /// <summary>Runs the service's conflict predicate against the given rows, like the database would.</summary>
@@ -92,6 +100,120 @@ public class LookupServiceTests
         var result = await _sut.SaveMassTypeAsync(Guid.NewGuid(), new SaveCatalogItemRequest { Name = "X" }, _ct);
 
         Assert.Equal(ErrorCodes.LookupNotFound, result.Code);
+    }
+
+    [Fact]
+    public async Task SaveSkillCategory_SwitchingOffASeededCategory_ReturnsLookupInUse_ButRenamingWorks_Async()
+    {
+        var vocal = new SkillCategory { Id = SkillCategoryIds.Vocal, Name = "Vocal" };
+        _skillCategories.GetByIdAsync(vocal.Id, _ct).Returns(vocal);
+        Rows(_skillCategories, vocal);
+
+        var off = await _sut.SaveSkillCategoryAsync(vocal.Id, new SaveCatalogItemRequest { Name = "Vocal", IsActive = false }, _ct);
+        var renamed = await _sut.SaveSkillCategoryAsync(vocal.Id, new SaveCatalogItemRequest { Name = "Voices" }, _ct);
+
+        Assert.Equal(ErrorCodes.LookupInUse, off.Code);
+        Assert.True(vocal.IsActive);
+        Assert.Equal("Voices", renamed.Value!.Name);
+    }
+
+    [Fact]
+    public async Task SaveSkillCategory_SwitchingOffAnAdminMadeCategory_IsAllowed_Async()
+    {
+        var custom = new SkillCategory { Id = Guid.NewGuid(), Name = "Dance" };
+        _skillCategories.GetByIdAsync(custom.Id, _ct).Returns(custom);
+        Rows(_skillCategories, custom);
+
+        var result = await _sut.SaveSkillCategoryAsync(custom.Id, new SaveCatalogItemRequest { Name = "Dance", IsActive = false }, _ct);
+
+        Assert.False(result.Value!.IsActive);
+    }
+
+    /// <summary>A skill in <paramref name="fromCategoryId"/>, plus the category the test moves it to.</summary>
+    private Skill ExistingSkill(Guid fromCategoryId, Guid toCategoryId, bool isTargetActive = true)
+    {
+        var skill = new Skill { Id = Guid.NewGuid(), CategoryId = fromCategoryId, Name = "Organ" };
+        _skills.GetByIdAsync(skill.Id, _ct).Returns(skill);
+        _skillCategories.GetByIdAsync(toCategoryId, _ct).Returns(new SkillCategory { Id = toCategoryId, IsActive = isTargetActive });
+        Rows(_skills, skill);
+        return skill;
+    }
+
+    [Fact]
+    public async Task SaveSkill_IntoSwitchedOffCategory_ReturnsLookupInactive_Async()
+    {
+        var off = Guid.NewGuid();
+        var moved = ExistingSkill(SkillCategoryIds.Vocal, off, isTargetActive: false);
+
+        var created = await _sut.SaveSkillAsync(null, new SaveSkillRequest { CategoryId = off, Name = "New" }, _ct);
+        var movedIn = await _sut.SaveSkillAsync(moved.Id, new SaveSkillRequest { CategoryId = off, Name = "Organ" }, _ct);
+
+        Assert.Equal(ErrorCodes.LookupInactive, created.Code);
+        Assert.Equal(ErrorCodes.LookupInactive, movedIn.Code);
+    }
+
+    [Fact]
+    public async Task SaveSkill_EditedInsideItsSwitchedOffCategory_IsAllowed_Async()
+    {
+        var off = Guid.NewGuid();
+        var skill = ExistingSkill(off, off, isTargetActive: false);
+
+        var result = await _sut.SaveSkillAsync(skill.Id, new SaveSkillRequest { CategoryId = off, Name = "Pipe organ" }, _ct);
+
+        Assert.Equal("Pipe organ", result.Value!.Name);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task SaveSkill_MovedAcrossTheInstrumentBoundaryWhileASongRequiresIt_ReturnsSkillInUse_Async(bool leavingInstrument)
+    {
+        var (from, to) = leavingInstrument
+            ? (SkillCategoryIds.Instrument, SkillCategoryIds.Vocal)
+            : (SkillCategoryIds.Vocal, SkillCategoryIds.Instrument);
+        var skill = ExistingSkill(from, to);
+        if (leavingInstrument) Rows(_instrumentRequirements, new SongInstrumentRequirement { SkillId = skill.Id });
+        else Rows(_vocalRequirements, new SongVocalRequirement { SkillId = skill.Id });
+
+        var result = await _sut.SaveSkillAsync(skill.Id, new SaveSkillRequest { CategoryId = to, Name = "Organ" }, _ct);
+
+        Assert.Equal(ErrorCodes.SkillInUse, result.Code);
+        Assert.Equal(from, skill.CategoryId);
+    }
+
+    [Fact]
+    public async Task SaveSkill_MoveThatNoSongDependsOn_IsAllowed_Async()
+    {
+        // An unused skill crossing the boundary.
+        var unused = ExistingSkill(SkillCategoryIds.Vocal, SkillCategoryIds.Instrument);
+
+        var crossed = await _sut.SaveSkillAsync(
+            unused.Id, new SaveSkillRequest { CategoryId = SkillCategoryIds.Instrument, Name = "Organ" }, _ct);
+
+        Assert.Equal(SkillCategoryIds.Instrument, crossed.Value!.CategoryId);
+    }
+
+    [Fact]
+    public async Task SaveSkill_RequiredSkillMovedBetweenNonInstrumentCategories_IsAllowed_Async()
+    {
+        var required = ExistingSkill(SkillCategoryIds.Vocal, SkillCategoryIds.Solo);
+        Rows(_vocalRequirements, new SongVocalRequirement { SkillId = required.Id });
+
+        var sideways = await _sut.SaveSkillAsync(
+            required.Id, new SaveSkillRequest { CategoryId = SkillCategoryIds.Solo, Name = "Organ" }, _ct);
+
+        Assert.Equal(SkillCategoryIds.Solo, sideways.Value!.CategoryId);
+    }
+
+    [Fact]
+    public async Task SaveSkill_UpdateMissingSkill_ReturnsSkillNotFound_Async()
+    {
+        var category = new SkillCategory { Id = Guid.NewGuid() };
+        _skillCategories.GetByIdAsync(category.Id, _ct).Returns(category);
+
+        var result = await _sut.SaveSkillAsync(Guid.NewGuid(), new SaveSkillRequest { CategoryId = category.Id, Name = "Organ" }, _ct);
+
+        Assert.Equal(ErrorCodes.SkillNotFound, result.Code);
     }
 
     [Fact]

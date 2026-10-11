@@ -171,6 +171,29 @@ public sealed class AuditableEntityInterceptorTests : IDisposable
     }
 
     [Fact]
+    public async Task AdminCatalogs_AreAudited_Async()
+    {
+        var category = new SkillCategory { Id = Guid.NewGuid(), Name = "Dance" };
+        var skill = new Skill { Id = Guid.NewGuid(), CategoryId = category.Id, Name = "Sacred dance" };
+        var massType = new MassType { Id = Guid.NewGuid(), Name = "Sunday Mass" };
+        await using (var context = _db.NewContext())
+        {
+            context.AddRange(category, skill, massType);
+            await context.SaveChangesAsync(_ct);
+        }
+
+        await using (var context = _db.NewContext())
+        {
+            (await context.Set<Skill>().SingleAsync(s => s.Id == skill.Id, _ct)).IsActive = false;
+            await context.SaveChangesAsync(_ct);
+        }
+
+        Assert.Equal(nameof(SkillCategory), Assert.Single(await LogsForAsync(category.Id, _ct)).EntityType);
+        Assert.Equal(nameof(MassType), Assert.Single(await LogsForAsync(massType.Id, _ct)).EntityType);
+        Assert.Equal(["Created", "Updated"], (await LogsForAsync(skill.Id, _ct)).Select(l => l.Action));
+    }
+
+    [Fact]
     public async Task MusicMaterial_SoftDeleted_LogsTheIsActiveChange_Async()
     {
         var material = new MusicMaterial

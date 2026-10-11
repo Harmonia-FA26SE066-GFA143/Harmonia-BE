@@ -19,6 +19,8 @@ public class LookupService(
     IGenericRepository<LiturgicalSlot> liturgicalSlots,
     IGenericRepository<WorshipLocation> worshipLocations,
     IGenericRepository<Skill> skills,
+    IGenericRepository<SongVocalRequirement> songVocalRequirements,
+    IGenericRepository<SongInstrumentRequirement> songInstrumentRequirements,
     IMapper mapper) : ILookupService
 {
     public async Task<Result<List<MassTypeDto>>> GetMassTypesAsync(bool includeInactive, CancellationToken cancellationToken)
@@ -111,6 +113,12 @@ public class LookupService(
 
     public Task<Result<SkillCategoryDto>> SaveSkillCategoryAsync(Guid? id, SaveCatalogItemRequest request, CancellationToken cancellationToken)
     {
+        // Code refers to the seeded categories by id (SkillCategoryIds), so they can be renamed but must stay on.
+        if (id is { } categoryId && !request.IsActive && SkillCategoryIds.IsFixed(categoryId))
+        {
+            return Task.FromResult(Result<SkillCategoryDto>.Failure(ErrorCodes.LookupInUse));
+        }
+
         var name = request.Name.Trim();
         return SaveAsync<SkillCategory, SkillCategoryDto>(
             skillCategories, id, ErrorCodes.LookupNotFound,
@@ -121,9 +129,33 @@ public class LookupService(
 
     public async Task<Result<SkillDto>> SaveSkillAsync(Guid? id, SaveSkillRequest request, CancellationToken cancellationToken)
     {
-        if (await skillCategories.GetByIdAsync(request.CategoryId, cancellationToken) is null)
+        var category = await skillCategories.GetByIdAsync(request.CategoryId, cancellationToken);
+        if (category is null)
         {
             return Result<SkillDto>.Failure(ErrorCodes.SkillCategoryNotFound);
+        }
+
+        var existing = id is { } skillId ? await skills.GetByIdAsync(skillId, cancellationToken) : null;
+        if (id is not null && existing is null)
+        {
+            return Result<SkillDto>.Failure(ErrorCodes.SkillNotFound);
+        }
+
+        if (existing?.CategoryId != request.CategoryId)
+        {
+            // A skill already sitting in a switched-off category can still be edited there.
+            if (!category.IsActive)
+            {
+                return Result<SkillDto>.Failure(ErrorCodes.LookupInactive);
+            }
+
+            // Songs keep vocal and instrument requirements in separate tables, split by this very boundary.
+            if (existing is not null
+                && (existing.CategoryId == SkillCategoryIds.Instrument) != (request.CategoryId == SkillCategoryIds.Instrument)
+                && await IsRequiredBySongsAsync(existing.Id, cancellationToken))
+            {
+                return Result<SkillDto>.Failure(ErrorCodes.SkillInUse);
+            }
         }
 
         var name = request.Name.Trim();
@@ -133,6 +165,10 @@ public class LookupService(
             x => { x.CategoryId = request.CategoryId; x.Name = name; x.Description = request.Description; x.IsActive = request.IsActive; },
             cancellationToken);
     }
+
+    private async Task<bool> IsRequiredBySongsAsync(Guid skillId, CancellationToken cancellationToken) =>
+        (await songVocalRequirements.ListAsync(x => x.SkillId == skillId, cancellationToken)).Count > 0
+        || (await songInstrumentRequirements.ListAsync(x => x.SkillId == skillId, cancellationToken)).Count > 0;
 
     /// <summary>
     /// Season names repeat every year, so only the dates must not overlap another active season.

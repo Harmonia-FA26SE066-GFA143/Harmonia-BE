@@ -61,6 +61,7 @@ public static class ErrorStatusMap
         [ErrorCodes.SkillNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.SkillNameDuplicate] = StatusCodes.Status409Conflict,
         [ErrorCodes.SkillInactive] = StatusCodes.Status409Conflict,
+        [ErrorCodes.SkillInUse] = StatusCodes.Status409Conflict,
         [ErrorCodes.SkillCategoryNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.MemberSkillNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.MemberSkillAlreadyDeclared] = StatusCodes.Status409Conflict,
