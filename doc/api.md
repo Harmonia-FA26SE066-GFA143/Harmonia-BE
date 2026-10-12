@@ -399,7 +399,7 @@ Chưa có kỹ năng nào → `[]`.
 
 ---
 
-## 4b. Lịch phụng vụ & sự kiện — `api/liturgical-days`, `api/liturgical-events` · role `ParishPriest` · tiến độ chuẩn bị: `ChoirDirector` · lịch sắp tới `api/schedule`: mọi role (UC-12 / UC-04 / UC-15 / UC-30)
+## 4b. Lịch phụng vụ & sự kiện — `api/liturgical-days`, `api/liturgical-events` · role `ParishPriest` · tiến độ chuẩn bị: `ChoirDirector` · tra ngày phụng vụ, lịch sắp tới `api/schedule`: mọi role (UC-12 / UC-04 / UC-15 / UC-30)
 
 ### `LiturgicalDayDto`
 
@@ -432,11 +432,11 @@ Chưa có kỹ năng nào → `[]`.
 
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
-| GET | `/api/liturgical-days/{date}` (`date` dạng `yyyy-MM-dd`) | — | 200 `LiturgicalDayDto` | 404 `CALENDAR_DAY_NOT_FOUND` |
+| GET | `/api/liturgical-days/{date}` (`date` dạng `yyyy-MM-dd`) · mọi role | — | 200 `LiturgicalDayDto` | 404 `CALENDAR_DAY_NOT_FOUND` |
 | POST | `/api/liturgical-days/import` | `multipart/form-data`: `file` (.ics) | 200 số ngày mới thêm (`int`) | 400 `CALENDAR_FILE_REQUIRED`, `CALENDAR_FILE_TYPE_NOT_ALLOWED`, `CALENDAR_FILE_INVALID` · 413 `CALENDAR_FILE_TOO_LARGE` |
 | GET | `/api/liturgical-events?fromDate=&toDate=&status=&pageNumber=&pageSize=` | — | 200 `PagedList<LiturgicalEventDto>` | — |
 | GET | `/api/liturgical-events/{id}` | — | 200 `LiturgicalEventDto` | 404 `EVENT_NOT_FOUND` |
-| POST | `/api/liturgical-events` | `{ "eventDate", "time", "liturgicalSeasonId?", "massTypeId?", "ceremonyTypeId?", "categoryId?", "locationId", "title?", "specialRequirements?" }` | 200 `LiturgicalEventDto` | 400 `VALIDATION_FAILED` (`EVENT_TYPE_REQUIRED`) · 409 `EVENT_SLOT_TAKEN` |
+| POST | `/api/liturgical-events` | `{ "eventDate", "time", "liturgicalSeasonId?", "massTypeId?", "ceremonyTypeId?", "categoryId?", "locationId", "title?", "specialRequirements?" }` | 200 `LiturgicalEventDto` | 400 `VALIDATION_FAILED` (`EVENT_TYPE_REQUIRED`), `EVENT_DATE_OUTSIDE_SEASON` · 404 `LOOKUP_NOT_FOUND` · 409 `EVENT_SLOT_TAKEN`, `LOOKUP_INACTIVE` |
 | PUT | `/api/liturgical-events/{id}` | như `POST` | 200 `LiturgicalEventDto` | 400 `VALIDATION_FAILED` (`EVENT_TYPE_REQUIRED`), `EVENT_DATE_OUTSIDE_SEASON` · 404 `EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND` · 409 `EVENT_CANCELLED`, `EVENT_SLOT_TAKEN`, `LOOKUP_INACTIVE` |
 | PATCH | `/api/liturgical-events/{id}/publish` | — | 200 `LiturgicalEventDto` | 404 `EVENT_NOT_FOUND` · 409 `EVENT_ALREADY_PUBLISHED`, `EVENT_CANCELLED` |
 | PATCH | `/api/liturgical-events/{id}/cancel` | — | 200 `LiturgicalEventDto` | 404 `EVENT_NOT_FOUND` · 409 `EVENT_CANCELLED`, `EVENT_ALREADY_PASSED` |
@@ -1484,11 +1484,11 @@ danh sách (dữ liệu cũ vẫn trỏ tới nó). Không phân trang — trả
 | `GET /api/lookups/mass-types` | `{ "id", "name", "description", "isActive" }` | tên |
 | `GET /api/lookups/ceremony-types` | `{ "id", "name", "description", "isActive" }` | tên |
 | `GET /api/lookups/event-categories` | `{ "id", "name", "description", "isActive" }` | tên |
-| `GET /api/lookups/song-themes` | `{ "id", "name", "description" }` | tên |
+| `GET /api/lookups/song-themes` | `{ "id", "name", "description", "isActive" }` | tên |
 | `GET /api/lookups/skill-categories` | `{ "id", "name", "description", "isActive" }` | tên |
 | `GET /api/lookups/liturgical-seasons` | `{ "id", "name", "startDate", "endDate", "colorHex", "isActive" }` | `startDate` |
-| `GET /api/lookups/liturgical-slots` | `{ "id", "name", "defaultOrder" }` | `defaultOrder` (thứ tự trong lễ) |
-| `GET /api/lookups/worship-locations` | `{ "id", "name", "address" }` | tên |
+| `GET /api/lookups/liturgical-slots` | `{ "id", "name", "defaultOrder", "isActive" }` | `defaultOrder` (thứ tự trong lễ) |
+| `GET /api/lookups/worship-locations` | `{ "id", "name", "address", "isActive" }` | tên |
 | `GET /api/lookups/skills?categoryId=` | `{ "id", "categoryId", "name", "description", "isActive" }` | tên |
 
 - `description`, `address`, `colorHex` có thể `null`.
