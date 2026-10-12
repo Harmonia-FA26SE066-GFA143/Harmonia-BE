@@ -63,7 +63,7 @@ public class DirectorNoteService(
         {
             await notificationService.SendAsync(
                 new SendNotificationRequest(
-                    NotificationType.DirectorNote, "New note from the parish priest", preview,
+                    NotificationType.DirectorNote, "Ghi chú mới từ cha xứ", preview,
                     [note.ToUserId], nameof(DirectorNote), note.Id),
                 cancellationToken);
         }

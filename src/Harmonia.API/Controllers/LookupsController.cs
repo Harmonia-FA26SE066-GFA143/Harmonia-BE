@@ -60,8 +60,18 @@ public class LookupsController(ILookupService lookupService) : ApiControllerBase
         ToActionResult(await lookupService.SaveEventCategoryAsync(id, request, cancellationToken));
 
     [HttpGet("song-themes")]
-    public async Task<IActionResult> GetSongThemesAsync(CancellationToken cancellationToken) =>
-        ToActionResult(await lookupService.GetSongThemesAsync(cancellationToken));
+    public async Task<IActionResult> GetSongThemesAsync([FromQuery] bool includeInactive, CancellationToken cancellationToken) =>
+        ToActionResult(await lookupService.GetSongThemesAsync(ShowInactive(includeInactive), cancellationToken));
+
+    [HttpPost("song-themes")]
+    [Authorize(Roles = RoleNames.Admin)]
+    public async Task<IActionResult> CreateSongThemeAsync([FromBody] SaveCatalogItemRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await lookupService.SaveSongThemeAsync(null, request, cancellationToken));
+
+    [HttpPut("song-themes/{id:guid}")]
+    [Authorize(Roles = RoleNames.Admin)]
+    public async Task<IActionResult> UpdateSongThemeAsync(Guid id, [FromBody] SaveCatalogItemRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await lookupService.SaveSongThemeAsync(id, request, cancellationToken));
 
     [HttpGet("skill-categories")]
     public async Task<IActionResult> GetSkillCategoriesAsync([FromQuery] bool includeInactive, CancellationToken cancellationToken) =>
@@ -92,12 +102,32 @@ public class LookupsController(ILookupService lookupService) : ApiControllerBase
         ToActionResult(await lookupService.SaveLiturgicalSeasonAsync(id, request, cancellationToken));
 
     [HttpGet("liturgical-slots")]
-    public async Task<IActionResult> GetLiturgicalSlotsAsync(CancellationToken cancellationToken) =>
-        ToActionResult(await lookupService.GetLiturgicalSlotsAsync(cancellationToken));
+    public async Task<IActionResult> GetLiturgicalSlotsAsync([FromQuery] bool includeInactive, CancellationToken cancellationToken) =>
+        ToActionResult(await lookupService.GetLiturgicalSlotsAsync(ShowInactive(includeInactive), cancellationToken));
+
+    [HttpPost("liturgical-slots")]
+    [Authorize(Roles = RoleNames.Admin)]
+    public async Task<IActionResult> CreateLiturgicalSlotAsync([FromBody] SaveLiturgicalSlotRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await lookupService.SaveLiturgicalSlotAsync(null, request, cancellationToken));
+
+    [HttpPut("liturgical-slots/{id:guid}")]
+    [Authorize(Roles = RoleNames.Admin)]
+    public async Task<IActionResult> UpdateLiturgicalSlotAsync(Guid id, [FromBody] SaveLiturgicalSlotRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await lookupService.SaveLiturgicalSlotAsync(id, request, cancellationToken));
 
     [HttpGet("worship-locations")]
-    public async Task<IActionResult> GetWorshipLocationsAsync(CancellationToken cancellationToken) =>
-        ToActionResult(await lookupService.GetWorshipLocationsAsync(cancellationToken));
+    public async Task<IActionResult> GetWorshipLocationsAsync([FromQuery] bool includeInactive, CancellationToken cancellationToken) =>
+        ToActionResult(await lookupService.GetWorshipLocationsAsync(ShowInactive(includeInactive), cancellationToken));
+
+    [HttpPost("worship-locations")]
+    [Authorize(Roles = RoleNames.Admin)]
+    public async Task<IActionResult> CreateWorshipLocationAsync([FromBody] SaveWorshipLocationRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await lookupService.SaveWorshipLocationAsync(null, request, cancellationToken));
+
+    [HttpPut("worship-locations/{id:guid}")]
+    [Authorize(Roles = RoleNames.Admin)]
+    public async Task<IActionResult> UpdateWorshipLocationAsync(Guid id, [FromBody] SaveWorshipLocationRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await lookupService.SaveWorshipLocationAsync(id, request, cancellationToken));
 
     [HttpGet("skills")]
     public async Task<IActionResult> GetSkillsAsync(

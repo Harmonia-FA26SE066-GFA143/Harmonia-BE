@@ -314,7 +314,7 @@ public class SongListServiceTests
         await _notifications.Received(1).SendAsync(
             Arg.Is<SendNotificationRequest>(r => r.Type == NotificationType.SongListSubmitted
                 && r.RecipientUserIds.SequenceEqual(new[] { _priestId })
-                && r.Content.Contains("version 2")
+                && r.Content.Contains("phiên bản 2")
                 && r.ReferenceType == nameof(SongList) && r.ReferenceId == songList.Id),
             _ct);
     }
@@ -370,9 +370,9 @@ public class SongListServiceTests
     // ---- Review ----
 
     [Theory]
-    [InlineData(ReviewDecision.Approve, SongListStatus.Approved, "approved")]
-    [InlineData(ReviewDecision.Reject, SongListStatus.Rejected, "rejected")]
-    [InlineData(ReviewDecision.RequestRevision, SongListStatus.NeedsRevision, "needs revision")]
+    [InlineData(ReviewDecision.Approve, SongListStatus.Approved, "đã được duyệt")]
+    [InlineData(ReviewDecision.Reject, SongListStatus.Rejected, "đã bị từ chối")]
+    [InlineData(ReviewDecision.RequestRevision, SongListStatus.NeedsRevision, "cần chỉnh sửa")]
     public async Task Review_Submitted_SetsStatus_StoresReview_AndNotifiesProposer_Async(
         ReviewDecision decision, SongListStatus expectedStatus, string expectedWording)
     {

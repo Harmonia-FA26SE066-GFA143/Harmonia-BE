@@ -37,4 +37,13 @@ public interface ILiturgicalEventRepository : IGenericRepository<LiturgicalEvent
     /// </summary>
     Task<PagedList<LiturgicalEvent>> GetHistoryForMemberAsync(
         Guid memberId, SearchMyParticipationHistoryRequest filter, DateOnly today, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Read-only page of Published events before <paramref name="today"/>, newest first, narrowed by the event,
+    /// season and date range of <paramref name="filter"/>. LiturgicalSeason, Location, EventParticipations,
+    /// ServiceRoster.Assignments and Rehearsals.Attendances are loaded; SongLists holds only Approved
+    /// versions, with their Items.
+    /// </summary>
+    Task<PagedList<LiturgicalEvent>> GetServiceHistoryAsync(
+        SearchReportsRequest filter, DateOnly today, CancellationToken cancellationToken);
 }

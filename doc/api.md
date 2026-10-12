@@ -437,7 +437,7 @@ Chưa có kỹ năng nào → `[]`.
 | GET | `/api/liturgical-events?fromDate=&toDate=&status=&pageNumber=&pageSize=` | — | 200 `PagedList<LiturgicalEventDto>` | — |
 | GET | `/api/liturgical-events/{id}` | — | 200 `LiturgicalEventDto` | 404 `EVENT_NOT_FOUND` |
 | POST | `/api/liturgical-events` | `{ "eventDate", "time", "liturgicalSeasonId?", "massTypeId?", "ceremonyTypeId?", "categoryId?", "locationId", "title?", "specialRequirements?" }` | 200 `LiturgicalEventDto` | 400 `VALIDATION_FAILED` (`EVENT_TYPE_REQUIRED`) · 409 `EVENT_SLOT_TAKEN` |
-| PUT | `/api/liturgical-events/{id}` | như `POST` | 200 `LiturgicalEventDto` | 400 `VALIDATION_FAILED` (`EVENT_TYPE_REQUIRED`) · 404 `EVENT_NOT_FOUND` · 409 `EVENT_CANCELLED`, `EVENT_SLOT_TAKEN` |
+| PUT | `/api/liturgical-events/{id}` | như `POST` | 200 `LiturgicalEventDto` | 400 `VALIDATION_FAILED` (`EVENT_TYPE_REQUIRED`), `EVENT_DATE_OUTSIDE_SEASON` · 404 `EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND` · 409 `EVENT_CANCELLED`, `EVENT_SLOT_TAKEN`, `LOOKUP_INACTIVE` |
 | PATCH | `/api/liturgical-events/{id}/publish` | — | 200 `LiturgicalEventDto` | 404 `EVENT_NOT_FOUND` · 409 `EVENT_ALREADY_PUBLISHED`, `EVENT_CANCELLED` |
 | PATCH | `/api/liturgical-events/{id}/cancel` | — | 200 `LiturgicalEventDto` | 404 `EVENT_NOT_FOUND` · 409 `EVENT_CANCELLED`, `EVENT_ALREADY_PASSED` |
 | GET | `/api/schedule/events` · mọi role | — | 200 `LiturgicalEventSummaryDto[]` | — |
@@ -464,6 +464,11 @@ Chưa có kỹ năng nào → `[]`.
 - Mỗi sự kiện công bố riêng (D6). Ca viên chỉ thấy sự kiện `Published`.
 - Danh sách (`GET`) trả sự kiện **mọi trạng thái** (kể cả `Draft`, `Cancelled`), sắp theo ngày rồi giờ; các bộ lọc
   `fromDate`, `toDate` (bao gồm hai đầu, `yyyy-MM-dd`) và `status` kết hợp AND, đều tuỳ chọn.
+- **Kiểm danh mục (cả `POST` lẫn `PUT`)**: `liturgicalSeasonId`, `massTypeId`, `ceremonyTypeId`, `categoryId`, `locationId`
+  phải trỏ tới mục có thật → nếu không 404 `LOOKUP_NOT_FOUND`; mục đã tắt (`isActive: false`) → 409 `LOOKUP_INACTIVE`.
+  Lỗi không cho biết trường nào sai. Khi `PUT`, Id giữ nguyên so với sự kiện hiện tại vẫn được chấp nhận dù mục đã tắt.
+- **Ngày phải thuộc mùa**: có `liturgicalSeasonId` mà `eventDate` nằm ngoài `startDate`–`endDate` của mùa → 400
+  `EVENT_DATE_OUTSIDE_SEASON`. Kiểm ở mọi lần lưu, nên sự kiện cũ đang lệch mùa phải chọn lại mùa (hoặc bỏ trống) mới sửa được.
 - Sửa (`PUT`) được khi sự kiện `Draft` hoặc `Published`; gửi đủ mọi trường như `POST`. Sửa không đổi trạng thái,
   không gửi thông báo. Trùng ngày + giờ + địa điểm với sự kiện **khác** → 409 `EVENT_SLOT_TAKEN`.
 - Huỷ (`cancel`) chuyển sang `Cancelled`, không hoàn tác được; sự kiện đã qua (trước hôm nay theo giờ Việt Nam)
@@ -513,6 +518,218 @@ Chưa có kỹ năng nào → `[]`.
 - `rosterShortages`: giống `GET /api/service-rosters/shortages?eventId=`; `null` khi chưa có danh sách bài hát được duyệt (chưa biết cần bao nhiêu người), `[]` khi đủ người.
 - `attendanceExpected` = `rehearsalsHeld` × số ca viên đang hoạt động; `attendancePresent` = tổng lượt `Present` + `Late`.
 - `practice*`: cộng dồn các cột `assignments*` của `preparation-progress` trên mọi ca viên đang hoạt động.
+
+---
+
+## 4c. Reports — `api/reports` · role `ParishPriest`, `Admin` (UC-16 / FE-22) · 4 báo cáo quản trị và xuất file: chỉ `Admin` (UC-34 / FE-52, UC-34E / FE-53)
+
+| Method | Route | Role | Query | Thành công | Lỗi |
+|---|---|---|---|---|---|
+| GET | `/api/reports/service-history` | `ParishPriest`, `Admin` | `eventId`, `liturgicalSeasonId`, `fromDate`, `toDate`, `pageNumber`, `pageSize` | 200 `PagedList<ServiceHistoryDto>` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`) |
+| GET | `/api/reports/song-usage` | `ParishPriest`, `Admin` | như trên | 200 `PagedList<SongUsageDto>` | như trên |
+| GET | `/api/reports/user-activity` | `Admin` | `fromDate`, `toDate`, `pageNumber`, `pageSize` | 200 `PagedList<UserActivityDto>` | như trên |
+| GET | `/api/reports/rehearsal-attendance` | `Admin` | như `service-history` | 200 `PagedList<RehearsalAttendanceReportDto>` | như trên |
+| GET | `/api/reports/participation` | `Admin` | như `service-history` | 200 `PagedList<ParticipationReportDto>` | như trên |
+| GET | `/api/reports/assignment-completion` | `Admin` | như `service-history` | 200 `PagedList<AssignmentCompletionDto>` | như trên |
+| GET | `/api/reports/export` | `Admin` | `type`, `format`, `eventId`, `liturgicalSeasonId`, `fromDate`, `toDate` | 200 file tải về | 400 `VALIDATION_FAILED` (`REPORT_TYPE_NOT_SUPPORTED`, `REPORT_DATE_RANGE_INVALID`) · 404 `REPORT_NO_DATA` · 502 `EXTERNAL_STORAGE_FAILED` |
+| GET | `/api/reports/exports` | `Admin` | `pageNumber`, `pageSize` | 200 `PagedList<ReportExportDto>` | — |
+
+- `eventId` thu hẹp báo cáo về một sự kiện; `user-activity` bỏ qua tham số này.
+- Các bộ lọc đều tuỳ chọn, kết hợp AND; `fromDate`, `toDate` bao gồm hai đầu (`yyyy-MM-dd`, giờ Việt Nam).
+  `fromDate` > `toDate` → 400, mã `REPORT_DATE_RANGE_INVALID` ở trường `toDate`.
+- `service-history` và `song-usage` chỉ xét sự kiện `Published` **trước hôm nay** (giờ Việt Nam).
+- Role khác gọi vào → `403` body rỗng.
+
+### Xuất báo cáo (UC-34E / FE-53)
+
+- `type` (bắt buộc): `UserActivity`, `RehearsalAttendance`, `Participation`, `AssignmentCompletion`, `SongUsage`,
+  `ServiceHistory`. Thiếu hoặc sai → 400, mã `REPORT_TYPE_NOT_SUPPORTED` ở trường `type`.
+- `format`: `Csv` (mặc định), `Xlsx`, `Pdf`, `Xml`, `Json`. Giá trị lạ → 400 `VALIDATION_FAILED`.
+- Bộ lọc giống báo cáo đang xem. "Theo tháng": gửi `fromDate` / `toDate` là ngày đầu và ngày cuối tháng;
+  "theo sự kiện": `eventId`; "theo mùa phụng vụ": `liturgicalSeasonId`.
+- File chứa **mọi dòng** khớp bộ lọc — `pageNumber`, `pageSize` bị bỏ qua. Báo cáo rỗng → 404 `REPORT_NO_DATA`.
+- Response là file nhị phân, tên trong header `Content-Disposition` dạng `RehearsalAttendance-20261011-153000.csv`
+  (giờ Việt Nam). `Content-Type` theo định dạng: `text/csv`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,
+  `application/pdf`, `text/xml`, `application/json`.
+- CSV, XLSX, PDF có tiêu đề cột tiếng Việt và ngày dạng `dd/MM/yyyy`; XML, JSON dùng tên trường của API và ngày ISO.
+  CSV là UTF-8 có BOM; ô bắt đầu bằng `=`, `+`, `-`, `@` được thêm `'` phía trước.
+- Mỗi lần xuất được lưu lại: file cất riêng tư trên kho lưu trữ, kho lỗi thì cả lần xuất trả `EXTERNAL_STORAGE_FAILED`
+  và không có file nào được phát ra.
+
+#### `ReportExportDto` — lịch sử xuất
+
+```json
+{
+  "id": "guid", "reportType": "RehearsalAttendance", "format": "Xlsx",
+  "eventId": null, "liturgicalSeasonId": "guid", "fromDate": "2026-10-01", "toDate": "2026-10-31",
+  "exportedBy": "guid", "exportedByName": "Quản trị viên", "exportedAt": "2026-10-11T08:30:00Z",
+  "downloadUrl": "https://..."
+}
+```
+
+- Mới nhất trước; mọi Admin thấy lịch sử của nhau. Bốn trường bộ lọc là giá trị đã dùng lúc xuất, có thể `null`.
+- `downloadUrl` là link ký ngắn hạn tới đúng file đã xuất; hết hạn thì gọi lại danh sách để lấy link mới.
+
+### Báo cáo quản trị (UC-34 / FE-52)
+
+Ba báo cáo theo ca viên (`rehearsal-attendance`, `participation`, `assignment-completion`) liệt kê **mọi ca viên
+`Active`**, sắp theo tên. Bộ lọc chỉ thu hẹp dữ liệu được đếm, không bỏ ca viên khỏi danh sách — ca viên không có
+dữ liệu trong khoảng lọc vẫn hiện với các số bằng 0.
+
+#### `UserActivityDto` — hoạt động tài khoản
+
+```json
+{
+  "userId": "guid", "fullName": "Nguyễn Văn A", "email": "a@example.com", "roleName": "ChoirMember",
+  "isActive": true, "lastLoginAt": "2026-10-10T12:30:00Z",
+  "passwordChangeCount": 1, "passwordResetCount": 0, "accountChangeCount": 2, "actionCount": 5
+}
+```
+
+- Mỗi dòng một tài khoản (kể cả đã khoá), sắp theo email. `liturgicalSeasonId` không áp dụng cho báo cáo này.
+- `lastLoginAt`: giá trị hiện tại, không phụ thuộc khoảng lọc; `null` nếu chưa đăng nhập lần nào.
+- `passwordChangeCount`: số lần tự đổi mật khẩu khi đang đăng nhập. `passwordResetCount`: số lần đặt lại qua link
+  email. Hai số này chỉ có từ khi hệ thống bắt đầu ghi sự kiện đổi mật khẩu (2026-10-11).
+- `accountChangeCount`: số lần tài khoản bị sửa — role, khoá / mở, họ tên, số điện thoại, email.
+- `actionCount`: số dòng nhật ký hoạt động do người này gây ra (duyệt kỹ năng, duyệt danh sách bài hát, chốt phân công…).
+- Hệ thống không lưu từng lần đăng nhập / đăng xuất, nên không có số đếm cho hai việc đó.
+
+#### `RehearsalAttendanceReportDto` — điểm danh buổi tập
+
+```json
+{ "memberId": "guid", "fullName": "Nguyễn Văn A", "presentCount": 6, "lateCount": 1, "absentCount": 1, "excusedCount": 0 }
+```
+
+- Đếm các dòng điểm danh đã ghi ở buổi tập **bắt đầu** trong khoảng lọc. Buổi chưa điểm danh không tính vào số nào.
+- Có `liturgicalSeasonId` thì chỉ tính buổi tập gắn với sự kiện thuộc mùa đó; buổi tập không gắn sự kiện bị bỏ.
+
+#### `ParticipationReportDto` — xác nhận tham gia
+
+```json
+{ "memberId": "guid", "fullName": "Nguyễn Văn A", "invitedCount": 1, "confirmedCount": 7, "declinedCount": 1, "unsureCount": 0 }
+```
+
+- Đếm theo trạng thái xác nhận ở các sự kiện `Published` có ngày trong khoảng lọc, **gồm cả sự kiện sắp tới**.
+  `invitedCount` là số yêu cầu chưa trả lời.
+
+#### `AssignmentCompletionDto` — hoàn thành bài tập
+
+```json
+{
+  "memberId": "guid", "fullName": "Nguyễn Văn A",
+  "assignedCount": 5, "passedCount": 3, "needsRevisionCount": 1, "awaitingReviewCount": 0, "notSubmittedCount": 1
+}
+```
+
+- Xét bài tập có **hạn nộp** trong khoảng lọc mà ca viên nhận (giao cho tất cả, giao đích danh, hoặc giao theo
+  kỹ năng ca viên đang được duyệt). Có `liturgicalSeasonId` thì chỉ tính bài gắn với sự kiện thuộc mùa đó.
+- Mỗi bài rơi vào đúng một trong bốn số sau theo **lần nộp mới nhất**; tổng bốn số bằng `assignedCount`.
+  `awaitingReviewCount`: đã nộp, chưa chấm. `notSubmittedCount`: chưa nộp.
+
+### `ServiceHistoryDto` — lịch sử phục vụ & kết quả chuẩn bị
+
+```json
+{
+  "eventId": "guid", "eventDate": "2026-09-27", "time": "07:00:00", "title": "Chúa nhật XXVI Thường niên",
+  "liturgicalSeasonName": "Mùa Thường niên", "locationName": "Nhà thờ chính",
+  "songCount": 5, "membersServed": 18,
+  "participationConfirmed": 25, "participationDeclined": 2,
+  "rehearsalsHeld": 2, "attendancePresent": 51
+}
+```
+
+- Mỗi dòng một sự kiện, mới nhất trước. `title`, `liturgicalSeasonName` có thể `null`.
+- `songCount`: số bài trong danh sách bài hát `Approved`; `0` nếu không có bản nào được duyệt.
+- `membersServed`: số ca viên khác nhau có dòng phân công `Active` trên roster `Finalized`; roster chưa chốt → `0`.
+- `rehearsalsHeld`: buổi tập gắn với sự kiện đã bắt đầu; `attendancePresent`: tổng lượt `Present` + `Late` ở các buổi đó.
+- Số liệu chi tiết của một sự kiện (thiếu người, bài tập đạt / quá hạn): `GET /api/liturgical-events/{id}/preparation-status`.
+
+### `SongUsageDto` — tần suất dùng bài hát
+
+```json
+{ "songId": "guid", "title": "Kinh Hoà Bình", "composer": "Kim Long", "timesUsed": 4, "lastUsedDate": "2026-09-27" }
+```
+
+- `timesUsed`: số **sự kiện** có bài này trong danh sách bài hát `Approved`; một bài hát hai lần trong cùng sự kiện tính 1.
+- Sắp theo `timesUsed` giảm dần rồi theo tên. Bài chưa dùng lần nào vẫn có trong danh sách với `timesUsed = 0`,
+  `lastUsedDate = null`. Bài đã xoá khỏi thư viện chỉ hiện khi từng được dùng trong khoảng lọc.
+- Bộ lọc chỉ thu hẹp tập sự kiện được đếm, không bỏ bài hát khỏi danh sách.
+
+---
+
+## 4d. Audit logs — `api/audit-logs` · role `Admin` (UC-35 / FE-54)
+
+| Method | Route | Query | Thành công | Lỗi |
+|---|---|---|---|---|
+| GET | `/api/audit-logs` | `userId`, `entityType`, `entityId`, `action`, `fromDate`, `toDate`, `pageNumber`, `pageSize` | 200 `PagedList<AuditLogDto>` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`) |
+
+- Mới nhất trước. Các bộ lọc đều tuỳ chọn, kết hợp AND, so khớp chính xác. `userId` là **người thực hiện**;
+  `fromDate`, `toDate` bao gồm hai đầu (`yyyy-MM-dd`, giờ Việt Nam). `fromDate` > `toDate` → 400 ở trường `toDate`.
+- Role khác gọi vào → `403` body rỗng.
+
+### `AuditLogDto`
+
+```json
+{
+  "id": "guid", "createdAt": "2026-10-11T08:30:00Z",
+  "userId": "guid", "userFullName": "Quản trị viên", "userEmail": "admin@example.com",
+  "action": "Updated", "entityType": "User", "entityId": "guid",
+  "oldValue": "{\"IsActive\":true}", "newValue": "{\"IsActive\":false}",
+  "ipAddress": "203.0.113.5"
+}
+```
+
+- `action`: `Created`, `Updated`, `Deleted`, `PasswordChanged`.
+- `entityType` đang được ghi: `User`, `Role`, `SystemSetting`, `SongList`, `SongListReview`, `ServiceRoster`,
+  `RosterAssignment`, `MemberSkill`, `LiturgicalEvent`, `MusicMaterial`, `RehearsalAttendance`, `Skill`,
+  `SkillCategory`, `MassType`, `CeremonyType`, `EventCategory`, `LiturgicalSeason`, `SongTheme`, `LiturgicalSlot`,
+  `WorshipLocation`.
+- `oldValue` / `newValue` là **chuỗi** chứa một object JSON, FE tự parse. `Updated` chỉ gồm các trường đã đổi;
+  `Created` chỉ có `newValue`; `Deleted` chỉ có `oldValue`; `PasswordChanged` không có cả hai.
+  Tên trường là tên property phía server (PascalCase); enum ghi bằng tên.
+- Mật khẩu và token không bao giờ xuất hiện trong hai trường này.
+- `userId`, `userFullName`, `userEmail` là `null` khi không ai đăng nhập lúc thay đổi xảy ra — ví dụ
+  `PasswordChanged` qua link đặt lại mật khẩu. `PasswordChanged` có `userId` là người dùng tự đổi.
+- Xoá tư liệu hiện ra là `MusicMaterial` + `Updated` với `newValue` = `{"IsActive":false}`.
+- `RehearsalAttendance` chỉ được ghi khi **sửa trạng thái** của một dòng đã điểm danh; lần điểm danh đầu không ghi.
+- Đăng nhập, đăng xuất không được ghi.
+
+---
+
+## 4e. System settings — `api/system-settings` · sửa: `Admin` · đọc cài đặt công khai: mọi role (UC-33 / FE-51)
+
+| Method | Route | Role | Body | Thành công | Lỗi |
+|---|---|---|---|---|---|
+| GET | `/api/system-settings` | `Admin` | — | 200 `SystemSettingDto[]` | — |
+| GET | `/api/system-settings/public` | mọi role | — | 200 `SystemSettingDto[]` (chỉ key công khai) | — |
+| PUT | `/api/system-settings/{id}` | `Admin` | `{ "value" }` | 200 `SystemSettingDto` | 400 `VALIDATION_FAILED`, `SETTING_VALUE_TYPE_MISMATCH`, `SETTING_VALUE_OUT_OF_RANGE` · 404 `SETTING_NOT_FOUND` |
+
+```json
+{
+  "id": "guid", "key": "Roster.RecentServiceDays", "value": "60", "dataType": "Int",
+  "description": "How many days back a service counts as recent when suggesting a roster.",
+  "isPublic": false, "minValue": 1, "maxValue": 365
+}
+```
+
+- Danh sách sắp theo `key`. **Bộ key do hệ thống định nghĩa**: Admin chỉ sửa `value`, không tạo, không xoá, không đổi kiểu.
+- `value` luôn là **chuỗi**, đọc theo `dataType`: `Int` → `"42"`, `Bool` → `"true"` / `"false"`, `String` → nguyên văn
+  (được để rỗng), `Json` → một giá trị JSON hợp lệ. Server cắt khoảng trắng hai đầu và chuẩn hoá (`" 042 "` → `"42"`,
+  `"True"` → `"true"`). Tối đa 1000 ký tự.
+- Sai kiểu → 400 `SETTING_VALUE_TYPE_MISMATCH`. Số nguyên ngoài `minValue`–`maxValue` → 400 `SETTING_VALUE_OUT_OF_RANGE`.
+  `minValue`, `maxValue` là `null` với key không phải số.
+- `description` là tiếng Anh, chỉ để tham khảo; FE đặt nhãn tiếng Việt theo `key`.
+- Mọi thay đổi được ghi vào nhật ký hoạt động (`entityType` = `SystemSetting`).
+
+| `key` | Kiểu | Mặc định | Công khai | Tác dụng |
+|---|---|---|---|---|
+| `Parish.Name` | String | rỗng | có | Tên giáo xứ để hiển thị |
+| `Choir.Name` | String | rỗng | có | Tên ca đoàn để hiển thị |
+| `System.Announcement` | String | rỗng | có | Thông báo chung cho mọi người dùng; rỗng thì không hiện |
+| `Roster.RecentServiceDays` | Int 1–365 | 60 | không | Số ngày tính "phục vụ gần đây" khi gợi ý phân công |
+| `Roster.AiSuggestionEnabled` | Bool | true | không | Tắt thì gợi ý phân công không gọi AI, chỉ xếp theo luật (`isAiGenerated` = `false`) |
+| `Practice.AllowLateSubmission` | Bool | false | không | Bật thì nộp bản thu sau hạn không còn bị `PRACTICE_SUBMISSION_PAST_DUE`; bài vẫn tính là quá hạn |
+| `Rehearsal.AttendanceOpensMinutesBefore` | Int 0–120 | 0 | không | Cho điểm danh sớm N phút trước giờ bắt đầu; sớm hơn nữa vẫn `REHEARSAL_NOT_STARTED` |
 
 ---
 
@@ -1277,25 +1494,39 @@ danh sách (dữ liệu cũ vẫn trỏ tới nó). Không phân trang — trả
 - `description`, `address`, `colorHex` có thể `null`.
 - `skills`: `categoryId` tuỳ chọn; bỏ qua kỹ năng thuộc nhóm đã tắt.
 - `?includeInactive=true` trên `mass-types`, `ceremony-types`, `event-categories`, `skill-categories`,
-  `liturgical-seasons`, `skills`: trả cả dòng đã tắt (kể cả kỹ năng thuộc nhóm đã tắt) — **chỉ Admin**; role khác
+  `liturgical-seasons`, `skills`, `song-themes`, `liturgical-slots`, `worship-locations`: trả cả dòng đã tắt (kể cả kỹ năng thuộc nhóm đã tắt) — **chỉ Admin**; role khác
   gửi cờ này bị bỏ qua.
 
 ### Admin cấu hình danh mục (UC-32 / FE-49, FE-50)
 
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
-| POST · PUT `{id}` | `/api/lookups/mass-types` · `ceremony-types` · `event-categories` · `skill-categories` | `{ "name", "description?", "isActive" }` | 200 phần tử như bảng trên | 400 `VALIDATION_FAILED` · 404 `LOOKUP_NOT_FOUND` (PUT) · 409 `LOOKUP_NAME_DUPLICATE` |
-| POST · PUT `{id}` | `/api/lookups/skills` | `{ "categoryId", "name", "description?", "isActive" }` | 200 `SkillDto` | 400 `VALIDATION_FAILED` · 404 `SKILL_CATEGORY_NOT_FOUND`, `SKILL_NOT_FOUND` (PUT) · 409 `SKILL_NAME_DUPLICATE` |
+| POST · PUT `{id}` | `/api/lookups/mass-types` · `ceremony-types` · `event-categories` · `skill-categories` | `{ "name", "description?", "isActive" }` | 200 phần tử như bảng trên | 400 `VALIDATION_FAILED` · 404 `LOOKUP_NOT_FOUND` (PUT) · 409 `LOOKUP_NAME_DUPLICATE`, `LOOKUP_IN_USE` (chỉ `skill-categories`) |
+| POST · PUT `{id}` | `/api/lookups/skills` | `{ "categoryId", "name", "description?", "isActive" }` | 200 `SkillDto` | 400 `VALIDATION_FAILED` · 404 `SKILL_CATEGORY_NOT_FOUND`, `SKILL_NOT_FOUND` (PUT) · 409 `SKILL_NAME_DUPLICATE`, `LOOKUP_INACTIVE`, `SKILL_IN_USE` |
+| POST · PUT `{id}` | `/api/lookups/song-themes` | `{ "name", "description?", "isActive" }` | 200 `SongThemeDto` | 400 `VALIDATION_FAILED` · 404 `LOOKUP_NOT_FOUND` (PUT) · 409 `LOOKUP_NAME_DUPLICATE` |
+| POST · PUT `{id}` | `/api/lookups/liturgical-slots` | `{ "name", "defaultOrder", "isActive" }` | 200 `LiturgicalSlotDto` | như trên |
+| POST · PUT `{id}` | `/api/lookups/worship-locations` | `{ "name", "address?", "isActive" }` | 200 `WorshipLocationDto` | như trên |
 | POST · PUT `{id}` | `/api/lookups/liturgical-seasons` | `{ "name", "startDate", "endDate", "colorHex?", "isActive" }` | 200 `LiturgicalSeasonDto` | 400 `VALIDATION_FAILED` (`SEASON_DATE_INVALID`) · 404 `LOOKUP_NOT_FOUND` (PUT) · 409 `SEASON_DATE_OVERLAP` |
 
 - `isActive` mặc định `true`. **Không có xoá**: các bảng khác đang trỏ tới danh mục, nên muốn bỏ thì gửi
   `PUT` với `isActive: false`. Bật lại bằng `isActive: true`.
 - `PUT` gửi đủ mọi trường (thay toàn bộ). `name` được cắt khoảng trắng hai đầu.
+- `song-themes`, `liturgical-slots`, `worship-locations`: response giờ có thêm `isActive`. Tên chủ đề tối đa 50 ký tự;
+  tên vị trí phụng vụ và nơi cử hành tối đa 100; `address` tối đa 300; `defaultOrder` ≥ 0.
+- Tắt một mục không gỡ nó khỏi dữ liệu đang dùng: sự kiện, danh sách bài hát cũ vẫn giữ tham chiếu; mục đã tắt
+  chỉ không chọn được cho bản ghi mới.
 - `name`: bắt buộc, tối đa 50 ký tự (mùa phụng vụ: 100); `description` tối đa 300; trùng tên (không phân biệt
   hoa thường) với dòng khác → 409. Tên kỹ năng chỉ cần duy nhất **trong nhóm**.
 - Mùa phụng vụ: `endDate` phải sau `startDate`, nếu không → `SEASON_DATE_INVALID`; `colorHex` dạng `#RRGGBB`.
   Tên mùa được trùng (mỗi năm một dòng), nhưng một mùa đang hoạt động không được trùng khoảng ngày với mùa
   đang hoạt động khác → 409 `SEASON_DATE_OVERLAP`.
+- **5 nhóm kỹ năng cố định không tắt được**: `PUT skill-categories/{id}` với `isActive: false` trên một trong 5 nhóm
+  dưới đây → 409 `LOOKUP_IN_USE`. Đổi tên, mô tả vẫn được. Nhóm do Admin tự tạo thì tắt bình thường.
+- **Không đưa kỹ năng vào nhóm đã tắt**: tạo kỹ năng, hoặc chuyển kỹ năng sang một nhóm có `isActive: false`
+  → 409 `LOOKUP_INACTIVE`. Sửa tên / mô tả của kỹ năng vốn đã nằm trong nhóm tắt vẫn được.
+- **Chuyển nhóm của kỹ năng đang được bài hát dùng**: nếu việc chuyển đưa kỹ năng vào hoặc ra khỏi nhóm
+  `Instrument` trong khi kỹ năng đang nằm trong yêu cầu bè / nhạc cụ của một bài hát → 409 `SKILL_IN_USE`.
+  Chuyển giữa các nhóm không phải nhạc cụ, hoặc chuyển kỹ năng chưa bài nào dùng, vẫn được.
 - Id của 5 nhóm kỹ năng là cố định trên mọi môi trường:
 
 | Nhóm | Id |

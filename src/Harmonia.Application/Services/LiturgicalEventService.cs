@@ -17,6 +17,7 @@ public class LiturgicalEventService(
     ILiturgicalEventRepository liturgicalEventRepository,
     IUserRepository userRepository,
     INotificationService notificationService,
+    ILookupService lookupService,
     IMapper mapper) : ILiturgicalEventService
 {
     public async Task<Result<PagedList<LiturgicalEventDto>>> SearchAsync(
@@ -40,6 +41,14 @@ public class LiturgicalEventService(
     public async Task<Result<LiturgicalEventDto>> CreateAsync(
         CreateLiturgicalEventRequest request, CancellationToken cancellationToken)
     {
+        var catalogs = await lookupService.CheckEventCatalogsAsync(
+            request.EventDate, request.LiturgicalSeasonId, request.MassTypeId, request.CeremonyTypeId,
+            request.CategoryId, request.LocationId, null, cancellationToken);
+        if (!catalogs.IsSuccess)
+        {
+            return Result<LiturgicalEventDto>.Failure(catalogs.Code!);
+        }
+
         if (await liturgicalEventRepository.ExistsBySlotAsync(
                 request.EventDate, request.Time, request.LocationId, null, cancellationToken))
         {
@@ -79,6 +88,14 @@ public class LiturgicalEventService(
         if (liturgicalEvent.Status == EventStatus.Cancelled)
         {
             return Result<LiturgicalEventDto>.Failure(ErrorCodes.EventCancelled);
+        }
+
+        var catalogs = await lookupService.CheckEventCatalogsAsync(
+            request.EventDate, request.LiturgicalSeasonId, request.MassTypeId, request.CeremonyTypeId,
+            request.CategoryId, request.LocationId, liturgicalEvent, cancellationToken);
+        if (!catalogs.IsSuccess)
+        {
+            return Result<LiturgicalEventDto>.Failure(catalogs.Code!);
         }
 
         if (await liturgicalEventRepository.ExistsBySlotAsync(
@@ -128,8 +145,8 @@ public class LiturgicalEventService(
         await NotifyDirectorsAndMembersAsync(
             liturgicalEvent,
             NotificationType.EventPublished,
-            "New event published",
-            $"The event on {liturgicalEvent.EventDate:dd/MM/yyyy} at {liturgicalEvent.Time:HH:mm} has been published.",
+            "Sự kiện mới được công bố",
+            $"Sự kiện ngày {liturgicalEvent.EventDate:dd/MM/yyyy} lúc {liturgicalEvent.Time:HH:mm} đã được công bố.",
             cancellationToken);
 
         return Result<LiturgicalEventDto>.Success(mapper.Map<LiturgicalEventDto>(liturgicalEvent));
@@ -163,8 +180,8 @@ public class LiturgicalEventService(
             await NotifyDirectorsAndMembersAsync(
                 liturgicalEvent,
                 NotificationType.EventCancelled,
-                "Event cancelled",
-                $"The event on {liturgicalEvent.EventDate:dd/MM/yyyy} at {liturgicalEvent.Time:HH:mm} has been cancelled.",
+                "Sự kiện đã bị huỷ",
+                $"Sự kiện ngày {liturgicalEvent.EventDate:dd/MM/yyyy} lúc {liturgicalEvent.Time:HH:mm} đã bị huỷ.",
                 cancellationToken);
         }
 

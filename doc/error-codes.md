@@ -137,6 +137,7 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `SKILL_NOT_FOUND` | 404 | Không tìm thấy kỹ năng |
 | `SKILL_NAME_DUPLICATE` | 409 | Kỹ năng này đã tồn tại trong nhóm |
 | `SKILL_INACTIVE` | 409 | Kỹ năng đã bị vô hiệu hoá |
+| `SKILL_IN_USE` | 409 | Kỹ năng đang được bài hát sử dụng, không thể đổi nhóm |
 | `SKILL_CATEGORY_NOT_FOUND` | 404 | Không tìm thấy nhóm kỹ năng |
 | `MEMBER_SKILL_NOT_FOUND` | 404 | Không tìm thấy kỹ năng đã khai báo |
 | `MEMBER_SKILL_ALREADY_DECLARED` | 409 | Bạn đã khai báo kỹ năng này rồi |
@@ -160,6 +161,7 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `EVENT_CANCELLED` | 409 | Sự kiện đã bị huỷ |
 | `EVENT_ALREADY_PASSED` | 409 | Sự kiện đã diễn ra |
 | `EVENT_TYPE_REQUIRED` | 400 | Phải chọn loại lễ hoặc loại nghi thức |
+| `EVENT_DATE_OUTSIDE_SEASON` | 400 | Ngày sự kiện không thuộc mùa phụng vụ đã chọn |
 | `SEASON_DATE_OVERLAP` | 409 | Khoảng thời gian trùng với mùa phụng vụ khác |
 | `SEASON_DATE_INVALID` | 400 | Ngày kết thúc phải sau ngày bắt đầu |
 
@@ -282,6 +284,7 @@ lọc theo cặp `(NotificationId, UserId)` nên "không tồn tại" và "của
 |---|---|---|
 | `SETTING_NOT_FOUND` | 404 | Không tìm thấy cấu hình |
 | `SETTING_VALUE_TYPE_MISMATCH` | 400 | Giá trị không đúng kiểu dữ liệu đã khai báo |
+| `SETTING_VALUE_OUT_OF_RANGE` | 400 | Giá trị nằm ngoài khoảng cho phép |
 | `REPORT_TYPE_NOT_SUPPORTED` | 400 | Loại báo cáo không được hỗ trợ |
 | `REPORT_DATE_RANGE_INVALID` | 400 | Khoảng thời gian không hợp lệ |
 | `REPORT_DATE_RANGE_TOO_LARGE` | 400 | Khoảng thời gian quá dài |
@@ -340,3 +343,9 @@ xem — trả 404, để không lộ sự tồn tại của bản ghi.
   cùng 4 exception tương ứng; khai `EVENT_ALREADY_PUBLISHED`, `EVENT_NOT_PUBLISHED`,
   `EXTERNAL_CALENDAR_FAILED`. Thêm `SONG_SKILL_REQUIREMENT_CATEGORY_INVALID` (FE-29).
   `SONG_CLASSIFICATION_DUPLICATE`, `SONG_SKILL_REQUIREMENT_DUPLICATE` đổi 409 → 400: là mã validate field.
+  
+- 2026-10-11: thêm `SKILL_IN_USE` (đổi nhóm của kỹ năng đang được bài hát dùng). `LOOKUP_IN_USE` và
+  `LOOKUP_INACTIVE` bắt đầu được dùng cho danh mục kỹ năng (UC-32 / FE-49).
+- 2026-10-11: thêm `EVENT_DATE_OUTSIDE_SEASON`. Tạo / sửa sự kiện bắt đầu trả `LOOKUP_NOT_FOUND`,
+  `LOOKUP_INACTIVE` khi Id danh mục (mùa, loại lễ, nghi thức, loại sự kiện, nơi cử hành) sai hoặc đã tắt.
+- 2026-10-11: thêm `SETTING_VALUE_OUT_OF_RANGE` (UC-33 / FE-51).

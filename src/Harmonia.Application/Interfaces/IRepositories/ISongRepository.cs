@@ -32,4 +32,12 @@ public interface ISongRepository : IGenericRepository<Song>
 
     /// <summary>Tracked skills keyed by id. Missing ids are absent from the result.</summary>
     Task<Dictionary<Guid, Skill>> GetSkillsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// One page of songs with the number of Published events before <paramref name="today"/> whose Approved
+    /// song list holds them, narrowed by the event, season and date range of <paramref name="filter"/>; most used
+    /// first, then by title. Active songs are listed even at zero uses; deleted songs only when they were used.
+    /// </summary>
+    Task<PagedList<(Song Song, int TimesUsed, DateOnly? LastUsedDate)>> GetUsageAsync(
+        SearchReportsRequest filter, DateOnly today, CancellationToken cancellationToken);
 }

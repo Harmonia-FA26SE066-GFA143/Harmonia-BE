@@ -19,6 +19,7 @@ public class RosterServiceTests
     private readonly IRosterSuggestionGenerator _generator = Substitute.For<IRosterSuggestionGenerator>();
     private readonly ICurrentUserService _currentUser = Substitute.For<ICurrentUserService>();
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
+    private readonly ISystemSettingService _settings = Substitute.For<ISystemSettingService>();
     private readonly RosterService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
 
@@ -40,7 +41,9 @@ public class RosterServiceTests
             cfg.AddProfile<ServiceRosterProfile>();
         }, NullLoggerFactory.Instance).CreateMapper();
         _currentUser.UserId.Returns(_directorId);
-        _sut = new RosterService(_repository, _generator, _currentUser, _notifications, mapper);
+        _sut = new RosterService(_repository, _generator, _currentUser, _notifications, _settings, mapper);
+        _settings.GetIntAsync(SystemSettingKeys.RosterRecentServiceDays, _ct).Returns(60);
+        _settings.GetBoolAsync(SystemSettingKeys.RosterAiSuggestionEnabled, _ct).Returns(true);
 
         _event = new LiturgicalEvent
         {
@@ -145,6 +148,31 @@ public class RosterServiceTests
         // An kept from the AI, then the best remaining soprano (Binh: Advanced, fewer recent services).
         Assert.Equal([_an, _binh], roster.Assignments.Where(x => x.SkillId == _soprano.Id).Select(x => x.MemberId));
         Assert.Equal([_an], roster.Assignments.Where(x => x.SkillId == _guitar.Id).Select(x => x.MemberId));
+    }
+
+    [Fact]
+    public async Task Suggest_AiSwitchedOffInSettings_FillsByRulesWithoutCallingTheAi_Async()
+    {
+        var roster = ExistingRoster();
+        _settings.GetBoolAsync(SystemSettingKeys.RosterAiSuggestionEnabled, _ct).Returns(false);
+
+        var result = await SuggestAsync();
+
+        Assert.False(result.Value!.IsAiGenerated);
+        Assert.Equal([_binh, _chi], roster.Assignments.Where(x => x.SkillId == _soprano.Id).Select(x => x.MemberId));
+        await _generator.DidNotReceiveWithAnyArgs().GenerateAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task Suggest_CountsRecentServicesOverTheConfiguredDays_Async()
+    {
+        ExistingRoster();
+        _settings.GetIntAsync(SystemSettingKeys.RosterRecentServiceDays, _ct).Returns(30);
+
+        await SuggestAsync();
+
+        await _repository.Received(1).CountRecentServicesAsync(
+            Arg.Any<IReadOnlyCollection<Guid>>(), _event.EventDate.AddDays(-30), _event.EventDate, _ct);
     }
 
     [Fact]

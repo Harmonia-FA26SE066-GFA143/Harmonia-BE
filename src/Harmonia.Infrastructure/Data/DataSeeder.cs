@@ -27,6 +27,25 @@ public class DataSeeder(
         await SeedRolesAsync(cancellationToken);
         await SeedFirstAdminAsync(cancellationToken);
         await SeedMissingMemberProfilesAsync(cancellationToken);
+        await SeedSystemSettingsAsync(cancellationToken);
+    }
+
+    /// <summary>Adds the settings of SystemSettingKeys the database lacks. Existing rows keep the Admin's values.</summary>
+    private async Task SeedSystemSettingsAsync(CancellationToken cancellationToken)
+    {
+        var existing = await dbContext.SystemSettings.Select(x => x.Key).ToListAsync(cancellationToken);
+        var missing = SystemSettingKeys.All.Where(x => !existing.Contains(x.Key)).ToList();
+        if (missing.Count == 0)
+        {
+            return;
+        }
+
+        dbContext.SystemSettings.AddRange(missing.Select(x => new SystemSetting
+        {
+            Id = Guid.NewGuid(), Key = x.Key, Value = x.DefaultValue, DataType = x.DataType, Description = x.Description,
+        }));
+        await dbContext.SaveChangesAsync(cancellationToken);
+        logger.LogInformation("Seeded system settings: {Keys}", string.Join(", ", missing.Select(x => x.Key)));
     }
 
     /// <summary>ChoirMember accounts created before profiles were made automatically get one now.</summary>

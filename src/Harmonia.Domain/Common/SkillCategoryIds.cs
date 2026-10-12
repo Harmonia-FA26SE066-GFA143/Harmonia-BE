@@ -15,4 +15,8 @@ public static class SkillCategoryIds
     public static readonly Guid Psalm = new("a1c322c5-14af-4ca4-892a-b6e8d0eacbbd");
 
     public static readonly Guid ConductingSupport = new("e2722720-3745-48ea-9e8e-14ec7a63907d");
+
+    /// <summary>True for the five seeded categories above, which the Admin may rename but not switch off.</summary>
+    public static bool IsFixed(Guid id) =>
+        id == Vocal || id == Instrument || id == Solo || id == Psalm || id == ConductingSupport;
 }

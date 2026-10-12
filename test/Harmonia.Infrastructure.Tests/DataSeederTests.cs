@@ -59,6 +59,28 @@ public sealed class DataSeederTests : IDisposable
     }
 
     [Fact]
+    public async Task SeedAsync_AddsMissingSystemSettings_AndKeepsValuesTheAdminChanged_Async()
+    {
+        await using (var seedContext = _db.NewContext())
+        {
+            seedContext.SystemSettings.Add(new SystemSetting
+            {
+                Id = Guid.NewGuid(), Key = SystemSettingKeys.RosterRecentServiceDays, Value = "14", DataType = SettingDataType.Int,
+            });
+            await seedContext.SaveChangesAsync(_ct);
+        }
+
+        await SeedAsync(_ct);
+        await SeedAsync(_ct);
+
+        await using var context = _db.NewContext();
+        var settings = await context.SystemSettings.ToDictionaryAsync(x => x.Key, x => x.Value, _ct);
+        Assert.Equal(SystemSettingKeys.All.Select(x => x.Key).Order(), settings.Keys.Order());
+        Assert.Equal("14", settings[SystemSettingKeys.RosterRecentServiceDays]);
+        Assert.Equal("true", settings[SystemSettingKeys.RosterAiSuggestionEnabled]);
+    }
+
+    [Fact]
     public async Task SeedAsync_ExistingRolesAndAdmin_KeepsThemUntouched_Async()
     {
         var existingAdmin = await _db.AddUserAsync("old-admin@test.com", RoleNames.Admin, _ct);

@@ -19,6 +19,8 @@ public class LookupService(
     IGenericRepository<LiturgicalSlot> liturgicalSlots,
     IGenericRepository<WorshipLocation> worshipLocations,
     IGenericRepository<Skill> skills,
+    IGenericRepository<SongVocalRequirement> songVocalRequirements,
+    IGenericRepository<SongInstrumentRequirement> songInstrumentRequirements,
     IMapper mapper) : ILookupService
 {
     public async Task<Result<List<MassTypeDto>>> GetMassTypesAsync(bool includeInactive, CancellationToken cancellationToken)
@@ -39,9 +41,9 @@ public class LookupService(
         return Result<List<EventCategoryDto>>.Success(mapper.Map<List<EventCategoryDto>>(rows.OrderBy(x => x.Name)));
     }
 
-    public async Task<Result<List<SongThemeDto>>> GetSongThemesAsync(CancellationToken cancellationToken)
+    public async Task<Result<List<SongThemeDto>>> GetSongThemesAsync(bool includeInactive, CancellationToken cancellationToken)
     {
-        var rows = await songThemes.ListAsync(x => x.IsActive, cancellationToken);
+        var rows = await songThemes.ListAsync(x => includeInactive || x.IsActive, cancellationToken);
         return Result<List<SongThemeDto>>.Success(mapper.Map<List<SongThemeDto>>(rows.OrderBy(x => x.Name)));
     }
 
@@ -58,16 +60,16 @@ public class LookupService(
             mapper.Map<List<LiturgicalSeasonDto>>(rows.OrderBy(x => x.StartDate).ThenBy(x => x.Name)));
     }
 
-    public async Task<Result<List<LiturgicalSlotDto>>> GetLiturgicalSlotsAsync(CancellationToken cancellationToken)
+    public async Task<Result<List<LiturgicalSlotDto>>> GetLiturgicalSlotsAsync(bool includeInactive, CancellationToken cancellationToken)
     {
-        var rows = await liturgicalSlots.ListAsync(x => x.IsActive, cancellationToken);
+        var rows = await liturgicalSlots.ListAsync(x => includeInactive || x.IsActive, cancellationToken);
         return Result<List<LiturgicalSlotDto>>.Success(
             mapper.Map<List<LiturgicalSlotDto>>(rows.OrderBy(x => x.DefaultOrder).ThenBy(x => x.Name)));
     }
 
-    public async Task<Result<List<WorshipLocationDto>>> GetWorshipLocationsAsync(CancellationToken cancellationToken)
+    public async Task<Result<List<WorshipLocationDto>>> GetWorshipLocationsAsync(bool includeInactive, CancellationToken cancellationToken)
     {
-        var rows = await worshipLocations.ListAsync(x => x.IsActive, cancellationToken);
+        var rows = await worshipLocations.ListAsync(x => includeInactive || x.IsActive, cancellationToken);
         return Result<List<WorshipLocationDto>>.Success(mapper.Map<List<WorshipLocationDto>>(rows.OrderBy(x => x.Name)));
     }
 
@@ -111,6 +113,12 @@ public class LookupService(
 
     public Task<Result<SkillCategoryDto>> SaveSkillCategoryAsync(Guid? id, SaveCatalogItemRequest request, CancellationToken cancellationToken)
     {
+        // Code refers to the seeded categories by id (SkillCategoryIds), so they can be renamed but must stay on.
+        if (id is { } categoryId && !request.IsActive && SkillCategoryIds.IsFixed(categoryId))
+        {
+            return Task.FromResult(Result<SkillCategoryDto>.Failure(ErrorCodes.LookupInUse));
+        }
+
         var name = request.Name.Trim();
         return SaveAsync<SkillCategory, SkillCategoryDto>(
             skillCategories, id, ErrorCodes.LookupNotFound,
@@ -121,9 +129,33 @@ public class LookupService(
 
     public async Task<Result<SkillDto>> SaveSkillAsync(Guid? id, SaveSkillRequest request, CancellationToken cancellationToken)
     {
-        if (await skillCategories.GetByIdAsync(request.CategoryId, cancellationToken) is null)
+        var category = await skillCategories.GetByIdAsync(request.CategoryId, cancellationToken);
+        if (category is null)
         {
             return Result<SkillDto>.Failure(ErrorCodes.SkillCategoryNotFound);
+        }
+
+        var existing = id is { } skillId ? await skills.GetByIdAsync(skillId, cancellationToken) : null;
+        if (id is not null && existing is null)
+        {
+            return Result<SkillDto>.Failure(ErrorCodes.SkillNotFound);
+        }
+
+        if (existing?.CategoryId != request.CategoryId)
+        {
+            // A skill already sitting in a switched-off category can still be edited there.
+            if (!category.IsActive)
+            {
+                return Result<SkillDto>.Failure(ErrorCodes.LookupInactive);
+            }
+
+            // Songs keep vocal and instrument requirements in separate tables, split by this very boundary.
+            if (existing is not null
+                && (existing.CategoryId == SkillCategoryIds.Instrument) != (request.CategoryId == SkillCategoryIds.Instrument)
+                && await IsRequiredBySongsAsync(existing.Id, cancellationToken))
+            {
+                return Result<SkillDto>.Failure(ErrorCodes.SkillInUse);
+            }
         }
 
         var name = request.Name.Trim();
@@ -133,6 +165,78 @@ public class LookupService(
             x => { x.CategoryId = request.CategoryId; x.Name = name; x.Description = request.Description; x.IsActive = request.IsActive; },
             cancellationToken);
     }
+
+    public Task<Result<SongThemeDto>> SaveSongThemeAsync(Guid? id, SaveCatalogItemRequest request, CancellationToken cancellationToken)
+    {
+        var name = request.Name.Trim();
+        return SaveAsync<SongTheme, SongThemeDto>(
+            songThemes, id, ErrorCodes.LookupNotFound,
+            x => x.Name == name && x.Id != id, ErrorCodes.LookupNameDuplicate,
+            x => { x.Name = name; x.Description = request.Description; x.IsActive = request.IsActive; },
+            cancellationToken);
+    }
+
+    public Task<Result<LiturgicalSlotDto>> SaveLiturgicalSlotAsync(Guid? id, SaveLiturgicalSlotRequest request, CancellationToken cancellationToken)
+    {
+        var name = request.Name.Trim();
+        return SaveAsync<LiturgicalSlot, LiturgicalSlotDto>(
+            liturgicalSlots, id, ErrorCodes.LookupNotFound,
+            x => x.Name == name && x.Id != id, ErrorCodes.LookupNameDuplicate,
+            x => { x.Name = name; x.DefaultOrder = request.DefaultOrder; x.IsActive = request.IsActive; },
+            cancellationToken);
+    }
+
+    public Task<Result<WorshipLocationDto>> SaveWorshipLocationAsync(Guid? id, SaveWorshipLocationRequest request, CancellationToken cancellationToken)
+    {
+        var name = request.Name.Trim();
+        return SaveAsync<WorshipLocation, WorshipLocationDto>(
+            worshipLocations, id, ErrorCodes.LookupNotFound,
+            x => x.Name == name && x.Id != id, ErrorCodes.LookupNameDuplicate,
+            x => { x.Name = name; x.Address = request.Address; x.IsActive = request.IsActive; },
+            cancellationToken);
+    }
+
+    public async Task<Result> CheckEventCatalogsAsync(
+        DateOnly eventDate, Guid? liturgicalSeasonId, Guid? massTypeId, Guid? ceremonyTypeId, Guid? categoryId,
+        Guid locationId, LiturgicalEvent? current, CancellationToken cancellationToken)
+    {
+        var season = liturgicalSeasonId is { } seasonId
+            ? await liturgicalSeasons.GetByIdAsync(seasonId, cancellationToken)
+            : null;
+
+        var error =
+            Check(liturgicalSeasonId, season, season?.IsActive, current?.LiturgicalSeasonId)
+            ?? await CheckAsync(massTypes, massTypeId, x => x.IsActive, current?.MassTypeId, cancellationToken)
+            ?? await CheckAsync(ceremonyTypes, ceremonyTypeId, x => x.IsActive, current?.CeremonyTypeId, cancellationToken)
+            ?? await CheckAsync(eventCategories, categoryId, x => x.IsActive, current?.CategoryId, cancellationToken)
+            ?? await CheckAsync(worshipLocations, locationId, x => x.IsActive, current?.LocationId, cancellationToken);
+        if (error is not null) return Result.Failure(error);
+
+        // Checked on every save, not only when the date or the season changed: either one moving breaks the pair.
+        return season is not null && (eventDate < season.StartDate || eventDate > season.EndDate)
+            ? Result.Failure(ErrorCodes.EventDateOutsideSeason)
+            : Result.Success();
+    }
+
+    private static async Task<string?> CheckAsync<T>(
+        IGenericRepository<T> repository, Guid? id, Func<T, bool> isActive, Guid? currentId, CancellationToken cancellationToken)
+        where T : BaseEntity
+    {
+        if (id is not { } value) return null;
+
+        var row = await repository.GetByIdAsync(value, cancellationToken);
+        return Check(id, row, row is null ? null : isActive(row), currentId);
+    }
+
+    private static string? Check(Guid? id, object? row, bool? isActive, Guid? currentId) =>
+        id is null ? null
+        : row is null ? ErrorCodes.LookupNotFound
+        : isActive == false && id != currentId ? ErrorCodes.LookupInactive
+        : null;
+
+    private async Task<bool> IsRequiredBySongsAsync(Guid skillId, CancellationToken cancellationToken) =>
+        (await songVocalRequirements.ListAsync(x => x.SkillId == skillId, cancellationToken)).Count > 0
+        || (await songInstrumentRequirements.ListAsync(x => x.SkillId == skillId, cancellationToken)).Count > 0;
 
     /// <summary>
     /// Season names repeat every year, so only the dates must not overlap another active season.

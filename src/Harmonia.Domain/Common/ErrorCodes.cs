@@ -103,6 +103,8 @@ public static class ErrorCodes
 
     public const string SkillInactive = "SKILL_INACTIVE";
 
+    public const string SkillInUse = "SKILL_IN_USE";
+
     public const string SkillCategoryNotFound = "SKILL_CATEGORY_NOT_FOUND";
 
     public const string MemberSkillNotFound = "MEMBER_SKILL_NOT_FOUND";
@@ -139,6 +141,8 @@ public static class ErrorCodes
     public const string EventAlreadyPassed = "EVENT_ALREADY_PASSED";
 
     public const string EventTypeRequired = "EVENT_TYPE_REQUIRED";
+
+    public const string EventDateOutsideSeason = "EVENT_DATE_OUTSIDE_SEASON";
 
     public const string SeasonDateOverlap = "SEASON_DATE_OVERLAP";
 
@@ -305,6 +309,8 @@ public static class ErrorCodes
     public const string SettingNotFound = "SETTING_NOT_FOUND";
 
     public const string SettingValueTypeMismatch = "SETTING_VALUE_TYPE_MISMATCH";
+
+    public const string SettingValueOutOfRange = "SETTING_VALUE_OUT_OF_RANGE";
 
     public const string ReportTypeNotSupported = "REPORT_TYPE_NOT_SUPPORTED";
 

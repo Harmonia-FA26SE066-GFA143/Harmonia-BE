@@ -7,4 +7,6 @@ public class WorshipLocationDto
     public string Name { get; set; } = string.Empty;
 
     public string? Address { get; set; }
+
+    public bool IsActive { get; set; }
 }

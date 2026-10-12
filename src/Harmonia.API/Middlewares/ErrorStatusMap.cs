@@ -61,6 +61,7 @@ public static class ErrorStatusMap
         [ErrorCodes.SkillNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.SkillNameDuplicate] = StatusCodes.Status409Conflict,
         [ErrorCodes.SkillInactive] = StatusCodes.Status409Conflict,
+        [ErrorCodes.SkillInUse] = StatusCodes.Status409Conflict,
         [ErrorCodes.SkillCategoryNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.MemberSkillNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.MemberSkillAlreadyDeclared] = StatusCodes.Status409Conflict,
@@ -81,6 +82,7 @@ public static class ErrorStatusMap
         [ErrorCodes.EventCancelled] = StatusCodes.Status409Conflict,
         [ErrorCodes.EventAlreadyPassed] = StatusCodes.Status409Conflict,
         [ErrorCodes.EventTypeRequired] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.EventDateOutsideSeason] = StatusCodes.Status400BadRequest,
         [ErrorCodes.SeasonDateOverlap] = StatusCodes.Status409Conflict,
         [ErrorCodes.SeasonDateInvalid] = StatusCodes.Status400BadRequest,
 
@@ -170,6 +172,7 @@ public static class ErrorStatusMap
         // 13. System settings & reports.
         [ErrorCodes.SettingNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.SettingValueTypeMismatch] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.SettingValueOutOfRange] = StatusCodes.Status400BadRequest,
         [ErrorCodes.ReportTypeNotSupported] = StatusCodes.Status400BadRequest,
         [ErrorCodes.ReportDateRangeInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.ReportDateRangeTooLarge] = StatusCodes.Status400BadRequest,

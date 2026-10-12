@@ -1,4 +1,5 @@
 using AutoMapper;
+using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IRepositories;
 using Harmonia.Application.Interfaces.IServices;
@@ -17,6 +18,7 @@ public class LiturgicalEventServiceTests
     private readonly ILiturgicalEventRepository _repository = Substitute.For<ILiturgicalEventRepository>();
     private readonly IUserRepository _users = Substitute.For<IUserRepository>();
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
+    private readonly ILookupService _lookups = Substitute.For<ILookupService>();
     private readonly LiturgicalEventService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
 
@@ -35,7 +37,9 @@ public class LiturgicalEventServiceTests
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<LiturgicalEventProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new LiturgicalEventService(_repository, _users, _notifications, mapper);
+        _sut = new LiturgicalEventService(_repository, _users, _notifications, _lookups, mapper);
+        _lookups.CheckEventCatalogsAsync(default, default, default, default, default, default, default, default)
+            .ReturnsForAnyArgs(Result.Success());
         _repository.GetWithLocationAsync(_event.Id, _ct).Returns(_event);
     }
 
@@ -61,6 +65,40 @@ public class LiturgicalEventServiceTests
         Assert.Equal(EventStatus.Published, _event.Status);
         await _repository.Received(1).ExistsBySlotAsync(request.EventDate, request.Time, request.LocationId, _event.Id, _ct);
         await _repository.Received(1).SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Create_CatalogCheckFails_ReturnsItsCode_AndAddsNothing_Async()
+    {
+        var request = new CreateLiturgicalEventRequest
+        {
+            EventDate = _event.EventDate, Time = _event.Time, LocationId = Guid.NewGuid(), MassTypeId = Guid.NewGuid(),
+            LiturgicalSeasonId = Guid.NewGuid(), CeremonyTypeId = Guid.NewGuid(), CategoryId = Guid.NewGuid(),
+        };
+        _lookups.CheckEventCatalogsAsync(
+                request.EventDate, request.LiturgicalSeasonId, request.MassTypeId, request.CeremonyTypeId,
+                request.CategoryId, request.LocationId, null, _ct)
+            .Returns(Result.Failure(ErrorCodes.LookupInactive));
+
+        var result = await _sut.CreateAsync(request, _ct);
+
+        Assert.Equal(ErrorCodes.LookupInactive, result.Code);
+        await _repository.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task Update_CatalogCheckFails_ReturnsItsCode_AndIsGivenTheCurrentEvent_Async()
+    {
+        var request = UpdateRequest();
+        _lookups.CheckEventCatalogsAsync(
+                request.EventDate, request.LiturgicalSeasonId, request.MassTypeId, request.CeremonyTypeId,
+                request.CategoryId, request.LocationId, _event, _ct)
+            .Returns(Result.Failure(ErrorCodes.EventDateOutsideSeason));
+
+        var result = await _sut.UpdateAsync(_event.Id, request, _ct);
+
+        Assert.Equal(ErrorCodes.EventDateOutsideSeason, result.Code);
+        await _repository.DidNotReceive().SaveChangesAsync(_ct);
     }
 
     [Fact]

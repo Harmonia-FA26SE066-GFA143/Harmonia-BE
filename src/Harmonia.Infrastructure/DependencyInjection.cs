@@ -110,11 +110,14 @@ public static class DependencyInjection
         services.AddScoped<IPracticeAssignmentRepository, PracticeAssignmentRepository>();
         services.AddScoped<IPracticeSubmissionRepository, PracticeSubmissionRepository>();
         services.AddScoped<IDirectorNoteRepository, DirectorNoteRepository>();
+        services.AddScoped<IReportExportRepository, ReportExportRepository>();
+        services.AddScoped<IAuditLogRepository, AuditLogRepository>();
 
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IPasswordHasherService, PasswordHasherService>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddSingleton<IFileStorageService, CloudinaryFileStorageService>();
+        services.AddSingleton<IReportFileWriter, ReportFileWriter>();
         services.AddSingleton<IEmailSender, BrevoEmailSender>();
         services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
         services.AddScoped<DataSeeder>();

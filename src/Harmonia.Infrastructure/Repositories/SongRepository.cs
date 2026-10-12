@@ -86,6 +86,63 @@ public class SongRepository(HarmoniaDbContext dbContext)
     public Task<Dictionary<Guid, Skill>> GetSkillsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken) =>
         DbContext.Skills.Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, cancellationToken);
 
+    public async Task<PagedList<(Song Song, int TimesUsed, DateOnly? LastUsedDate)>> GetUsageAsync(
+        SearchReportsRequest filter, DateOnly today, CancellationToken cancellationToken)
+    {
+        var events = DbContext.LiturgicalEvents
+            .Where(e => e.Status == EventStatus.Published && e.EventDate < today);
+
+        if (filter.EventId is { } eventId)
+        {
+            events = events.Where(e => e.Id == eventId);
+        }
+
+        if (filter.LiturgicalSeasonId is { } seasonId)
+        {
+            events = events.Where(e => e.LiturgicalSeasonId == seasonId);
+        }
+
+        if (filter.FromDate is { } fromDate)
+        {
+            events = events.Where(e => e.EventDate >= fromDate);
+        }
+
+        if (filter.ToDate is { } toDate)
+        {
+            events = events.Where(e => e.EventDate <= toDate);
+        }
+
+        // Counting events rather than items, so a song sung twice in one event counts once.
+        var query = DbContext.Songs
+            .AsNoTracking()
+            .Select(s => new
+            {
+                Song = s,
+                TimesUsed = events.Count(e => e.SongLists.Any(
+                    l => l.Status == SongListStatus.Approved && l.Items.Any(i => i.SongId == s.Id))),
+                LastUsedDate = events
+                    .Where(e => e.SongLists.Any(
+                        l => l.Status == SongListStatus.Approved && l.Items.Any(i => i.SongId == s.Id)))
+                    .Max(e => (DateOnly?)e.EventDate),
+            })
+            .Where(x => x.Song.IsActive || x.TimesUsed > 0);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var rows = await query
+            .OrderByDescending(x => x.TimesUsed)
+            .ThenBy(x => x.Song.Title)
+            .ThenBy(x => x.Song.Id)
+            .Skip((filter.PageNumber - 1) * filter.PageSize)
+            .Take(filter.PageSize)
+            .ToListAsync(cancellationToken);
+
+        // Expression trees cannot build tuples, so the page is shaped in memory.
+        return new PagedList<(Song, int, DateOnly?)>(
+            rows.Select(x => (x.Song, x.TimesUsed, x.LastUsedDate)).ToList(),
+            filter.PageNumber, filter.PageSize, totalCount);
+    }
+
     private static IQueryable<Song> WhereClassifiedAs(IQueryable<Song> query, ClassificationTarget targetType, Guid? targetId) =>
         targetId is { } id
             ? query.Where(x => x.Classifications.Any(c => c.TargetType == targetType && c.TargetId == id))

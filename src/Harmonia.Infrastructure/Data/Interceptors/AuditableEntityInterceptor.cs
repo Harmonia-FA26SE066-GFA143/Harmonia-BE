@@ -16,14 +16,25 @@ namespace Harmonia.Infrastructure.Data.Interceptors;
 /// </summary>
 public class AuditableEntityInterceptor(ICurrentUserService currentUser) : SaveChangesInterceptor
 {
+    /// <summary>Action of the row written when a user's password changes. It carries no values.</summary>
+    public const string PasswordChangedAction = "PasswordChanged";
+
     private static readonly HashSet<Type> AuditedTypes =
     [
         typeof(User), typeof(Role), typeof(SystemSetting),
         typeof(SongList), typeof(SongListReview),
         typeof(ServiceRoster), typeof(RosterAssignment),
         typeof(MemberSkill),
-        typeof(LiturgicalEvent)
+        typeof(LiturgicalEvent),
+        typeof(MusicMaterial),
+        typeof(RehearsalAttendance),
+        typeof(Skill), typeof(SkillCategory),
+        typeof(MassType), typeof(CeremonyType), typeof(EventCategory), typeof(LiturgicalSeason),
+        typeof(SongTheme), typeof(LiturgicalSlot), typeof(WorshipLocation)
     ];
+
+    // Taking attendance adds a row per member at every rehearsal; only a later correction is worth an entry.
+    private static readonly HashSet<Type> ChangesOnlyTypes = [typeof(RehearsalAttendance)];
 
     // Stamped by this interceptor, so they add nothing to a diff.
     private static readonly HashSet<string> AuditColumns =
@@ -32,10 +43,13 @@ public class AuditableEntityInterceptor(ICurrentUserService currentUser) : SaveC
         nameof(BaseAuditableEntity.UpdatedAt), nameof(BaseAuditableEntity.UpdatedBy)
     ];
 
-    // Routine bookkeeping that would flood the log (every login touches LastLoginAt).
+    // Routine bookkeeping that would flood the log: every login touches LastLoginAt, and saving an
+    // attendance sheet again re-stamps every row even when no status changed.
     private static readonly HashSet<string> IgnoredProperties =
     [
-        $"{nameof(User)}.{nameof(User.LastLoginAt)}"
+        $"{nameof(User)}.{nameof(User.LastLoginAt)}",
+        $"{nameof(RehearsalAttendance)}.{nameof(RehearsalAttendance.CheckedBy)}",
+        $"{nameof(RehearsalAttendance)}.{nameof(RehearsalAttendance.CheckedAt)}"
     ];
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -73,6 +87,21 @@ public class AuditableEntityInterceptor(ICurrentUserService currentUser) : SaveC
             .Where(e => AuditedTypes.Contains(e.Metadata.ClrType))
             .Select(e => BuildLog(e, userId, now))
             .OfType<AuditLog>()
+            // The hash is never logged, so a password change would otherwise leave no trace at all.
+            // UserId is null when it came through the reset link, where nobody is signed in.
+            .Concat(context.ChangeTracker.Entries<User>()
+                .Where(e => e.State == EntityState.Modified
+                    && e.Property(u => u.PasswordHash) is { IsModified: true } hash
+                    && hash.OriginalValue != hash.CurrentValue)
+                .Select(e => new AuditLog
+                {
+                    UserId = userId,
+                    Action = PasswordChangedAction,
+                    EntityType = nameof(User),
+                    EntityId = e.Entity.Id,
+                    IpAddress = currentUser.IpAddress,
+                    CreatedAt = now
+                }))
             .ToList();
 
         foreach (var entry in context.ChangeTracker.Entries<BaseAuditableEntity>())
@@ -96,6 +125,11 @@ public class AuditableEntityInterceptor(ICurrentUserService currentUser) : SaveC
 
     private AuditLog? BuildLog(EntityEntry<BaseEntity> entry, Guid? userId, DateTime now)
     {
+        if (entry.State == EntityState.Added && ChangesOnlyTypes.Contains(entry.Metadata.ClrType))
+        {
+            return null;
+        }
+
         var entityType = entry.Metadata.ClrType.Name;
         var properties = entry.Properties
             .Where(p => !AuditColumns.Contains(p.Metadata.Name)

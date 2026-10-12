@@ -136,6 +136,24 @@ public sealed class AuditableEntityInterceptorTests : IDisposable
     }
 
     [Fact]
+    public async Task PasswordHashChanged_WritesPasswordChangedLogWithoutValues_Async()
+    {
+        var user = await _db.AddUserAsync("a@test.com", cancellationToken: _ct);
+        await using (var context = _db.NewContext())
+        {
+            var tracked = await context.Users.SingleAsync(u => u.Id == user.Id, _ct);
+            tracked.PasswordHash = "new-hash";
+            tracked.FullName = "Renamed";
+            await context.SaveChangesAsync(_ct);
+        }
+
+        var logs = await LogsForAsync(user.Id, _ct);
+        var log = Assert.Single(logs, l => l.Action == Data.Interceptors.AuditableEntityInterceptor.PasswordChangedAction);
+        Assert.Equal((nameof(User), _actorId, null, null), (log.EntityType, log.UserId, log.OldValue, log.NewValue));
+        Assert.DoesNotContain("hash", Assert.Single(logs, l => l.Action == "Updated").NewValue);
+    }
+
+    [Fact]
     public async Task NonAuditedEntity_WritesNoLog_Async()
     {
         var user = await _db.AddUserAsync("a@test.com", cancellationToken: _ct);
@@ -150,6 +168,95 @@ public sealed class AuditableEntityInterceptorTests : IDisposable
         }
 
         Assert.Empty(await LogsForAsync(tokenId, _ct));
+    }
+
+    [Fact]
+    public async Task AdminCatalogs_AreAudited_Async()
+    {
+        var category = new SkillCategory { Id = Guid.NewGuid(), Name = "Dance" };
+        var skill = new Skill { Id = Guid.NewGuid(), CategoryId = category.Id, Name = "Sacred dance" };
+        var massType = new MassType { Id = Guid.NewGuid(), Name = "Sunday Mass" };
+        await using (var context = _db.NewContext())
+        {
+            context.AddRange(category, skill, massType);
+            await context.SaveChangesAsync(_ct);
+        }
+
+        await using (var context = _db.NewContext())
+        {
+            (await context.Set<Skill>().SingleAsync(s => s.Id == skill.Id, _ct)).IsActive = false;
+            await context.SaveChangesAsync(_ct);
+        }
+
+        Assert.Equal(nameof(SkillCategory), Assert.Single(await LogsForAsync(category.Id, _ct)).EntityType);
+        Assert.Equal(nameof(MassType), Assert.Single(await LogsForAsync(massType.Id, _ct)).EntityType);
+        Assert.Equal(["Created", "Updated"], (await LogsForAsync(skill.Id, _ct)).Select(l => l.Action));
+    }
+
+    [Fact]
+    public async Task MusicMaterial_SoftDeleted_LogsTheIsActiveChange_Async()
+    {
+        var material = new MusicMaterial
+        {
+            Id = Guid.NewGuid(), Title = "Kyrie sheet", FilePublicId = "f.pdf", FileName = "kyrie.pdf",
+            Song = new Song { Id = Guid.NewGuid(), Title = "Kyrie" },
+        };
+        await using (var context = _db.NewContext())
+        {
+            context.Add(material);
+            await context.SaveChangesAsync(_ct);
+        }
+
+        await using (var context = _db.NewContext())
+        {
+            (await context.Set<MusicMaterial>().SingleAsync(m => m.Id == material.Id, _ct)).IsActive = false;
+            await context.SaveChangesAsync(_ct);
+        }
+
+        var log = Assert.Single(await LogsForAsync(material.Id, _ct), l => l.Action == "Updated");
+        Assert.Equal((nameof(MusicMaterial), """{"IsActive":true}""", """{"IsActive":false}"""), (log.EntityType, log.OldValue, log.NewValue));
+    }
+
+    [Fact]
+    public async Task RehearsalAttendance_LogsOnlyAChangedStatus_Async()
+    {
+        var member = new MemberProfile
+        {
+            Id = Guid.NewGuid(), UserId = (await _db.AddUserAsync("m@test.com", cancellationToken: _ct)).Id,
+        };
+        var attendance = new RehearsalAttendance
+        {
+            Id = Guid.NewGuid(), MemberId = member.Id, CheckedBy = _actorId, CheckedAt = DateTime.UtcNow.AddHours(-1),
+            Status = Domain.Enums.AttendanceStatus.Absent,
+            Rehearsal = new Rehearsal { Id = Guid.NewGuid(), StartTime = DateTime.UtcNow.AddHours(-2), EndTime = DateTime.UtcNow },
+        };
+        async Task SaveAsync(Action<RehearsalAttendance> change)
+        {
+            await using var context = _db.NewContext();
+            change(await context.Set<RehearsalAttendance>().SingleAsync(a => a.Id == attendance.Id, _ct));
+            await context.SaveChangesAsync(_ct);
+        }
+
+        await using (var context = _db.NewContext())
+        {
+            context.AddRange(member, attendance);
+            await context.SaveChangesAsync(_ct);
+        }
+
+        // Taking attendance, then saving the sheet again unchanged: neither is a correction.
+        await SaveAsync(a => a.CheckedAt = DateTime.UtcNow);
+        Assert.Empty(await LogsForAsync(attendance.Id, _ct));
+
+        await SaveAsync(a =>
+        {
+            a.Status = Domain.Enums.AttendanceStatus.Excused;
+            a.CheckedAt = DateTime.UtcNow;
+        });
+
+        var log = Assert.Single(await LogsForAsync(attendance.Id, _ct));
+        Assert.Equal(
+            ("Updated", """{"Status":"Absent"}""", """{"Status":"Excused"}""", _actorId),
+            (log.Action, log.OldValue, log.NewValue, log.UserId!.Value));
     }
 
     [Fact]

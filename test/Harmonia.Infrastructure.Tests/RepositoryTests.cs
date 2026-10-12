@@ -1571,6 +1571,96 @@ public sealed class RepositoryTests : IDisposable
         Assert.NotEqual(Guid.Empty, saved.Single(a => a.MemberId == newcomer.Id).Id);
     }
 
+    // ---- Reports ----
+
+    private sealed record ReportSeed(Guid KyrieId, Guid GloriaId, Guid UnusedId, Guid RecentEventId, Guid OlderEventId);
+
+    /// <summary>
+    /// Two past Published events: "recent" (approved list: Kyrie twice + Gloria; a rejected list holding Unused)
+    /// and "older" (approved list: Kyrie). An upcoming and a past Cancelled event both hold Gloria approved.
+    /// Songs: Kyrie, Gloria, Unused (active, never approved) and Deleted (inactive, never used).
+    /// </summary>
+    private async Task<ReportSeed> SeedReportsAsync()
+    {
+        var proposer = await _db.AddUserAsync("d@test.com", RoleNames.ChoirDirector, _ct);
+        var location = new WorshipLocation { Id = Guid.NewGuid(), Name = "Main church" };
+        var slot = new LiturgicalSlot { Id = Guid.NewGuid(), Name = "Report slot" };
+        var kyrie = new Song { Id = Guid.NewGuid(), Title = "Kyrie" };
+        var gloria = new Song { Id = Guid.NewGuid(), Title = "Gloria" };
+        var unused = new Song { Id = Guid.NewGuid(), Title = "Unused" };
+        var deleted = new Song { Id = Guid.NewGuid(), Title = "Deleted", IsActive = false };
+        var today = VietnamTime.Today;
+        LiturgicalEvent NewEvent(int days, EventStatus status = EventStatus.Published) =>
+            new() { Id = Guid.NewGuid(), EventDate = today.AddDays(days), LocationId = location.Id, Status = status };
+        SongList List(int version, SongListStatus status, params Song[] songs) => new()
+        {
+            Id = Guid.NewGuid(), Version = version, Status = status, ProposedBy = proposer.Id,
+            Items = songs.Select((s, i) => new SongListItem
+            {
+                Id = Guid.NewGuid(), SongId = s.Id, SlotId = slot.Id, DisplayOrder = i,
+            }).ToList(),
+        };
+
+        var recent = NewEvent(-3);
+        recent.SongLists = [List(1, SongListStatus.Rejected, unused), List(2, SongListStatus.Approved, kyrie, kyrie, gloria)];
+        var older = NewEvent(-10);
+        older.SongLists = [List(1, SongListStatus.Approved, kyrie)];
+        var upcoming = NewEvent(3);
+        upcoming.SongLists = [List(1, SongListStatus.Approved, gloria)];
+        var cancelled = NewEvent(-5, EventStatus.Cancelled);
+        cancelled.SongLists = [List(1, SongListStatus.Approved, gloria)];
+
+        await using var context = _db.NewContext();
+        context.AddRange(location, slot, kyrie, gloria, unused, deleted, recent, older, upcoming, cancelled);
+        await context.SaveChangesAsync(_ct);
+
+        return new ReportSeed(kyrie.Id, gloria.Id, unused.Id, recent.Id, older.Id);
+    }
+
+    [Fact]
+    public async Task GetUsage_CountsPastPublishedEventsWithApprovedList_AndListsUnusedActiveSongs_Async()
+    {
+        var seed = await SeedReportsAsync();
+        await using var context = _db.NewContext();
+
+        var page = await new SongRepository(context).GetUsageAsync(new SearchReportsRequest(), VietnamTime.Today, _ct);
+
+        Assert.Equal(3, page.TotalCount);
+        Assert.Equal(
+            [(seed.KyrieId, 2, VietnamTime.Today.AddDays(-3)), (seed.GloriaId, 1, VietnamTime.Today.AddDays(-3)), (seed.UnusedId, 0, (DateOnly?)null)],
+            page.Items.Select(x => (x.Song.Id, x.TimesUsed, x.LastUsedDate)));
+    }
+
+    [Fact]
+    public async Task GetUsage_DateRange_CountsOnlyEventsInside_Async()
+    {
+        var seed = await SeedReportsAsync();
+        await using var context = _db.NewContext();
+
+        var page = await new SongRepository(context).GetUsageAsync(
+            new SearchReportsRequest { ToDate = VietnamTime.Today.AddDays(-7) }, VietnamTime.Today, _ct);
+
+        var kyrie = page.Items[0];
+        Assert.Equal((seed.KyrieId, 1, VietnamTime.Today.AddDays(-10)), (kyrie.Song.Id, kyrie.TimesUsed, kyrie.LastUsedDate));
+        Assert.Equal(0, page.Items.Single(x => x.Song.Id == seed.GloriaId).TimesUsed);
+    }
+
+    [Fact]
+    public async Task GetServiceHistory_ReturnsPastPublishedNewestFirst_WithOnlyApprovedLists_Async()
+    {
+        var seed = await SeedReportsAsync();
+        await using var context = _db.NewContext();
+
+        var page = await new LiturgicalEventRepository(context).GetServiceHistoryAsync(
+            new SearchReportsRequest(), VietnamTime.Today, _ct);
+
+        Assert.Equal([seed.RecentEventId, seed.OlderEventId], page.Items.Select(e => e.Id));
+        Assert.Equal(2, page.TotalCount);
+        var approved = Assert.Single(page.Items[0].SongLists);
+        Assert.Equal(3, approved.Items.Count);
+        Assert.Equal("Main church", page.Items[0].Location.Name);
+    }
+
     // ---- Rehearsal songs ----
 
     [Fact]
@@ -1680,6 +1770,214 @@ public sealed class RepositoryTests : IDisposable
 
         Assert.Equal(["Alpha", "Zeta"], directors.Select(u => u.FullName));
         Assert.All(directors, u => Assert.Equal(RoleNames.ChoirDirector, u.Role.Name));
+    }
+
+    // ---- Admin reports (UC-34) ----
+
+    [Fact]
+    public async Task GetActiveWithActivity_LoadsRowsOfPublishedEventsAndRehearsalsInsideTheFilter_Async()
+    {
+        var seed = await SeedHistoryAsync();
+        var today = VietnamTime.Today;
+        async Task<MemberProfile> MemberAsync(SearchReportsRequest filter)
+        {
+            await using var context = _db.NewContext();
+            var page = await new MemberProfileRepository(context).GetActiveWithActivityAsync(filter, _ct);
+            Assert.Equal(2, page.TotalCount);
+            return page.Items.Single(m => m.Id == seed.MemberId);
+        }
+
+        var all = await MemberAsync(new SearchReportsRequest());
+        // The cancelled event's participation is left out; the upcoming one counts.
+        Assert.Equal((2, 2), (all.RehearsalAttendances.Count, all.EventParticipations.Count));
+        Assert.NotNull(all.User);
+
+        var inSeason = await MemberAsync(new SearchReportsRequest { LiturgicalSeasonId = seed.SeasonId });
+        Assert.Equal((2, 1), (inSeason.RehearsalAttendances.Count, inSeason.EventParticipations.Count));
+
+        // Rehearsals were 5 and 6 days ago; the invited event 3 days ago, the upcoming one in 3 days.
+        var ranged = await MemberAsync(new SearchReportsRequest { FromDate = today.AddDays(-5), ToDate = today });
+        Assert.Equal((1, 1), (ranged.RehearsalAttendances.Count, ranged.EventParticipations.Count));
+
+        var ofEvent = await MemberAsync(new SearchReportsRequest { EventId = seed.InvitedEventId });
+        Assert.Equal((2, 1), (ofEvent.RehearsalAttendances.Count, ofEvent.EventParticipations.Count));
+        var ofOtherEvent = await MemberAsync(new SearchReportsRequest { EventId = seed.ServedEventId });
+        Assert.Equal((0, 0), (ofOtherEvent.RehearsalAttendances.Count, ofOtherEvent.EventParticipations.Count));
+    }
+
+    [Fact]
+    public async Task ReportFilters_EventId_NarrowsHistoryUsageAndAssignments_Async()
+    {
+        var seed = await SeedReportsAsync();
+        var filter = new SearchReportsRequest { EventId = seed.OlderEventId };
+        await using (var seedContext = _db.NewContext())
+        {
+            seedContext.AddRange(new[] { seed.OlderEventId, seed.RecentEventId }.Select(eventId => new PracticeAssignment
+            {
+                Id = Guid.NewGuid(), EventId = eventId, Title = "t", Scope = AssignmentScope.All, DueDate = DateTime.UtcNow,
+            }));
+            await seedContext.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var history = await new LiturgicalEventRepository(context).GetServiceHistoryAsync(filter, VietnamTime.Today, _ct);
+        var usage = await new SongRepository(context).GetUsageAsync(filter, VietnamTime.Today, _ct);
+        var assignments = await new PracticeAssignmentRepository(context).GetForReportAsync(filter, [], _ct);
+
+        Assert.Equal(seed.OlderEventId, Assert.Single(history.Items).Id);
+        Assert.Equal(1, usage.Items.Single(x => x.Song.Id == seed.KyrieId).TimesUsed);
+        Assert.Equal(0, usage.Items.Single(x => x.Song.Id == seed.GloriaId).TimesUsed);
+        Assert.Equal(seed.OlderEventId, Assert.Single(assignments).EventId);
+    }
+
+    [Fact]
+    public async Task ReportExports_GetPage_ReturnsNewestFirst_WithExporter_Async()
+    {
+        var admin = await _db.AddUserAsync("exporter@test.com", RoleNames.Admin, _ct, "Admin");
+        ReportExport Export(int hoursAgo) => new()
+        {
+            Id = Guid.NewGuid(), ReportType = ReportType.SongUsage, Parameters = "{}", FileUrl = "f.csv",
+            ExportedBy = admin.Id, ExportedAt = DateTime.UtcNow.AddHours(-hoursAgo),
+        };
+        var (older, newer) = (Export(5), Export(1));
+        await using (var seedContext = _db.NewContext())
+        {
+            seedContext.AddRange(older, newer);
+            await seedContext.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var page = await new ReportExportRepository(context).GetPageAsync(new PagingRequest { PageSize = 1 }, _ct);
+
+        Assert.Equal(2, page.TotalCount);
+        var first = Assert.Single(page.Items);
+        Assert.Equal((newer.Id, "Admin"), (first.Id, first.Exporter.FullName));
+    }
+
+    [Fact]
+    public async Task GetActiveWithActivity_LeavesOutMembersWhoAreNotActive_Async()
+    {
+        var seed = await SeedHistoryAsync();
+        await using (var seedContext = _db.NewContext())
+        {
+            (await seedContext.MemberProfiles.SingleAsync(m => m.Id == seed.OtherId, _ct)).Status = MemberStatus.Left;
+            await seedContext.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var page = await new MemberProfileRepository(context).GetActiveWithActivityAsync(new SearchReportsRequest(), _ct);
+
+        Assert.Equal(seed.MemberId, Assert.Single(page.Items).Id);
+    }
+
+    [Fact]
+    public async Task GetForReport_PicksAssignmentsByDueDateAndSeason_WithOnlyTheGivenMembersSubmissions_Async()
+    {
+        var seed = await SeedHistoryAsync();
+        PracticeAssignment Assignment(Guid? eventId, int dueInDays) => new()
+        {
+            Id = Guid.NewGuid(), EventId = eventId, Title = "t", Scope = AssignmentScope.Individual,
+            DueDate = DateTime.UtcNow.AddDays(dueInDays),
+            Targets = [new PracticeAssignmentTarget { Id = Guid.NewGuid(), TargetType = TargetType.Member, MemberId = seed.MemberId }],
+        };
+        var seasonal = Assignment(seed.InvitedEventId, -1);
+        seasonal.Submissions =
+        [
+            new PracticeSubmission { Id = Guid.NewGuid(), MemberId = seed.MemberId, AudioPublicId = "a1", AttemptNo = 1 },
+            new PracticeSubmission { Id = Guid.NewGuid(), MemberId = seed.OtherId, AudioPublicId = "a2", AttemptNo = 1 },
+        ];
+        var noEvent = Assignment(null, -2);
+        var old = Assignment(seed.InvitedEventId, -30);
+        await using (var seedContext = _db.NewContext())
+        {
+            seedContext.AddRange(seasonal, noEvent, old);
+            await seedContext.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var repository = new PracticeAssignmentRepository(context);
+        var recent = new SearchReportsRequest { FromDate = VietnamTime.Today.AddDays(-7) };
+
+        var ranged = await repository.GetForReportAsync(recent, [seed.MemberId], _ct);
+        recent.LiturgicalSeasonId = seed.SeasonId;
+        var inSeason = await repository.GetForReportAsync(recent, [seed.MemberId], _ct);
+
+        Assert.Equal(new[] { seasonal.Id, noEvent.Id }.Order(), ranged.Select(a => a.Id).Order());
+        var only = Assert.Single(inSeason);
+        Assert.Equal(seed.MemberId, Assert.Single(only.Submissions).MemberId);
+        Assert.Single(only.Targets);
+    }
+
+    [Fact]
+    public async Task GetActivity_CountsAuditLogsInsideTheRange_PerUser_Async()
+    {
+        var admin = await _db.AddUserAsync("a@test.com", RoleNames.Admin, _ct);
+        var member = await _db.AddUserAsync("b@test.com", cancellationToken: _ct);
+        const string passwordChanged = Data.Interceptors.AuditableEntityInterceptor.PasswordChangedAction;
+        AuditLog Log(string action, Guid? actorId, int daysAgo = 1) => new()
+        {
+            Id = Guid.NewGuid(), Action = action, EntityType = nameof(User), EntityId = member.Id,
+            UserId = actorId, CreatedAt = DateTime.UtcNow.AddDays(-daysAgo),
+        };
+        await using (var seedContext = _db.NewContext())
+        {
+            seedContext.AddRange(
+                Log(passwordChanged, member.Id), Log(passwordChanged, null), Log("Updated", admin.Id),
+                Log(passwordChanged, member.Id, daysAgo: 40));
+            await seedContext.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var page = await new UserRepository(context).GetActivityAsync(
+            new SearchReportsRequest { FromDate = VietnamTime.Today.AddDays(-7) }, _ct);
+
+        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(
+            [(admin.Id, RoleNames.Admin, 0, 0, 0, 1), (member.Id, RoleNames.ChoirMember, 1, 1, 1, 1)],
+            page.Items.Select(x => (x.User.Id, x.User.Role.Name, x.PasswordChangeCount, x.PasswordResetCount, x.AccountChangeCount, x.ActionCount)));
+    }
+
+    // ---- Audit log (UC-35) ----
+
+    [Fact]
+    public async Task AuditLogs_Search_FiltersAndReturnsNewestFirst_WithUser_Async()
+    {
+        var admin = await _db.AddUserAsync("audit-admin@test.com", RoleNames.Admin, _ct, "Admin");
+        var entityId = Guid.NewGuid();
+        // "Probe" keeps these rows apart from the ones the interceptor wrote while seeding the user.
+        AuditLog Log(string action, int daysAgo, Guid? userId = null, Guid? entity = null) => new()
+        {
+            Id = Guid.NewGuid(), Action = action, EntityType = "Probe", EntityId = entity ?? Guid.NewGuid(),
+            UserId = userId, CreatedAt = DateTime.UtcNow.AddDays(-daysAgo),
+        };
+        var (recent, older, ancient) = (Log("Updated", 1, admin.Id, entityId), Log("Created", 3, entity: entityId), Log("Updated", 40));
+        await using (var seedContext = _db.NewContext())
+        {
+            seedContext.AddRange(recent, older, ancient);
+            await seedContext.SaveChangesAsync(_ct);
+        }
+
+        async Task<PagedList<AuditLog>> SearchAsync(SearchAuditLogsRequest filter)
+        {
+            filter.EntityType = "Probe";
+            await using var context = _db.NewContext();
+            return await new AuditLogRepository(context).SearchAsync(filter, _ct);
+        }
+
+        var all = await SearchAsync(new SearchAuditLogsRequest());
+        Assert.Equal([recent.Id, older.Id, ancient.Id], all.Items.Select(l => l.Id));
+        Assert.Equal(("Admin", null), (all.Items[0].User!.FullName, all.Items[1].User));
+
+        Assert.Equal(recent.Id, Assert.Single((await SearchAsync(new SearchAuditLogsRequest { UserId = admin.Id })).Items).Id);
+        Assert.Equal(older.Id, Assert.Single((await SearchAsync(new SearchAuditLogsRequest { Action = "Created" })).Items).Id);
+        Assert.Equal(2, (await SearchAsync(new SearchAuditLogsRequest { EntityId = entityId })).TotalCount);
+
+        var today = VietnamTime.Today;
+        var ranged = await SearchAsync(new SearchAuditLogsRequest { FromDate = today.AddDays(-7), ToDate = today.AddDays(-2) });
+        Assert.Equal(older.Id, Assert.Single(ranged.Items).Id);
+
+        var paged = await SearchAsync(new SearchAuditLogsRequest { PageSize = 1, PageNumber = 2 });
+        Assert.Equal((older.Id, 3), (Assert.Single(paged.Items).Id, paged.TotalCount));
     }
 
     private static RefreshToken NewRefreshToken(Guid userId, string hash, DateTime? revokedAt = null) =>
