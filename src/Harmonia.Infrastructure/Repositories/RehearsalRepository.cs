@@ -70,4 +70,9 @@ public class RehearsalRepository(HarmoniaDbContext dbContext)
             throw;
         }
     }
+
+    public Task<bool> HasConflictAsync(
+        Guid locationId, DateTime start, DateTime end, CancellationToken cancellationToken) =>
+        DbContext.Rehearsals.AsNoTracking().AnyAsync(
+            x => x.LocationId == locationId && x.StartTime < end && start < x.EndTime, cancellationToken);
 }

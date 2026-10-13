@@ -110,6 +110,7 @@ public static class DependencyInjection
         services.AddScoped<IPracticeAssignmentRepository, PracticeAssignmentRepository>();
         services.AddScoped<IPracticeSubmissionRepository, PracticeSubmissionRepository>();
         services.AddScoped<IDirectorNoteRepository, DirectorNoteRepository>();
+        services.AddScoped<IEventParticipationRepository, EventParticipationRepository>();
 
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IPasswordHasherService, PasswordHasherService>();

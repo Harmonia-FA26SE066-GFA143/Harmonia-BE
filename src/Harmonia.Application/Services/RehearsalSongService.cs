@@ -5,12 +5,18 @@ using Harmonia.Application.Interfaces.IRepositories;
 using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Domain.Common;
 using Harmonia.Domain.Entities;
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Harmonia.Application.Services;
 
 public class RehearsalSongService(
     IRehearsalRepository rehearsalRepository,
     IGenericRepository<Song> songRepository,
+    ILiturgicalEventRepository liturgicalEventRepository,
+    ISongListRepository songListRepository,
     IMapper mapper) : IRehearsalSongService
 {
     public async Task<Result<List<RehearsalSongDto>>> GetAsync(Guid rehearsalId, CancellationToken cancellationToken)
@@ -67,5 +73,32 @@ public class RehearsalSongService(
 
         var saved = await rehearsalRepository.GetSongsAsync(rehearsalId, cancellationToken);
         return Result<List<RehearsalSongDto>>.Success(mapper.Map<List<RehearsalSongDto>>(saved));
+    }
+
+    public async Task<Result<List<RehearsalSongDto>>> GetDefaultForEventAsync(
+        Guid eventId, CancellationToken cancellationToken)
+    {
+        if (await liturgicalEventRepository.GetByIdAsync(eventId, cancellationToken) is null)
+        {
+            return Result<List<RehearsalSongDto>>.Failure(ErrorCodes.EventNotFound);
+        }
+
+        var songList = await songListRepository.GetApprovedForEventAsync(eventId, cancellationToken);
+        if (songList is null) return Result<List<RehearsalSongDto>>.Success([]);
+
+        // A song may fill several slots of the list; the rehearsal needs it once, at its first position.
+        var songs = songList.Items
+            .OrderBy(i => i.DisplayOrder)
+            .GroupBy(i => i.SongId)
+            .Select(g => g.First().Song)
+            .Select((song, index) => new RehearsalSongDto
+            {
+                SongId = song.Id,
+                SongTitle = song.Title,
+                DisplayOrder = index + 1,
+            })
+            .ToList();
+
+        return Result<List<RehearsalSongDto>>.Success(songs);
     }
 }
