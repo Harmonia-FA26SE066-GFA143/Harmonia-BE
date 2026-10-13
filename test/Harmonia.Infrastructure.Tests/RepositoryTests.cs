@@ -1692,7 +1692,8 @@ public sealed class RepositoryTests : IDisposable
         {
             await using var context = _db.NewContext();
             var service = new Harmonia.Application.Services.RehearsalSongService(
-                new RehearsalRepository(context), new GenericRepository<Song>(context), mapper);
+                new RehearsalRepository(context), new GenericRepository<Song>(context),
+                new LiturgicalEventRepository(context), new SongListRepository(context), mapper);
             var result = await service.UpdateAsync(
                 rehearsal.Id,
                 new UpdateRehearsalSongsRequest

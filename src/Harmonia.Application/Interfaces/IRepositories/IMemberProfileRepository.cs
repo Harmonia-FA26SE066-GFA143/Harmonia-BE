@@ -62,4 +62,10 @@ public interface IMemberProfileRepository : IGenericRepository<MemberProfile>
     /// </summary>
     Task<PagedList<MemberProfile>> GetActiveWithActivityAsync(
         SearchReportsRequest filter, CancellationToken cancellationToken);
+
+    /// <summary>Read-only members with the given ids, with <see cref="MemberProfile.User"/> loaded.</summary>
+    Task<List<MemberProfile>> GetByIdsWithUserAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken);
+
+    /// <summary>Read-only active members, with <see cref="MemberProfile.User"/> loaded, ordered by name.</summary>
+    Task<List<MemberProfile>> GetAllActiveWithUserAsync(CancellationToken cancellationToken);
 }

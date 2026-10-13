@@ -1,5 +1,9 @@
 using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Harmonia.Application.Interfaces.IServices;
 
@@ -15,4 +19,11 @@ public interface IRehearsalSongService
     /// </summary>
     Task<Result<List<RehearsalSongDto>>> UpdateAsync(
         Guid rehearsalId, UpdateRehearsalSongsRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Suggested programme for a rehearsal tied to the event: the songs of its approved song list, in
+    /// list order, each song once. Read-only, nothing is saved; empty when the event has no approved list.
+    /// Fails with EVENT_NOT_FOUND for an unknown event.
+    /// </summary>
+    Task<Result<List<RehearsalSongDto>>> GetDefaultForEventAsync(Guid eventId, CancellationToken cancellationToken);
 }

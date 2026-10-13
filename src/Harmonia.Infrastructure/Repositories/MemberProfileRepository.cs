@@ -168,4 +168,21 @@ public class MemberProfileRepository(HarmoniaDbContext dbContext)
 
         return new PagedList<MemberProfile>(items, filter.PageNumber, filter.PageSize, totalCount);
     }
+
+    public Task<List<MemberProfile>> GetByIdsWithUserAsync(
+        IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken) =>
+        DbContext.MemberProfiles
+            .AsNoTracking()
+            .Include(x => x.User)
+            .Where(x => ids.Contains(x.Id))
+            .ToListAsync(cancellationToken);
+
+    public Task<List<MemberProfile>> GetAllActiveWithUserAsync(CancellationToken cancellationToken) =>
+        DbContext.MemberProfiles
+            .AsNoTracking()
+            .Include(x => x.User)
+            .Where(x => x.Status == MemberStatus.Active)
+            .OrderBy(x => x.User.FullName)
+            .ThenBy(x => x.Id)
+            .ToListAsync(cancellationToken);
 }

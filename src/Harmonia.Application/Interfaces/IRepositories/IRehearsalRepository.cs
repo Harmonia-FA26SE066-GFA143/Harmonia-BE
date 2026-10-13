@@ -27,4 +27,7 @@ public interface IRehearsalRepository : IGenericRepository<Rehearsal>
 
     /// <summary>Read-only rehearsals of the event, with <see cref="Rehearsal.Attendances"/> loaded.</summary>
     Task<List<Rehearsal>> GetByEventWithAttendancesAsync(Guid eventId, CancellationToken cancellationToken);
+
+    /// <summary>True when a rehearsal at the location overlaps [start, end); touching ends do not conflict.</summary>
+    Task<bool> HasConflictAsync(Guid locationId, DateTime start, DateTime end, CancellationToken cancellationToken);
 }

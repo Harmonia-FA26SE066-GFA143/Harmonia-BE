@@ -112,6 +112,7 @@ public static class DependencyInjection
         services.AddScoped<IDirectorNoteRepository, DirectorNoteRepository>();
         services.AddScoped<IReportExportRepository, ReportExportRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+        services.AddScoped<IEventParticipationRepository, EventParticipationRepository>();
 
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IPasswordHasherService, PasswordHasherService>();
