@@ -27,22 +27,22 @@ public class EventParticipationService(
         var liturgicalEvent = await liturgicalEventRepository.GetByIdAsync(request.EventId, cancellationToken);
         if (liturgicalEvent is null)
         {
-            return Result<List<EventParticipationDto>>.Failure(ErrorCodes.EventNotFound);
+            return Result<List<EventParticipationDto>>.Failure(ErrorCodes.LiturgicalEventNotFound);
         }
 
         if (liturgicalEvent.Status == EventStatus.Cancelled)
         {
-            return Result<List<EventParticipationDto>>.Failure(ErrorCodes.EventCancelled);
+            return Result<List<EventParticipationDto>>.Failure(ErrorCodes.LiturgicalEventCancelled);
         }
 
         if (liturgicalEvent.Status != EventStatus.Published)
         {
-            return Result<List<EventParticipationDto>>.Failure(ErrorCodes.EventNotPublished);
+            return Result<List<EventParticipationDto>>.Failure(ErrorCodes.LiturgicalEventNotPublished);
         }
 
         if (HasPassed(liturgicalEvent))
         {
-            return Result<List<EventParticipationDto>>.Failure(ErrorCodes.EventAlreadyPassed);
+            return Result<List<EventParticipationDto>>.Failure(ErrorCodes.LiturgicalEventAlreadyPassed);
         }
 
         var invitees = await ResolveInviteesAsync(liturgicalEvent.Id, request.MemberIds, cancellationToken);
@@ -80,10 +80,10 @@ public class EventParticipationService(
         await notificationService.SendAsync(
             new SendNotificationRequest(
                 Type: NotificationType.ParticipationRequest,
-                Title: "Participation requested",
+                Title: "Yêu cầu xác nhận tham gia",
                 Content: string.Create(
                     CultureInfo.InvariantCulture,
-                    $"Please confirm your participation in the event on {liturgicalEvent.EventDate:yyyy-MM-dd} at {liturgicalEvent.Time:HH:mm}."),
+                    $"Vui lòng xác nhận tham gia sự kiện ngày {liturgicalEvent.EventDate:dd/MM/yyyy} lúc {liturgicalEvent.Time:HH:mm}."),
                 RecipientUserIds: members.Select(member => member.UserId).ToList(),
                 ReferenceType: nameof(LiturgicalEvent),
                 ReferenceId: liturgicalEvent.Id),
@@ -105,7 +105,7 @@ public class EventParticipationService(
         var liturgicalEvent = await liturgicalEventRepository.GetByIdAsync(eventId, cancellationToken);
         if (liturgicalEvent is null)
         {
-            return Result<EventParticipationSummaryDto>.Failure(ErrorCodes.EventNotFound);
+            return Result<EventParticipationSummaryDto>.Failure(ErrorCodes.LiturgicalEventNotFound);
         }
 
         var participations = await participationRepository.GetByEventAsync(eventId, cancellationToken);
@@ -142,23 +142,23 @@ public class EventParticipationService(
             eventId, profile.Id, cancellationToken);
         if (participation is null)
         {
-            return Result<EventParticipationDto>.Failure(ErrorCodes.ParticipationNotInvited);
+            return Result<EventParticipationDto>.Failure(ErrorCodes.EventParticipationNotInvited);
         }
 
         if (participation.LiturgicalEvent.Status == EventStatus.Cancelled)
         {
-            return Result<EventParticipationDto>.Failure(ErrorCodes.EventCancelled);
+            return Result<EventParticipationDto>.Failure(ErrorCodes.LiturgicalEventCancelled);
         }
 
         // A member answers once; the answer is final.
         if (participation.Status != ParticipationStatus.Invited)
         {
-            return Result<EventParticipationDto>.Failure(ErrorCodes.ParticipationAlreadyResponded);
+            return Result<EventParticipationDto>.Failure(ErrorCodes.EventParticipationAlreadyResponded);
         }
 
         if (HasPassed(participation.LiturgicalEvent))
         {
-            return Result<EventParticipationDto>.Failure(ErrorCodes.ParticipationEventPassed);
+            return Result<EventParticipationDto>.Failure(ErrorCodes.EventParticipationClosed);
         }
 
         participation.Status = request.Status;
@@ -201,7 +201,7 @@ public class EventParticipationService(
                 eventId, ids, cancellationToken);
             if (alreadyRequested.Count > 0)
             {
-                return Result<List<MemberProfile>>.Failure(ErrorCodes.ParticipationAlreadyRequested);
+                return Result<List<MemberProfile>>.Failure(ErrorCodes.EventParticipationAlreadyRequested);
             }
 
             return Result<List<MemberProfile>>.Success(members);

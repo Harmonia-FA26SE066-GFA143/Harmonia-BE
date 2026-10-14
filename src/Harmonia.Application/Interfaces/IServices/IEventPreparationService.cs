@@ -11,13 +11,13 @@ public interface IEventPreparationService
 {
     /// <summary>
     /// Participation, roster and practice totals for the event. Attendance and practice sum the rows of
-    /// <see cref="GetProgressAsync"/>. A missing event fails with EVENT_NOT_FOUND.
+    /// <see cref="GetProgressAsync"/>. A missing event fails with LITURGICAL_EVENT_NOT_FOUND.
     /// </summary>
     Task<Result<EventPreparationStatusDto>> GetStatusAsync(Guid eventId, CancellationToken cancellationToken);
 
     /// <summary>
     /// One row per active member, ordered by name. Any event can be read, past ones included.
-    /// A missing event fails with EVENT_NOT_FOUND.
+    /// A missing event fails with LITURGICAL_EVENT_NOT_FOUND.
     /// </summary>
     Task<Result<List<EventPreparationProgressDto>>> GetProgressAsync(Guid eventId, CancellationToken cancellationToken);
 }

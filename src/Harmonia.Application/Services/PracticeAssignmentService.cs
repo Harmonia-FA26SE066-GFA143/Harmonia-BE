@@ -237,8 +237,8 @@ public class PracticeAssignmentService(
         if (request.EventId is { } eventId)
         {
             var liturgicalEvent = await liturgicalEventRepository.GetByIdAsync(eventId, cancellationToken);
-            if (liturgicalEvent is null) return ErrorCodes.EventNotFound;
-            if (liturgicalEvent.Status == EventStatus.Cancelled) return ErrorCodes.EventCancelled;
+            if (liturgicalEvent is null) return ErrorCodes.LiturgicalEventNotFound;
+            if (liturgicalEvent.Status == EventStatus.Cancelled) return ErrorCodes.LiturgicalEventCancelled;
         }
 
         if (request.SongId is { } songId)

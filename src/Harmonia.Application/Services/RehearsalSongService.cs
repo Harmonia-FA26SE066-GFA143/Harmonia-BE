@@ -80,7 +80,7 @@ public class RehearsalSongService(
     {
         if (await liturgicalEventRepository.GetByIdAsync(eventId, cancellationToken) is null)
         {
-            return Result<List<RehearsalSongDto>>.Failure(ErrorCodes.EventNotFound);
+            return Result<List<RehearsalSongDto>>.Failure(ErrorCodes.LiturgicalEventNotFound);
         }
 
         var songList = await songListRepository.GetApprovedForEventAsync(eventId, cancellationToken);

@@ -25,10 +25,6 @@ public class CreateRehearsalRequestValidator : AbstractValidator<CreateRehearsal
             .Must(x => x.Select(i => i.SongId).Distinct().Count() == x.Count)
             .WithErrorCode(ErrorCodes.RehearsalSongDuplicate);
 
-        RuleForEach(x => x.Songs).ChildRules(i =>
-        {
-            i.RuleFor(x => x.SongId).NotEmpty();
-            i.RuleFor(x => x.Note).MaximumLength(500);
-        });
+        RuleForEach(x => x.Songs).SetValidator(new UpdateRehearsalSongRequestValidator());
     }
 }

@@ -12,7 +12,7 @@ public class SaveLiturgicalSeasonRequestValidator : AbstractValidator<SaveLiturg
         RuleFor(x => x.StartDate).NotEmpty();
         RuleFor(x => x.EndDate)
             .GreaterThan(x => x.StartDate)
-            .WithErrorCode(ErrorCodes.SeasonDateInvalid);
+            .WithErrorCode(ErrorCodes.LiturgicalSeasonDateInvalid);
         RuleFor(x => x.ColorHex).Matches("^#[0-9A-Fa-f]{6}$");
     }
 }

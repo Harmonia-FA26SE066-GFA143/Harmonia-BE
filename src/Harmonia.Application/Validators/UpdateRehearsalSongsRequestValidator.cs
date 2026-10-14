@@ -13,10 +13,6 @@ public class UpdateRehearsalSongsRequestValidator : AbstractValidator<UpdateRehe
             .Must(x => x.Select(i => i.SongId).Distinct().Count() == x.Count)
             .WithErrorCode(ErrorCodes.RehearsalSongDuplicate);
 
-        RuleForEach(x => x.Items).ChildRules(i =>
-        {
-            i.RuleFor(x => x.SongId).NotEmpty();
-            i.RuleFor(x => x.Note).MaximumLength(500);
-        });
+        RuleForEach(x => x.Items).SetValidator(new UpdateRehearsalSongRequestValidator());
     }
 }

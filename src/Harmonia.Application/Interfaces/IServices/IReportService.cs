@@ -27,6 +27,6 @@ public interface IReportService
         SearchReportsRequest request, CancellationToken cancellationToken);
 
     /// <summary>Admin only (UC-34 / FE-52). Active members, ordered by name; assignments are picked by due date.</summary>
-    Task<Result<PagedList<AssignmentCompletionDto>>> GetAssignmentCompletionAsync(
+    Task<Result<PagedList<PracticeAssignmentCompletionDto>>> GetAssignmentCompletionAsync(
         SearchReportsRequest request, CancellationToken cancellationToken);
 }

@@ -109,7 +109,7 @@ public class EventPreparationServiceTests
     {
         var result = await _sut.GetProgressAsync(Guid.NewGuid(), _ct);
 
-        Assert.Equal(ErrorCodes.EventNotFound, result.Code);
+        Assert.Equal(ErrorCodes.LiturgicalEventNotFound, result.Code);
         await _members.DidNotReceive().GetActiveForEventAsync(Arg.Any<Guid>(), _ct);
     }
 
@@ -190,7 +190,7 @@ public class EventPreparationServiceTests
     {
         var result = await _sut.GetStatusAsync(Guid.NewGuid(), _ct);
 
-        Assert.Equal(ErrorCodes.EventNotFound, result.Code);
+        Assert.Equal(ErrorCodes.LiturgicalEventNotFound, result.Code);
         await _roster.DidNotReceive().GetShortagesAsync(Arg.Any<Guid>(), _ct);
     }
 }

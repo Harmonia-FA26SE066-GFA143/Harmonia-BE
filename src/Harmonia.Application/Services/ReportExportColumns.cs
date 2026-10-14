@@ -39,7 +39,7 @@ public static class ReportExportColumns
         ("declinedCount", "Từ chối", x => x.DeclinedCount),
         ("unsureCount", "Chưa chắc", x => x.UnsureCount));
 
-    public static ReportTable AssignmentCompletion(IEnumerable<AssignmentCompletionDto> rows) => Table(
+    public static ReportTable AssignmentCompletion(IEnumerable<PracticeAssignmentCompletionDto> rows) => Table(
         "Hoàn thành bài tập", rows,
         ("fullName", "Họ tên", x => x.FullName),
         ("assignedCount", "Được giao", x => x.AssignedCount),

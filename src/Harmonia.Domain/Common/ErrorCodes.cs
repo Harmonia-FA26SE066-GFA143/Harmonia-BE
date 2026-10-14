@@ -128,25 +128,25 @@ public static class ErrorCodes
 
     public const string CalendarFileInvalid = "CALENDAR_FILE_INVALID";
 
-    public const string EventNotFound = "EVENT_NOT_FOUND";
+    public const string LiturgicalEventNotFound = "LITURGICAL_EVENT_NOT_FOUND";
 
-    public const string EventSlotTaken = "EVENT_SLOT_TAKEN";
+    public const string LiturgicalEventSlotTaken = "LITURGICAL_EVENT_SLOT_TAKEN";
 
-    public const string EventAlreadyPublished = "EVENT_ALREADY_PUBLISHED";
+    public const string LiturgicalEventAlreadyPublished = "LITURGICAL_EVENT_ALREADY_PUBLISHED";
 
-    public const string EventNotPublished = "EVENT_NOT_PUBLISHED";
+    public const string LiturgicalEventNotPublished = "LITURGICAL_EVENT_NOT_PUBLISHED";
 
-    public const string EventCancelled = "EVENT_CANCELLED";
+    public const string LiturgicalEventCancelled = "LITURGICAL_EVENT_CANCELLED";
 
-    public const string EventAlreadyPassed = "EVENT_ALREADY_PASSED";
+    public const string LiturgicalEventAlreadyPassed = "LITURGICAL_EVENT_ALREADY_PASSED";
 
-    public const string EventTypeRequired = "EVENT_TYPE_REQUIRED";
+    public const string LiturgicalEventTypeRequired = "LITURGICAL_EVENT_TYPE_REQUIRED";
 
-    public const string EventDateOutsideSeason = "EVENT_DATE_OUTSIDE_SEASON";
+    public const string LiturgicalEventDateOutsideLiturgicalSeason = "LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON";
 
-    public const string SeasonDateOverlap = "SEASON_DATE_OVERLAP";
+    public const string LiturgicalSeasonDateOverlap = "LITURGICAL_SEASON_DATE_OVERLAP";
 
-    public const string SeasonDateInvalid = "SEASON_DATE_INVALID";
+    public const string LiturgicalSeasonDateInvalid = "LITURGICAL_SEASON_DATE_INVALID";
 
     // 6. Song library.
     public const string SongNotFound = "SONG_NOT_FOUND";
@@ -203,15 +203,15 @@ public static class ErrorCodes
     public const string ReviewNotesRequired = "REVIEW_NOTES_REQUIRED";
 
     // 8. Event participation.
-    public const string ParticipationNotFound = "PARTICIPATION_NOT_FOUND";
+    public const string EventParticipationNotFound = "EVENT_PARTICIPATION_NOT_FOUND";
 
-    public const string ParticipationAlreadyRequested = "PARTICIPATION_ALREADY_REQUESTED";
+    public const string EventParticipationAlreadyRequested = "EVENT_PARTICIPATION_ALREADY_REQUESTED";
 
-    public const string ParticipationAlreadyResponded = "PARTICIPATION_ALREADY_RESPONDED";
+    public const string EventParticipationAlreadyResponded = "EVENT_PARTICIPATION_ALREADY_RESPONDED";
 
-    public const string ParticipationEventPassed = "PARTICIPATION_EVENT_PASSED";
+    public const string EventParticipationClosed = "EVENT_PARTICIPATION_CLOSED";
 
-    public const string ParticipationNotInvited = "PARTICIPATION_NOT_INVITED";
+    public const string EventParticipationNotInvited = "EVENT_PARTICIPATION_NOT_INVITED";
 
     // 9. Service roster.
     public const string RosterNotFound = "ROSTER_NOT_FOUND";
@@ -228,13 +228,13 @@ public static class ErrorCodes
 
     public const string RosterInsufficientMembers = "ROSTER_INSUFFICIENT_MEMBERS";
 
-    public const string AssignmentNotFound = "ASSIGNMENT_NOT_FOUND";
+    public const string RosterAssignmentNotFound = "ROSTER_ASSIGNMENT_NOT_FOUND";
 
-    public const string AssignmentMemberSkillNotApproved = "ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED";
+    public const string RosterAssignmentMemberSkillNotApproved = "ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED";
 
-    public const string AssignmentMemberNotConfirmed = "ASSIGNMENT_MEMBER_NOT_CONFIRMED";
+    public const string RosterAssignmentMemberNotConfirmed = "ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED";
 
-    public const string AssignmentDuplicate = "ASSIGNMENT_DUPLICATE";
+    public const string RosterAssignmentDuplicate = "ROSTER_ASSIGNMENT_DUPLICATE";
 
     public const string PersonnelRequirementNotFound = "PERSONNEL_REQUIREMENT_NOT_FOUND";
 
@@ -251,13 +251,13 @@ public static class ErrorCodes
 
     public const string RehearsalAlreadyPassed = "REHEARSAL_ALREADY_PASSED";
 
-    public const string AttendanceNotFound = "ATTENDANCE_NOT_FOUND";
+    public const string RehearsalAttendanceNotFound = "REHEARSAL_ATTENDANCE_NOT_FOUND";
 
-    public const string AttendanceAlreadyRecorded = "ATTENDANCE_ALREADY_RECORDED";
+    public const string RehearsalAttendanceAlreadyRecorded = "REHEARSAL_ATTENDANCE_ALREADY_RECORDED";
 
     public const string RehearsalNotStarted = "REHEARSAL_NOT_STARTED";
 
-    public const string AttendanceMemberDuplicate = "ATTENDANCE_MEMBER_DUPLICATE";
+    public const string RehearsalAttendanceMemberDuplicate = "REHEARSAL_ATTENDANCE_MEMBER_DUPLICATE";
 
     public const string RehearsalSongDuplicate = "REHEARSAL_SONG_DUPLICATE";
 

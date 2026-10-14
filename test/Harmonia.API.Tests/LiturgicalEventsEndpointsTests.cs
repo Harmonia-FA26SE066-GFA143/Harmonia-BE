@@ -42,7 +42,7 @@ public class LiturgicalEventsEndpointsTests(HarmoniaApiFactory factory) : IClass
         Assert.Equal(HttpStatusCode.Conflict, closedLocation.StatusCode);
         Assert.Contains(ErrorCodes.LookupInactive, await closedLocation.Content.ReadAsStringAsync(_ct));
         Assert.Equal(HttpStatusCode.BadRequest, outsideSeason.StatusCode);
-        Assert.Contains(ErrorCodes.EventDateOutsideSeason, await outsideSeason.Content.ReadAsStringAsync(_ct));
+        Assert.Contains(ErrorCodes.LiturgicalEventDateOutsideLiturgicalSeason, await outsideSeason.Content.ReadAsStringAsync(_ct));
         Assert.Equal(HttpStatusCode.OK, valid.StatusCode);
     }
 }

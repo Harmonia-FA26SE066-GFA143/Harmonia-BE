@@ -18,7 +18,7 @@ public class EventPreparationService(
     public async Task<Result<EventPreparationStatusDto>> GetStatusAsync(Guid eventId, CancellationToken cancellationToken)
     {
         var liturgicalEvent = await liturgicalEventRepository.GetWithPreparationAsync(eventId, cancellationToken);
-        if (liturgicalEvent is null) return Result<EventPreparationStatusDto>.Failure(ErrorCodes.EventNotFound);
+        if (liturgicalEvent is null) return Result<EventPreparationStatusDto>.Failure(ErrorCodes.LiturgicalEventNotFound);
 
         var progress = await GetProgressAsync(eventId, cancellationToken);
         if (!progress.IsSuccess) return Result<EventPreparationStatusDto>.Failure(progress.Code!);
@@ -65,7 +65,7 @@ public class EventPreparationService(
     {
         if (await liturgicalEventRepository.GetByIdAsync(eventId, cancellationToken) is null)
         {
-            return Result<List<EventPreparationProgressDto>>.Failure(ErrorCodes.EventNotFound);
+            return Result<List<EventPreparationProgressDto>>.Failure(ErrorCodes.LiturgicalEventNotFound);
         }
 
         var members = await memberProfileRepository.GetActiveForEventAsync(eventId, cancellationToken);

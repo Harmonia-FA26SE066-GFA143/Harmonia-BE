@@ -188,9 +188,9 @@ public class LookupsEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<H
 
         await AssertConflictAsync(duplicate, ErrorCodes.LookupNameDuplicate, _ct);
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
-        await AssertConflictAsync(overlapping, ErrorCodes.SeasonDateOverlap, _ct);
+        await AssertConflictAsync(overlapping, ErrorCodes.LiturgicalSeasonDateOverlap, _ct);
         Assert.Equal(HttpStatusCode.BadRequest, backwards.StatusCode);
-        Assert.Contains(ErrorCodes.SeasonDateInvalid, await backwards.Content.ReadAsStringAsync(_ct));
+        Assert.Contains(ErrorCodes.LiturgicalSeasonDateInvalid, await backwards.Content.ReadAsStringAsync(_ct));
     }
 
     [Fact]

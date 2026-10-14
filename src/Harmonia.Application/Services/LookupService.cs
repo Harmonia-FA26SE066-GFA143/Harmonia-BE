@@ -214,7 +214,7 @@ public class LookupService(
 
         // Checked on every save, not only when the date or the season changed: either one moving breaks the pair.
         return season is not null && (eventDate < season.StartDate || eventDate > season.EndDate)
-            ? Result.Failure(ErrorCodes.EventDateOutsideSeason)
+            ? Result.Failure(ErrorCodes.LiturgicalEventDateOutsideLiturgicalSeason)
             : Result.Success();
     }
 
@@ -247,7 +247,7 @@ public class LookupService(
         SaveAsync<LiturgicalSeason, LiturgicalSeasonDto>(
             liturgicalSeasons, id, ErrorCodes.LookupNotFound,
             x => request.IsActive && x.IsActive && x.Id != id && x.StartDate <= request.EndDate && request.StartDate <= x.EndDate,
-            ErrorCodes.SeasonDateOverlap,
+            ErrorCodes.LiturgicalSeasonDateOverlap,
             x =>
             {
                 x.Name = request.Name.Trim();

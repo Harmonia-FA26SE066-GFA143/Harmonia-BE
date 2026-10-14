@@ -34,7 +34,7 @@ public class LiturgicalEventService(
         var liturgicalEvent = await liturgicalEventRepository.GetWithLocationAsync(id, cancellationToken);
 
         return liturgicalEvent is null
-            ? Result<LiturgicalEventDto>.Failure(ErrorCodes.EventNotFound)
+            ? Result<LiturgicalEventDto>.Failure(ErrorCodes.LiturgicalEventNotFound)
             : Result<LiturgicalEventDto>.Success(mapper.Map<LiturgicalEventDto>(liturgicalEvent));
     }
 
@@ -52,7 +52,7 @@ public class LiturgicalEventService(
         if (await liturgicalEventRepository.ExistsBySlotAsync(
                 request.EventDate, request.Time, request.LocationId, null, cancellationToken))
         {
-            return Result<LiturgicalEventDto>.Failure(ErrorCodes.EventSlotTaken);
+            return Result<LiturgicalEventDto>.Failure(ErrorCodes.LiturgicalEventSlotTaken);
         }
 
         var liturgicalEvent = new LiturgicalEvent
@@ -82,12 +82,12 @@ public class LiturgicalEventService(
         var liturgicalEvent = await liturgicalEventRepository.GetWithLocationAsync(id, cancellationToken);
         if (liturgicalEvent is null)
         {
-            return Result<LiturgicalEventDto>.Failure(ErrorCodes.EventNotFound);
+            return Result<LiturgicalEventDto>.Failure(ErrorCodes.LiturgicalEventNotFound);
         }
 
         if (liturgicalEvent.Status == EventStatus.Cancelled)
         {
-            return Result<LiturgicalEventDto>.Failure(ErrorCodes.EventCancelled);
+            return Result<LiturgicalEventDto>.Failure(ErrorCodes.LiturgicalEventCancelled);
         }
 
         var catalogs = await lookupService.CheckEventCatalogsAsync(
@@ -101,7 +101,7 @@ public class LiturgicalEventService(
         if (await liturgicalEventRepository.ExistsBySlotAsync(
                 request.EventDate, request.Time, request.LocationId, id, cancellationToken))
         {
-            return Result<LiturgicalEventDto>.Failure(ErrorCodes.EventSlotTaken);
+            return Result<LiturgicalEventDto>.Failure(ErrorCodes.LiturgicalEventSlotTaken);
         }
 
         liturgicalEvent.EventDate = request.EventDate;
@@ -125,17 +125,17 @@ public class LiturgicalEventService(
         var liturgicalEvent = await liturgicalEventRepository.GetByIdAsync(id, cancellationToken);
         if (liturgicalEvent is null)
         {
-            return Result<LiturgicalEventDto>.Failure(ErrorCodes.EventNotFound);
+            return Result<LiturgicalEventDto>.Failure(ErrorCodes.LiturgicalEventNotFound);
         }
 
         if (liturgicalEvent.Status == EventStatus.Published)
         {
-            return Result<LiturgicalEventDto>.Failure(ErrorCodes.EventAlreadyPublished);
+            return Result<LiturgicalEventDto>.Failure(ErrorCodes.LiturgicalEventAlreadyPublished);
         }
 
         if (liturgicalEvent.Status == EventStatus.Cancelled)
         {
-            return Result<LiturgicalEventDto>.Failure(ErrorCodes.EventCancelled);
+            return Result<LiturgicalEventDto>.Failure(ErrorCodes.LiturgicalEventCancelled);
         }
 
         liturgicalEvent.Status = EventStatus.Published;
@@ -157,17 +157,17 @@ public class LiturgicalEventService(
         var liturgicalEvent = await liturgicalEventRepository.GetWithLocationAsync(id, cancellationToken);
         if (liturgicalEvent is null)
         {
-            return Result<LiturgicalEventDto>.Failure(ErrorCodes.EventNotFound);
+            return Result<LiturgicalEventDto>.Failure(ErrorCodes.LiturgicalEventNotFound);
         }
 
         if (liturgicalEvent.Status == EventStatus.Cancelled)
         {
-            return Result<LiturgicalEventDto>.Failure(ErrorCodes.EventCancelled);
+            return Result<LiturgicalEventDto>.Failure(ErrorCodes.LiturgicalEventCancelled);
         }
 
         if (liturgicalEvent.EventDate < VietnamTime.Today)
         {
-            return Result<LiturgicalEventDto>.Failure(ErrorCodes.EventAlreadyPassed);
+            return Result<LiturgicalEventDto>.Failure(ErrorCodes.LiturgicalEventAlreadyPassed);
         }
 
         var wasPublished = liturgicalEvent.Status == EventStatus.Published;

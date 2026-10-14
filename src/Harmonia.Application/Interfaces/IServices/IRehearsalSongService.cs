@@ -23,7 +23,7 @@ public interface IRehearsalSongService
     /// <summary>
     /// Suggested programme for a rehearsal tied to the event: the songs of its approved song list, in
     /// list order, each song once. Read-only, nothing is saved; empty when the event has no approved list.
-    /// Fails with EVENT_NOT_FOUND for an unknown event.
+    /// Fails with LITURGICAL_EVENT_NOT_FOUND for an unknown event.
     /// </summary>
     Task<Result<List<RehearsalSongDto>>> GetDefaultForEventAsync(Guid eventId, CancellationToken cancellationToken);
 }

@@ -108,7 +108,7 @@ public class ReportService(
                 UnsureCount = member.EventParticipations.Count(p => p.Status == ParticipationStatus.Unsure),
             });
 
-    public async Task<Result<PagedList<AssignmentCompletionDto>>> GetAssignmentCompletionAsync(
+    public async Task<Result<PagedList<PracticeAssignmentCompletionDto>>> GetAssignmentCompletionAsync(
         SearchReportsRequest request, CancellationToken cancellationToken)
     {
         var page = await memberProfileRepository.GetActiveWithActivityAsync(request, cancellationToken);
@@ -123,7 +123,7 @@ public class ReportService(
                     .OrderByDescending(s => s.AttemptNo).Select(s => (SubmissionStatus?)s.Status).FirstOrDefault())
                 .ToList();
 
-            return new AssignmentCompletionDto
+            return new PracticeAssignmentCompletionDto
             {
                 MemberId = member.Id,
                 FullName = member.User.FullName,

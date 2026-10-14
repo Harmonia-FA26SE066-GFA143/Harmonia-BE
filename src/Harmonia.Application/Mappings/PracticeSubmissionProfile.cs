@@ -24,8 +24,5 @@ public class PracticeSubmissionProfile : Profile
         CreateMap<PracticeSubmission, PracticeSubmissionReviewDto>()
             .IncludeBase<PracticeSubmission, PracticeSubmissionDetailDto>()
             .ForMember(dest => dest.Feedback, opt => opt.Ignore());
-
-        CreateMap<PracticeFeedback, PracticeFeedbackDto>()
-            .ForMember(dest => dest.ReviewerName, opt => opt.MapFrom(src => src.Reviewer == null ? null : src.Reviewer.FullName));
     }
 }

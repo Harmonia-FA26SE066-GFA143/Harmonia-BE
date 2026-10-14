@@ -24,8 +24,8 @@ public class UpdateSongClassificationRequestValidator : AbstractValidator<Update
         RuleFor(x => x.InstrumentRequirements).Cascade(CascadeMode.Stop).NotNull()
             .Must(x => BeDistinct(x.Select(r => r.SkillId))).WithErrorCode(ErrorCodes.SongSkillRequirementDuplicate);
 
-        RuleForEach(x => x.VocalRequirements).ChildRules(r => r.RuleFor(x => x.SkillId).NotEmpty());
-        RuleForEach(x => x.InstrumentRequirements).ChildRules(r => r.RuleFor(x => x.SkillId).NotEmpty());
+        RuleForEach(x => x.VocalRequirements).SetValidator(new UpdateSongSkillRequirementRequestValidator());
+        RuleForEach(x => x.InstrumentRequirements).SetValidator(new UpdateSongSkillRequirementRequestValidator());
     }
 
     private static bool BeDistinct(IEnumerable<Guid> ids)

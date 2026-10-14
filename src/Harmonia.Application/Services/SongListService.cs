@@ -61,18 +61,18 @@ public class SongListService(
         var liturgicalEvent = await liturgicalEventRepository.GetByIdAsync(request.EventId, cancellationToken);
         if (liturgicalEvent is null)
         {
-            return Result<SongListDto>.Failure(ErrorCodes.EventNotFound);
+            return Result<SongListDto>.Failure(ErrorCodes.LiturgicalEventNotFound);
         }
 
         if (liturgicalEvent.Status == EventStatus.Cancelled)
         {
-            return Result<SongListDto>.Failure(ErrorCodes.EventCancelled);
+            return Result<SongListDto>.Failure(ErrorCodes.LiturgicalEventCancelled);
         }
 
         // Only the Parish Priest sees a Draft event; every other role sees it once it is published.
         if (liturgicalEvent.Status != EventStatus.Published)
         {
-            return Result<SongListDto>.Failure(ErrorCodes.EventNotPublished);
+            return Result<SongListDto>.Failure(ErrorCodes.LiturgicalEventNotPublished);
         }
 
         var latest = await songListRepository.GetLatestVersionAsync(request.EventId, cancellationToken);

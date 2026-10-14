@@ -32,7 +32,14 @@ public class SongListServiceTests
 
     public SongListServiceTests()
     {
-        var mapper = new MapperConfiguration(cfg => cfg.AddProfile<SongListProfile>(), NullLoggerFactory.Instance)
+        var mapper = new MapperConfiguration(
+                cfg =>
+                {
+                    cfg.AddProfile<SongListProfile>();
+                    cfg.AddProfile<SongListItemProfile>();
+                    cfg.AddProfile<SongListReviewProfile>();
+                },
+                NullLoggerFactory.Instance)
             .CreateMapper();
         _sut = new SongListService(_songLists, _events, _songs, _slots, _users, _notifications, mapper);
 
@@ -194,12 +201,12 @@ public class SongListServiceTests
 
         var result = await _sut.CreateAsync(request, _directorId, _ct);
 
-        Assert.Equal(ErrorCodes.EventNotFound, result.Code);
+        Assert.Equal(ErrorCodes.LiturgicalEventNotFound, result.Code);
     }
 
     [Theory]
-    [InlineData(EventStatus.Cancelled, ErrorCodes.EventCancelled)]
-    [InlineData(EventStatus.Draft, ErrorCodes.EventNotPublished)]
+    [InlineData(EventStatus.Cancelled, ErrorCodes.LiturgicalEventCancelled)]
+    [InlineData(EventStatus.Draft, ErrorCodes.LiturgicalEventNotPublished)]
     public async Task Create_EventNotPublished_ReturnsCode_Async(EventStatus status, string expectedCode)
     {
         _event.Status = status;

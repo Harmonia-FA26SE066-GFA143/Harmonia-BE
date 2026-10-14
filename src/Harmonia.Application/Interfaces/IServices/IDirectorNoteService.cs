@@ -11,7 +11,7 @@ public interface IDirectorNoteService
 
     /// <summary>
     /// Stores one copy of the note per recipient and notifies each of them (S-05). Every recipient must be an
-    /// active Choir Director, otherwise DIRECTOR_NOTE_RECIPIENT_INVALID; a missing event fails with EVENT_NOT_FOUND.
+    /// active Choir Director, otherwise DIRECTOR_NOTE_RECIPIENT_INVALID; a missing event fails with LITURGICAL_EVENT_NOT_FOUND.
     /// </summary>
     Task<Result<List<DirectorNoteDto>>> CreateAsync(
         Guid fromUserId, CreateDirectorNoteRequest request, CancellationToken cancellationToken);

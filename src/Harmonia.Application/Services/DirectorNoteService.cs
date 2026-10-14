@@ -38,7 +38,7 @@ public class DirectorNoteService(
         if (request.EventId is { } eventId
             && await liturgicalEventRepository.GetByIdAsync(eventId, cancellationToken) is null)
         {
-            return Result<List<DirectorNoteDto>>.Failure(ErrorCodes.EventNotFound);
+            return Result<List<DirectorNoteDto>>.Failure(ErrorCodes.LiturgicalEventNotFound);
         }
 
         var content = request.Content.Trim();

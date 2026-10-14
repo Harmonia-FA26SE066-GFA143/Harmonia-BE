@@ -115,9 +115,9 @@ stateDiagram-v2
 
 | Từ chối | Mã lỗi |
 |---|---|
-| publish khi đã Published | `EVENT_ALREADY_PUBLISHED` |
-| update / publish / cancel khi đã Cancelled | `EVENT_CANCELLED` |
-| cancel khi ngày lễ đã qua | `EVENT_ALREADY_PASSED` |
+| publish khi đã Published | `LITURGICAL_EVENT_ALREADY_PUBLISHED` |
+| update / publish / cancel khi đã Cancelled | `LITURGICAL_EVENT_CANCELLED` |
+| cancel khi ngày lễ đã qua | `LITURGICAL_EVENT_ALREADY_PASSED` |
 
 ### 5.2 `SongList` — `SongListService`
 
@@ -142,7 +142,7 @@ stateDiagram-v2
 
 | Từ chối | Mã lỗi |
 |---|---|
-| create khi sự kiện chưa Published / đã Cancelled | `EVENT_NOT_PUBLISHED` / `EVENT_CANCELLED` |
+| create khi sự kiện chưa Published / đã Cancelled | `LITURGICAL_EVENT_NOT_PUBLISHED` / `LITURGICAL_EVENT_CANCELLED` |
 | create khi phiên bản mới nhất đã Approved | `SONG_LIST_EVENT_HAS_APPROVED_VERSION` |
 | create khi phiên bản mới nhất còn Draft / Submitted | `SONG_LIST_CANNOT_BE_REVISED` |
 | updateItems / submit không phải phiên bản mới nhất | `SONG_LIST_NOT_LATEST_VERSION` |
@@ -173,7 +173,7 @@ stateDiagram-v2
 
 | Từ chối | Mã lỗi |
 |---|---|
-| sự kiện Cancelled / đã qua | `EVENT_CANCELLED` / `EVENT_ALREADY_PASSED` |
+| sự kiện Cancelled / đã qua | `LITURGICAL_EVENT_CANCELLED` / `LITURGICAL_EVENT_ALREADY_PASSED` |
 | chưa có SongList Approved | `ROSTER_SONG_LIST_NOT_APPROVED` |
 | suggest / sửa phân công khi đã Finalized | `ROSTER_ALREADY_FINALIZED` |
 | sendNotifications khi chưa Finalized | `ROSTER_NOT_FINALIZED` |

@@ -28,12 +28,12 @@ public class RehearsalService(
             var liturgicalEvent = await liturgicalEventRepository.GetByIdAsync(eventId, cancellationToken);
             if (liturgicalEvent is null)
             {
-                return Result<RehearsalDto>.Failure(ErrorCodes.EventNotFound);
+                return Result<RehearsalDto>.Failure(ErrorCodes.LiturgicalEventNotFound);
             }
 
             if (liturgicalEvent.Status == EventStatus.Cancelled)
             {
-                return Result<RehearsalDto>.Failure(ErrorCodes.EventCancelled);
+                return Result<RehearsalDto>.Failure(ErrorCodes.LiturgicalEventCancelled);
             }
         }
 

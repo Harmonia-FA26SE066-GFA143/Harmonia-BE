@@ -239,7 +239,7 @@ public class RosterServiceTests
     {
         var result = await _sut.SuggestAsync(new SuggestServiceRosterRequest { EventId = Guid.NewGuid() }, _ct);
 
-        Assert.Equal(ErrorCodes.EventNotFound, result.Code);
+        Assert.Equal(ErrorCodes.LiturgicalEventNotFound, result.Code);
     }
 
     [Fact]
@@ -247,7 +247,7 @@ public class RosterServiceTests
     {
         _event.Status = EventStatus.Cancelled;
 
-        Assert.Equal(ErrorCodes.EventCancelled, (await SuggestAsync()).Code);
+        Assert.Equal(ErrorCodes.LiturgicalEventCancelled, (await SuggestAsync()).Code);
     }
 
     [Fact]
@@ -255,7 +255,7 @@ public class RosterServiceTests
     {
         _event.EventDate = VietnamTime.Today.AddDays(-1);
 
-        Assert.Equal(ErrorCodes.EventAlreadyPassed, (await SuggestAsync()).Code);
+        Assert.Equal(ErrorCodes.LiturgicalEventAlreadyPassed, (await SuggestAsync()).Code);
     }
 
     [Fact]
@@ -315,7 +315,7 @@ public class RosterServiceTests
     {
         var result = await _sut.GetShortagesAsync(Guid.NewGuid(), _ct);
 
-        Assert.Equal(ErrorCodes.EventNotFound, result.Code);
+        Assert.Equal(ErrorCodes.LiturgicalEventNotFound, result.Code);
     }
 
     [Fact]
@@ -469,7 +469,7 @@ public class RosterServiceTests
     {
         MemberIs(_an, skillApproved: false);
 
-        Assert.Equal(ErrorCodes.AssignmentMemberSkillNotApproved, (await AddAsync(_an)).Code);
+        Assert.Equal(ErrorCodes.RosterAssignmentMemberSkillNotApproved, (await AddAsync(_an)).Code);
     }
 
     [Fact]
@@ -477,7 +477,7 @@ public class RosterServiceTests
     {
         MemberIs(_an, confirmed: false);
 
-        Assert.Equal(ErrorCodes.AssignmentMemberNotConfirmed, (await AddAsync(_an)).Code);
+        Assert.Equal(ErrorCodes.RosterAssignmentMemberNotConfirmed, (await AddAsync(_an)).Code);
     }
 
     [Fact]
@@ -486,7 +486,7 @@ public class RosterServiceTests
         RosterWith(RosterStatus.Suggested, SopranoLine(_an));
         MemberIs(_an);
 
-        Assert.Equal(ErrorCodes.AssignmentDuplicate, (await AddAsync(_an)).Code);
+        Assert.Equal(ErrorCodes.RosterAssignmentDuplicate, (await AddAsync(_an)).Code);
     }
 
     [Fact]
@@ -504,7 +504,7 @@ public class RosterServiceTests
     {
         var result = await _sut.AddAssignmentAsync(new CreateRosterAssignmentRequest { EventId = Guid.NewGuid() }, _ct);
 
-        Assert.Equal(ErrorCodes.EventNotFound, result.Code);
+        Assert.Equal(ErrorCodes.LiturgicalEventNotFound, result.Code);
     }
 
     [Fact]
@@ -535,7 +535,7 @@ public class RosterServiceTests
 
         var result = await _sut.ReplaceAssignmentAsync(old.Id, new ReplaceRosterAssignmentRequest { MemberId = _an }, _ct);
 
-        Assert.Equal(ErrorCodes.AssignmentNotFound, result.Code);
+        Assert.Equal(ErrorCodes.RosterAssignmentNotFound, result.Code);
     }
 
     [Fact]
@@ -567,7 +567,7 @@ public class RosterServiceTests
     [Fact]
     public async Task RemoveAssignment_Missing_ReturnsAssignmentNotFound_Async()
     {
-        Assert.Equal(ErrorCodes.AssignmentNotFound, (await _sut.RemoveAssignmentAsync(Guid.NewGuid(), _ct)).Code);
+        Assert.Equal(ErrorCodes.RosterAssignmentNotFound, (await _sut.RemoveAssignmentAsync(Guid.NewGuid(), _ct)).Code);
     }
 
     [Fact]
@@ -577,7 +577,7 @@ public class RosterServiceTests
         RosterWith(RosterStatus.Suggested, line);
         _event.EventDate = VietnamTime.Today.AddDays(-1);
 
-        Assert.Equal(ErrorCodes.EventAlreadyPassed, (await _sut.RemoveAssignmentAsync(line.Id, _ct)).Code);
+        Assert.Equal(ErrorCodes.LiturgicalEventAlreadyPassed, (await _sut.RemoveAssignmentAsync(line.Id, _ct)).Code);
     }
 
     // --- Finalize (UC-26) ---
@@ -644,7 +644,7 @@ public class RosterServiceTests
         var roster = FinalizableRoster(RosterStatus.Suggested, SopranoLineFor(_an));
         _event.EventDate = VietnamTime.Today.AddDays(-1);
 
-        Assert.Equal(ErrorCodes.EventAlreadyPassed, (await _sut.FinalizeAsync(roster.Id, _ct)).Code);
+        Assert.Equal(ErrorCodes.LiturgicalEventAlreadyPassed, (await _sut.FinalizeAsync(roster.Id, _ct)).Code);
     }
 
     [Fact]
@@ -658,8 +658,8 @@ public class RosterServiceTests
 
     [Theory]
     [InlineData(MemberStatus.Inactive, true, true, ErrorCodes.MemberNotActive)]
-    [InlineData(MemberStatus.Active, false, true, ErrorCodes.AssignmentMemberSkillNotApproved)]
-    [InlineData(MemberStatus.Active, true, false, ErrorCodes.AssignmentMemberNotConfirmed)]
+    [InlineData(MemberStatus.Active, false, true, ErrorCodes.RosterAssignmentMemberSkillNotApproved)]
+    [InlineData(MemberStatus.Active, true, false, ErrorCodes.RosterAssignmentMemberNotConfirmed)]
     public async Task Finalize_LineNoLongerEligible_ReturnsItsCodeAndKeepsRosterOpen_Async(
         MemberStatus status, bool skillApproved, bool confirmed, string expectedCode)
     {
@@ -757,7 +757,7 @@ public class RosterServiceTests
     {
         var roster = NotifiableRoster(RosterStatus.Finalized, NotifiableLine(_an));
 
-        Assert.Equal(ErrorCodes.AssignmentNotFound, (await NotifyAsync(roster, _an, _chi)).Code);
+        Assert.Equal(ErrorCodes.RosterAssignmentNotFound, (await NotifyAsync(roster, _an, _chi)).Code);
         await _notifications.DidNotReceive().SendAsync(Arg.Any<SendNotificationRequest>(), _ct);
     }
 
@@ -767,6 +767,6 @@ public class RosterServiceTests
         var roster = NotifiableRoster(RosterStatus.Finalized, NotifiableLine(_an));
         _event.EventDate = VietnamTime.Today.AddDays(-1);
 
-        Assert.Equal(ErrorCodes.EventAlreadyPassed, (await NotifyAsync(roster, _an)).Code);
+        Assert.Equal(ErrorCodes.LiturgicalEventAlreadyPassed, (await NotifyAsync(roster, _an)).Code);
     }
 }

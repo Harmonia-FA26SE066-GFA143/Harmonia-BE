@@ -4,7 +4,7 @@ namespace Harmonia.Application.DTOs;
 /// One active member's practice assignments due inside the report's range, split by the state of their newest
 /// attempt (UC-34 / FE-52). The four state counts add up to <see cref="AssignedCount"/>.
 /// </summary>
-public class AssignmentCompletionDto
+public class PracticeAssignmentCompletionDto
 {
     public Guid MemberId { get; set; }
 

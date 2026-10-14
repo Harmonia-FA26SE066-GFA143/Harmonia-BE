@@ -93,11 +93,11 @@ public class LiturgicalEventServiceTests
         _lookups.CheckEventCatalogsAsync(
                 request.EventDate, request.LiturgicalSeasonId, request.MassTypeId, request.CeremonyTypeId,
                 request.CategoryId, request.LocationId, _event, _ct)
-            .Returns(Result.Failure(ErrorCodes.EventDateOutsideSeason));
+            .Returns(Result.Failure(ErrorCodes.LiturgicalEventDateOutsideLiturgicalSeason));
 
         var result = await _sut.UpdateAsync(_event.Id, request, _ct);
 
-        Assert.Equal(ErrorCodes.EventDateOutsideSeason, result.Code);
+        Assert.Equal(ErrorCodes.LiturgicalEventDateOutsideLiturgicalSeason, result.Code);
         await _repository.DidNotReceive().SaveChangesAsync(_ct);
     }
 
@@ -108,7 +108,7 @@ public class LiturgicalEventServiceTests
 
         var result = await _sut.UpdateAsync(_event.Id, UpdateRequest(), _ct);
 
-        Assert.Equal(ErrorCodes.EventSlotTaken, result.Code);
+        Assert.Equal(ErrorCodes.LiturgicalEventSlotTaken, result.Code);
         await _repository.DidNotReceive().SaveChangesAsync(_ct);
     }
 
@@ -117,13 +117,13 @@ public class LiturgicalEventServiceTests
     {
         _event.Status = EventStatus.Cancelled;
 
-        Assert.Equal(ErrorCodes.EventCancelled, (await _sut.UpdateAsync(_event.Id, UpdateRequest(), _ct)).Code);
+        Assert.Equal(ErrorCodes.LiturgicalEventCancelled, (await _sut.UpdateAsync(_event.Id, UpdateRequest(), _ct)).Code);
     }
 
     [Fact]
     public async Task Update_MissingEvent_ReturnsEventNotFound_Async()
     {
-        Assert.Equal(ErrorCodes.EventNotFound, (await _sut.UpdateAsync(Guid.NewGuid(), UpdateRequest(), _ct)).Code);
+        Assert.Equal(ErrorCodes.LiturgicalEventNotFound, (await _sut.UpdateAsync(Guid.NewGuid(), UpdateRequest(), _ct)).Code);
     }
 
     [Fact]
@@ -158,7 +158,7 @@ public class LiturgicalEventServiceTests
     {
         _event.Status = EventStatus.Cancelled;
 
-        Assert.Equal(ErrorCodes.EventCancelled, (await _sut.CancelAsync(_event.Id, _ct)).Code);
+        Assert.Equal(ErrorCodes.LiturgicalEventCancelled, (await _sut.CancelAsync(_event.Id, _ct)).Code);
     }
 
     [Fact]
@@ -166,7 +166,7 @@ public class LiturgicalEventServiceTests
     {
         _event.EventDate = VietnamTime.Today.AddDays(-1);
 
-        Assert.Equal(ErrorCodes.EventAlreadyPassed, (await _sut.CancelAsync(_event.Id, _ct)).Code);
+        Assert.Equal(ErrorCodes.LiturgicalEventAlreadyPassed, (await _sut.CancelAsync(_event.Id, _ct)).Code);
         await _repository.DidNotReceive().SaveChangesAsync(_ct);
     }
 }

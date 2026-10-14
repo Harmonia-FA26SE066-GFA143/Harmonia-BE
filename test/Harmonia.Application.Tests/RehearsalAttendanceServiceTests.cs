@@ -143,7 +143,7 @@ public class RehearsalAttendanceServiceTests
 
         var result = await _sut.RecordAsync(_directorUserId, _rehearsal.Id, Request((_alice.Id, AttendanceStatus.Present)), _ct);
 
-        Assert.Equal(ErrorCodes.AttendanceAlreadyRecorded, result.Code);
+        Assert.Equal(ErrorCodes.RehearsalAttendanceAlreadyRecorded, result.Code);
     }
 
     [Fact]

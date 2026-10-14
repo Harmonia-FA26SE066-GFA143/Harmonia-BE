@@ -15,6 +15,8 @@ public class RehearsalSongServiceTests
 {
     private readonly IRehearsalRepository _rehearsals = Substitute.For<IRehearsalRepository>();
     private readonly IGenericRepository<Song> _songs = Substitute.For<IGenericRepository<Song>>();
+    private readonly ILiturgicalEventRepository _events = Substitute.For<ILiturgicalEventRepository>();
+    private readonly ISongListRepository _songLists = Substitute.For<ISongListRepository>();
     private readonly RehearsalSongService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly Rehearsal _rehearsal = new() { Id = Guid.NewGuid() };
@@ -26,8 +28,7 @@ public class RehearsalSongServiceTests
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<RehearsalSongProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new RehearsalSongService(
-            _rehearsals, _songs, Substitute.For<ILiturgicalEventRepository>(), Substitute.For<ISongListRepository>(), mapper);
+        _sut = new RehearsalSongService(_rehearsals, _songs, _events, _songLists, mapper);
 
         _rehearsals.GetByIdAsync(_rehearsal.Id, _ct).Returns(_rehearsal);
         _rehearsals.GetWithSongsForUpdateAsync(_rehearsal.Id, _ct).Returns(_rehearsal);
@@ -157,5 +158,47 @@ public class RehearsalSongServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal([_kyrie.Id, _retired.Id], result.Value!.Select(s => s.SongId));
+    }
+
+    [Fact]
+    public async Task GetDefaultForEvent_ApprovedList_ReturnsEachSongOnceInListOrder_Async()
+    {
+        var eventId = Guid.NewGuid();
+        _events.GetByIdAsync(eventId, _ct).Returns(new LiturgicalEvent { Id = eventId });
+        _songLists.GetApprovedForEventAsync(eventId, _ct).Returns(new SongList
+        {
+            Items =
+            [
+                new() { SongId = _kyrie.Id, Song = _kyrie, DisplayOrder = 3 },
+                new() { SongId = _gloria.Id, Song = _gloria, DisplayOrder = 1 },
+                new() { SongId = _kyrie.Id, Song = _kyrie, DisplayOrder = 2 },
+            ],
+        });
+
+        var result = await _sut.GetDefaultForEventAsync(eventId, _ct);
+
+        Assert.Equal(
+            [(_gloria.Id, "Gloria", 1), (_kyrie.Id, "Kyrie", 2)],
+            result.Value!.Select(s => (s.SongId, s.SongTitle, s.DisplayOrder)));
+    }
+
+    [Fact]
+    public async Task GetDefaultForEvent_NoApprovedList_ReturnsEmpty_Async()
+    {
+        var eventId = Guid.NewGuid();
+        _events.GetByIdAsync(eventId, _ct).Returns(new LiturgicalEvent { Id = eventId });
+
+        var result = await _sut.GetDefaultForEventAsync(eventId, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value!);
+    }
+
+    [Fact]
+    public async Task GetDefaultForEvent_UnknownEvent_ReturnsEventNotFound_Async()
+    {
+        var result = await _sut.GetDefaultForEventAsync(Guid.NewGuid(), _ct);
+
+        Assert.Equal(ErrorCodes.LiturgicalEventNotFound, result.Code);
     }
 }

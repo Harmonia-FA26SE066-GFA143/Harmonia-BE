@@ -31,7 +31,7 @@ public class RosterService(
     public async Task<Result<RosterSuggestionResponse>> SuggestAsync(SuggestServiceRosterRequest request, CancellationToken cancellationToken)
     {
         var liturgicalEvent = await rosterRepository.GetEventWithRosterAsync(request.EventId, cancellationToken);
-        if (liturgicalEvent is null) return Result<RosterSuggestionResponse>.Failure(ErrorCodes.EventNotFound);
+        if (liturgicalEvent is null) return Result<RosterSuggestionResponse>.Failure(ErrorCodes.LiturgicalEventNotFound);
         if (EventNotEditableCode(liturgicalEvent) is { } eventError) return Result<RosterSuggestionResponse>.Failure(eventError);
 
         var songList = await rosterRepository.GetApprovedSongListAsync(request.EventId, cancellationToken);
@@ -104,7 +104,7 @@ public class RosterService(
     public async Task<Result<List<RosterShortageDto>>> GetShortagesAsync(Guid eventId, CancellationToken cancellationToken)
     {
         var liturgicalEvent = await rosterRepository.GetEventWithRosterAsync(eventId, cancellationToken);
-        if (liturgicalEvent is null) return Result<List<RosterShortageDto>>.Failure(ErrorCodes.EventNotFound);
+        if (liturgicalEvent is null) return Result<List<RosterShortageDto>>.Failure(ErrorCodes.LiturgicalEventNotFound);
 
         var songList = await rosterRepository.GetApprovedSongListAsync(eventId, cancellationToken);
         if (songList is null) return Result<List<RosterShortageDto>>.Failure(ErrorCodes.RosterSongListNotApproved);
@@ -117,7 +117,7 @@ public class RosterService(
     public async Task<Result<ServiceRosterDto>> GetByEventAsync(Guid eventId, CancellationToken cancellationToken)
     {
         var liturgicalEvent = await rosterRepository.GetEventWithRosterAsync(eventId, cancellationToken);
-        if (liturgicalEvent is null) return Result<ServiceRosterDto>.Failure(ErrorCodes.EventNotFound);
+        if (liturgicalEvent is null) return Result<ServiceRosterDto>.Failure(ErrorCodes.LiturgicalEventNotFound);
         if (liturgicalEvent.ServiceRoster is not { } roster) return Result<ServiceRosterDto>.Failure(ErrorCodes.RosterNotFound);
 
         var assignments = await rosterRepository.GetAssignmentsAsync(roster.Id, cancellationToken);
@@ -143,8 +143,8 @@ public class RosterService(
         foreach (var assignment in assignments)
         {
             var code = assignment.Member.Status != MemberStatus.Active ? ErrorCodes.MemberNotActive
-                : !assignment.Member.MemberSkills.Any(s => s.SkillId == assignment.SkillId) ? ErrorCodes.AssignmentMemberSkillNotApproved
-                : assignment.Member.EventParticipations.Count == 0 ? ErrorCodes.AssignmentMemberNotConfirmed
+                : !assignment.Member.MemberSkills.Any(s => s.SkillId == assignment.SkillId) ? ErrorCodes.RosterAssignmentMemberSkillNotApproved
+                : assignment.Member.EventParticipations.Count == 0 ? ErrorCodes.RosterAssignmentMemberNotConfirmed
                 : null;
             if (code is not null)
                 return Result<ServiceRosterDto>.Failure(code, $"Assignment {assignment.Id} is no longer valid.");
@@ -175,7 +175,7 @@ public class RosterService(
             .ToDictionary(g => g.Key, g => g.OrderBy(x => x.SongListItem?.DisplayOrder).ToList());
 
         var memberIds = request.MemberIds.Distinct().ToList();
-        if (memberIds.Any(id => !linesByMember.ContainsKey(id))) return Result.Failure(ErrorCodes.AssignmentNotFound);
+        if (memberIds.Any(id => !linesByMember.ContainsKey(id))) return Result.Failure(ErrorCodes.RosterAssignmentNotFound);
         if (memberIds.Count == 0)
             memberIds = linesByMember.Where(x => x.Value.Any(a => a.NotifiedAt is null)).Select(x => x.Key).ToList();
 
@@ -225,7 +225,7 @@ public class RosterService(
     public async Task<Result<RosterAssignmentDto>> AddAssignmentAsync(CreateRosterAssignmentRequest request, CancellationToken cancellationToken)
     {
         var liturgicalEvent = await rosterRepository.GetEventWithRosterAsync(request.EventId, cancellationToken);
-        if (liturgicalEvent is null) return Result<RosterAssignmentDto>.Failure(ErrorCodes.EventNotFound);
+        if (liturgicalEvent is null) return Result<RosterAssignmentDto>.Failure(ErrorCodes.LiturgicalEventNotFound);
         if (EventNotEditableCode(liturgicalEvent) is { } eventError) return Result<RosterAssignmentDto>.Failure(eventError);
 
         var roster = liturgicalEvent.ServiceRoster;
@@ -258,7 +258,7 @@ public class RosterService(
     {
         var roster = await rosterRepository.GetRosterByAssignmentAsync(assignmentId, cancellationToken);
         var old = roster?.Assignments.FirstOrDefault(x => x.Id == assignmentId && x.Status == RosterAssignmentStatus.Active);
-        if (roster is null || old is null) return Result<RosterAssignmentDto>.Failure(ErrorCodes.AssignmentNotFound);
+        if (roster is null || old is null) return Result<RosterAssignmentDto>.Failure(ErrorCodes.RosterAssignmentNotFound);
         if (RosterNotEditableCode(roster) is { } rosterError) return Result<RosterAssignmentDto>.Failure(rosterError);
 
         var memberError = await MemberNotAssignableCodeAsync(
@@ -278,7 +278,7 @@ public class RosterService(
     {
         var roster = await rosterRepository.GetRosterByAssignmentAsync(assignmentId, cancellationToken);
         var assignment = roster?.Assignments.FirstOrDefault(x => x.Id == assignmentId && x.Status == RosterAssignmentStatus.Active);
-        if (roster is null || assignment is null) return Result.Failure(ErrorCodes.AssignmentNotFound);
+        if (roster is null || assignment is null) return Result.Failure(ErrorCodes.RosterAssignmentNotFound);
         if (RosterNotEditableCode(roster) is { } rosterError) return Result.Failure(rosterError);
 
         // A line it replaced keeps its Replaced status; the FK clears its ReplacedByAssignmentId.
@@ -290,9 +290,9 @@ public class RosterService(
     /// <summary>Error code when the event's roster can no longer change, or null when it can.</summary>
     private static string? EventNotEditableCode(LiturgicalEvent liturgicalEvent)
     {
-        if (liturgicalEvent.Status == EventStatus.Cancelled) return ErrorCodes.EventCancelled;
+        if (liturgicalEvent.Status == EventStatus.Cancelled) return ErrorCodes.LiturgicalEventCancelled;
 
-        return liturgicalEvent.EventDate < VietnamTime.Today ? ErrorCodes.EventAlreadyPassed : null;
+        return liturgicalEvent.EventDate < VietnamTime.Today ? ErrorCodes.LiturgicalEventAlreadyPassed : null;
     }
 
     private static string? RosterNotEditableCode(ServiceRoster roster) =>
@@ -308,13 +308,13 @@ public class RosterService(
     {
         if (roster?.Assignments.Any(a => a.Status == RosterAssignmentStatus.Active
                 && a.SongListItemId == songListItemId && a.SkillId == skillId && a.MemberId == memberId) == true)
-            return ErrorCodes.AssignmentDuplicate;
+            return ErrorCodes.RosterAssignmentDuplicate;
 
         var member = await rosterRepository.GetMemberForAssignmentAsync(memberId, skillId, eventId, cancellationToken);
         if (member is null) return ErrorCodes.MemberNotFound;
         if (member.Status != MemberStatus.Active) return ErrorCodes.MemberNotActive;
-        if (member.MemberSkills.Count == 0) return ErrorCodes.AssignmentMemberSkillNotApproved;
-        if (member.EventParticipations.Count == 0) return ErrorCodes.AssignmentMemberNotConfirmed;
+        if (member.MemberSkills.Count == 0) return ErrorCodes.RosterAssignmentMemberSkillNotApproved;
+        if (member.EventParticipations.Count == 0) return ErrorCodes.RosterAssignmentMemberNotConfirmed;
         return null;
     }
 

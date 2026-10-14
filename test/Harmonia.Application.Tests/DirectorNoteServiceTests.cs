@@ -106,7 +106,7 @@ public class DirectorNoteServiceTests
 
         var result = await _sut.CreateAsync(_priestId, request, _ct);
 
-        Assert.Equal(ErrorCodes.EventNotFound, result.Code);
+        Assert.Equal(ErrorCodes.LiturgicalEventNotFound, result.Code);
         Assert.Empty(_added);
     }
 

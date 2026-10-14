@@ -32,7 +32,13 @@ public class PracticeSubmissionServiceTests
 
     public PracticeSubmissionServiceTests()
     {
-        var mapper = new MapperConfiguration(cfg => cfg.AddProfile<PracticeSubmissionProfile>(), NullLoggerFactory.Instance)
+        var mapper = new MapperConfiguration(
+                cfg =>
+                {
+                    cfg.AddProfile<PracticeSubmissionProfile>();
+                    cfg.AddProfile<PracticeFeedbackProfile>();
+                },
+                NullLoggerFactory.Instance)
             .CreateMapper();
         _sut = new PracticeSubmissionService(_submissions, _assignments, _members, _notifications, _storage, mapper);
         _storage.GetSignedUrl(Arg.Any<string>()).Returns(call => $"signed:{call.Arg<string>()}");

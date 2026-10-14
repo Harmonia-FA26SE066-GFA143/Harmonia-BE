@@ -154,16 +154,16 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `CALENDAR_FILE_TYPE_NOT_ALLOWED` | 400 | Chỉ hỗ trợ tệp lịch định dạng .ics |
 | `CALENDAR_FILE_TOO_LARGE` | 413 | Tệp lịch vượt quá dung lượng cho phép |
 | `CALENDAR_FILE_INVALID` | 400 | Tệp lịch không hợp lệ hoặc không có ngày phụng vụ nào |
-| `EVENT_NOT_FOUND` | 404 | Không tìm thấy sự kiện |
-| `EVENT_SLOT_TAKEN` | 409 | Đã có sự kiện khác vào giờ này tại địa điểm này |
-| `EVENT_ALREADY_PUBLISHED` | 409 | Sự kiện đã công bố, không thể sửa |
-| `EVENT_NOT_PUBLISHED` | 409 | Sự kiện chưa được công bố |
-| `EVENT_CANCELLED` | 409 | Sự kiện đã bị huỷ |
-| `EVENT_ALREADY_PASSED` | 409 | Sự kiện đã diễn ra |
-| `EVENT_TYPE_REQUIRED` | 400 | Phải chọn loại lễ hoặc loại nghi thức |
-| `EVENT_DATE_OUTSIDE_SEASON` | 400 | Ngày sự kiện không thuộc mùa phụng vụ đã chọn |
-| `SEASON_DATE_OVERLAP` | 409 | Khoảng thời gian trùng với mùa phụng vụ khác |
-| `SEASON_DATE_INVALID` | 400 | Ngày kết thúc phải sau ngày bắt đầu |
+| `LITURGICAL_EVENT_NOT_FOUND` | 404 | Không tìm thấy sự kiện |
+| `LITURGICAL_EVENT_SLOT_TAKEN` | 409 | Đã có sự kiện khác vào giờ này tại địa điểm này |
+| `LITURGICAL_EVENT_ALREADY_PUBLISHED` | 409 | Sự kiện đã công bố, không thể sửa |
+| `LITURGICAL_EVENT_NOT_PUBLISHED` | 409 | Sự kiện chưa được công bố |
+| `LITURGICAL_EVENT_CANCELLED` | 409 | Sự kiện đã bị huỷ |
+| `LITURGICAL_EVENT_ALREADY_PASSED` | 409 | Sự kiện đã diễn ra |
+| `LITURGICAL_EVENT_TYPE_REQUIRED` | 400 | Phải chọn loại lễ hoặc loại nghi thức |
+| `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` | 400 | Ngày sự kiện không thuộc mùa phụng vụ đã chọn |
+| `LITURGICAL_SEASON_DATE_OVERLAP` | 409 | Khoảng thời gian trùng với mùa phụng vụ khác |
+| `LITURGICAL_SEASON_DATE_INVALID` | 400 | Ngày kết thúc phải sau ngày bắt đầu |
 
 ## 6. Thư viện thánh ca
 
@@ -207,11 +207,11 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 
 | Mã | HTTP | Tiếng Việt |
 |---|---|---|
-| `PARTICIPATION_NOT_FOUND` | 404 | Không tìm thấy yêu cầu tham gia |
-| `PARTICIPATION_ALREADY_REQUESTED` | 409 | Đã gửi yêu cầu cho ca viên này |
-| `PARTICIPATION_ALREADY_RESPONDED` | 409 | Bạn đã phản hồi yêu cầu này |
-| `PARTICIPATION_EVENT_PASSED` | 409 | Sự kiện đã diễn ra, không thể phản hồi |
-| `PARTICIPATION_NOT_INVITED` | 409 | Bạn chưa được mời tham gia sự kiện này |
+| `EVENT_PARTICIPATION_NOT_FOUND` | 404 | Không tìm thấy yêu cầu tham gia |
+| `EVENT_PARTICIPATION_ALREADY_REQUESTED` | 409 | Đã gửi yêu cầu cho ca viên này |
+| `EVENT_PARTICIPATION_ALREADY_RESPONDED` | 409 | Bạn đã phản hồi yêu cầu này |
+| `EVENT_PARTICIPATION_CLOSED` | 409 | Sự kiện đã diễn ra, không thể phản hồi |
+| `EVENT_PARTICIPATION_NOT_INVITED` | 409 | Bạn chưa được mời tham gia sự kiện này |
 
 ## 9. Phân công phục vụ
 
@@ -224,10 +224,10 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 | `ROSTER_SONG_LIST_NOT_APPROVED` | 409 | Phải duyệt danh sách bài hát trước khi chốt phân công |
 | `ROSTER_NO_PERSONNEL_REQUIREMENT` | 409 | Chưa khai báo nhân sự cần cho các bài hát |
 | `ROSTER_INSUFFICIENT_MEMBERS` | 409 | Không đủ người cho một số bè hoặc nhạc cụ |
-| `ASSIGNMENT_NOT_FOUND` | 404 | Không tìm thấy dòng phân công |
-| `ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED` | 409 | Ca viên chưa được duyệt kỹ năng này |
-| `ASSIGNMENT_MEMBER_NOT_CONFIRMED` | 409 | Ca viên chưa xác nhận tham gia |
-| `ASSIGNMENT_DUPLICATE` | 409 | Ca viên đã được phân công vị trí này |
+| `ROSTER_ASSIGNMENT_NOT_FOUND` | 404 | Không tìm thấy dòng phân công |
+| `ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED` | 409 | Ca viên chưa được duyệt kỹ năng này |
+| `ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED` | 409 | Ca viên chưa xác nhận tham gia |
+| `ROSTER_ASSIGNMENT_DUPLICATE` | 409 | Ca viên đã được phân công vị trí này |
 | `PERSONNEL_REQUIREMENT_NOT_FOUND` | 404 | Không tìm thấy yêu cầu nhân sự |
 | `PERSONNEL_REQUIRED_COUNT_INVALID` | 400 | Số lượng người phải lớn hơn 0 |
 | `PERSONNEL_REQUIREMENT_DUPLICATE` | 409 | Kỹ năng này đã được khai báo cho bài hát |
@@ -240,10 +240,10 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 | `REHEARSAL_TIME_INVALID` | 400 | Giờ kết thúc phải sau giờ bắt đầu |
 | `REHEARSAL_TIME_CONFLICT` | 409 | Địa điểm đã có buổi tập khác vào giờ này |
 | `REHEARSAL_ALREADY_PASSED` | 409 | Buổi tập đã diễn ra |
-| `ATTENDANCE_NOT_FOUND` | 404 | Không tìm thấy bản ghi điểm danh |
-| `ATTENDANCE_ALREADY_RECORDED` | 409 | Ca viên này đã được điểm danh |
+| `REHEARSAL_ATTENDANCE_NOT_FOUND` | 404 | Không tìm thấy bản ghi điểm danh |
+| `REHEARSAL_ATTENDANCE_ALREADY_RECORDED` | 409 | Ca viên này đã được điểm danh |
 | `REHEARSAL_NOT_STARTED` | 409 | Buổi tập chưa bắt đầu, chưa thể điểm danh |
-| `ATTENDANCE_MEMBER_DUPLICATE` | 400 | Một ca viên xuất hiện nhiều lần trong danh sách điểm danh |
+| `REHEARSAL_ATTENDANCE_MEMBER_DUPLICATE` | 400 | Một ca viên xuất hiện nhiều lần trong danh sách điểm danh |
 | `REHEARSAL_SONG_DUPLICATE` | 400 | Một bài hát xuất hiện nhiều lần trong danh sách bài của buổi tập |
 
 ## 11. Bài tập & bản thu
@@ -340,12 +340,14 @@ xem — trả 404, để không lộ sự tồn tại của bản ghi.
   `AUTH_INVALID_CREDENTIALS` — không tự tạo tài khoản, không lộ email đã đăng ký.
 - 2026-10-02: đồng bộ `ErrorCodes.cs` với D6 — bỏ `WEEK_NOT_FOUND`, `WEEK_ALREADY_EXISTS`,
   `WEEK_START_NOT_MONDAY`, `WEEK_ALREADY_PUBLISHED`, `WEEK_NOT_PUBLISHED`, `EVENT_DATE_OUTSIDE_WEEK`
-  cùng 4 exception tương ứng; khai `EVENT_ALREADY_PUBLISHED`, `EVENT_NOT_PUBLISHED`,
+  cùng 4 exception tương ứng; khai `LITURGICAL_EVENT_ALREADY_PUBLISHED`, `LITURGICAL_EVENT_NOT_PUBLISHED`,
   `EXTERNAL_CALENDAR_FAILED`. Thêm `SONG_SKILL_REQUIREMENT_CATEGORY_INVALID` (FE-29).
   `SONG_CLASSIFICATION_DUPLICATE`, `SONG_SKILL_REQUIREMENT_DUPLICATE` đổi 409 → 400: là mã validate field.
   
 - 2026-10-11: thêm `SKILL_IN_USE` (đổi nhóm của kỹ năng đang được bài hát dùng). `LOOKUP_IN_USE` và
   `LOOKUP_INACTIVE` bắt đầu được dùng cho danh mục kỹ năng (UC-32 / FE-49).
-- 2026-10-11: thêm `EVENT_DATE_OUTSIDE_SEASON`. Tạo / sửa sự kiện bắt đầu trả `LOOKUP_NOT_FOUND`,
+- 2026-10-11: thêm `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON`. Tạo / sửa sự kiện bắt đầu trả `LOOKUP_NOT_FOUND`,
   `LOOKUP_INACTIVE` khi Id danh mục (mùa, loại lễ, nghi thức, loại sự kiện, nơi cử hành) sai hoặc đã tắt.
 - 2026-10-11: thêm `SETTING_VALUE_OUT_OF_RANGE` (UC-33 / FE-51).
+- 2026-10-13: đổi tiền tố `PARTICIPATION_*` thành `EVENT_PARTICIPATION_*` cho 5 mã (`_NOT_FOUND`, `_ALREADY_REQUESTED`,
+  `_ALREADY_RESPONDED`, `_CLOSED`, `_NOT_INVITED`) theo từ điển `EventParticipation`. FE cần đổi khoá trong bảng dịch.

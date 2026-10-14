@@ -366,7 +366,7 @@ public class LookupServiceTests
         var result = await _sut.CheckEventCatalogsAsync(
             _eventDate.AddDays(offsetDays), season.Id, null, null, null, location.Id, current, _ct);
 
-        Assert.Equal(ErrorCodes.EventDateOutsideSeason, result.Code);
+        Assert.Equal(ErrorCodes.LiturgicalEventDateOutsideLiturgicalSeason, result.Code);
     }
 
     [Fact]
@@ -382,7 +382,7 @@ public class LookupServiceTests
             Name = "Christmas", StartDate = new DateOnly(2026, 12, 24), EndDate = new DateOnly(2027, 1, 10),
         }, _ct);
 
-        Assert.Equal(ErrorCodes.SeasonDateOverlap, result.Code);
+        Assert.Equal(ErrorCodes.LiturgicalSeasonDateOverlap, result.Code);
     }
 
     [Fact]
@@ -409,6 +409,6 @@ public class LookupServiceTests
             Name = "Advent", StartDate = new DateOnly(2026, 12, 1), EndDate = new DateOnly(2026, 12, 1),
         }, _ct);
 
-        Assert.Contains(result.Errors, e => e.ErrorCode == ErrorCodes.SeasonDateInvalid);
+        Assert.Contains(result.Errors, e => e.ErrorCode == ErrorCodes.LiturgicalSeasonDateInvalid);
     }
 }

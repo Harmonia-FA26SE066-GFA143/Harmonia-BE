@@ -16,7 +16,7 @@ public class UpdateLiturgicalEventRequestValidator : AbstractValidator<UpdateLit
 
         RuleFor(x => x)
             .Must(x => x.MassTypeId.HasValue || x.CeremonyTypeId.HasValue)
-            .WithErrorCode(ErrorCodes.EventTypeRequired)
+            .WithErrorCode(ErrorCodes.LiturgicalEventTypeRequired)
             .WithMessage("Either MassTypeId or CeremonyTypeId is required.");
     }
 }

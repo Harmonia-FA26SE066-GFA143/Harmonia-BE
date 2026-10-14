@@ -12,11 +12,7 @@ public class UpdateSongListItemsRequestValidator : AbstractValidator<UpdateSongL
             .NotEmpty()
             .WithErrorCode(ErrorCodes.SongListEmpty);
 
-        RuleForEach(x => x.Items).ChildRules(item =>
-        {
-            item.RuleFor(i => i.SongId).NotEmpty();
-            item.RuleFor(i => i.SlotId).NotEmpty();
-        });
+        RuleForEach(x => x.Items).SetValidator(new UpdateSongListItemRequestValidator());
 
         RuleFor(x => x.Items)
             .Must(items => items.Select(i => i.SlotId).Distinct().Count() == items.Count)

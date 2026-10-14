@@ -11,12 +11,8 @@ public class RecordRehearsalAttendancesRequestValidator : AbstractValidator<Reco
     {
         RuleFor(x => x.Items).Cascade(CascadeMode.Stop).NotEmpty()
             .Must(x => x.Select(i => i.MemberId).Distinct().Count() == x.Count)
-            .WithErrorCode(ErrorCodes.AttendanceMemberDuplicate);
+            .WithErrorCode(ErrorCodes.RehearsalAttendanceMemberDuplicate);
 
-        RuleForEach(x => x.Items).ChildRules(i =>
-        {
-            i.RuleFor(x => x.MemberId).NotEmpty();
-            i.RuleFor(x => x.Status).IsInEnum();
-        });
+        RuleForEach(x => x.Items).SetValidator(new RecordRehearsalAttendanceRequestValidator());
     }
 }

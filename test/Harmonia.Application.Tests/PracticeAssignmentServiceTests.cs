@@ -40,6 +40,7 @@ public class PracticeAssignmentServiceTests
             {
                 cfg.AddProfile<PracticeAssignmentProfile>();
                 cfg.AddProfile<PracticeSubmissionProfile>();
+                cfg.AddProfile<PracticeFeedbackProfile>();
             }, NullLoggerFactory.Instance)
             .CreateMapper();
         _sut = new PracticeAssignmentService(
@@ -169,7 +170,7 @@ public class PracticeAssignmentServiceTests
 
         var result = await _sut.CreateAsync(request, _ct);
 
-        Assert.Equal(ErrorCodes.EventNotFound, result.Code);
+        Assert.Equal(ErrorCodes.LiturgicalEventNotFound, result.Code);
         await AssertNothingSavedAsync();
     }
 
@@ -183,7 +184,7 @@ public class PracticeAssignmentServiceTests
 
         var result = await _sut.CreateAsync(request, _ct);
 
-        Assert.Equal(ErrorCodes.EventCancelled, result.Code);
+        Assert.Equal(ErrorCodes.LiturgicalEventCancelled, result.Code);
         await AssertNothingSavedAsync();
     }
 

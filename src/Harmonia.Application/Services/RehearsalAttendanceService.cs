@@ -62,6 +62,6 @@ public class RehearsalAttendanceService(
         // Another director recorded one of these members between our read and our save; let the client reload.
         return await rehearsalRepository.TrySaveAttendancesAsync(rehearsal, cancellationToken)
             ? Result.Success()
-            : Result.Failure(ErrorCodes.AttendanceAlreadyRecorded);
+            : Result.Failure(ErrorCodes.RehearsalAttendanceAlreadyRecorded);
     }
 }

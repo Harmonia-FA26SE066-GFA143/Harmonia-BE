@@ -152,7 +152,7 @@ flowchart TD
         D3{Có ít nhất 1 bài?}
         B2[Chuyển Submitted, báo ParishPriest]
         B3[Lưu SongListReview, đổi trạng thái, báo người đề xuất]
-        X1[/Trả EVENT_NOT_PUBLISHED hoặc EVENT_CANCELLED/]
+        X1[/Trả LITURGICAL_EVENT_NOT_PUBLISHED hoặc LITURGICAL_EVENT_CANCELLED/]
         X2[/Trả SONG_LIST_EVENT_HAS_APPROVED_VERSION/]
         X3[/Trả SONG_LIST_CANNOT_BE_REVISED/]
         X4[/Trả SONG_LIST_EMPTY/]
@@ -204,10 +204,10 @@ flowchart TD
         D4{Mọi phân công còn hợp lệ?}
         B6[Roster = Finalized]
         B7[Gửi thông báo cho từng ca viên]
-        X1[/Trả EVENT_CANCELLED hoặc EVENT_ALREADY_PASSED/]
+        X1[/Trả LITURGICAL_EVENT_CANCELLED hoặc LITURGICAL_EVENT_ALREADY_PASSED/]
         X2[/Trả ROSTER_SONG_LIST_NOT_APPROVED hoặc ROSTER_NO_PERSONNEL_REQUIREMENT/]
         X3[/Trả ROSTER_ALREADY_FINALIZED/]
-        X4[/Trả MEMBER_NOT_ACTIVE, ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED hoặc ASSIGNMENT_MEMBER_NOT_CONFIRMED/]
+        X4[/Trả MEMBER_NOT_ACTIVE, ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED hoặc ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED/]
     end
 
     subgraph CM[ChoirMember]

@@ -374,7 +374,7 @@ public class ValidatorTests
         var codes = ErrorCodesOf(new RecordRehearsalAttendancesRequestValidator(),
             new RecordRehearsalAttendancesRequest { Items = [new() { MemberId = id, Status = AttendanceStatus.Present }, new() { MemberId = id, Status = AttendanceStatus.Late }] });
 
-        Assert.Equal([ErrorCodes.AttendanceMemberDuplicate], codes);
+        Assert.Equal([ErrorCodes.RehearsalAttendanceMemberDuplicate], codes);
     }
 
     [Fact]
@@ -616,5 +616,180 @@ public class ValidatorTests
         };
 
         Assert.Equal([ErrorCodes.ReportDateRangeInvalid], ErrorCodesOf(new ExportReportRequestValidator(), request));
+    }
+
+    // ---- Create rehearsal ----
+
+    private static CreateRehearsalRequest NewRehearsal(params Guid[] songIds) => new()
+    {
+        StartTime = new DateTime(2026, 12, 1, 12, 0, 0, DateTimeKind.Utc),
+        EndTime = new DateTime(2026, 12, 1, 14, 0, 0, DateTimeKind.Utc),
+        Songs = songIds.Select(id => new UpdateRehearsalSongRequest { SongId = id }).ToList(),
+    };
+
+    [Fact]
+    public void CreateRehearsal_ValidWithOrWithoutSongs_HasNoErrors()
+    {
+        var validator = new CreateRehearsalRequestValidator();
+
+        Assert.Empty(ErrorCodesOf(validator, NewRehearsal()));
+        Assert.Empty(ErrorCodesOf(validator, NewRehearsal(Guid.NewGuid(), Guid.NewGuid())));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void CreateRehearsal_EndNotAfterStart_ReturnsTimeInvalid(int hoursAfterStart)
+    {
+        var request = NewRehearsal();
+        request.EndTime = request.StartTime.AddHours(hoursAfterStart);
+
+        Assert.Equal([ErrorCodes.RehearsalTimeInvalid], ErrorCodesOf(new CreateRehearsalRequestValidator(), request));
+    }
+
+    [Fact]
+    public void CreateRehearsal_SameSongTwice_ReturnsSongDuplicate()
+    {
+        var id = Guid.NewGuid();
+
+        var codes = ErrorCodesOf(new CreateRehearsalRequestValidator(), NewRehearsal(id, id));
+
+        Assert.Equal([ErrorCodes.RehearsalSongDuplicate], codes);
+    }
+
+    [Fact]
+    public void CreateRehearsal_MissingTimesEmptySongIdOrLongNote_IsInvalid()
+    {
+        var validator = new CreateRehearsalRequestValidator();
+        var longNote = NewRehearsal();
+        longNote.Note = new string('x', 501);
+
+        Assert.False(validator.Validate(new CreateRehearsalRequest()).IsValid);
+        Assert.False(validator.Validate(longNote).IsValid);
+        Assert.False(validator.Validate(NewRehearsal(Guid.Empty)).IsValid);
+    }
+
+    // ---- Event participation ----
+
+    [Theory]
+    [InlineData(ParticipationStatus.Confirmed, true)]
+    [InlineData(ParticipationStatus.Declined, true)]
+    [InlineData(ParticipationStatus.Unsure, true)]
+    [InlineData(ParticipationStatus.Invited, false)]
+    [InlineData((ParticipationStatus)99, false)]
+    public void RespondParticipation_OnlyARealAnswerIsValid(ParticipationStatus status, bool expected)
+    {
+        var result = new RespondParticipationRequestValidator().Validate(new RespondParticipationRequest { Status = status });
+
+        Assert.Equal(expected, result.IsValid);
+    }
+
+    [Fact]
+    public void RespondParticipation_NoteOver300Chars_IsInvalid()
+    {
+        var request = new RespondParticipationRequest { Status = ParticipationStatus.Declined, Note = new string('x', 301) };
+
+        Assert.False(new RespondParticipationRequestValidator().Validate(request).IsValid);
+    }
+
+    [Fact]
+    public void SendParticipationRequests_EventIdRequired_MemberIdsOptionalButNeverEmptyGuid()
+    {
+        var validator = new SendParticipationRequestsRequestValidator();
+        var eventId = Guid.NewGuid();
+
+        Assert.True(validator.Validate(new SendParticipationRequestsRequest { EventId = eventId }).IsValid);
+        Assert.True(validator.Validate(new SendParticipationRequestsRequest { EventId = eventId, MemberIds = [Guid.NewGuid()] }).IsValid);
+        Assert.False(validator.Validate(new SendParticipationRequestsRequest()).IsValid);
+        Assert.False(validator.Validate(new SendParticipationRequestsRequest { EventId = eventId, MemberIds = [Guid.Empty] }).IsValid);
+    }
+    // ---- Search filters ----
+
+    public static TheoryData<IValidator, object> SearchRequests() => new()
+    {
+        { new SearchUsersRequestValidator(), new SearchUsersRequest() },
+        { new SearchSongsRequestValidator(), new SearchSongsRequest() },
+        { new SearchPracticeSubmissionsRequestValidator(), new SearchPracticeSubmissionsRequest() },
+        { new SearchMyPracticeSubmissionsRequestValidator(), new SearchMyPracticeSubmissionsRequest() },
+        { new SearchMyPracticeAssignmentsRequestValidator(), new SearchMyPracticeAssignmentsRequest() },
+        { new SearchMyParticipationHistoryRequestValidator(), new SearchMyParticipationHistoryRequest() },
+        { new SearchMusicMaterialsRequestValidator(), new SearchMusicMaterialsRequest() },
+        { new SearchMemberProfilesRequestValidator(), new SearchMemberProfilesRequest() },
+        { new SearchMaterialLearningProgressRequestValidator(), new SearchMaterialLearningProgressRequest() },
+        { new SearchLiturgicalEventsRequestValidator(), new SearchLiturgicalEventsRequest() },
+        { new SearchDirectorNotesRequestValidator(), new SearchDirectorNotesRequest() },
+    };
+
+    public static TheoryData<IValidator, object> BadSearchRequests() => new()
+    {
+        { new SearchUsersRequestValidator(), new SearchUsersRequest { Keyword = new string('x', 101) } },
+        { new SearchSongsRequestValidator(), new SearchSongsRequest { Keyword = new string('x', 101) } },
+        { new SearchSongsRequestValidator(), new SearchSongsRequest { LiturgicalSeasonId = Guid.Empty } },
+        { new SearchSongsRequestValidator(), new SearchSongsRequest { MassTypeId = Guid.Empty } },
+        { new SearchSongsRequestValidator(), new SearchSongsRequest { CeremonyTypeId = Guid.Empty } },
+        { new SearchSongsRequestValidator(), new SearchSongsRequest { SongThemeId = Guid.Empty } },
+        { new SearchSongsRequestValidator(), new SearchSongsRequest { SkillId = Guid.Empty } },
+        { new SearchPracticeSubmissionsRequestValidator(), new SearchPracticeSubmissionsRequest { Status = (SubmissionStatus)99 } },
+        { new SearchMyPracticeSubmissionsRequestValidator(), new SearchMyPracticeSubmissionsRequest { AssignmentId = Guid.Empty } },
+        { new SearchMyPracticeAssignmentsRequestValidator(), new SearchMyPracticeAssignmentsRequest { Status = (SubmissionStatus)99 } },
+        { new SearchMyParticipationHistoryRequestValidator(), new SearchMyParticipationHistoryRequest { LiturgicalSeasonId = Guid.Empty } },
+        { new SearchMusicMaterialsRequestValidator(), new SearchMusicMaterialsRequest { Keyword = new string('x', 101) } },
+        { new SearchMusicMaterialsRequestValidator(), new SearchMusicMaterialsRequest { SongId = Guid.Empty } },
+        { new SearchMusicMaterialsRequestValidator(), new SearchMusicMaterialsRequest { LiturgicalSeasonId = Guid.Empty } },
+        { new SearchMusicMaterialsRequestValidator(), new SearchMusicMaterialsRequest { SkillId = Guid.Empty } },
+        { new SearchMusicMaterialsRequestValidator(), new SearchMusicMaterialsRequest { MaterialType = (MaterialType)99 } },
+        { new SearchMusicMaterialsRequestValidator(), new SearchMusicMaterialsRequest { LearningStatus = (LearningStatus)99 } },
+        { new SearchMemberProfilesRequestValidator(), new SearchMemberProfilesRequest { Keyword = new string('x', 101) } },
+        { new SearchMemberProfilesRequestValidator(), new SearchMemberProfilesRequest { Status = (MemberStatus)99 } },
+        { new SearchMemberProfilesRequestValidator(), new SearchMemberProfilesRequest { SkillId = Guid.Empty } },
+        { new SearchMaterialLearningProgressRequestValidator(), new SearchMaterialLearningProgressRequest { Status = (LearningStatus)99 } },
+        { new SearchLiturgicalEventsRequestValidator(), new SearchLiturgicalEventsRequest { Status = (EventStatus)99 } },
+        { new SearchDirectorNotesRequestValidator(), new SearchDirectorNotesRequest { EventId = Guid.Empty } },
+    };
+
+    private static bool IsValid(IValidator validator, object request) =>
+        validator.Validate(new ValidationContext<object>(request)).IsValid;
+
+    [Theory]
+    [MemberData(nameof(SearchRequests))]
+    public void Search_NoFilters_IsValid(IValidator validator, object request) => Assert.True(IsValid(validator, request));
+
+    [Theory]
+    [MemberData(nameof(BadSearchRequests))]
+    public void Search_LongKeywordEmptyGuidOrUnknownEnum_IsInvalid(IValidator validator, object request) =>
+        Assert.False(IsValid(validator, request));
+
+    [Fact]
+    public void Search_EveryFilterSet_IsValid()
+    {
+        var songs = new SearchSongsRequest { Keyword = new string('x', 100), SkillId = Guid.NewGuid() };
+        var materials = new SearchMusicMaterialsRequest { MaterialType = MaterialType.Lyrics, LearningStatus = LearningStatus.Learned };
+
+        Assert.True(IsValid(new SearchSongsRequestValidator(), songs));
+        Assert.True(IsValid(new SearchMusicMaterialsRequestValidator(), materials));
+    }
+
+    [Fact]
+    public void SearchLiturgicalEvents_FromDateAfterToDate_ReturnsDateRangeInvalid_OtherwiseNoErrors()
+    {
+        var validator = new SearchLiturgicalEventsRequestValidator();
+        var day = new DateOnly(2026, 10, 1);
+
+        Assert.Equal(
+            [ErrorCodes.ReportDateRangeInvalid],
+            ErrorCodesOf(validator, new SearchLiturgicalEventsRequest { FromDate = day.AddDays(1), ToDate = day }));
+        Assert.Empty(ErrorCodesOf(validator, new SearchLiturgicalEventsRequest { FromDate = day, ToDate = day, Status = EventStatus.Published }));
+    }
+
+    [Fact]
+    public void SearchMyParticipationHistory_FromDateAfterToDate_ReturnsDateRangeInvalid_OtherwiseNoErrors()
+    {
+        var validator = new SearchMyParticipationHistoryRequestValidator();
+        var day = new DateOnly(2026, 10, 1);
+
+        Assert.Equal(
+            [ErrorCodes.ReportDateRangeInvalid],
+            ErrorCodesOf(validator, new SearchMyParticipationHistoryRequest { FromDate = day.AddDays(1), ToDate = day }));
+        Assert.Empty(ErrorCodesOf(validator, new SearchMyParticipationHistoryRequest { FromDate = day }));
     }
 }

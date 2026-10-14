@@ -14,11 +14,7 @@ public class UpdateSongPersonnelRequirementsRequestValidator : AbstractValidator
         RuleFor(x => x.Requirements).Cascade(CascadeMode.Stop).NotNull()
             .Must(x => BeDistinct(x.Select(r => r.SkillId))).WithErrorCode(ErrorCodes.PersonnelRequirementDuplicate);
 
-        RuleForEach(x => x.Requirements).ChildRules(r =>
-        {
-            r.RuleFor(x => x.SkillId).NotEmpty();
-            r.RuleFor(x => x.RequiredCount).InclusiveBetween(1, MaxRequiredCount).WithErrorCode(ErrorCodes.PersonnelRequiredCountInvalid);
-        });
+        RuleForEach(x => x.Requirements).SetValidator(new UpdateSongPersonnelRequirementRequestValidator());
     }
 
     private static bool BeDistinct(IEnumerable<Guid> ids)
