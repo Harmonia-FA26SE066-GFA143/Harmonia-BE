@@ -44,4 +44,4 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapApiHubs();
 
-app.Run();
+await app.RunAsync();

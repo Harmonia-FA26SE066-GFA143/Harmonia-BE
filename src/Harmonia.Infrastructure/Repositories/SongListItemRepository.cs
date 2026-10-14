@@ -11,7 +11,7 @@ public class SongListItemRepository(HarmoniaDbContext dbContext)
     public Task<SongListItem?> GetWithPersonnelRequirementsAsync(Guid id, CancellationToken cancellationToken) =>
         DbContext.SongListItems
             .Include(x => x.PersonnelRequirements).ThenInclude(x => x.Skill)
-            .Include(x => x.SongList).ThenInclude(x => x.LiturgicalEvent).ThenInclude(x => x.ServiceRoster)
+            .Include(x => x.SongList.LiturgicalEvent.ServiceRoster)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
     public async Task<bool> IsLatestVersionAsync(Guid eventId, int version, CancellationToken cancellationToken) =>

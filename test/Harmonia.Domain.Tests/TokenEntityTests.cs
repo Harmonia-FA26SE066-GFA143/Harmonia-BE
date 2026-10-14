@@ -12,7 +12,7 @@ public class TokenEntityTests
     {
         var token = new RefreshToken { ExpiresAt = DateTime.UtcNow.AddMinutes(5) };
 
-        token.EnsureUsable();
+        Assert.Null(Record.Exception(token.EnsureUsable));
     }
 
     [Fact]
@@ -69,7 +69,7 @@ public class TokenEntityTests
     {
         var token = new PasswordResetToken { ExpiresAt = Now.AddMinutes(1) };
 
-        token.EnsureUsable(Now);
+        Assert.Null(Record.Exception(() => token.EnsureUsable(Now)));
     }
 
     [Fact]

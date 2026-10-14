@@ -44,8 +44,7 @@ public class MemberSkillRepository(HarmoniaDbContext dbContext)
     public Task<MemberSkill?> GetWithSkillAsync(Guid id, CancellationToken cancellationToken) =>
         DbContext.MemberSkills
             .AsNoTracking()
-            .Include(x => x.Skill)
-                .ThenInclude(s => s.Category)
+            .Include(x => x.Skill.Category)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
     public async Task<PagedList<MemberSkill>> GetByMemberAsync(
@@ -60,8 +59,7 @@ public class MemberSkillRepository(HarmoniaDbContext dbContext)
         var totalCount = await query.CountAsync(cancellationToken);
 
         var items = await query
-            .Include(x => x.Skill)
-                .ThenInclude(s => s.Category)
+            .Include(x => x.Skill.Category)
             .OrderByDescending(x => x.DeclaredAt)
             .ThenBy(x => x.Id)
             .Skip((paging.PageNumber - 1) * paging.PageSize)
@@ -80,10 +78,8 @@ public class MemberSkillRepository(HarmoniaDbContext dbContext)
         var totalCount = await query.CountAsync(cancellationToken);
 
         var items = await query
-            .Include(x => x.Skill)
-                .ThenInclude(s => s.Category)
-            .Include(x => x.Member)
-                .ThenInclude(m => m.User)
+            .Include(x => x.Skill.Category)
+            .Include(x => x.Member.User)
             .OrderBy(x => x.DeclaredAt)
             .ThenBy(x => x.Id)
             .Skip((paging.PageNumber - 1) * paging.PageSize)
@@ -95,10 +91,8 @@ public class MemberSkillRepository(HarmoniaDbContext dbContext)
 
     public Task<MemberSkill?> GetForReviewAsync(Guid id, CancellationToken cancellationToken) =>
         DbContext.MemberSkills
-            .Include(x => x.Skill)
-                .ThenInclude(s => s.Category)
-            .Include(x => x.Member)
-                .ThenInclude(m => m.User)
+            .Include(x => x.Skill.Category)
+            .Include(x => x.Member.User)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
     public async Task<bool> TrySaveReviewAsync(MemberSkill memberSkill, CancellationToken cancellationToken)

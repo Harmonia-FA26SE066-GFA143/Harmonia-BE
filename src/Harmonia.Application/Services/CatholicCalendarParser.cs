@@ -17,12 +17,14 @@ public class CatholicCalendarParser : ICatholicCalendarParser
 {
     private const int MaxCelebrationNameLength = 200;
 
+    private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(1);
+
     private static readonly string[] ColourEmojis = ["⚪", "🟢", "🟣", "🔴"];
 
-    private static readonly Regex RankPattern = new(@"^\[(?<code>[A-Za-z*]+)\]\s*(?<name>.*)$", RegexOptions.Compiled);
+    private static readonly Regex RankPattern = new(@"^\[(?<code>[A-Za-z*]+)\]\s*(?<name>.*)$", RegexOptions.Compiled, RegexTimeout);
 
     // RFC 5545 TEXT escapes: \n \N \, \; \\
-    private static readonly Regex TextEscapePattern = new(@"\\([nN,;\\])", RegexOptions.Compiled);
+    private static readonly Regex TextEscapePattern = new(@"\\([nN,;\\])", RegexOptions.Compiled, RegexTimeout);
 
     private static readonly (string Keyword, string Season)[] SeasonKeywords =
     [
@@ -143,13 +145,10 @@ public class CatholicCalendarParser : ICatholicCalendarParser
     {
         var rest = summary;
 
-        foreach (var colour in ColourEmojis)
+        var colour = Array.Find(ColourEmojis, c => rest.StartsWith(c, StringComparison.Ordinal));
+        if (colour is not null)
         {
-            if (rest.StartsWith(colour, StringComparison.Ordinal))
-            {
-                rest = rest[colour.Length..].TrimStart();
-                break;
-            }
+            rest = rest[colour.Length..].TrimStart();
         }
 
         var match = RankPattern.Match(rest);

@@ -15,6 +15,7 @@ public class SongListRepository(HarmoniaDbContext dbContext)
 {
     public Task<SongList?> GetByIdWithDetailsAsync(Guid id, CancellationToken cancellationToken) =>
         DbContext.SongLists
+            .AsSplitQuery()
             .Include(x => x.Items).ThenInclude(i => i.Song)
             .Include(x => x.Items).ThenInclude(i => i.Slot)
             .Include(x => x.Reviews)
@@ -28,6 +29,7 @@ public class SongListRepository(HarmoniaDbContext dbContext)
 
     public Task<SongList?> GetApprovedForEventAsync(Guid eventId, CancellationToken cancellationToken) =>
         DbContext.SongLists
+            .AsSplitQuery()
             .Include(x => x.Items).ThenInclude(i => i.Song)
             .Include(x => x.Items).ThenInclude(i => i.Slot)
             .Include(x => x.Reviews)

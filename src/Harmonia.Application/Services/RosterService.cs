@@ -63,16 +63,18 @@ public class RosterService(
             roster.Assignments.Remove(old);
 
         foreach (var slot in slots)
-        foreach (var memberId in slot.Picked)
         {
-            roster.Assignments.Add(new RosterAssignment
+            foreach (var memberId in slot.Picked)
             {
-                RosterId = roster.Id,
-                MemberId = memberId,
-                SkillId = slot.Requirement.SkillId,
-                SongListItemId = slot.Item.Id,
-                Source = AssignmentSource.Suggested,
-            });
+                roster.Assignments.Add(new RosterAssignment
+                {
+                    RosterId = roster.Id,
+                    MemberId = memberId,
+                    SkillId = slot.Requirement.SkillId,
+                    SongListItemId = slot.Item.Id,
+                    Source = AssignmentSource.Suggested,
+                });
+            }
         }
 
         await rosterRepository.SaveChangesAsync(cancellationToken);
@@ -142,10 +144,13 @@ public class RosterService(
         var assignments = await rosterRepository.GetAssignmentsWithEligibilityAsync(roster.Id, roster.EventId, cancellationToken);
         foreach (var assignment in assignments)
         {
-            var code = assignment.Member.Status != MemberStatus.Active ? ErrorCodes.MemberNotActive
-                : !assignment.Member.MemberSkills.Any(s => s.SkillId == assignment.SkillId) ? ErrorCodes.RosterAssignmentMemberSkillNotApproved
-                : assignment.Member.EventParticipations.Count == 0 ? ErrorCodes.RosterAssignmentMemberNotConfirmed
-                : null;
+            var code = assignment switch
+            {
+                { Member.Status: not MemberStatus.Active } => ErrorCodes.MemberNotActive,
+                _ when !assignment.Member.MemberSkills.Any(s => s.SkillId == assignment.SkillId) => ErrorCodes.RosterAssignmentMemberSkillNotApproved,
+                { Member.EventParticipations.Count: 0 } => ErrorCodes.RosterAssignmentMemberNotConfirmed,
+                _ => null,
+            };
             if (code is not null)
                 return Result<ServiceRosterDto>.Failure(code, $"Assignment {assignment.Id} is no longer valid.");
         }
@@ -436,10 +441,12 @@ public class RosterService(
     private static void FillByRules(List<Slot> slots)
     {
         foreach (var slot in slots)
-        foreach (var candidate in slot.Candidates)
         {
-            if (slot.Picked.Count >= slot.NeededCount) break;
-            if (!slot.Picked.Contains(candidate.MemberId)) slot.Picked.Add(candidate.MemberId);
+            foreach (var memberId in slot.Candidates.Select(candidate => candidate.MemberId))
+            {
+                if (slot.Picked.Count >= slot.NeededCount) break;
+                if (!slot.Picked.Contains(memberId)) slot.Picked.Add(memberId);
+            }
         }
     }
 }

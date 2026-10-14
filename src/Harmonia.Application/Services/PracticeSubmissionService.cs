@@ -100,11 +100,12 @@ public class PracticeSubmissionService(
             return Result<PracticeSubmissionDetailDto>.Failure(ErrorCodes.PracticeSubmissionAlreadyReviewed);
 
         var title = submission.PracticeAssignment.Title;
+        var resultText = submission.Status == SubmissionStatus.Passed ? "đã đạt yêu cầu" : "được đánh dấu cần chỉnh sửa";
         await NotifyMemberAsync(
             submission,
             isResultChange ? "Kết quả bài tập đã thay đổi" : "Nhận xét mới cho bài tập",
             isResultChange
-                ? $"Bản thu \"{title}\" của bạn hiện {(submission.Status == SubmissionStatus.Passed ? "đã đạt yêu cầu" : "được đánh dấu cần chỉnh sửa")}."
+                ? $"Bản thu \"{title}\" của bạn hiện {resultText}."
                 : $"Ca trưởng đã để lại nhận xét mới cho bản thu \"{title}\" của bạn.",
             cancellationToken);
 

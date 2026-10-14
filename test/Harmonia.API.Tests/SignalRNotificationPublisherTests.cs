@@ -40,7 +40,7 @@ public class SignalRNotificationPublisherTests
     {
         _client.ReceiveNotificationAsync(_notification, _ct).ThrowsAsync(new IOException("backplane down"));
 
-        await _sut.PublishAsync(_notification, _userIds, _ct);
+        Assert.Null(await Record.ExceptionAsync(() => _sut.PublishAsync(_notification, _userIds, _ct)));
     }
 
     [Fact]
@@ -50,6 +50,6 @@ public class SignalRNotificationPublisherTests
         await aborted.CancelAsync();
         _client.ReceiveNotificationAsync(_notification, aborted.Token).ThrowsAsync(new OperationCanceledException(aborted.Token));
 
-        await _sut.PublishAsync(_notification, _userIds, aborted.Token);
+        Assert.Null(await Record.ExceptionAsync(() => _sut.PublishAsync(_notification, _userIds, aborted.Token)));
     }
 }

@@ -16,13 +16,13 @@ public class EventParticipationRepository(HarmoniaDbContext dbContext)
         Guid eventId, Guid memberId, CancellationToken cancellationToken) =>
         DbContext.EventParticipations
             .Include(x => x.LiturgicalEvent)
-            .Include(x => x.Member).ThenInclude(m => m.User)
+            .Include(x => x.Member.User)
             .FirstOrDefaultAsync(x => x.EventId == eventId && x.MemberId == memberId, cancellationToken);
 
     public Task<List<EventParticipation>> GetByEventAsync(Guid eventId, CancellationToken cancellationToken) =>
         DbContext.EventParticipations
             .AsNoTracking()
-            .Include(x => x.Member).ThenInclude(m => m.User)
+            .Include(x => x.Member.User)
             .Where(x => x.EventId == eventId)
             .OrderBy(x => x.Member.User.FullName)
             .ThenBy(x => x.Id)

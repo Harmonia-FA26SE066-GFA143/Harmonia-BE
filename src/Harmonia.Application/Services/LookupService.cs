@@ -228,11 +228,12 @@ public class LookupService(
         return Check(id, row, row is null ? null : isActive(row), currentId);
     }
 
-    private static string? Check(Guid? id, object? row, bool? isActive, Guid? currentId) =>
-        id is null ? null
-        : row is null ? ErrorCodes.LookupNotFound
-        : isActive == false && id != currentId ? ErrorCodes.LookupInactive
-        : null;
+    private static string? Check(Guid? id, object? row, bool? isActive, Guid? currentId)
+    {
+        if (id is null) return null;
+        if (row is null) return ErrorCodes.LookupNotFound;
+        return isActive == false && id != currentId ? ErrorCodes.LookupInactive : null;
+    }
 
     private async Task<bool> IsRequiredBySongsAsync(Guid skillId, CancellationToken cancellationToken) =>
         (await songVocalRequirements.ListAsync(x => x.SkillId == skillId, cancellationToken)).Count > 0

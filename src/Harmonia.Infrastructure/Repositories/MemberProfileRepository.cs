@@ -21,11 +21,9 @@ public class MemberProfileRepository(HarmoniaDbContext dbContext)
     public Task<MemberProfile?> GetByUserIdWithApprovedSkillsAsync(Guid userId, CancellationToken cancellationToken) =>
         DbContext.MemberProfiles
             .AsNoTracking()
-            .Include(x => x.User)
-                .ThenInclude(u => u.Role)
+            .Include(x => x.User.Role)
             .Include(x => x.MemberSkills.Where(s => s.Status == ApprovalStatus.Approved && s.Skill.IsActive))
-                .ThenInclude(s => s.Skill)
-                .ThenInclude(s => s.Category)
+                .ThenInclude(s => s.Skill.Category)
             .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
 
     public Task<MemberProfile?> GetByUserIdForUpdateAsync(Guid userId, CancellationToken cancellationToken) =>
@@ -65,8 +63,7 @@ public class MemberProfileRepository(HarmoniaDbContext dbContext)
         var items = await query
             .Include(x => x.User)
             .Include(x => x.MemberSkills.Where(s => s.Status == ApprovalStatus.Approved && s.Skill.IsActive))
-                .ThenInclude(s => s.Skill)
-                .ThenInclude(s => s.Category)
+                .ThenInclude(s => s.Skill.Category)
             .OrderBy(x => x.User.FullName)
             .ThenBy(x => x.Id)
             .Skip((filter.PageNumber - 1) * filter.PageSize)

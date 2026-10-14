@@ -98,8 +98,7 @@ public class UserRepository(HarmoniaDbContext dbContext)
 
     public Task<RefreshToken?> GetRefreshTokenByHashAsync(string tokenHash, CancellationToken cancellationToken) =>
         DbContext.RefreshTokens
-            .Include(x => x.User)
-            .ThenInclude(x => x.Role)
+            .Include(x => x.User.Role)
             .FirstOrDefaultAsync(x => x.TokenHash == tokenHash, cancellationToken);
 
     public async Task AddRefreshTokenAsync(RefreshToken refreshToken, CancellationToken cancellationToken) =>
@@ -135,14 +134,14 @@ public class UserRepository(HarmoniaDbContext dbContext)
         .Include(x => x.Role)
         .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
-    public Task<bool> ExistsByEmailAsync(string email, Guid? excludeUserId, CancellationToken ct) => 
-        DbContext.Users.AnyAsync(x => x.Email == email && x.Id != excludeUserId, ct);
+    public Task<bool> ExistsByEmailAsync(string email, Guid? excludeUserId, CancellationToken cancellationToken) => 
+        DbContext.Users.AnyAsync(x => x.Email == email && x.Id != excludeUserId, cancellationToken);
 
-    public Task<Role?> GetRoleByNameAsync(string roleName, CancellationToken ct) =>
-        DbContext.Roles.FirstOrDefaultAsync(x => x.Name == roleName, ct);
+    public Task<Role?> GetRoleByNameAsync(string roleName, CancellationToken cancellationToken) =>
+        DbContext.Roles.FirstOrDefaultAsync(x => x.Name == roleName, cancellationToken);
 
-    public Task<int> CountActiveAdminsAsync(CancellationToken ct) =>
-        DbContext.Users.CountAsync(x => x.Role.Name == RoleNames.Admin && x.IsActive, ct);
+    public Task<int> CountActiveAdminsAsync(CancellationToken cancellationToken) =>
+        DbContext.Users.CountAsync(x => x.Role.Name == RoleNames.Admin && x.IsActive, cancellationToken);
 
     public Task<List<Guid>> GetActiveUserIdsByRolesAsync(
     IReadOnlyCollection<string> roleNames, CancellationToken cancellationToken)

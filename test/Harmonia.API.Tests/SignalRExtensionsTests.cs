@@ -36,14 +36,18 @@ public class SignalRExtensionsTests
     [InlineData("Testing")]
     public void AddApiSignalR_NoConnectionStringInDevelopmentOrTesting_RunsInProcess(string environmentName)
     {
-        new ServiceCollection().AddApiSignalR(Configuration(""), Environment(environmentName));
+        var ex = Record.Exception(() => new ServiceCollection().AddApiSignalR(Configuration(""), Environment(environmentName)));
+
+        Assert.Null(ex);
     }
 
     [Fact]
     public void AddApiSignalR_WithConnectionString_DoesNotThrowInProduction()
     {
-        new ServiceCollection().AddApiSignalR(
+        var ex = Record.Exception(() => new ServiceCollection().AddApiSignalR(
             Configuration("Endpoint=https://test.service.signalr.net;AccessKey=dGVzdA==;Version=1.0;"),
-            Environment("Production"));
+            Environment("Production")));
+
+        Assert.Null(ex);
     }
 }

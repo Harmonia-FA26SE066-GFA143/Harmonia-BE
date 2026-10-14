@@ -122,8 +122,7 @@ public class PracticeSubmissionRepository(HarmoniaDbContext dbContext)
 
     private static IQueryable<PracticeSubmission> WithMemberAndAssignment(IQueryable<PracticeSubmission> query) =>
         query
-            .Include(x => x.Member)
-                .ThenInclude(m => m.User)
+            .Include(x => x.Member.User)
             .Include(x => x.PracticeAssignment)
             .Include(x => x.Feedbacks)
                 .ThenInclude(f => f.Reviewer)
