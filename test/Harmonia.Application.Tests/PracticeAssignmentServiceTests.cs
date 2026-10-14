@@ -245,6 +245,10 @@ public class PracticeAssignmentServiceTests
         var item = Assert.Single(result.Value!.Items);
         Assert.Equal("Entrance hymn", item.SongTitle);
         Assert.Null(item.EventDate);
+        Assert.Null(item.EventTime);
+        Assert.Null(item.EventTitle);
+        Assert.Null(item.MaterialTitle);
+        Assert.Null(item.MaterialType);
         Assert.Equal(SubmissionStatus.Submitted, item.LatestSubmissionStatus);
         Assert.Equal(submittedAt, item.LatestSubmittedAt);
     }

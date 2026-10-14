@@ -419,8 +419,15 @@ public class RosterService(
         var result = await suggestionGenerator.GenerateAsync(input, cancellationToken);
         if (!result.IsSuccess) return false;
 
-        var slotByCode = open.ToDictionary(x => x.Code);
-        foreach (var pick in result.Value!)
+        ApplyAiPicks(open.ToDictionary(x => x.Code), result.Value!, idOf);
+        return true;
+    }
+
+    /// <summary>Keeps only AI picks that are real candidates of their slot, not repeated, and within the needed count.</summary>
+    private static void ApplyAiPicks(
+        Dictionary<string, Slot> slotByCode, IEnumerable<RosterSlotPick> picks, Dictionary<string, Guid> idOf)
+    {
+        foreach (var pick in picks)
         {
             if (!slotByCode.TryGetValue(pick.SlotCode, out var slot)) continue;
 
@@ -433,8 +440,6 @@ public class RosterService(
                     slot.Picked.Add(memberId);
             }
         }
-
-        return true;
     }
 
     /// <summary>Tops every slot up from its remaining candidates, best first. The whole fallback when the AI failed.</summary>

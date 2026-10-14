@@ -23,18 +23,9 @@ public class RehearsalService(
     public async Task<Result<RehearsalDto>> CreateAsync(
         CreateRehearsalRequest request, CancellationToken cancellationToken)
     {
-        if (request.EventId is { } eventId)
+        if (await CheckEventAsync(request.EventId, cancellationToken) is { } eventError)
         {
-            var liturgicalEvent = await liturgicalEventRepository.GetByIdAsync(eventId, cancellationToken);
-            if (liturgicalEvent is null)
-            {
-                return Result<RehearsalDto>.Failure(ErrorCodes.LiturgicalEventNotFound);
-            }
-
-            if (liturgicalEvent.Status == EventStatus.Cancelled)
-            {
-                return Result<RehearsalDto>.Failure(ErrorCodes.LiturgicalEventCancelled);
-            }
+            return Result<RehearsalDto>.Failure(eventError);
         }
 
         WorshipLocation? location = null;
@@ -98,5 +89,22 @@ public class RehearsalService(
         await rehearsalRepository.SaveChangesAsync(cancellationToken);
 
         return Result<RehearsalDto>.Success(mapper.Map<RehearsalDto>(rehearsal));
+    }
+
+    /// <summary>Error code when the linked event is missing or cancelled; null when there is no event or it is usable.</summary>
+    private async Task<string?> CheckEventAsync(Guid? eventId, CancellationToken cancellationToken)
+    {
+        if (eventId is null)
+        {
+            return null;
+        }
+
+        var liturgicalEvent = await liturgicalEventRepository.GetByIdAsync(eventId.Value, cancellationToken);
+        if (liturgicalEvent is null)
+        {
+            return ErrorCodes.LiturgicalEventNotFound;
+        }
+
+        return liturgicalEvent.Status == EventStatus.Cancelled ? ErrorCodes.LiturgicalEventCancelled : null;
     }
 }

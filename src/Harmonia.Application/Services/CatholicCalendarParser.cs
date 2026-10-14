@@ -65,35 +65,12 @@ public class CatholicCalendarParser : ICatholicCalendarParser
             {
                 if (currentDate is { } date && currentSummary is not null)
                 {
-                    var (celebrationName, rank, priority) = ParseSummary(currentSummary);
-                    var seasonName = DetectSeason(celebrationName);
-
-                    if (!byDate.TryGetValue(date, out var existing) || priority > existing.Priority)
-                    {
-                        byDate[date] = (new CalendarDayResult(date, celebrationName, rank, seasonName), priority);
-                    }
+                    AddEvent(byDate, date, currentSummary);
                 }
             }
             else
             {
-                var separator = line.IndexOf(':');
-                if (separator <= 0)
-                {
-                    continue;
-                }
-
-                // Property parameters sit before the colon, e.g. "DTSTART;VALUE=DATE:20261225".
-                var propertyName = line[..separator].Split(';', 2)[0];
-                var value = line[(separator + 1)..];
-
-                if (propertyName == "DTSTART")
-                {
-                    currentDate = ParseDate(value);
-                }
-                else if (propertyName == "SUMMARY")
-                {
-                    currentSummary = UnescapeText(value);
-                }
+                ReadProperty(line, ref currentDate, ref currentSummary);
             }
         }
 
@@ -104,6 +81,42 @@ public class CatholicCalendarParser : ICatholicCalendarParser
 
         return Result<List<CalendarDayResult>>.Success(
             byDate.Values.Select(x => x.Result).OrderBy(x => x.Date).ToList());
+    }
+
+    /// <summary>Keeps the highest-priority celebration when several events share a date.</summary>
+    private static void AddEvent(
+        Dictionary<DateOnly, (CalendarDayResult Result, int Priority)> byDate, DateOnly date, string summary)
+    {
+        var (celebrationName, rank, priority) = ParseSummary(summary);
+        var seasonName = DetectSeason(celebrationName);
+
+        if (!byDate.TryGetValue(date, out var existing) || priority > existing.Priority)
+        {
+            byDate[date] = (new CalendarDayResult(date, celebrationName, rank, seasonName), priority);
+        }
+    }
+
+    /// <summary>Picks up DTSTART and SUMMARY of the current event; other properties are ignored.</summary>
+    private static void ReadProperty(string line, ref DateOnly? currentDate, ref string? currentSummary)
+    {
+        var separator = line.IndexOf(':');
+        if (separator <= 0)
+        {
+            return;
+        }
+
+        // Property parameters sit before the colon, e.g. "DTSTART;VALUE=DATE:20261225".
+        var propertyName = line[..separator].Split(';', 2)[0];
+        var value = line[(separator + 1)..];
+
+        if (propertyName == "DTSTART")
+        {
+            currentDate = ParseDate(value);
+        }
+        else if (propertyName == "SUMMARY")
+        {
+            currentSummary = UnescapeText(value);
+        }
     }
 
     /// <summary>Un-folds RFC 5545 continuation lines (a line starting with one space/tab belongs to the previous line).</summary>
