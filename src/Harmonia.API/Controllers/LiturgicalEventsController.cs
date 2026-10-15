@@ -15,11 +15,13 @@ public class LiturgicalEventsController(
     ILiturgicalEventService liturgicalEventService,
     IEventPreparationService eventPreparationService) : ApiControllerBase
 {
+    /// <summary>Draft events are listed for the priest only (B23).</summary>
     [HttpGet]
-    [Authorize(Roles = RoleNames.ParishPriest)]
+    [Authorize(Roles = $"{RoleNames.ParishPriest},{RoleNames.ChoirDirector}")]
     public async Task<IActionResult> SearchAsync(
         [FromQuery] SearchLiturgicalEventsRequest request, CancellationToken cancellationToken) =>
-        ToActionResult(await liturgicalEventService.SearchAsync(request, cancellationToken));
+        ToActionResult(await liturgicalEventService.SearchAsync(
+            request, User.IsInRole(RoleNames.ParishPriest), cancellationToken));
 
     [HttpGet("{id:guid}")]
     [Authorize(Roles = RoleNames.ParishPriest)]

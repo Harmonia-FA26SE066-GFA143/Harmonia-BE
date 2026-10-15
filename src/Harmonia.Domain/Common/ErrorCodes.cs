@@ -261,6 +261,8 @@ public static class ErrorCodes
 
     public const string RehearsalSongDuplicate = "REHEARSAL_SONG_DUPLICATE";
 
+    public const string RehearsalHasAttendance = "REHEARSAL_HAS_ATTENDANCE";
+
     // 11. Practice assignment & submission.
     public const string PracticeAssignmentNotFound = "PRACTICE_ASSIGNMENT_NOT_FOUND";
 

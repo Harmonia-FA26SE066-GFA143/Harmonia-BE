@@ -18,11 +18,28 @@ public class RehearsalsController(
     IRehearsalAttendanceService rehearsalAttendanceService,
     IRehearsalSongService rehearsalSongService) : ApiControllerBase
 {
+    [HttpGet]
+    [Authorize(Roles = RoleNames.ChoirDirector)]
+    public async Task<IActionResult> SearchAsync(
+        [FromQuery] SearchRehearsalsRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await rehearsalService.SearchAsync(request, cancellationToken));
+
     [HttpPost]
     [Authorize(Roles = RoleNames.ChoirDirector)]
     public async Task<IActionResult> CreateAsync(
         [FromBody] CreateRehearsalRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await rehearsalService.CreateAsync(request, cancellationToken));
+
+    [HttpPut("{id:guid}")]
+    [Authorize(Roles = RoleNames.ChoirDirector)]
+    public async Task<IActionResult> UpdateAsync(
+        Guid id, [FromBody] UpdateRehearsalRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await rehearsalService.UpdateAsync(id, request, cancellationToken));
+
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = RoleNames.ChoirDirector)]
+    public async Task<IActionResult> DeleteAsync(Guid id, CancellationToken cancellationToken) =>
+        ToActionResult(await rehearsalService.DeleteAsync(id, cancellationToken));
 
     // Suggestion only, nothing is created; the director edits it and saves through POST or PUT songs.
     [HttpGet("default-songs")]

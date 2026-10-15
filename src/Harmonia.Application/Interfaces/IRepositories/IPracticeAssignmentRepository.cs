@@ -17,6 +17,10 @@ public interface IPracticeAssignmentRepository : IGenericRepository<PracticeAssi
     Task<PagedList<PracticeAssignment>> GetForMemberAsync(
         Guid memberId, SearchMyPracticeAssignmentsRequest filter, CancellationToken cancellationToken);
 
+    /// <summary>Read-only page of every assignment (or those of one event), latest due date first, with Targets loaded.</summary>
+    Task<PagedList<PracticeAssignment>> SearchAsync(
+        SearchPracticeAssignmentsRequest filter, CancellationToken cancellationToken);
+
     /// <summary>Due date and the member's newest attempt status of every assignment the member receives.</summary>
     Task<List<(DateTime DueDate, SubmissionStatus? LatestStatus)>> GetProgressForMemberAsync(
         Guid memberId, CancellationToken cancellationToken);

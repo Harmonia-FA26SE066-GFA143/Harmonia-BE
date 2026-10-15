@@ -32,6 +32,14 @@ public class LiturgicalDayService(
             : Result<LiturgicalDayDto>.Success(mapper.Map<LiturgicalDayDto>(liturgicalDay));
     }
 
+    public async Task<Result<List<LiturgicalDayDto>>> GetRangeAsync(
+        SearchLiturgicalDaysRequest request, CancellationToken cancellationToken)
+    {
+        var days = await liturgicalDayRepository.GetRangeAsync(request.FromDate, request.ToDate, cancellationToken);
+
+        return Result<List<LiturgicalDayDto>>.Success(mapper.Map<List<LiturgicalDayDto>>(days));
+    }
+
     public async Task<Result<int>> ImportAsync(
         Stream content,
         string fileName,

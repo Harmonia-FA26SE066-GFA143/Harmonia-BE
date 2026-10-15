@@ -18,6 +18,13 @@ public class SongListsController(ISongListService songListService) : ApiControll
     public async Task<IActionResult> GetApprovedForEventAsync(Guid eventId, CancellationToken cancellationToken) =>
         ToActionResult(await songListService.GetApprovedForEventAsync(eventId, cancellationToken));
 
+    /// <summary>Newest version in any status (B14); the priest gets the newest one that is not a Draft.</summary>
+    [HttpGet("event/{eventId:guid}/latest")]
+    [Authorize(Roles = $"{RoleNames.ChoirDirector},{RoleNames.ParishPriest}")]
+    public async Task<IActionResult> GetLatestForEventAsync(Guid eventId, CancellationToken cancellationToken) =>
+        ToActionResult(await songListService.GetLatestForEventAsync(
+            eventId, User.IsInRole(RoleNames.ChoirDirector), cancellationToken));
+
     [HttpGet("{id:guid}")]
     [Authorize(Roles = $"{RoleNames.ChoirDirector},{RoleNames.ParishPriest}")]
     public async Task<IActionResult> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>

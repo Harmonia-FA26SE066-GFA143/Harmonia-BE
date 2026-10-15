@@ -12,6 +12,10 @@ public interface IPracticeAssignmentService
     Task<Result<PracticeAssignmentDto>> CreateAsync(
         CreatePracticeAssignmentRequest request, CancellationToken cancellationToken);
 
+    /// <summary>Assignments the Choir Director has given, all or those of one event (B21), latest due date first.</summary>
+    Task<Result<PagedList<PracticeAssignmentDto>>> SearchAsync(
+        SearchPracticeAssignmentsRequest request, CancellationToken cancellationToken);
+
     /// <summary>Assignments the calling member currently receives (UC-09 / FE-10), with their own newest submission.</summary>
     Task<Result<PagedList<PracticeAssignmentDetailDto>>> GetMineAsync(
         Guid userId, SearchMyPracticeAssignmentsRequest request, CancellationToken cancellationToken);

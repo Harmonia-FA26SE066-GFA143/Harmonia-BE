@@ -14,6 +14,14 @@ public class LiturgicalDayRepository(HarmoniaDbContext dbContext)
     public Task<LiturgicalDay?> GetByDateAsync(DateOnly date, CancellationToken cancellationToken) =>
         DbContext.LiturgicalDays.FirstOrDefaultAsync(x => x.Date == date, cancellationToken);
 
+    public Task<List<LiturgicalDay>> GetRangeAsync(
+        DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken) =>
+        DbContext.LiturgicalDays
+            .AsNoTracking()
+            .Where(x => x.Date >= fromDate && x.Date <= toDate)
+            .OrderBy(x => x.Date)
+            .ToListAsync(cancellationToken);
+
     public async Task<HashSet<DateOnly>> GetCachedDatesInYearAsync(int year, CancellationToken cancellationToken)
     {
         var start = new DateOnly(year, 1, 1);

@@ -35,6 +35,17 @@ public class SongListRepository(HarmoniaDbContext dbContext)
             .Include(x => x.Reviews)
             .FirstOrDefaultAsync(x => x.EventId == eventId && x.Status == SongListStatus.Approved, cancellationToken);
 
+    public Task<SongList?> GetLatestWithDetailsAsync(Guid eventId, bool includeDraft, CancellationToken cancellationToken) =>
+        DbContext.SongLists
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Include(x => x.Items).ThenInclude(i => i.Song)
+            .Include(x => x.Items).ThenInclude(i => i.Slot)
+            .Include(x => x.Reviews)
+            .Where(x => x.EventId == eventId && (includeDraft || x.Status != SongListStatus.Draft))
+            .OrderByDescending(x => x.Version)
+            .FirstOrDefaultAsync(cancellationToken);
+
     public Task<List<SongList>> GetByStatusAsync(SongListStatus status, CancellationToken cancellationToken) =>
         DbContext.SongLists
             .Include(x => x.LiturgicalEvent)

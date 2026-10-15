@@ -20,6 +20,13 @@ public class PracticeAssignmentsController(
         [FromBody] CreatePracticeAssignmentRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await practiceAssignmentService.CreateAsync(request, cancellationToken));
 
+    /// <summary>Assignments the Choir Director has given, all or those of one event (B21).</summary>
+    [HttpGet]
+    [Authorize(Roles = RoleNames.ChoirDirector)]
+    public async Task<IActionResult> SearchAsync(
+        [FromQuery] SearchPracticeAssignmentsRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await practiceAssignmentService.SearchAsync(request, cancellationToken));
+
     /// <summary>Assignments the calling member receives (UC-09 / FE-10).</summary>
     [HttpGet("mine")]
     [Authorize(Roles = RoleNames.ChoirMember)]

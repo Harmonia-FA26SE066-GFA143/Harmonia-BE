@@ -214,7 +214,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 | `AssignmentScope` | All, SkillGroup, Individual |
 | `TargetType` | Member, Skill |
 | `SubmissionStatus` | Submitted, Passed, NeedsRevision, Overdue |
-| `NotificationType` | EventPublished, SongListDecision, ParticipationRequest, AssignmentNotice, PracticeFeedback, DirectorNote, SkillReview, EventCancelled, SongListSubmitted |
+| `NotificationType` | EventPublished, SongListDecision, ParticipationRequest, AssignmentNotice, PracticeFeedback, DirectorNote, SkillReview, EventCancelled, SongListSubmitted, RehearsalChanged |
 | `SettingDataType` | String, Int, Bool, Json |
 | `ReportType` | UserActivity, RehearsalAttendance, Participation, AssignmentCompletion, SongUsage, ServiceHistory |
 | `ReportFormat` | Csv, Xlsx, Pdf, Xml, Json |

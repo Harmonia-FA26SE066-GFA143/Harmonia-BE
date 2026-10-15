@@ -31,9 +31,14 @@ public class LiturgicalEventRepository(HarmoniaDbContext dbContext)
             .ToListAsync(cancellationToken);
 
     public async Task<PagedList<LiturgicalEvent>> SearchAsync(
-        SearchLiturgicalEventsRequest filter, CancellationToken cancellationToken)
+        SearchLiturgicalEventsRequest filter, bool includeDrafts, CancellationToken cancellationToken)
     {
         var query = DbContext.LiturgicalEvents.AsNoTracking();
+
+        if (!includeDrafts)
+        {
+            query = query.Where(x => x.Status != EventStatus.Draft);
+        }
 
         if (filter.FromDate is { } fromDate)
         {
@@ -54,6 +59,11 @@ public class LiturgicalEventRepository(HarmoniaDbContext dbContext)
 
         var items = await query
             .Include(x => x.Location)
+            .Include(x => x.LiturgicalSeason)
+            .Include(x => x.MassType)
+            .Include(x => x.CeremonyType)
+            .Include(x => x.SongLists)
+            .AsSplitQuery()
             .OrderBy(x => x.EventDate)
             .ThenBy(x => x.Time)
             .ThenBy(x => x.Id)

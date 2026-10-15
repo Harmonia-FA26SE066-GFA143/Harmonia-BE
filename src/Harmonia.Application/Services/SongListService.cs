@@ -39,6 +39,16 @@ public class SongListService(
             : Result<SongListDto>.Success(mapper.Map<SongListDto>(songList));
     }
 
+    public async Task<Result<SongListDto>> GetLatestForEventAsync(
+        Guid eventId, bool includeDraft, CancellationToken cancellationToken)
+    {
+        var songList = await songListRepository.GetLatestWithDetailsAsync(eventId, includeDraft, cancellationToken);
+
+        return songList is null
+            ? Result<SongListDto>.Failure(ErrorCodes.SongListNotFound)
+            : Result<SongListDto>.Success(mapper.Map<SongListDto>(songList));
+    }
+
     public async Task<Result<SongListDto>> GetByIdAsync(Guid id, CancellationToken cancellationToken)
     {
         var songList = await songListRepository.GetByIdWithDetailsAsync(id, cancellationToken);

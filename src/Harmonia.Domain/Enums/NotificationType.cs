@@ -11,5 +11,6 @@ public enum NotificationType
     DirectorNote,
     SkillReview,
     EventCancelled,
-    SongListSubmitted
+    SongListSubmitted,
+    RehearsalChanged
 }

@@ -2001,4 +2001,103 @@ public sealed class RepositoryTests : IDisposable
             Id = Guid.NewGuid(), Title = title, Content = "c", CreatedAt = createdAt,
             Recipients = [new NotificationRecipient { Id = Guid.NewGuid(), UserId = userId, IsRead = isRead }],
         };
+
+    // ---- FE requests B14 / B20 / B23 ----
+
+    private async Task<(Guid DraftOnlyEventId, Guid MixedEventId, Guid DraftEventId)> SeedEventsWithSongListsAsync()
+    {
+        var proposer = await _db.AddUserAsync("director@test.com", RoleNames.ChoirDirector, cancellationToken: _ct);
+        var location = new WorshipLocation { Id = Guid.NewGuid(), Name = "Main church" };
+        var season = new LiturgicalSeason { Id = Guid.NewGuid(), Name = "Advent" };
+        var today = VietnamTime.Today;
+        LiturgicalEvent NewEvent(int days, EventStatus status) =>
+            new() { Id = Guid.NewGuid(), EventDate = today.AddDays(days), LocationId = location.Id, Status = status };
+        SongList List(int version, SongListStatus status) =>
+            new() { Id = Guid.NewGuid(), Version = version, Status = status, ProposedBy = proposer.Id };
+
+        var draftOnly = NewEvent(-2, EventStatus.Published);
+        draftOnly.SongLists = [List(1, SongListStatus.Draft)];
+        var mixed = NewEvent(3, EventStatus.Published);
+        mixed.LiturgicalSeasonId = season.Id;
+        mixed.SongLists = [List(1, SongListStatus.NeedsRevision), List(2, SongListStatus.Draft)];
+        var draft = NewEvent(5, EventStatus.Draft);
+
+        await using var seed = _db.NewContext();
+        seed.AddRange(location, season, draftOnly, mixed, draft);
+        await seed.SaveChangesAsync(_ct);
+        return (draftOnly.Id, mixed.Id, draft.Id);
+    }
+
+    [Fact]
+    public async Task SongListGetLatestWithDetails_SkipsDraftUnlessIncluded_Async()
+    {
+        var seed = await SeedEventsWithSongListsAsync();
+        await using var context = _db.NewContext();
+        var repository = new SongListRepository(context);
+
+        Assert.Equal(2, (await repository.GetLatestWithDetailsAsync(seed.MixedEventId, true, _ct))!.Version);
+        Assert.Equal(1, (await repository.GetLatestWithDetailsAsync(seed.MixedEventId, false, _ct))!.Version);
+        Assert.Null(await repository.GetLatestWithDetailsAsync(seed.DraftOnlyEventId, false, _ct));
+    }
+
+    [Fact]
+    public async Task LiturgicalEventSearch_HidesDraftsUnlessIncluded_AndLoadsListData_Async()
+    {
+        var seed = await SeedEventsWithSongListsAsync();
+        await using var context = _db.NewContext();
+        var repository = new LiturgicalEventRepository(context);
+
+        var all = await repository.SearchAsync(new SearchLiturgicalEventsRequest(), true, _ct);
+        var published = await repository.SearchAsync(new SearchLiturgicalEventsRequest(), false, _ct);
+
+        Assert.Equal(3, all.TotalCount);
+        Assert.Equal([seed.DraftOnlyEventId, seed.MixedEventId], published.Items.Select(x => x.Id));
+        var mixed = published.Items[1];
+        Assert.Equal("Advent", mixed.LiturgicalSeason!.Name);
+        Assert.Equal(2, mixed.SongLists.Count);
+    }
+
+    [Fact]
+    public async Task RehearsalHasConflict_SkipsExcludedRehearsal_Async()
+    {
+        var location = new WorshipLocation { Id = Guid.NewGuid(), Name = "Hall" };
+        var start = DateTime.UtcNow.AddDays(1);
+        var rehearsal = new Rehearsal { Id = Guid.NewGuid(), LocationId = location.Id, StartTime = start, EndTime = start.AddHours(2) };
+        await using (var seed = _db.NewContext())
+        {
+            seed.AddRange(location, rehearsal);
+            await seed.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var repository = new RehearsalRepository(context);
+
+        Assert.True(await repository.HasConflictAsync(location.Id, start.AddHours(1), start.AddHours(3), null, _ct));
+        Assert.False(await repository.HasConflictAsync(location.Id, start.AddHours(1), start.AddHours(3), rehearsal.Id, _ct));
+    }
+
+    [Fact]
+    public async Task RehearsalUpcomingAndSearch_IncludeOngoing_AndFilterByParishDate_Async()
+    {
+        var now = DateTime.UtcNow;
+        var ongoing = new Rehearsal { Id = Guid.NewGuid(), StartTime = now.AddHours(-1), EndTime = now.AddHours(1) };
+        var ended = new Rehearsal { Id = Guid.NewGuid(), StartTime = now.AddDays(-2), EndTime = now.AddDays(-2).AddHours(2) };
+        await using (var seed = _db.NewContext())
+        {
+            seed.AddRange(ongoing, ended);
+            await seed.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var repository = new RehearsalRepository(context);
+
+        Assert.Equal([ongoing.Id], (await repository.GetUpcomingAsync(now, _ct)).Select(x => x.Id));
+        var page = await repository.SearchAsync(new SearchRehearsalsRequest(), _ct);
+        Assert.Equal([ongoing.Id, ended.Id], page.Items.Select(x => x.Id));
+        // Filter by the parish date the ended rehearsal starts on.
+        var endedDate = DateOnly.FromDateTime(VietnamTime.FromUtc(ended.StartTime));
+        var filtered = await repository.SearchAsync(
+            new SearchRehearsalsRequest { FromDate = endedDate, ToDate = endedDate }, _ct);
+        Assert.Equal([ended.Id], filtered.Items.Select(x => x.Id));
+    }
 }

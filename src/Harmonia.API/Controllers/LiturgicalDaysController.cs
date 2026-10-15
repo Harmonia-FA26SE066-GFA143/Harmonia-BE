@@ -1,4 +1,5 @@
 using Harmonia.Application.Common.Models;
+using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Domain.Common;
 using Microsoft.AspNetCore.Authorization;
@@ -13,6 +14,11 @@ namespace Harmonia.API.Controllers;
 [Authorize]
 public class LiturgicalDaysController(ILiturgicalDayService liturgicalDayService) : ApiControllerBase
 {
+    [HttpGet]
+    public async Task<IActionResult> GetRangeAsync(
+        [FromQuery] SearchLiturgicalDaysRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await liturgicalDayService.GetRangeAsync(request, cancellationToken));
+
     [HttpGet("{date}")]
     public async Task<IActionResult> GetByDateAsync(DateOnly date, CancellationToken cancellationToken) =>
         ToActionResult(await liturgicalDayService.GetByDateAsync(date, cancellationToken));

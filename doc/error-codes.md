@@ -245,6 +245,7 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 | `REHEARSAL_NOT_STARTED` | 409 | Buổi tập chưa bắt đầu, chưa thể điểm danh |
 | `REHEARSAL_ATTENDANCE_MEMBER_DUPLICATE` | 400 | Một ca viên xuất hiện nhiều lần trong danh sách điểm danh |
 | `REHEARSAL_SONG_DUPLICATE` | 400 | Một bài hát xuất hiện nhiều lần trong danh sách bài của buổi tập |
+| `REHEARSAL_HAS_ATTENDANCE` | 409 | Buổi tập đã có điểm danh, không thể xoá |
 
 ## 11. Bài tập & bản thu
 

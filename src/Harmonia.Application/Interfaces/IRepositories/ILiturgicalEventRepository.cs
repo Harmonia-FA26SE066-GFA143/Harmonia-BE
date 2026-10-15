@@ -16,8 +16,12 @@ public interface ILiturgicalEventRepository : IGenericRepository<LiturgicalEvent
 
     Task<List<LiturgicalEvent>> GetUpcomingPublishedAsync(DateOnly fromDate, CancellationToken cancellationToken);
 
-    /// <summary>Read-only page of events of every status, with Location loaded, ordered by date then time.</summary>
-    Task<PagedList<LiturgicalEvent>> SearchAsync(SearchLiturgicalEventsRequest filter, CancellationToken cancellationToken);
+    /// <summary>
+    /// Read-only page of events ordered by date then time; Draft events only when <paramref name="includeDrafts"/>.
+    /// Location, LiturgicalSeason, MassType, CeremonyType and every SongLists version are loaded.
+    /// </summary>
+    Task<PagedList<LiturgicalEvent>> SearchAsync(
+        SearchLiturgicalEventsRequest filter, bool includeDrafts, CancellationToken cancellationToken);
 
     /// <summary>Tracked event with its Location loaded.</summary>
     Task<LiturgicalEvent?> GetWithLocationAsync(Guid id, CancellationToken cancellationToken);

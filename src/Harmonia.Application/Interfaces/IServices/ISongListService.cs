@@ -11,6 +11,12 @@ public interface ISongListService
 {
     Task<Result<SongListDto>> GetApprovedForEventAsync(Guid eventId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Newest version of the event's song list in any status (B14), so the director can reopen a draft.
+    /// Draft versions are the director's own work: without <paramref name="includeDraft"/> the newest submitted one is returned.
+    /// </summary>
+    Task<Result<SongListDto>> GetLatestForEventAsync(Guid eventId, bool includeDraft, CancellationToken cancellationToken);
+
     Task<Result<SongListDto>> GetByIdAsync(Guid id, CancellationToken cancellationToken);
 
     Task<Result<List<SongListDto>>> GetPendingAsync(CancellationToken cancellationToken);

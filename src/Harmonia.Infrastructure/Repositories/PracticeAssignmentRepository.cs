@@ -53,6 +53,27 @@ public class PracticeAssignmentRepository(HarmoniaDbContext dbContext)
         return new PagedList<PracticeAssignment>(items, filter.PageNumber, filter.PageSize, totalCount);
     }
 
+    public async Task<PagedList<PracticeAssignment>> SearchAsync(
+        SearchPracticeAssignmentsRequest filter, CancellationToken cancellationToken)
+    {
+        var query = DbContext.PracticeAssignments.AsNoTracking();
+
+        if (filter.EventId is { } eventId)
+            query = query.Where(x => x.EventId == eventId);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .Include(x => x.Targets)
+            .OrderByDescending(x => x.DueDate)
+            .ThenBy(x => x.Id)
+            .Skip((filter.PageNumber - 1) * filter.PageSize)
+            .Take(filter.PageSize)
+            .ToListAsync(cancellationToken);
+
+        return new PagedList<PracticeAssignment>(items, filter.PageNumber, filter.PageSize, totalCount);
+    }
+
     public async Task<List<(DateTime DueDate, SubmissionStatus? LatestStatus)>> GetProgressForMemberAsync(
         Guid memberId, CancellationToken cancellationToken)
     {

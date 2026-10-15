@@ -403,7 +403,7 @@ Chưa có kỹ năng nào → `[]`.
 
 ---
 
-## 4b. Lịch phụng vụ & sự kiện — `api/liturgical-days`, `api/liturgical-events` · role `ParishPriest` · tiến độ chuẩn bị: `ChoirDirector` · tra ngày phụng vụ, lịch sắp tới `api/schedule`: mọi role (UC-12 / UC-04 / UC-15 / UC-30)
+## 4b. Lịch phụng vụ & sự kiện — `api/liturgical-days`, `api/liturgical-events` · role `ParishPriest` · danh sách sự kiện, tiến độ chuẩn bị: `ChoirDirector` · tra ngày phụng vụ, lịch sắp tới `api/schedule`: mọi role (UC-12 / UC-04 / UC-15 / UC-30)
 
 ### `LiturgicalDayDto`
 
@@ -436,9 +436,10 @@ Chưa có kỹ năng nào → `[]`.
 
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
+| GET | `/api/liturgical-days?fromDate=&toDate=` · mọi role | — | 200 `LiturgicalDayDto[]` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`, `REPORT_DATE_RANGE_TOO_LARGE`) |
 | GET | `/api/liturgical-days/{date}` (`date` dạng `yyyy-MM-dd`) · mọi role | — | 200 `LiturgicalDayDto` | 404 `CALENDAR_DAY_NOT_FOUND` |
 | POST | `/api/liturgical-days/import` | `multipart/form-data`: `file` (.ics) | 200 số ngày mới thêm (`int`) | 400 `CALENDAR_FILE_REQUIRED`, `CALENDAR_FILE_TYPE_NOT_ALLOWED`, `CALENDAR_FILE_INVALID` · 413 `CALENDAR_FILE_TOO_LARGE` |
-| GET | `/api/liturgical-events?fromDate=&toDate=&status=&pageNumber=&pageSize=` | — | 200 `PagedList<LiturgicalEventDto>` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`) |
+| GET | `/api/liturgical-events?fromDate=&toDate=&status=&pageNumber=&pageSize=` · `ParishPriest`, `ChoirDirector` | — | 200 `PagedList<LiturgicalEventListItemDto>` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`) |
 | GET | `/api/liturgical-events/{id}` | — | 200 `LiturgicalEventDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
 | POST | `/api/liturgical-events` | `{ "eventDate", "time", "liturgicalSeasonId?", "massTypeId?", "ceremonyTypeId?", "categoryId?", "locationId", "title?", "specialRequirements?" }` | 200 `LiturgicalEventDto` | 400 `VALIDATION_FAILED` (`LITURGICAL_EVENT_TYPE_REQUIRED`), `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` · 404 `LOOKUP_NOT_FOUND` · 409 `LITURGICAL_EVENT_SLOT_TAKEN`, `LOOKUP_INACTIVE` |
 | PUT | `/api/liturgical-events/{id}` | như `POST` | 200 `LiturgicalEventDto` | 400 `VALIDATION_FAILED` (`LITURGICAL_EVENT_TYPE_REQUIRED`), `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_SLOT_TAKEN`, `LOOKUP_INACTIVE` |
@@ -450,6 +451,9 @@ Chưa có kỹ năng nào → `[]`.
 | GET | `/api/liturgical-events/{id}/preparation-status` | — | 200 `EventPreparationStatusDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
 
 **Ngày phụng vụ (UC-12 / FE-15)**
+
+- `GET ?fromDate=&toDate=`: cả hai bắt buộc, tính cả hai đầu, tối đa 366 ngày. Trả các ngày đã import trong khoảng,
+  sắp theo ngày; ngày chưa import thì **không có trong mảng** (không báo lỗi). Dùng để hiện tên ngày trên lịch tháng.
 
 - Ngày phụng vụ là bản cache của lịch Công giáo, nạp bằng file `.ics`. Chỉ nhận đuôi `.ics`, tối đa **2 MB**;
   server chỉ xét đuôi và dung lượng thật, bỏ qua `Content-Type`.
@@ -481,10 +485,18 @@ Chưa có kỹ năng nào → `[]`.
 - Hiện tại `locationName` trong response của `POST` và `publish` là `null` (server chưa nạp địa điểm);
   lấy tên địa điểm từ `GET /api/lookups/worship-locations` theo `locationId`.
 
+**Danh sách sự kiện — `LiturgicalEventListItemDto`**
+
+Gồm mọi trường của `LiturgicalEventDto`, thêm `liturgicalSeasonName`, `massTypeName`, `ceremonyTypeName` (tên danh mục,
+`null` khi không chọn) và `latestSongListStatus` (trạng thái phiên bản danh sách bài hát mới nhất, `null` khi chưa có).
+
+- Có cả sự kiện đã qua lẫn sắp tới; lọc bằng `fromDate` / `toDate` / `status`. Sắp theo ngày rồi giờ.
+- `ChoirDirector` **không thấy sự kiện `Draft`** (lọc `status=Draft` → trang rỗng); `ParishPriest` thấy mọi trạng thái.
+
 **Lịch sắp tới (UC-04 / FE-05)**
 
 - `events`: sự kiện `Published` từ hôm nay trở đi, sắp theo ngày rồi giờ.
-- `rehearsals`: buổi tập bắt đầu từ thời điểm gọi trở đi, sắp theo giờ bắt đầu. `locationName`, `note` có thể `null`.
+- `rehearsals`: buổi tập **chưa kết thúc** tại thời điểm gọi (cả buổi đang diễn ra), sắp theo giờ bắt đầu. `locationName`, `note` có thể `null`.
   `songs`: `RehearsalSongDto[]` (xem mục 7e) theo thứ tự hiển thị, `[]` khi ca trưởng chưa chọn bài.
 - Không phân trang — trả mảng; không có gì → `[]`.
 
@@ -758,7 +770,7 @@ Chỉ thao tác trên thông báo **của chính người gọi**.
 ```
 
 `type`: `EventPublished` | `SongListDecision` | `ParticipationRequest` | `AssignmentNotice` |
-`PracticeFeedback` | `DirectorNote` | `SkillReview` | `EventCancelled` | `SongListSubmitted`. `referenceType` + `referenceId` (nullable) cho biết bấm vào
+`PracticeFeedback` | `DirectorNote` | `SkillReview` | `EventCancelled` | `SongListSubmitted` | `RehearsalChanged`. `referenceType` + `referenceId` (nullable) cho biết bấm vào
 thì mở màn nào.
 
 | Method | Route | Thành công | Lỗi |
@@ -1029,6 +1041,7 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
 | GET | `/api/song-lists/event/{eventId}/approved` · mọi role | — | 200 `SongListDto` | 404 `SONG_LIST_NOT_FOUND` |
+| GET | `/api/song-lists/event/{eventId}/latest` · `ChoirDirector`, `ParishPriest` | — | 200 `SongListDto` | 404 `SONG_LIST_NOT_FOUND` |
 | GET | `/api/song-lists/{id}` · `ChoirDirector`, `ParishPriest` | — | 200 `SongListDto` | 404 `SONG_LIST_NOT_FOUND` |
 | GET | `/api/song-lists/pending` · `ParishPriest` | — | 200 `SongListDto[]` | — |
 | POST | `/api/song-lists` · `ChoirDirector` | `CreateSongListRequest` | 200 `SongListDto` | 400 `VALIDATION_FAILED` (`SONG_LIST_EMPTY`, `SONG_LIST_SLOT_DUPLICATE`) · 404 `LITURGICAL_EVENT_NOT_FOUND`, `SONG_NOT_FOUND`, `SLOT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_NOT_PUBLISHED`, `SONG_LIST_EVENT_HAS_APPROVED_VERSION`, `SONG_LIST_CANNOT_BE_REVISED`, `SONG_INACTIVE`, `LOOKUP_INACTIVE` |
@@ -1049,6 +1062,9 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 - `review`: `notes` bắt buộc khi `decision` là `Reject` hoặc `RequestRevision`; `Approve` thì tuỳ chọn.
 - `GET …/approved` chỉ trả danh sách `Approved` của sự kiện đang `Published`. Sự kiện còn `Draft`, đã huỷ hoặc không tồn tại
   → 404 `SONG_LIST_NOT_FOUND`, với mọi role. Cha xứ và ca trưởng vẫn xem được bằng `GET /api/song-lists/{id}`.
+- `GET …/latest`: phiên bản mới nhất ở **mọi trạng thái**, kèm `items` và `reviews` — ca trưởng dùng để mở lại danh sách
+  đang soạn. Riêng `ParishPriest` **không thấy bản `Draft`**: trả phiên bản mới nhất không phải `Draft` (ví dụ ca trưởng
+  đang soạn v2 thì cha xứ nhận v1 `NeedsRevision`). Sự kiện chưa có danh sách (hoặc chỉ có `Draft`, với cha xứ) → 404.
 - `GET …/pending`: các danh sách đang `Submitted`, bản gửi sớm nhất trước. **`items` và `reviews` ở đây luôn rỗng** —
   gọi `GET /api/song-lists/{id}` để lấy chi tiết.
 - `submit` xong, mọi `ParishPriest` đang hoạt động nhận thông báo `SongListSubmitted`; `review` xong, ca trưởng đề xuất
@@ -1215,8 +1231,11 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 
 | Method | Path | Body | Thành công | Lỗi |
 |---|---|---|---|---|
+| GET | `/api/practice-assignments?eventId=&pageNumber=&pageSize=` | — | 200 `PagedList<PracticeAssignmentDto>` | — |
 | POST | `/api/practice-assignments` | `{ "title", "instruction?", "scope", "dueDate", "eventId?", "songId?", "materialId?", "skillIds?", "memberIds?" }` | 200 `PracticeAssignmentDto` | 400 `VALIDATION_FAILED` (`PRACTICE_DUE_DATE_IN_PAST`, `PRACTICE_TARGET_REQUIRED`) · 404 `LITURGICAL_EVENT_NOT_FOUND`, `SONG_NOT_FOUND`, `MATERIAL_NOT_FOUND`, `SKILL_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `SONG_INACTIVE`, `SKILL_INACTIVE` |
 
+- `GET`: bài tập ca trưởng đã giao, tất cả hoặc của một sự kiện (`eventId`), hạn nộp muộn nhất trước.
+  Tên bài hát / tư liệu lấy theo `songId` / `materialId`; bài nộp của từng bài tập xem ở `GET …/{id}/submissions`.
 - `scope`: `All` | `SkillGroup` | `Individual`.
   - `All`: giao cho mọi ca viên **đang hoạt động**. `skillIds` / `memberIds` bị bỏ qua.
   - `SkillGroup`: `skillIds` bắt buộc. Người nhận là ca viên đang hoạt động đã được **duyệt** ít nhất một skill trong danh sách.
@@ -1428,6 +1447,9 @@ Lên lịch tập và điểm danh chỉ dành cho `ChoirDirector`. Danh sách b
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
 | POST | `/api/rehearsals` · `ChoirDirector` | `{ "eventId?", "locationId?", "startTime", "endTime", "note?", "songs": [{ "songId", "note" }] }` | 200 `RehearsalDto` | 400 `VALIDATION_FAILED` (`REHEARSAL_TIME_INVALID`, `REHEARSAL_SONG_DUPLICATE`) · 404 `LITURGICAL_EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND`, `SONG_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LOOKUP_INACTIVE`, `REHEARSAL_TIME_CONFLICT`, `SONG_INACTIVE` |
+| GET | `/api/rehearsals?eventId=&fromDate=&toDate=&pageNumber=&pageSize=` · `ChoirDirector` | — | 200 `PagedList<RehearsalDto>` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`) |
+| PUT | `/api/rehearsals/{id}` · `ChoirDirector` | `{ "eventId?", "locationId?", "startTime", "endTime", "note?" }` | 200 `RehearsalDto` | 400 `VALIDATION_FAILED` (`REHEARSAL_TIME_INVALID`) · 404 `REHEARSAL_NOT_FOUND`, `LITURGICAL_EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND` · 409 `REHEARSAL_ALREADY_PASSED`, `LITURGICAL_EVENT_CANCELLED`, `LOOKUP_INACTIVE`, `REHEARSAL_TIME_CONFLICT` |
+| DELETE | `/api/rehearsals/{id}` · `ChoirDirector` | — | 204 | 404 `REHEARSAL_NOT_FOUND` · 409 `REHEARSAL_HAS_ATTENDANCE` |
 | GET | `/api/rehearsals/default-songs?eventId=` · `ChoirDirector` | — | 200 `RehearsalSongDto[]` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
 
 - `eventId` tuỳ chọn: có thì buổi tập là buổi chuẩn bị cho sự kiện đó (sự kiện đã huỷ → 409 `LITURGICAL_EVENT_CANCELLED`);
@@ -1436,6 +1458,15 @@ Lên lịch tập và điểm danh chỉ dành cho `ChoirDirector`. Danh sách b
 - 409 `REHEARSAL_TIME_CONFLICT`: nơi tập đã có buổi tập khác trùng giờ. Không chọn `locationId` thì không kiểm trùng.
 - `songs` bắt buộc gửi (có thể `[]`), không trùng `songId`; thứ tự trong mảng là thứ tự hiển thị — server tự đánh
   `displayOrder` từ 1. `note` của từng bài tối đa 500 ký tự.
+- `GET`: mọi buổi tập — đã qua, đang diễn ra, sắp tới — giờ bắt đầu muộn nhất trước. `fromDate` / `toDate` là ngày theo giờ
+  Việt Nam, tính cả hai đầu, so với `startTime`. Dùng để chọn buổi tập cần điểm danh.
+- `PUT {id}` sửa giờ, nơi tập, sự kiện, ghi chú; **bài hát sửa riêng** qua `PUT {id}/songs`. Buổi tập đã kết thúc →
+  `REHEARSAL_ALREADY_PASSED`. Kiểm trùng giờ bỏ qua chính buổi đang sửa. Giữ nguyên nơi tập đã ngưng hoạt động thì được,
+  đổi sang nơi tập đã ngưng → `LOOKUP_INACTIVE`. Sửa xong, mọi ca viên đang hoạt động nhận thông báo `RehearsalChanged`
+  (`referenceType = "Rehearsal"`).
+- `DELETE {id}`: buổi tập đã có điểm danh → `REHEARSAL_HAS_ATTENDANCE` (xoá sẽ mất điểm danh). Xoá buổi chưa kết thúc thì
+  mọi ca viên đang hoạt động nhận thông báo `RehearsalChanged` (`referenceType = "LiturgicalEvent"` nếu buổi tập gắn
+  sự kiện, ngược lại `null`).
 - `GET default-songs` chỉ **gợi ý**, không tạo gì: trả các bài của danh sách bài hát **đã duyệt** của sự kiện, mỗi bài một
   lần theo vị trí xuất hiện đầu tiên, `note` = `null`. Sự kiện chưa có danh sách đã duyệt → `[]`. Ca trưởng chỉnh rồi gửi
   qua `songs` của `POST` hoặc `PUT /api/rehearsals/{id}/songs`.

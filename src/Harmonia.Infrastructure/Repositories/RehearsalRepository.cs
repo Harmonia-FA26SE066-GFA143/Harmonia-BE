@@ -1,4 +1,7 @@
+using Harmonia.Application.Common.Models;
+using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IRepositories;
+using Harmonia.Domain.Common;
 using Harmonia.Domain.Entities;
 using Harmonia.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -16,10 +19,55 @@ public class RehearsalRepository(HarmoniaDbContext dbContext)
         DbContext.Rehearsals
             .Include(x => x.Location)
             .Include(x => x.Songs).ThenInclude(s => s.Song)
-            .Where(x => x.StartTime >= fromTime)
+            .Where(x => x.EndTime >= fromTime)
             .OrderBy(x => x.StartTime)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
+
+    public async Task<PagedList<Rehearsal>> SearchAsync(
+        SearchRehearsalsRequest filter, CancellationToken cancellationToken)
+    {
+        var query = DbContext.Rehearsals.AsNoTracking();
+
+        if (filter.EventId is { } eventId)
+        {
+            query = query.Where(x => x.EventId == eventId);
+        }
+
+        // Dates are parish dates; StartTime is stored in UTC.
+        if (filter.FromDate is { } fromDate)
+        {
+            var from = VietnamTime.StartOfDayUtc(fromDate);
+            query = query.Where(x => x.StartTime >= from);
+        }
+
+        if (filter.ToDate is { } toDate)
+        {
+            var before = VietnamTime.StartOfDayUtc(toDate.AddDays(1));
+            query = query.Where(x => x.StartTime < before);
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .Include(x => x.Location)
+            .Include(x => x.Songs).ThenInclude(s => s.Song)
+            .AsSplitQuery()
+            .OrderByDescending(x => x.StartTime)
+            .ThenBy(x => x.Id)
+            .Skip((filter.PageNumber - 1) * filter.PageSize)
+            .Take(filter.PageSize)
+            .ToListAsync(cancellationToken);
+
+        return new PagedList<Rehearsal>(items, filter.PageNumber, filter.PageSize, totalCount);
+    }
+
+    public Task<Rehearsal?> GetWithDetailsForUpdateAsync(Guid id, CancellationToken cancellationToken) =>
+        DbContext.Rehearsals
+            .Include(x => x.Location)
+            .Include(x => x.Songs).ThenInclude(s => s.Song)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
     public Task<Rehearsal?> GetWithSongsForUpdateAsync(Guid id, CancellationToken cancellationToken) =>
         DbContext.Rehearsals
@@ -72,7 +120,8 @@ public class RehearsalRepository(HarmoniaDbContext dbContext)
     }
 
     public Task<bool> HasConflictAsync(
-        Guid locationId, DateTime start, DateTime end, CancellationToken cancellationToken) =>
+        Guid locationId, DateTime start, DateTime end, Guid? excludeId, CancellationToken cancellationToken) =>
         DbContext.Rehearsals.AsNoTracking().AnyAsync(
-            x => x.LocationId == locationId && x.StartTime < end && start < x.EndTime, cancellationToken);
+            x => x.LocationId == locationId && x.StartTime < end && start < x.EndTime && x.Id != excludeId,
+            cancellationToken);
 }

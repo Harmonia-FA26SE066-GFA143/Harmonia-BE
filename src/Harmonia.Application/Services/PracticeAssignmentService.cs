@@ -27,6 +27,15 @@ public class PracticeAssignmentService(
 
     private static readonly string[] AudioExtensions = [".mp3", ".m4a", ".wav"];
 
+    public async Task<Result<PagedList<PracticeAssignmentDto>>> SearchAsync(
+        SearchPracticeAssignmentsRequest request, CancellationToken cancellationToken)
+    {
+        var page = await practiceAssignmentRepository.SearchAsync(request, cancellationToken);
+
+        return Result<PagedList<PracticeAssignmentDto>>.Success(new PagedList<PracticeAssignmentDto>(
+            mapper.Map<List<PracticeAssignmentDto>>(page.Items), page.PageNumber, page.PageSize, page.TotalCount));
+    }
+
     public async Task<Result<PracticeAssignmentDto>> CreateAsync(
         CreatePracticeAssignmentRequest request, CancellationToken cancellationToken)
     {

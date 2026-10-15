@@ -8,9 +8,12 @@ namespace Harmonia.Application.Interfaces.IServices;
 
 public interface ILiturgicalEventService
 {
-    /// <summary>Events of every status (Draft included) for the priest's program pages (UC-12 / FE-15).</summary>
-    Task<Result<PagedList<LiturgicalEventDto>>> SearchAsync(
-        SearchLiturgicalEventsRequest request, CancellationToken cancellationToken);
+    /// <summary>
+    /// Events past and upcoming for the priest's program pages (UC-12 / FE-15) and the director's event list (B23).
+    /// Draft events only when <paramref name="includeDrafts"/>: they stay the priest's until published.
+    /// </summary>
+    Task<Result<PagedList<LiturgicalEventListItemDto>>> SearchAsync(
+        SearchLiturgicalEventsRequest request, bool includeDrafts, CancellationToken cancellationToken);
 
     Task<Result<LiturgicalEventDto>> GetByIdAsync(Guid id, CancellationToken cancellationToken);
 
