@@ -309,6 +309,28 @@ public class PracticeAssignmentServiceTests
         Assert.Equal(expected, Assert.Single(result.Value!.Items).IsOverdue);
     }
 
+    [Theory]
+    [InlineData(2, null, false, null)]
+    [InlineData(2, SubmissionStatus.NeedsRevision, false, null)]
+    [InlineData(2, SubmissionStatus.Passed, false, ErrorCodes.PracticeSubmissionAlreadyPassed)]
+    [InlineData(-1, null, false, ErrorCodes.PracticeSubmissionPastDue)]
+    [InlineData(-1, SubmissionStatus.NeedsRevision, true, null)]
+    [InlineData(-1, SubmissionStatus.Passed, true, ErrorCodes.PracticeSubmissionAlreadyPassed)]
+    public async Task GetMineById_CanSubmit_MatchesWhatSubmitWouldReturn_Async(
+        int dueInDays, SubmissionStatus? latestStatus, bool allowLate, string? expectedReason)
+    {
+        var assignment = ReceivedAssignment(
+            latestStatus is { } status ? new PracticeSubmission { AttemptNo = 1, Status = status } : null, dueInDays);
+        _settings.GetBoolAsync(SystemSettingKeys.PracticeAllowLateSubmission, _ct).Returns(allowLate);
+
+        var dto = (await _sut.GetMineByIdAsync(_activeMember.UserId, assignment.Id, _ct)).Value!;
+        var submit = await SubmitAsync(assignment, NewAudio());
+
+        Assert.Equal((expectedReason is null, expectedReason), (dto.CanSubmit, dto.CannotSubmitReason));
+        if (expectedReason is null) Assert.True(submit.IsSuccess);
+        else Assert.Equal(expectedReason, submit.Code);
+    }
+
     [Fact]
     public async Task GetMine_NoMemberProfile_ReturnsMemberNotFound_Async()
     {

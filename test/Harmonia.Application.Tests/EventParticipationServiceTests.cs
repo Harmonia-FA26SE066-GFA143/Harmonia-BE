@@ -361,6 +361,21 @@ public class EventParticipationServiceTests
     }
 
     [Fact]
+    public async Task GetMine_InactiveMember_CannotRespondWithTheSameCodeAsPut_Async()
+    {
+        var open = Invitation(_anna);
+        _anna.Status = MemberStatus.Inactive;
+        _participations.GetUpcomingForMemberAsync(_anna.Id, Arg.Any<DateOnly>(), _ct).Returns([open]);
+
+        var result = await _sut.GetMineAsync(_anna.UserId, _ct);
+        var put = await _sut.RespondAsync(_anna.UserId, _event.Id, Confirm(), _ct);
+
+        var item = Assert.Single(result.Value!);
+        Assert.Equal((false, ErrorCodes.MemberNotActive), (item.CanRespond, item.CannotRespondReason));
+        Assert.Equal(ErrorCodes.MemberNotActive, put.Code);
+    }
+
+    [Fact]
     public async Task GetMine_UserWithoutMemberProfile_ReturnsMemberNotFound_Async()
     {
         var result = await _sut.GetMineAsync(Guid.NewGuid(), _ct);

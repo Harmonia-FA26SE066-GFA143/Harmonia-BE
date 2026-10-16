@@ -1,4 +1,5 @@
 using Harmonia.API.Extensions;
+using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Domain.Common;
@@ -17,21 +18,25 @@ public class DirectorNotesController(IDirectorNoteService directorNoteService) :
 {
     [HttpGet("recipients")]
     [Authorize(Roles = RoleNames.ParishPriest)]
+    [ProducesResponseType<List<UserSummaryDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetRecipientsAsync(CancellationToken cancellationToken) =>
         ToActionResult(await directorNoteService.GetRecipientsAsync(cancellationToken));
 
     [HttpPost]
     [Authorize(Roles = RoleNames.ParishPriest)]
+    [ProducesResponseType<List<DirectorNoteDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> CreateAsync(
         [FromBody] CreateDirectorNoteRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await directorNoteService.CreateAsync(User.GetUserId(), request, cancellationToken));
 
     [HttpGet]
+    [ProducesResponseType<PagedList<DirectorNoteDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> SearchAsync(
         [FromQuery] SearchDirectorNotesRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await directorNoteService.SearchAsync(User.GetUserId(), request, cancellationToken));
 
     [HttpGet("{id:guid}")]
+    [ProducesResponseType<DirectorNoteDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await directorNoteService.GetByIdAsync(User.GetUserId(), id, cancellationToken));
 }

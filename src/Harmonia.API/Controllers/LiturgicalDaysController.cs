@@ -15,17 +15,20 @@ namespace Harmonia.API.Controllers;
 public class LiturgicalDaysController(ILiturgicalDayService liturgicalDayService) : ApiControllerBase
 {
     [HttpGet]
+    [ProducesResponseType<List<LiturgicalDayDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetRangeAsync(
         [FromQuery] SearchLiturgicalDaysRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await liturgicalDayService.GetRangeAsync(request, cancellationToken));
 
     [HttpGet("{date}")]
+    [ProducesResponseType<LiturgicalDayDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetByDateAsync(DateOnly date, CancellationToken cancellationToken) =>
         ToActionResult(await liturgicalDayService.GetByDateAsync(date, cancellationToken));
 
     [Authorize(Roles = RoleNames.ParishPriest)]
     [HttpPost("import")]
     [Consumes("multipart/form-data")]
+    [ProducesResponseType<int>(StatusCodes.Status200OK)]
     public async Task<IActionResult> ImportAsync(IFormFile? file, CancellationToken cancellationToken)
     {
         if (file is null)

@@ -132,11 +132,6 @@ public class EventParticipationService(
             return Result<EventParticipationDto>.Failure(ErrorCodes.MemberNotFound);
         }
 
-        if (profile.Status != MemberStatus.Active)
-        {
-            return Result<EventParticipationDto>.Failure(ErrorCodes.MemberNotActive);
-        }
-
         // Looked up by the caller's own member id, so another member's request is never reachable.
         var participation = await participationRepository.GetByEventAndMemberAsync(
             eventId, profile.Id, cancellationToken);
@@ -145,7 +140,7 @@ public class EventParticipationService(
             return Result<EventParticipationDto>.Failure(ErrorCodes.EventParticipationNotInvited);
         }
 
-        if (CannotRespondCode(participation, participation.LiturgicalEvent) is { } closedCode)
+        if (CannotRespondCode(participation, participation.LiturgicalEvent, profile.Status) is { } closedCode)
         {
             return Result<EventParticipationDto>.Failure(closedCode);
         }
@@ -173,23 +168,25 @@ public class EventParticipationService(
             profile.Id, VietnamTime.Today, cancellationToken);
 
         return Result<List<MyParticipationDto>>.Success(
-            participations.Select(p => ToMyParticipationDto(p, p.LiturgicalEvent, mapper)).ToList());
+            participations.Select(p => ToMyParticipationDto(p, p.LiturgicalEvent, profile.Status, mapper)).ToList());
     }
 
     /// <summary>Maps the member's own request and fills in whether <see cref="RespondAsync"/> would accept an answer now.</summary>
     internal static MyParticipationDto ToMyParticipationDto(
-        EventParticipation participation, LiturgicalEvent liturgicalEvent, IMapper mapper)
+        EventParticipation participation, LiturgicalEvent liturgicalEvent, MemberStatus memberStatus, IMapper mapper)
     {
         var dto = mapper.Map<MyParticipationDto>(participation);
-        dto.CannotRespondReason = CannotRespondCode(participation, liturgicalEvent);
+        dto.CannotRespondReason = CannotRespondCode(participation, liturgicalEvent, memberStatus);
         dto.CanRespond = dto.CannotRespondReason is null;
         return dto;
     }
 
-    // A member answers once; the answer is final, so only an Invited request before the event can be answered.
-    private static string? CannotRespondCode(EventParticipation participation, LiturgicalEvent liturgicalEvent)
+    // A member answers once; the answer is final, so only an active member's Invited request before the event can be answered.
+    private static string? CannotRespondCode(
+        EventParticipation participation, LiturgicalEvent liturgicalEvent, MemberStatus memberStatus)
     {
         if (liturgicalEvent.Status == EventStatus.Cancelled) return ErrorCodes.LiturgicalEventCancelled;
+        if (memberStatus != MemberStatus.Active) return ErrorCodes.MemberNotActive;
         if (participation.Status != ParticipationStatus.Invited) return ErrorCodes.EventParticipationAlreadyResponded;
         return HasPassed(liturgicalEvent) ? ErrorCodes.EventParticipationClosed : null;
     }

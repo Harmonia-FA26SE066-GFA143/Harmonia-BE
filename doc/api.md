@@ -4,7 +4,8 @@ Tài liệu cho FE (web) và mobile. Chỉ liệt kê endpoint **đã có trong 
 mới thì cập nhật file này trong cùng PR.
 
 - Base URL dev: `http://localhost:5259` · `https://localhost:7112`
-- Swagger (dev): `/swagger`
+- Swagger (dev): `/swagger` — mọi endpoint có schema của response thành công (200 kèm kiểu body, hoặc 204);
+  response lỗi không khai trong Swagger vì luôn cùng một dạng (mục 1).
 - Định dạng: JSON, tên field `camelCase`. Enum truyền bằng **tên** (`"Android"`, không phải `0`).
 - Thời gian:
   - `DateTime` (mốc thời gian: `createdAt`, `publishedAt`, `accessTokenExpiresAt`, `startTime`…) là
@@ -1287,7 +1288,9 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
   "materialType": "SheetMusic | null",
   "latestSubmissionStatus": "Submitted | null",
   "latestSubmittedAt": "2026-10-10T09:00:00Z | null",
-  "isOverdue": false
+  "isOverdue": false,
+  "canSubmit": true,
+  "cannotSubmitReason": "string | null"
 }
 ```
 
@@ -1310,7 +1313,11 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 - `latestSubmissionStatus` / `latestSubmittedAt` là lần nộp mới nhất **của chính ca viên**; `null` = chưa nộp.
 - `isOverdue` (UC-10 / FE-12): đã qua `dueDate` mà chưa có lần nộp `Passed` — chưa nộp, hoặc lần mới nhất còn
   `Submitted` / `NeedsRevision`. Server tính lúc đọc; FE hiển thị "Quá hạn" theo field này, không tự tính.
-  Không bản thu nào mang `status = Overdue` (nộp sau hạn bị chặn).
+  Không bản thu nào mang `status = Overdue`.
+- `canSubmit` = `POST {id}/submissions` sẽ nhận bản thu lúc này; ngược lại `cannotSubmitReason` là mã lỗi `POST` sẽ trả:
+  `PRACTICE_SUBMISSION_ALREADY_PASSED` (lần mới nhất đã `Passed`) hoặc `PRACTICE_SUBMISSION_PAST_DUE` (quá `dueDate`
+  và setting `Practice.AllowLateSubmission` đang tắt). Server đã xét setting; FE bật / tắt nút nộp theo field này,
+  không tự suy từ `isOverdue`.
 - Mở file tư liệu qua `api/music-materials` bằng `materialId`.
 
 `MyPracticeAssignmentCountsResponse` (`GET mine/counts`) — số bài tập ca viên đang nhận, theo lần nộp mới nhất:
@@ -1347,7 +1354,8 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 - `durationSeconds`: do app ghi âm báo, 1–3600, chỉ để hiển thị.
 - Bài không dành cho ca viên → 404 `PRACTICE_ASSIGNMENT_NOT_FOUND`.
 - Nộp được nhiều lần tới hạn nộp; mỗi lần là một bản thu mới, `attemptNo` tăng dần từ 1, `status = Submitted`.
-  Lần mới nhất đã `Passed` → 409 `PRACTICE_SUBMISSION_ALREADY_PASSED`. Quá `dueDate` → 409 `PRACTICE_SUBMISSION_PAST_DUE`.
+  Lần mới nhất đã `Passed` → 409 `PRACTICE_SUBMISSION_ALREADY_PASSED`. Quá `dueDate` → 409 `PRACTICE_SUBMISSION_PAST_DUE`,
+  trừ khi Admin bật `Practice.AllowLateSubmission`. Biết trước bằng `canSubmit` của `GET mine` / `GET mine/{id}`.
 - Hai lần nộp cùng lúc (bấm hai lần) → lần sau nhận 409 `PRACTICE_SUBMISSION_CONFLICT`; tải lại bài tập rồi nộp lại.
 - `audioUrl` là URL ký, hết hạn sau ít phút; cần nghe lại thì gọi lại API. Không gửi thông báo cho ca trưởng.
 
@@ -1549,7 +1557,8 @@ Lên lịch tập và điểm danh chỉ dành cho `ChoirDirector`. Danh sách b
 
 `MyParticipationDto` = `{ participationId, eventId, status, requestedAt, respondedAt, note, canRespond, cannotRespondReason }`.
 `canRespond = true` khi `PUT mine/{eventId}` sẽ nhận câu trả lời lúc này; ngược lại `cannotRespondReason` là mã lỗi `PUT`
-sẽ trả (`LITURGICAL_EVENT_CANCELLED`, `EVENT_PARTICIPATION_ALREADY_RESPONDED`, `EVENT_PARTICIPATION_CLOSED`).
+sẽ trả (`LITURGICAL_EVENT_CANCELLED`, `MEMBER_NOT_ACTIVE`, `EVENT_PARTICIPATION_ALREADY_RESPONDED`,
+`EVENT_PARTICIPATION_CLOSED`). Ca viên `Inactive` / `Left` vẫn thấy lời mời nhưng `canRespond = false`.
 
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|

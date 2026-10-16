@@ -16,15 +16,18 @@ public class SystemSettingsController(ISystemSettingService systemSettingService
 {
     [HttpGet]
     [Authorize(Roles = RoleNames.Admin)]
+    [ProducesResponseType<List<SystemSettingDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAllAsync(CancellationToken cancellationToken) =>
         ToActionResult(await systemSettingService.GetAllAsync(cancellationToken));
 
     [HttpGet("public")]
+    [ProducesResponseType<List<SystemSettingDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPublicAsync(CancellationToken cancellationToken) =>
         ToActionResult(await systemSettingService.GetPublicAsync(cancellationToken));
 
     [HttpPut("{id:guid}")]
     [Authorize(Roles = RoleNames.Admin)]
+    [ProducesResponseType<SystemSettingDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateAsync(
         Guid id, [FromBody] UpdateSystemSettingRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await systemSettingService.UpdateAsync(id, request, cancellationToken));

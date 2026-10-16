@@ -35,18 +35,20 @@ public class UpcomingScheduleService(
     public async Task<Result<MemberEventDetailDto>> GetEventDetailAsync(
         Guid userId, Guid eventId, CancellationToken cancellationToken)
     {
-        var memberId = await GetMemberIdAsync(userId, cancellationToken);
+        var profile = await memberProfileRepository.GetByUserIdAsync(userId, cancellationToken);
         var liturgicalEvent = await liturgicalEventRepository.GetPublishedForMemberAsync(
-            eventId, memberId, cancellationToken);
+            eventId, profile?.Id ?? Guid.Empty, cancellationToken);
         if (liturgicalEvent is null)
         {
             return Result<MemberEventDetailDto>.Failure(ErrorCodes.LiturgicalEventNotFound);
         }
 
         var dto = mapper.Map<MemberEventDetailDto>(liturgicalEvent);
+        // A participation row comes back only for the caller's own profile, so profile is set here.
         if (liturgicalEvent.EventParticipations.FirstOrDefault() is { } participation)
         {
-            dto.Participation = EventParticipationService.ToMyParticipationDto(participation, liturgicalEvent, mapper);
+            dto.Participation = EventParticipationService.ToMyParticipationDto(
+                participation, liturgicalEvent, profile!.Status, mapper);
         }
 
         return Result<MemberEventDetailDto>.Success(dto);

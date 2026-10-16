@@ -43,4 +43,13 @@ public class PracticeAssignmentDetailDto
     /// Submitted or NeedsRevision. Computed on read; no submission row is ever stored as Overdue.
     /// </summary>
     public bool IsOverdue { get; set; }
+
+    /// <summary>
+    /// Whether POST {id}/submissions would accept a recording now: false once the newest attempt is Passed,
+    /// or after the due date while the Admin does not allow late submissions.
+    /// </summary>
+    public bool CanSubmit { get; set; }
+
+    /// <summary>The error code POST {id}/submissions would return; null when <see cref="CanSubmit"/> is true.</summary>
+    public string? CannotSubmitReason { get; set; }
 }

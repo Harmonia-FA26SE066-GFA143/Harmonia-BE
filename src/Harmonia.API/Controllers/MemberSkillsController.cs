@@ -19,34 +19,40 @@ public class MemberSkillsController(IMemberSkillService memberSkillService) : Ap
 {
     [HttpPost]
     [Authorize(Roles = RoleNames.ChoirMember)]
+    [ProducesResponseType<MemberSkillDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> DeclareAsync(
         [FromBody] DeclareMemberSkillRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await memberSkillService.DeclareAsync(User.GetUserId(), request, cancellationToken));
 
     [HttpGet("mine")]
     [Authorize(Roles = RoleNames.ChoirMember)]
+    [ProducesResponseType<PagedList<MemberSkillDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMineAsync(
         [FromQuery] ApprovalStatus? status, [FromQuery] PagingRequest paging, CancellationToken cancellationToken) =>
         ToActionResult(await memberSkillService.GetMineAsync(User.GetUserId(), status, paging, cancellationToken));
 
     [HttpGet("{id:guid}")]
     [Authorize(Roles = RoleNames.ChoirMember)]
+    [ProducesResponseType<MemberSkillDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMineByIdAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await memberSkillService.GetMineByIdAsync(User.GetUserId(), id, cancellationToken));
 
     [HttpGet("pending")]
     [Authorize(Roles = RoleNames.ChoirDirector)]
+    [ProducesResponseType<PagedList<MemberSkillDetailDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPendingAsync(
         [FromQuery] PagingRequest paging, CancellationToken cancellationToken) =>
         ToActionResult(await memberSkillService.GetPendingAsync(paging, cancellationToken));
 
     [HttpPatch("{id:guid}/approve")]
     [Authorize(Roles = RoleNames.ChoirDirector)]
+    [ProducesResponseType<MemberSkillDetailDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> ApproveAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await memberSkillService.ApproveAsync(User.GetUserId(), id, cancellationToken));
 
     [HttpPatch("{id:guid}/reject")]
     [Authorize(Roles = RoleNames.ChoirDirector)]
+    [ProducesResponseType<MemberSkillDetailDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> RejectAsync(
         Guid id, [FromBody] RejectMemberSkillRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await memberSkillService.RejectAsync(User.GetUserId(), id, request, cancellationToken));

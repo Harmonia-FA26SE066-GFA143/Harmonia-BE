@@ -206,6 +206,33 @@ public class UpcomingScheduleServiceTests
     }
 
     [Fact]
+    public async Task GetEventDetail_InactiveMember_CannotRespond_Async()
+    {
+        var member = StubMember();
+        member.Status = MemberStatus.Inactive;
+        var christmas = new LiturgicalEvent
+        {
+            Id = Guid.NewGuid(), EventDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)), Time = new TimeOnly(8, 0),
+            Status = EventStatus.Published, Location = _church,
+        };
+        christmas.EventParticipations =
+        [
+            new EventParticipation
+            {
+                Id = Guid.NewGuid(), EventId = christmas.Id, MemberId = member.Id, Status = ParticipationStatus.Invited,
+                LiturgicalEvent = christmas,
+            },
+        ];
+        _events.GetPublishedForMemberAsync(christmas.Id, member.Id, _ct).Returns(christmas);
+
+        var result = await _sut.GetEventDetailAsync(member.UserId, christmas.Id, _ct);
+
+        Assert.Equal(
+            (false, ErrorCodes.MemberNotActive),
+            (result.Value!.Participation!.CanRespond, result.Value.Participation.CannotRespondReason));
+    }
+
+    [Fact]
     public async Task GetEventDetail_NotMember_AsksWithEmptyMemberId_AndGetsNoOwnSections_Async()
     {
         var christmas = new LiturgicalEvent { Id = Guid.NewGuid(), Status = EventStatus.Published, Location = _church };

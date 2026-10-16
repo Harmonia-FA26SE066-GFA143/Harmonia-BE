@@ -18,7 +18,10 @@ public class MyParticipationDto
 
     public string? Note { get; set; }
 
-    /// <summary>The answer is final, so this is true only while the request is still Invited and the event has not started.</summary>
+    /// <summary>
+    /// The answer is final, so this is true only while the member is Active, the request is still Invited
+    /// and the event has not started.
+    /// </summary>
     public bool CanRespond { get; set; }
 
     /// <summary>The error code PUT mine/{eventId} would return; null when <see cref="CanRespond"/> is true.</summary>

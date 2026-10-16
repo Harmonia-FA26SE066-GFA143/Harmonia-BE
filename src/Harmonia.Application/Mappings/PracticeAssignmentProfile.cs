@@ -33,6 +33,9 @@ public class PracticeAssignmentProfile : Profile
             .ForMember(dest => dest.IsOverdue, opt => opt.MapFrom(src => PracticeAssignment.IsOverdue(
                 src.DueDate,
                 src.Submissions.OrderByDescending(s => s.AttemptNo).Select(s => (SubmissionStatus?)s.Status).FirstOrDefault(),
-                DateTime.UtcNow)));
+                DateTime.UtcNow)))
+            // They depend on a system setting, so the service sets them.
+            .ForMember(dest => dest.CanSubmit, opt => opt.Ignore())
+            .ForMember(dest => dest.CannotSubmitReason, opt => opt.Ignore());
     }
 }

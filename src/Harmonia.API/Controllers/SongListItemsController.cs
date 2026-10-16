@@ -12,11 +12,13 @@ namespace Harmonia.API.Controllers;
 public class SongListItemsController(ISongPersonnelRequirementService personnelRequirementService) : ApiControllerBase
 {
     [HttpGet("{id:guid}/personnel-requirements")]
+    [ProducesResponseType<List<SongPersonnelRequirementDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPersonnelRequirementsAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await personnelRequirementService.GetAsync(id, cancellationToken));
 
     [HttpPut("{id:guid}/personnel-requirements")]
     [Authorize(Roles = RoleNames.ChoirDirector)]
+    [ProducesResponseType<List<SongPersonnelRequirementDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdatePersonnelRequirementsAsync(
         Guid id, [FromBody] UpdateSongPersonnelRequirementsRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await personnelRequirementService.UpdateAsync(id, request, cancellationToken));

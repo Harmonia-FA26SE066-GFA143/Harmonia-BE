@@ -16,6 +16,7 @@ public class PracticeAssignmentsController(
 {
     [HttpPost]
     [Authorize(Roles = RoleNames.ChoirDirector)]
+    [ProducesResponseType<PracticeAssignmentDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> CreateAsync(
         [FromBody] CreatePracticeAssignmentRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await practiceAssignmentService.CreateAsync(request, cancellationToken));
@@ -23,6 +24,7 @@ public class PracticeAssignmentsController(
     /// <summary>Assignments the Choir Director has given, all or those of one event (B21).</summary>
     [HttpGet]
     [Authorize(Roles = RoleNames.ChoirDirector)]
+    [ProducesResponseType<PagedList<PracticeAssignmentDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> SearchAsync(
         [FromQuery] SearchPracticeAssignmentsRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await practiceAssignmentService.SearchAsync(request, cancellationToken));
@@ -30,6 +32,7 @@ public class PracticeAssignmentsController(
     /// <summary>Assignments the calling member receives (UC-09 / FE-10).</summary>
     [HttpGet("mine")]
     [Authorize(Roles = RoleNames.ChoirMember)]
+    [ProducesResponseType<PagedList<PracticeAssignmentDetailDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMineAsync(
         [FromQuery] SearchMyPracticeAssignmentsRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await practiceAssignmentService.GetMineAsync(User.GetUserId(), request, cancellationToken));
@@ -37,17 +40,20 @@ public class PracticeAssignmentsController(
     /// <summary>How many of the calling member's assignments are in each state (UC-10 / FE-12).</summary>
     [HttpGet("mine/counts")]
     [Authorize(Roles = RoleNames.ChoirMember)]
+    [ProducesResponseType<MyPracticeAssignmentCountsResponse>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMyCountsAsync(CancellationToken cancellationToken) =>
         ToActionResult(await practiceAssignmentService.GetMyCountsAsync(User.GetUserId(), cancellationToken));
 
     [HttpGet("mine/{id:guid}")]
     [Authorize(Roles = RoleNames.ChoirMember)]
+    [ProducesResponseType<PracticeAssignmentDetailDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMineByIdAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await practiceAssignmentService.GetMineByIdAsync(User.GetUserId(), id, cancellationToken));
 
     /// <summary>Submissions of one assignment for the Choir Director to listen to (UC-29 / FE-42).</summary>
     [HttpGet("{id:guid}/submissions")]
     [Authorize(Roles = RoleNames.ChoirDirector)]
+    [ProducesResponseType<PagedList<PracticeSubmissionDetailDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetSubmissionsAsync(
         Guid id, [FromQuery] SearchPracticeSubmissionsRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await practiceSubmissionService.GetByAssignmentAsync(id, request, cancellationToken));
@@ -56,6 +62,7 @@ public class PracticeAssignmentsController(
     [HttpPost("{id:guid}/submissions")]
     [Authorize(Roles = RoleNames.ChoirMember)]
     [Consumes("multipart/form-data")]
+    [ProducesResponseType<PracticeSubmissionDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> SubmitAsync(
         Guid id, [FromForm] CreatePracticeSubmissionRequest request, IFormFile? file, CancellationToken cancellationToken)
     {

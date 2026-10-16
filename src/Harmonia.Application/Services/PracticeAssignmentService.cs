@@ -131,8 +131,10 @@ public class PracticeAssignmentService(
         if (member is null) return Result<PagedList<PracticeAssignmentDetailDto>>.Failure(ErrorCodes.MemberNotFound);
 
         var page = await practiceAssignmentRepository.GetForMemberAsync(member.Id, request, cancellationToken);
+        var items = mapper.Map<List<PracticeAssignmentDetailDto>>(page.Items);
+        await FillCanSubmitAsync(items, cancellationToken);
         return Result<PagedList<PracticeAssignmentDetailDto>>.Success(new PagedList<PracticeAssignmentDetailDto>(
-            mapper.Map<List<PracticeAssignmentDetailDto>>(page.Items), page.PageNumber, page.PageSize, page.TotalCount));
+            items, page.PageNumber, page.PageSize, page.TotalCount));
     }
 
     public async Task<Result<PracticeAssignmentDetailDto>> GetMineByIdAsync(
@@ -142,9 +144,32 @@ public class PracticeAssignmentService(
         if (member is null) return Result<PracticeAssignmentDetailDto>.Failure(ErrorCodes.MemberNotFound);
 
         var assignment = await practiceAssignmentRepository.GetByIdForMemberAsync(id, member.Id, cancellationToken);
-        return assignment is null
-            ? Result<PracticeAssignmentDetailDto>.Failure(ErrorCodes.PracticeAssignmentNotFound)
-            : Result<PracticeAssignmentDetailDto>.Success(mapper.Map<PracticeAssignmentDetailDto>(assignment));
+        if (assignment is null) return Result<PracticeAssignmentDetailDto>.Failure(ErrorCodes.PracticeAssignmentNotFound);
+
+        var dto = mapper.Map<PracticeAssignmentDetailDto>(assignment);
+        await FillCanSubmitAsync([dto], cancellationToken);
+        return Result<PracticeAssignmentDetailDto>.Success(dto);
+    }
+
+    // Reads the setting once per request; the rule itself is CannotSubmitCode, shared with SubmitAsync.
+    private async Task FillCanSubmitAsync(List<PracticeAssignmentDetailDto> items, CancellationToken cancellationToken)
+    {
+        if (items.Count == 0) return;
+
+        var allowLate = await systemSettingService.GetBoolAsync(SystemSettingKeys.PracticeAllowLateSubmission, cancellationToken);
+        var now = DateTime.UtcNow;
+        foreach (var item in items)
+        {
+            item.CannotSubmitReason = CannotSubmitCode(item.LatestSubmissionStatus, now > item.DueDate, allowLate);
+            item.CanSubmit = item.CannotSubmitReason is null;
+        }
+    }
+
+    // A late recording is still counted as overdue in progress and reports; the setting only lets it in.
+    private static string? CannotSubmitCode(SubmissionStatus? latestStatus, bool isPastDue, bool allowLate)
+    {
+        if (latestStatus == SubmissionStatus.Passed) return ErrorCodes.PracticeSubmissionAlreadyPassed;
+        return isPastDue && !allowLate ? ErrorCodes.PracticeSubmissionPastDue : null;
     }
 
     public async Task<Result<MyPracticeAssignmentCountsResponse>> GetMyCountsAsync(
@@ -179,13 +204,12 @@ public class PracticeAssignmentService(
 
         // Submissions holds only the member's newest attempt.
         var latest = assignment.Submissions.MaxBy(x => x.AttemptNo);
-        if (latest?.Status == SubmissionStatus.Passed)
-            return Result<PracticeSubmissionDto>.Failure(ErrorCodes.PracticeSubmissionAlreadyPassed);
-
-        // A late recording is still counted as overdue in progress and reports; the setting only lets it in.
-        if (DateTime.UtcNow > assignment.DueDate
-            && !await systemSettingService.GetBoolAsync(SystemSettingKeys.PracticeAllowLateSubmission, cancellationToken))
-            return Result<PracticeSubmissionDto>.Failure(ErrorCodes.PracticeSubmissionPastDue);
+        var isPastDue = DateTime.UtcNow > assignment.DueDate;
+        // The setting is read only when it can matter.
+        var allowLate = isPastDue
+            && await systemSettingService.GetBoolAsync(SystemSettingKeys.PracticeAllowLateSubmission, cancellationToken);
+        if (CannotSubmitCode(latest?.Status, isPastDue, allowLate) is { } cannotSubmit)
+            return Result<PracticeSubmissionDto>.Failure(cannotSubmit);
 
         if (CheckAudio(file) is { } fileError) return Result<PracticeSubmissionDto>.Failure(fileError);
 
