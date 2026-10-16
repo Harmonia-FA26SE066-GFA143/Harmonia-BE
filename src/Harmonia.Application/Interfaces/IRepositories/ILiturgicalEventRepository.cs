@@ -17,6 +17,21 @@ public interface ILiturgicalEventRepository : IGenericRepository<LiturgicalEvent
     Task<List<LiturgicalEvent>> GetUpcomingPublishedAsync(DateOnly fromDate, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Read-only Published events dated from <paramref name="fromDate"/>, soonest first, on whose Finalized roster the
+    /// member has an Active, notified line. Location is loaded; ServiceRoster.Assignments holds only those lines,
+    /// each with Skill and SongListItem.Song.
+    /// </summary>
+    Task<List<LiturgicalEvent>> GetUpcomingAssignedToMemberAsync(
+        Guid memberId, DateOnly fromDate, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Read-only Published event, null otherwise. Location and the catalog names are loaded; EventParticipations,
+    /// ServiceRoster.Assignments (Active and notified, with Skill and SongListItem.Song) and Rehearsals.Attendances
+    /// hold only the member's rows. Rehearsals also carry Location and Songs.Song.
+    /// </summary>
+    Task<LiturgicalEvent?> GetPublishedForMemberAsync(Guid id, Guid memberId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Read-only page of events ordered by date then time; Draft events only when <paramref name="includeDrafts"/>.
     /// Location, LiturgicalSeason, MassType, CeremonyType and every SongLists version are loaded.
     /// </summary>

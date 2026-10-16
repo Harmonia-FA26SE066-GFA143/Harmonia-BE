@@ -58,7 +58,9 @@ public class ServiceRosterRepository(HarmoniaDbContext dbContext)
             .AsNoTracking()
             .AsSplitQuery()
             .Include(x => x.MemberSkills.Where(s => s.SkillId == skillId && s.Status == ApprovalStatus.Approved))
-            .Include(x => x.EventParticipations.Where(p => p.EventId == eventId && p.Status == ParticipationStatus.Confirmed))
+            // The director may hand-pick an Unsure member; only the suggestion is limited to Confirmed.
+            .Include(x => x.EventParticipations.Where(p => p.EventId == eventId
+                && (p.Status == ParticipationStatus.Confirmed || p.Status == ParticipationStatus.Unsure)))
             .FirstOrDefaultAsync(x => x.Id == memberId, cancellationToken);
 
     public Task<ServiceRoster?> GetRosterByAssignmentAsync(Guid assignmentId, CancellationToken cancellationToken) =>
@@ -80,7 +82,8 @@ public class ServiceRosterRepository(HarmoniaDbContext dbContext)
             .Include(x => x.Member.User)
             .Include(x => x.Member.MemberSkills.Where(s => s.Status == ApprovalStatus.Approved))
             .Include(x => x.Member.EventParticipations
-                .Where(p => p.EventId == eventId && p.Status == ParticipationStatus.Confirmed))
+                .Where(p => p.EventId == eventId
+                    && (p.Status == ParticipationStatus.Confirmed || p.Status == ParticipationStatus.Unsure)))
             .Include(x => x.Skill)
             .Include(x => x.SongListItem!.Song)
             .Where(x => x.RosterId == rosterId && x.Status == RosterAssignmentStatus.Active)

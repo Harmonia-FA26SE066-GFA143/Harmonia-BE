@@ -26,6 +26,11 @@ public class EventParticipationsController(IEventParticipationService eventParti
         [FromQuery] Guid eventId, CancellationToken cancellationToken) =>
         ToActionResult(await eventParticipationService.GetByEventAsync(eventId, cancellationToken));
 
+    [HttpGet("mine")]
+    [Authorize(Roles = RoleNames.ChoirMember)]
+    public async Task<IActionResult> GetMineAsync(CancellationToken cancellationToken) =>
+        ToActionResult(await eventParticipationService.GetMineAsync(User.GetUserId(), cancellationToken));
+
     [HttpPut("mine/{eventId:guid}")]
     [Authorize(Roles = RoleNames.ChoirMember)]
     public async Task<IActionResult> RespondAsync(

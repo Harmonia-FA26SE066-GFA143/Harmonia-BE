@@ -74,7 +74,7 @@ Tên entity, property, enum lấy **nguyên văn** từ tài liệu. Thấy tên
 
 ## VERIFY
 
-- `dotnet build Harmonia.slnx`
+- `dotnet build Harmonia.Solution.slnx`
 - Đối chiếu lại từng dòng trong bảng SUMMARIZE: đã làm hết chưa, có làm thừa gì không.
 
 ## STOP

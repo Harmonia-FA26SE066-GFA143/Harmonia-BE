@@ -253,13 +253,15 @@ flowchart LR
     E[LiturgicalEvent<br/>Published] --> S[SongList<br/>Approved]
     S --> R[ServiceRoster<br/>Finalized]
     K[MemberSkill<br/>Approved] --> R
-    P[EventParticipation<br/>Confirmed] --> R
+    P[EventParticipation<br/>Confirmed / Unsure] --> R
 ```
 
 - `SongList` chỉ tạo được khi `LiturgicalEvent` ở `Published`.
 - `ServiceRoster` chỉ lập được khi có `SongList` ở `Approved`.
 - Ứng viên phân công phải có `MemberSkill` ở `Approved`, `MemberProfile` ở `Active`
-  và `EventParticipation` ở `Confirmed`.
+  và `EventParticipation` ở `Confirmed`. Riêng ca trưởng thêm tay hoặc thay người (UC-25b)
+  thì nhận cả `Unsure` — phản hồi là cuối cùng, ca trưởng xếp họ vào chỗ ít quan trọng
+  (chốt 2026-10-16). Gợi ý tự động (UC-25) vẫn chỉ lấy `Confirmed`.
 - `LiturgicalEvent` sang `Cancelled` thì khoá toàn bộ nhánh bên phải.
 
 ## 7. Checklist trước khi nộp sơ đồ

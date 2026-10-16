@@ -3,6 +3,7 @@ using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IRepositories;
 using Harmonia.Domain.Common;
 using Harmonia.Domain.Entities;
+using Harmonia.Domain.Enums;
 using Harmonia.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -20,9 +21,21 @@ public class RehearsalRepository(HarmoniaDbContext dbContext)
             .Include(x => x.Location)
             .Include(x => x.Songs).ThenInclude(s => s.Song)
             .Where(x => x.EndTime >= fromTime)
+            .Where(x => x.LiturgicalEvent == null || x.LiturgicalEvent.Status == EventStatus.Published)
             .OrderBy(x => x.StartTime)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
+
+    public Task<Rehearsal?> GetVisibleForMemberAsync(Guid id, Guid memberId, CancellationToken cancellationToken) =>
+        DbContext.Rehearsals
+            .AsNoTracking()
+            .Include(x => x.Location)
+            .Include(x => x.Songs).ThenInclude(s => s.Song)
+            .Include(x => x.Attendances.Where(a => a.MemberId == memberId))
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(
+                x => x.Id == id && (x.LiturgicalEvent == null || x.LiturgicalEvent.Status == EventStatus.Published),
+                cancellationToken);
 
     public async Task<PagedList<Rehearsal>> SearchAsync(
         SearchRehearsalsRequest filter, CancellationToken cancellationToken)

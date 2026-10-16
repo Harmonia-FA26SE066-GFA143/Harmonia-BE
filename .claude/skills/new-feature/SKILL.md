@@ -1,6 +1,6 @@
 ---
 name: new-feature
-description: Dùng khi thêm hoặc sửa chức năng ở backend Harmonia — dựng entity, repository, DTO, validator, service, controller theo đúng thứ tự layer. Kích hoạt khi người dùng nói "thêm chức năng", "thêm endpoint", "thêm API", "làm tính năng", "tạo API cho", "dựng module", hoặc mô tả một use case cần làm.
+description: Dùng khi thêm hoặc sửa chức năng ở backend Harmonia — dựng entity, repository, DTO, validator, service, controller theo đúng thứ tự layer. Kích hoạt khi người dùng nói "thêm chức năng", "làm tính năng", "dựng module", hoặc mô tả một use case cần entity/bảng mới. Chỉ thêm một endpoint vào resource đã có thì dùng `add-endpoint`.
 ---
 
 # Thêm chức năng mới cho Harmonia
@@ -56,8 +56,8 @@ Chỉ **DTO** được phép sinh thêm. Mọi thứ khác là mở file cũ ra 
 5. **Validator** — `Application/Validators/`, FluentValidation.
 6. **AutoMapper profile** — `Application/Mappings/`.
 7. **Interface service + service** — trả `Result<T>`, danh sách trả `PagedList<T>`.
-   Lấy người gọi từ `ICurrentUserService`, kiểm dữ liệu có thuộc `Choir` của họ không
-   trước khi đọc/sửa. Sai `Choir` trả `404`, không trả `403`.
+   Lấy người gọi từ `ICurrentUserService`. Ca viên chỉ đọc/sửa bản ghi của chính mình
+   (`03-security.md`); bản ghi của người khác trả `404`, không trả `403`.
 8. **Gửi notification nếu use case yêu cầu** — trong service, gọi `INotificationService`,
    KHÔNG gọi `IHubContext` trực tiếp.
 9. **Đăng ký DI** — `Application/DependencyInjection.cs`.
@@ -70,8 +70,9 @@ Chỉ **DTO** được phép sinh thêm. Mọi thứ khác là mở file cũ ra 
     vào `HarmoniaDbContext`. **Luôn cần migration** — báo, không tự chạy `dotnet ef`.
 12. **Controller** — `API/Controllers/`. Route kebab-case số nhiều.
     Bắt buộc `[Authorize]`; mọi role thì để trần, không liệt kê đủ 4 role. Nhận `Request`, trả `Dto`.
-13. **Unit test cho service** — `tests/Harmonia.Application.UnitTests/`.
-    Tối thiểu: một case thành công, một case sai quyền `Choir`, một case không tìm thấy.
+13. **Unit test cho service** — `test/Harmonia.Application.Tests/`.
+    Tối thiểu: một case thành công, một case sai quyền (bản ghi của người khác → 404),
+    một case không tìm thấy.
 
 ## Dừng lại và hỏi giữa chừng khi
 

@@ -302,5 +302,77 @@ public class EventParticipationServiceTests
         Assert.Equal(ParticipationStatus.Invited, participation.Status);
     }
 
+    // An hour ago in Vietnam is still six hours ahead of UTC now, so a UTC comparison would keep this open.
+    [Fact]
+    public async Task Respond_EventStartedAnHourAgoInVietnam_ReturnsClosed_Async()
+    {
+        Invitation(_anna);
+        SetEventStart(VietnamTime.Now.AddHours(-1));
+
+        var result = await _sut.RespondAsync(_anna.UserId, _event.Id, Confirm(), _ct);
+
+        Assert.Equal(ErrorCodes.EventParticipationClosed, result.Code);
+    }
+
+    [Fact]
+    public async Task Respond_EventStartsInAnHourInVietnam_IsAccepted_Async()
+    {
+        Invitation(_anna);
+        SetEventStart(VietnamTime.Now.AddHours(1));
+
+        var result = await _sut.RespondAsync(_anna.UserId, _event.Id, Confirm(), _ct);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    // ---- GetMine ----
+
+    [Fact]
+    public async Task GetMine_FlagsWhichRequestsCanStillBeAnswered_Async()
+    {
+        var started = new LiturgicalEvent { Id = Guid.NewGuid(), Status = EventStatus.Published };
+        var startedAt = VietnamTime.Now.AddHours(-1);
+        (started.EventDate, started.Time) = (DateOnly.FromDateTime(startedAt), TimeOnly.FromDateTime(startedAt));
+        var open = Invitation(_anna);
+        var answered = new EventParticipation
+        {
+            Id = Guid.NewGuid(), EventId = _event.Id, MemberId = _anna.Id, Status = ParticipationStatus.Unsure,
+            RespondedAt = DateTime.UtcNow, Note = "Maybe", LiturgicalEvent = _event,
+        };
+        var closed = new EventParticipation
+        {
+            Id = Guid.NewGuid(), EventId = started.Id, MemberId = _anna.Id, Status = ParticipationStatus.Invited,
+            LiturgicalEvent = started,
+        };
+        var fromDates = new List<DateOnly>();
+        var before = VietnamTime.Today;
+        _participations.GetUpcomingForMemberAsync(_anna.Id, Arg.Do<DateOnly>(fromDates.Add), _ct)
+            .Returns([open, answered, closed]);
+
+        var result = await _sut.GetMineAsync(_anna.UserId, _ct);
+
+        Assert.InRange(Assert.Single(fromDates), before, VietnamTime.Today);
+        Assert.True(result.IsSuccess);
+        Assert.Equal([open.Id, answered.Id, closed.Id], result.Value!.Select(p => p.ParticipationId));
+        Assert.Equal(
+            [(true, null), (false, ErrorCodes.EventParticipationAlreadyResponded), (false, ErrorCodes.EventParticipationClosed)],
+            result.Value!.Select(p => (p.CanRespond, p.CannotRespondReason)));
+        Assert.Equal((ParticipationStatus.Unsure, "Maybe"), (result.Value![1].Status, result.Value[1].Note));
+    }
+
+    [Fact]
+    public async Task GetMine_UserWithoutMemberProfile_ReturnsMemberNotFound_Async()
+    {
+        var result = await _sut.GetMineAsync(Guid.NewGuid(), _ct);
+
+        Assert.Equal(ErrorCodes.MemberNotFound, result.Code);
+    }
+
+    private void SetEventStart(DateTime parishTime)
+    {
+        _event.EventDate = DateOnly.FromDateTime(parishTime);
+        _event.Time = TimeOnly.FromDateTime(parishTime);
+    }
+
     private static RespondParticipationRequest Confirm() => new() { Status = ParticipationStatus.Confirmed };
 }

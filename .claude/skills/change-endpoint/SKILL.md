@@ -23,8 +23,8 @@ Tìm và đọc toàn bộ chuỗi của endpoint đang sửa:
 - Validator trong `Application/Validators/`
 - Service xử lý, và mã lỗi nó trả về
 - `AutoMapper` profile liên quan
-- Test trong `tests/Harmonia.Application.UnitTests/`
-- `claude/error-codes.md` nếu thay đổi đụng tới mã lỗi
+- Test trong `test/Harmonia.Application.Tests/` và `test/Harmonia.API.Tests/`
+- `doc/error-codes.md` nếu thay đổi đụng tới mã lỗi
 
 ## SUMMARIZE
 
@@ -73,12 +73,13 @@ Từ trong ra ngoài, controller sửa cuối cùng. Bước nào không cần t
 3. **Validator** — `Application/Validators/`. Quy tắc mới dùng `.WithErrorCode(ErrorCodes.X)`.
 4. **Mapping** — `Application/Mappings/`, thêm `CreateMap` cho trường mới.
 5. **Service** — logic và mã lỗi. Trả `Result<T>`, danh sách trả `PagedList<T>`.
-   Mã lỗi mới khai hằng trong `Application/Common/ErrorCodes.cs` trước khi dùng.
-   Thay đổi có ghi dữ liệu thì gọi `IUnitOfWork.SaveChangesAsync` đúng một lần ở cuối.
+   Mã lỗi mới khai hằng trong `Domain/Common/ErrorCodes.cs` trước khi dùng, và map HTTP status
+   ở `API/Middlewares/ErrorStatusMap.cs`.
+   Thay đổi có ghi dữ liệu thì gọi `SaveChangesAsync` của repository đúng một lần ở cuối.
 6. **Kiểm quyền** — nếu thay đổi đụng tới `[Authorize]`, tới ai được xem, hay tới
    trạng thái bản ghi được trả về, đọc lại `.claude/rules/03-security.md` và soát:
    - Ca viên chỉ thao tác trên bản ghi **của chính mình**.
-   - Ca viên chỉ xem `SongList` ở trạng thái `Approved`, `LiturgicalWeek` ở `Published`.
+   - Ca viên chỉ xem `SongList` ở trạng thái `Approved`, `LiturgicalEvent` ở `Published`.
    - Không thuộc phạm vi người gọi thì trả **404**, không trả 403.
    Kiểm ở service, không chỉ dựa vào attribute.
 7. **Controller** — route, method, `[Authorize]`, kiểu trả về.
@@ -86,7 +87,7 @@ Từ trong ra ngoài, controller sửa cuối cùng. Bước nào không cần t
 
 ## VERIFY
 
-- `dotnet build Harmonia.slnx` và `dotnet test`
+- `dotnet build Harmonia.Solution.slnx` và `dotnet test`
 - Chạy API, mở Swagger, **đọc lại hợp đồng mới trên đó** — đúng với bảng SUMMARIZE chưa.
 - Thử bằng tài khoản của role **không** được phép gọi: phải ra 403, hoặc 404 nếu là
   bản ghi không thuộc người gọi.
@@ -100,7 +101,6 @@ Từ trong ra ngoài, controller sửa cuối cùng. Bước nào không cần t
 Không commit. Báo lại ba thứ:
 
 1. Hợp đồng trước / sau, dạng như mục SUMMARIZE — đây là thứ gửi cho nhóm FE và mobile.
-2. Có mã lỗi mới không. Có thì nhắc cập nhật `claude/error-codes.md` và `doc/error-codes.md`
-   **trong cùng PR**, nếu không FE sẽ hiển thị mã thô cho ca viên xem.
+2. Có mã lỗi mới không. Có thì nhắc cập nhật `doc/error-codes.md` **trong cùng PR**, nếu không FE sẽ hiển thị mã thô cho ca viên xem.
 3. Thay đổi phá client thì nói rõ bên nào phải sửa gì, và PR này **không được merge**
    trước khi hai bên hẹn nhau.

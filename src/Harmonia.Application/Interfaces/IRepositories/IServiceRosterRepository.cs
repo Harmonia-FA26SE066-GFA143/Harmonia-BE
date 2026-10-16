@@ -32,7 +32,7 @@ public interface IServiceRosterRepository : IGenericRepository<ServiceRoster>
 
     /// <summary>
     /// Read-only member with only their approved declaration of <paramref name="skillId"/> and their
-    /// confirmed participation in <paramref name="eventId"/> loaded (either collection may be empty).
+    /// Confirmed or Unsure participation in <paramref name="eventId"/> loaded (either collection may be empty).
     /// </summary>
     Task<MemberProfile?> GetMemberForAssignmentAsync(
         Guid memberId, Guid skillId, Guid eventId, CancellationToken cancellationToken);
@@ -45,7 +45,7 @@ public interface IServiceRosterRepository : IGenericRepository<ServiceRoster>
 
     /// <summary>
     /// Read-only Active assignments of the roster, loaded like <see cref="GetAssignmentsAsync"/> plus, on each Member,
-    /// only their approved skill declarations and their confirmed participation in <paramref name="eventId"/>.
+    /// only their approved skill declarations and their Confirmed or Unsure participation in <paramref name="eventId"/>.
     /// </summary>
     Task<List<RosterAssignment>> GetAssignmentsWithEligibilityAsync(
         Guid rosterId, Guid eventId, CancellationToken cancellationToken);

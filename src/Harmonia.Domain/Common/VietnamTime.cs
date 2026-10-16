@@ -12,6 +12,9 @@ public static class VietnamTime
 
     public static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow + Offset);
 
+    /// <summary>Wall-clock time at the parish, to compare with an event's zone-less EventDate + Time.</summary>
+    public static DateTime Now => DateTime.SpecifyKind(DateTime.UtcNow + Offset, DateTimeKind.Unspecified);
+
     /// <summary>A stored UTC timestamp as the wall-clock time at the parish, for text a person reads.</summary>
     public static DateTime FromUtc(DateTime utc) => utc + Offset;
 

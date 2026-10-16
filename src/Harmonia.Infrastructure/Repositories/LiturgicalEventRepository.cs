@@ -30,6 +30,46 @@ public class LiturgicalEventRepository(HarmoniaDbContext dbContext)
             .ThenBy(x => x.Time)
             .ToListAsync(cancellationToken);
 
+    public Task<List<LiturgicalEvent>> GetUpcomingAssignedToMemberAsync(
+        Guid memberId, DateOnly fromDate, CancellationToken cancellationToken) =>
+        DbContext.LiturgicalEvents
+            .AsNoTracking()
+            .Where(x => x.Status == EventStatus.Published && x.EventDate >= fromDate
+                && x.ServiceRoster != null && x.ServiceRoster.Status == RosterStatus.Finalized
+                && x.ServiceRoster.Assignments.Any(a => a.MemberId == memberId
+                    && a.Status == RosterAssignmentStatus.Active && a.NotifiedAt != null))
+            .Include(x => x.Location)
+            .Include(x => x.ServiceRoster!.Assignments.Where(a => a.MemberId == memberId
+                    && a.Status == RosterAssignmentStatus.Active && a.NotifiedAt != null))
+                .ThenInclude(x => x.Skill)
+            .Include(x => x.ServiceRoster!.Assignments.Where(a => a.MemberId == memberId
+                    && a.Status == RosterAssignmentStatus.Active && a.NotifiedAt != null))
+                .ThenInclude(x => x.SongListItem!.Song)
+            .OrderBy(x => x.EventDate)
+            .ThenBy(x => x.Time)
+            .AsSplitQuery()
+            .ToListAsync(cancellationToken);
+
+    public Task<LiturgicalEvent?> GetPublishedForMemberAsync(Guid id, Guid memberId, CancellationToken cancellationToken) =>
+        DbContext.LiturgicalEvents
+            .AsNoTracking()
+            .Include(x => x.Location)
+            .Include(x => x.LiturgicalSeason)
+            .Include(x => x.MassType)
+            .Include(x => x.CeremonyType)
+            .Include(x => x.EventParticipations.Where(p => p.MemberId == memberId))
+            .Include(x => x.ServiceRoster!.Assignments.Where(a => a.MemberId == memberId
+                    && a.Status == RosterAssignmentStatus.Active && a.NotifiedAt != null))
+                .ThenInclude(x => x.Skill)
+            .Include(x => x.ServiceRoster!.Assignments.Where(a => a.MemberId == memberId
+                    && a.Status == RosterAssignmentStatus.Active && a.NotifiedAt != null))
+                .ThenInclude(x => x.SongListItem!.Song)
+            .Include(x => x.Rehearsals).ThenInclude(x => x.Location)
+            .Include(x => x.Rehearsals).ThenInclude(x => x.Songs).ThenInclude(x => x.Song)
+            .Include(x => x.Rehearsals).ThenInclude(x => x.Attendances.Where(a => a.MemberId == memberId))
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(x => x.Id == id && x.Status == EventStatus.Published, cancellationToken);
+
     public async Task<PagedList<LiturgicalEvent>> SearchAsync(
         SearchLiturgicalEventsRequest filter, bool includeDrafts, CancellationToken cancellationToken)
     {

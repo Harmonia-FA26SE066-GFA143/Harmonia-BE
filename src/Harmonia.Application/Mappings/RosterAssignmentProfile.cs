@@ -12,5 +12,8 @@ public class RosterAssignmentProfile : Profile
         CreateMap<RosterAssignment, RosterAssignmentDto>()
             .ForMember(d => d.MemberName, o => o.MapFrom(s => s.Member.User.FullName))
             .ForMember(d => d.SongTitle, o => o.MapFrom(s => s.SongListItem != null ? s.SongListItem.Song.Title : null));
+
+        CreateMap<RosterAssignment, MyAssignmentDto>()
+            .ForMember(d => d.SongTitle, o => o.MapFrom(s => s.SongListItem != null ? s.SongListItem.Song.Title : null));
     }
 }

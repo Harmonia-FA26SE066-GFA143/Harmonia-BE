@@ -1329,12 +1329,13 @@ public sealed class RepositoryTests : IDisposable
 
     // ---- ServiceRosterRepository ----
 
-    private sealed record RosterSeed(Guid EventId, Guid SopranoId, Guid ConfirmedId, Guid DeclinedId, Guid InactiveId, Guid PendingId);
+    private sealed record RosterSeed(
+        Guid EventId, Guid SopranoId, Guid ConfirmedId, Guid DeclinedId, Guid InactiveId, Guid PendingId, Guid UnsureId);
 
     /// <summary>
-    /// One upcoming event plus two past ones 10 and 90 days earlier. Of four sopranos only "confirmed" is a
-    /// candidate: the others declined, are inactive, or still wait for skill approval. "confirmed" served the
-    /// 10-day-old event twice (two skills) and the 90-day-old one once.
+    /// One upcoming event plus two past ones 10 and 90 days earlier. Of five sopranos only "confirmed" is a
+    /// candidate: the others are unsure, declined, are inactive, or still wait for skill approval. "confirmed" served
+    /// the 10-day-old event twice (two skills) and the 90-day-old one once.
     /// </summary>
     private async Task<RosterSeed> SeedRosterAsync()
     {
@@ -1360,16 +1361,33 @@ public sealed class RepositoryTests : IDisposable
         var declined = await MemberAsync("declined@test.com", MemberStatus.Active, ParticipationStatus.Declined, ApprovalStatus.Approved);
         var inactive = await MemberAsync("inactive@test.com", MemberStatus.Inactive, ParticipationStatus.Confirmed, ApprovalStatus.Approved);
         var pending = await MemberAsync("pending@test.com", MemberStatus.Active, ParticipationStatus.Confirmed, ApprovalStatus.Pending);
+        var unsure = await MemberAsync("unsure@test.com", MemberStatus.Active, ParticipationStatus.Unsure, ApprovalStatus.Approved);
 
         RosterAssignment Assign(Guid skillId) => new() { Id = Guid.NewGuid(), MemberId = confirmed.Id, SkillId = skillId };
         await using var context = _db.NewContext();
-        context.AddRange(soprano, alto, location, upcoming, recent, old, confirmed, declined, inactive, pending);
+        context.AddRange(soprano, alto, location, upcoming, recent, old, confirmed, declined, inactive, pending, unsure);
         context.AddRange(
             new ServiceRoster { Id = Guid.NewGuid(), EventId = recent.Id, Assignments = [Assign(soprano.Id), Assign(alto.Id)] },
             new ServiceRoster { Id = Guid.NewGuid(), EventId = old.Id, Assignments = [Assign(soprano.Id)] });
         await context.SaveChangesAsync(_ct);
 
-        return new RosterSeed(upcoming.Id, soprano.Id, confirmed.Id, declined.Id, inactive.Id, pending.Id);
+        return new RosterSeed(upcoming.Id, soprano.Id, confirmed.Id, declined.Id, inactive.Id, pending.Id, unsure.Id);
+    }
+
+    [Theory]
+    [InlineData("confirmed", true)]
+    [InlineData("unsure", true)]
+    [InlineData("declined", false)]
+    public async Task GetMemberForAssignment_LoadsConfirmedOrUnsureParticipationOnly_Async(string who, bool eligible)
+    {
+        var seed = await SeedRosterAsync();
+        var memberId = who switch { "confirmed" => seed.ConfirmedId, "unsure" => seed.UnsureId, _ => seed.DeclinedId };
+        await using var context = _db.NewContext();
+
+        var member = await new ServiceRosterRepository(context).GetMemberForAssignmentAsync(
+            memberId, seed.SopranoId, seed.EventId, _ct);
+
+        Assert.Equal(eligible, member!.EventParticipations.Count == 1);
     }
 
     [Fact]

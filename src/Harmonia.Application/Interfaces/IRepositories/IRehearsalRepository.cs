@@ -11,7 +11,14 @@ namespace Harmonia.Application.Interfaces.IRepositories;
 public interface IRehearsalRepository : IGenericRepository<Rehearsal>
 {
     /// <summary>Rehearsals not ended at <paramref name="fromTime"/> (an ongoing one included), earliest first.</summary>
+    /// <summary>Rehearsals not yet over that are standalone or belong to a Published event.</summary>
     Task<List<Rehearsal>> GetUpcomingAsync(DateTime fromTime, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Read-only rehearsal that is standalone or belongs to a Published event, null otherwise. Location and Songs.Song
+    /// are loaded; Attendances holds only the member's row.
+    /// </summary>
+    Task<Rehearsal?> GetVisibleForMemberAsync(Guid id, Guid memberId, CancellationToken cancellationToken);
 
     /// <summary>Read-only page, newest start first, with Location and Songs (with Song) loaded.</summary>
     Task<PagedList<Rehearsal>> SearchAsync(SearchRehearsalsRequest filter, CancellationToken cancellationToken);

@@ -145,25 +145,14 @@ public class EventParticipationService(
             return Result<EventParticipationDto>.Failure(ErrorCodes.EventParticipationNotInvited);
         }
 
-        if (participation.LiturgicalEvent.Status == EventStatus.Cancelled)
+        if (CannotRespondCode(participation, participation.LiturgicalEvent) is { } closedCode)
         {
-            return Result<EventParticipationDto>.Failure(ErrorCodes.LiturgicalEventCancelled);
-        }
-
-        // A member answers once; the answer is final.
-        if (participation.Status != ParticipationStatus.Invited)
-        {
-            return Result<EventParticipationDto>.Failure(ErrorCodes.EventParticipationAlreadyResponded);
-        }
-
-        if (HasPassed(participation.LiturgicalEvent))
-        {
-            return Result<EventParticipationDto>.Failure(ErrorCodes.EventParticipationClosed);
+            return Result<EventParticipationDto>.Failure(closedCode);
         }
 
         participation.Status = request.Status;
         participation.Note = request.Note;
-        participation.RespondedAt = DateTime.UtcNow;   // <-- UtcNow
+        participation.RespondedAt = DateTime.UtcNow;
         await participationRepository.SaveChangesAsync(cancellationToken);
 
         var dto = mapper.Map<EventParticipationDto>(participation);
@@ -172,9 +161,42 @@ public class EventParticipationService(
         return Result<EventParticipationDto>.Success(dto);
     }
 
-    // Event date and time are stored without a zone; they are compared with UTC now.
+    public async Task<Result<List<MyParticipationDto>>> GetMineAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var profile = await memberProfileRepository.GetByUserIdAsync(userId, cancellationToken);
+        if (profile is null)
+        {
+            return Result<List<MyParticipationDto>>.Failure(ErrorCodes.MemberNotFound);
+        }
+
+        var participations = await participationRepository.GetUpcomingForMemberAsync(
+            profile.Id, VietnamTime.Today, cancellationToken);
+
+        return Result<List<MyParticipationDto>>.Success(
+            participations.Select(p => ToMyParticipationDto(p, p.LiturgicalEvent, mapper)).ToList());
+    }
+
+    /// <summary>Maps the member's own request and fills in whether <see cref="RespondAsync"/> would accept an answer now.</summary>
+    internal static MyParticipationDto ToMyParticipationDto(
+        EventParticipation participation, LiturgicalEvent liturgicalEvent, IMapper mapper)
+    {
+        var dto = mapper.Map<MyParticipationDto>(participation);
+        dto.CannotRespondReason = CannotRespondCode(participation, liturgicalEvent);
+        dto.CanRespond = dto.CannotRespondReason is null;
+        return dto;
+    }
+
+    // A member answers once; the answer is final, so only an Invited request before the event can be answered.
+    private static string? CannotRespondCode(EventParticipation participation, LiturgicalEvent liturgicalEvent)
+    {
+        if (liturgicalEvent.Status == EventStatus.Cancelled) return ErrorCodes.LiturgicalEventCancelled;
+        if (participation.Status != ParticipationStatus.Invited) return ErrorCodes.EventParticipationAlreadyResponded;
+        return HasPassed(liturgicalEvent) ? ErrorCodes.EventParticipationClosed : null;
+    }
+
+    // Event date and time are parish wall-clock values stored without a zone.
     private static bool HasPassed(LiturgicalEvent liturgicalEvent) =>
-        liturgicalEvent.EventDate.ToDateTime(liturgicalEvent.Time) <= DateTime.UtcNow;   // <-- UtcNow
+        liturgicalEvent.EventDate.ToDateTime(liturgicalEvent.Time) <= VietnamTime.Now;
 
     /// <summary>
     /// Explicit ids must all exist, be active and not be invited yet. Without ids, everyone active

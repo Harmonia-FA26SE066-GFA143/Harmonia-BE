@@ -306,7 +306,7 @@ public class RosterService(
 
     /// <summary>
     /// Error code when the member cannot take the song / skill: already holds it on the roster, missing, not Active,
-    /// skill not approved or participation not confirmed. Null when they can.
+    /// skill not approved or participation neither Confirmed nor Unsure. Null when they can.
     /// </summary>
     private async Task<string?> MemberNotAssignableCodeAsync(
         ServiceRoster? roster, Guid eventId, Guid? songListItemId, Guid skillId, Guid memberId, CancellationToken cancellationToken)
