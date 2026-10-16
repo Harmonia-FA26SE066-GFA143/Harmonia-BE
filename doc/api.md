@@ -446,7 +446,10 @@ Chưa có kỹ năng nào → `[]`.
 | PATCH | `/api/liturgical-events/{id}/publish` | — | 200 `LiturgicalEventDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_ALREADY_PUBLISHED`, `LITURGICAL_EVENT_CANCELLED` |
 | PATCH | `/api/liturgical-events/{id}/cancel` | — | 200 `LiturgicalEventDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED` |
 | GET | `/api/schedule/events` · mọi role | — | 200 `LiturgicalEventSummaryDto[]` | — |
+| GET | `/api/schedule/events/{id}` · mọi role | — | 200 `MemberEventDetailDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
 | GET | `/api/schedule/rehearsals` · mọi role | — | 200 `RehearsalSummaryDto[]` | — |
+| GET | `/api/schedule/rehearsals/{id}` · mọi role | — | 200 `MemberRehearsalDetailDto` | 404 `REHEARSAL_NOT_FOUND` |
+| GET | `/api/schedule/assignments` · `ChoirMember` | — | 200 `MyAssignedEventDto[]` | 404 `MEMBER_NOT_FOUND` |
 | GET | `/api/liturgical-events/{id}/preparation-progress` · `ChoirDirector` | — | 200 `EventPreparationProgressDto[]` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
 | GET | `/api/liturgical-events/{id}/preparation-status` | — | 200 `EventPreparationStatusDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
 
@@ -496,8 +499,23 @@ Gồm mọi trường của `LiturgicalEventDto`, thêm `liturgicalSeasonName`, 
 **Lịch sắp tới (UC-04 / FE-05)**
 
 - `events`: sự kiện `Published` từ hôm nay trở đi, sắp theo ngày rồi giờ.
-- `rehearsals`: buổi tập **chưa kết thúc** tại thời điểm gọi (cả buổi đang diễn ra), sắp theo giờ bắt đầu. `locationName`, `note` có thể `null`.
+- `rehearsals`: buổi tập **chưa kết thúc** tại thời điểm gọi (cả buổi đang diễn ra), sắp theo giờ bắt đầu. Chỉ buổi tập
+  thường (không gắn sự kiện) hoặc gắn sự kiện `Published`. `locationName`, `note` có thể `null`.
   `songs`: `RehearsalSongDto[]` (xem mục 7e) theo thứ tự hiển thị, `[]` khi ca trưởng chưa chọn bài.
+- `events/{id}` — `MemberEventDetailDto` = `{ id, eventDate, time, title, locationName, liturgicalSeasonName,
+  massTypeName, ceremonyTypeName, specialRequirements, participation, assignments, rehearsals }`. Chỉ sự kiện `Published`;
+  `Draft`, đã huỷ hoặc không tồn tại → 404 `LITURGICAL_EVENT_NOT_FOUND`. Các phần riêng chỉ chứa dữ liệu của **người gọi**:
+  - `participation`: `MyParticipationDto` (xem mục 7f), `null` khi người gọi không được mời xác nhận.
+  - `assignments`: `MyAssignmentDto[]` = `{ skillId, skillName, songListItemId, songTitle }`, `[]` cho tới khi bảng
+    phân công đã chốt và người gọi đã được thông báo. `songListItemId`, `songTitle` `null` khi dòng phân công không gắn bài cụ thể.
+  - `rehearsals`: `MemberRehearsalDetailDto[]` của sự kiện, sắp theo giờ bắt đầu.
+  Role khác `ChoirMember` gọi được, nhưng `participation` luôn `null` và `assignments` luôn `[]`.
+- `rehearsals/{id}` — `MemberRehearsalDetailDto` = `RehearsalSummaryDto` + `myAttendanceStatus` (`Present` | `Absent` |
+  `Late` | `Excused`, `null` khi chưa được điểm danh hoặc người gọi không phải ca viên). Chỉ buổi tập thường hoặc gắn sự
+  kiện `Published`, kể cả buổi đã qua; còn lại → 404 `REHEARSAL_NOT_FOUND`.
+- `assignments` — `MyAssignedEventDto` = `{ eventId, eventDate, time, title, locationName, assignments: MyAssignmentDto[] }`:
+  sự kiện `Published` từ hôm nay trở đi mà ca viên có dòng phân công còn hiệu lực trên bảng **đã chốt** và đã được
+  thông báo, sắp theo ngày rồi giờ. Không có → `[]`.
 - Không phân trang — trả mảng; không có gì → `[]`.
 
 **Tiến độ chuẩn bị cho sự kiện (UC-30 / FE-46)**
@@ -1177,8 +1195,9 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 
 **Sửa tay (`assignments`, UC-25b)**
 
-- Ca viên được thêm / thay vào phải **đang hoạt động**, đã được **duyệt** skill đó và đã **xác nhận tham gia**
-  sự kiện. Đã có đúng (bài, skill, ca viên) đó trên bảng → 409 `ROSTER_ASSIGNMENT_DUPLICATE`.
+- Ca viên được thêm / thay vào phải **đang hoạt động**, đã được **duyệt** skill đó và đã trả lời `Confirmed` **hoặc**
+  `Unsure` cho yêu cầu xác nhận tham gia sự kiện (chưa trả lời hoặc `Declined` → `ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED`;
+  gợi ý tự động vẫn chỉ lấy `Confirmed`). Luật này cũng được kiểm lại khi chốt (`finalization`). Đã có đúng (bài, skill, ca viên) đó trên bảng → 409 `ROSTER_ASSIGNMENT_DUPLICATE`.
 - Thêm: cặp (`songListItemId`, `skillId`) phải là một yêu cầu nhân sự của danh sách đã duyệt, nếu không → 404
   `PERSONNEL_REQUIREMENT_NOT_FOUND`. Được thêm vượt `requiredCount`. Sự kiện chưa có bảng thì tự tạo bảng `Draft`.
   Dòng thêm tay có `source = Manual`.
@@ -1528,10 +1547,15 @@ Lên lịch tập và điểm danh chỉ dành cho `ChoirDirector`. Danh sách b
 `EventParticipationSummaryDto` = `{ eventId, totalCount, invitedCount, confirmedCount, declinedCount, unsureCount, items }`,
 `items` là `EventParticipationDto[]`.
 
+`MyParticipationDto` = `{ participationId, eventId, status, requestedAt, respondedAt, note, canRespond, cannotRespondReason }`.
+`canRespond = true` khi `PUT mine/{eventId}` sẽ nhận câu trả lời lúc này; ngược lại `cannotRespondReason` là mã lỗi `PUT`
+sẽ trả (`LITURGICAL_EVENT_CANCELLED`, `EVENT_PARTICIPATION_ALREADY_RESPONDED`, `EVENT_PARTICIPATION_CLOSED`).
+
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
 | POST | `/api/event-participations` · `ChoirDirector` | `{ "eventId", "memberIds?": ["guid"] }` | 200 `EventParticipationDto[]` | 400 `VALIDATION_FAILED` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_NOT_PUBLISHED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `MEMBER_NOT_ACTIVE`, `EVENT_PARTICIPATION_ALREADY_REQUESTED` |
 | GET | `/api/event-participations?eventId=` · `ChoirDirector` | — | 200 `EventParticipationSummaryDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
+| GET | `/api/event-participations/mine` · `ChoirMember` | — | 200 `MyParticipationDto[]` | 404 `MEMBER_NOT_FOUND` |
 | PUT | `/api/event-participations/mine/{eventId}` · `ChoirMember` | `{ "status", "note?" }` | 200 `EventParticipationDto` | 400 `VALIDATION_FAILED` · 404 `MEMBER_NOT_FOUND` · 409 `MEMBER_NOT_ACTIVE`, `EVENT_PARTICIPATION_NOT_INVITED`, `LITURGICAL_EVENT_CANCELLED`, `EVENT_PARTICIPATION_ALREADY_RESPONDED`, `EVENT_PARTICIPATION_CLOSED` |
 
 - `POST` chỉ gửi được cho sự kiện `Published` và chưa diễn ra. Mỗi ca viên được mời nhận một thông báo
@@ -1545,7 +1569,10 @@ Lên lịch tập và điểm danh chỉ dành cho `ChoirDirector`. Danh sách b
 - `PUT` — ca viên phản hồi yêu cầu của **chính mình**: `status` là `Confirmed` | `Declined` | `Unsure` (không nhận
   `Invited`), `note` tối đa 300 ký tự. Phản hồi **một lần**, không sửa lại được (`EVENT_PARTICIPATION_ALREADY_RESPONDED`).
 - 409 `EVENT_PARTICIPATION_NOT_INVITED`: ca viên chưa được mời tham gia sự kiện này. 409 `EVENT_PARTICIPATION_CLOSED`:
-  sự kiện đã diễn ra.
+  sự kiện đã bắt đầu (so ngày + giờ sự kiện với giờ Việt Nam).
+- `GET mine` — yêu cầu của **chính** ca viên cho các sự kiện `Published` từ hôm nay trở đi, sắp theo ngày rồi giờ;
+  sự kiện không được mời thì không có trong mảng. Không phân trang, không có gì → `[]`. Dùng `canRespond` để bật / tắt
+  nút trả lời thay vì tự tính.
 
 ---
 
