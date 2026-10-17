@@ -114,7 +114,7 @@ public class DataSeeder(
 
         var admin = new User
         {
-            Id = Guid.NewGuid(), Email = email, FullName = "Administrator", RoleId = adminRoleId, IsActive = true,
+            Id = Guid.NewGuid(), Email = email, FullName = "Quản trị viên", RoleId = adminRoleId, IsActive = true,
         };
         admin.PasswordHash = passwordHasherService.HashPassword(admin, password);
         dbContext.Users.Add(admin);

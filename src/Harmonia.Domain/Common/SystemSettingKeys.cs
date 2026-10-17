@@ -24,18 +24,18 @@ public static class SystemSettingKeys
 
     public static readonly IReadOnlyList<SystemSettingDefinition> All =
     [
-        new(ParishName, SettingDataType.String, string.Empty, "Name of the parish, shown by the clients.", IsPublic: true),
-        new(ChoirName, SettingDataType.String, string.Empty, "Name of the choir, shown by the clients.", IsPublic: true),
+        new(ParishName, SettingDataType.String, string.Empty, "Tên giáo xứ, hiển thị trên ứng dụng.", IsPublic: true),
+        new(ChoirName, SettingDataType.String, string.Empty, "Tên ca đoàn, hiển thị trên ứng dụng.", IsPublic: true),
         new(SystemAnnouncement, SettingDataType.String, string.Empty,
-            "Notice shown to every user; empty shows nothing.", IsPublic: true),
+            "Thông báo hiển thị cho mọi người dùng; để trống thì không hiển thị.", IsPublic: true),
         new(RosterRecentServiceDays, SettingDataType.Int, "60",
-            "How many days back a service counts as recent when suggesting a roster.", MinValue: 1, MaxValue: 365),
+            "Số ngày gần nhất được tính là đã phục vụ gần đây khi đề xuất phân công.", MinValue: 1, MaxValue: 365),
         new(RosterAiSuggestionEnabled, SettingDataType.Bool, "true",
-            "Whether roster suggestions ask the AI; when off they are filled by the built-in rules only."),
+            "Có dùng AI để đề xuất phân công không; tắt thì chỉ dùng quy tắc có sẵn."),
         new(PracticeAllowLateSubmission, SettingDataType.Bool, "false",
-            "Whether a member may still submit a recording after the assignment's due date."),
+            "Cho phép ca viên nộp bản thu sau hạn của bài tập."),
         new(RehearsalAttendanceOpensMinutesBefore, SettingDataType.Int, "0",
-            "How many minutes before a rehearsal starts attendance may be recorded.", MinValue: 0, MaxValue: 120),
+            "Số phút trước giờ bắt đầu buổi tập được phép điểm danh.", MinValue: 0, MaxValue: 120),
     ];
 
     public static SystemSettingDefinition? Find(string key) => All.FirstOrDefault(x => x.Key == key);

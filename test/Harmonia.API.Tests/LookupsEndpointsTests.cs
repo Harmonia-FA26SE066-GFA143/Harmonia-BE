@@ -123,7 +123,7 @@ public class LookupsEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<H
         var admin = await factory.CreateClientAsAsync("admin@test.com", _ct);
 
         var seededOff = await admin.PutAsJsonAsync(
-            $"api/lookups/skill-categories/{SkillCategoryIds.Psalm}", new { name = "Psalm", isActive = false }, _ct);
+            $"api/lookups/skill-categories/{SkillCategoryIds.Psalm}", new { name = "Đáp ca", isActive = false }, _ct);
         var intoOff = await admin.PostAsJsonAsync(
             "api/lookups/skills", new { categoryId = offCategory.Id, name = "Orphan" }, _ct);
         var acrossBoundary = await admin.PutAsJsonAsync(
