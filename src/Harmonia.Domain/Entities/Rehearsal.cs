@@ -14,9 +14,15 @@ public class Rehearsal : BaseAuditableEntity
 
     public string? Note { get; set; }
 
+    public Guid? ChoirId { get; set; }
+
     public LiturgicalEvent? LiturgicalEvent { get; set; }
 
     public WorshipLocation? Location { get; set; }
 
+    public Choir? Choir { get; set; }
+
     public ICollection<RehearsalAttendance> Attendances { get; set; } = [];
+
+    public ICollection<RehearsalSong> Songs { get; set; } = [];
 }

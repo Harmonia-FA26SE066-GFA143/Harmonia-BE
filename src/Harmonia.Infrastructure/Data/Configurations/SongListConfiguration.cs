@@ -24,5 +24,10 @@ public class SongListConfiguration : IEntityTypeConfiguration<SongList>
             .WithMany()
             .HasForeignKey(x => x.PreviousVersionId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(x => x.Choir)
+            .WithMany(x => x.SongLists)
+            .HasForeignKey(x => x.ChoirId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

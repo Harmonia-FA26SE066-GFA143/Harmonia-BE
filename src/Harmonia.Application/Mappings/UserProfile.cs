@@ -12,6 +12,6 @@ public class UserProfile : Profile
             .ForMember(dest => dest.RoleName, opt => opt.MapFrom(src => src.Role.Name));
 
         CreateMap<User, UserDto>()
-    .ForMember(dest => dest.RoleName, opt => opt.MapFrom(src => src.Role.Name));
+            .ForMember(dest => dest.RoleName, opt => opt.MapFrom(src => src.Role.Name));
     }
 }

@@ -17,7 +17,14 @@ public class RosterAssignment : BaseEntity
 
     public DateTime? NotifiedAt { get; set; }
 
+    public RosterAssignmentStatus Status { get; set; }
+
+    /// <summary>The assignment that took this one's place; set only when Status is Replaced.</summary>
+    public Guid? ReplacedByAssignmentId { get; set; }
+
     public ServiceRoster Roster { get; set; } = null!;
+
+    public RosterAssignment? ReplacedByAssignment { get; set; }
 
     public MemberProfile Member { get; set; } = null!;
 

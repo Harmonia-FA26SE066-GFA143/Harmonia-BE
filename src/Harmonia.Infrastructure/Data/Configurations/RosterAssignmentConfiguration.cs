@@ -28,5 +28,11 @@ public class RosterAssignmentConfiguration : IEntityTypeConfiguration<RosterAssi
             .HasForeignKey(x => x.SongListItemId)
             // SQL Server rejects a second path (Event -> SongList -> Item -> Assignment vs Event -> Roster -> Assignment).
             .OnDelete(DeleteBehavior.ClientSetNull);
+
+        // Deleting a replacement keeps the line it replaced (still Replaced) and only clears the link.
+        builder.HasOne(x => x.ReplacedByAssignment)
+            .WithMany()
+            .HasForeignKey(x => x.ReplacedByAssignmentId)
+            .OnDelete(DeleteBehavior.ClientSetNull);
     }
 }

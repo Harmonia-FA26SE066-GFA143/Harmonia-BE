@@ -39,8 +39,8 @@ Số liệu thật về repo được hook `SessionStart` in ra ở đầu phiê
 
 Đã chốt: khóa chính mọi entity là `Guid`, khai ở `BaseEntity`.
 Entity có audit thì kế thừa `BaseAuditableEntity` (`CreatedAt/By`, `UpdatedAt/By`).
-Domain đã dựng đủ 42 entity + 21 enum theo `doc/harmonia-domain-entity-list.md`.
-Hệ thống phục vụ MỘT ca đoàn — không có entity `Choir`, không có `ChoirId`.
+Domain đã dựng đủ 47 entity + 22 enum theo `doc/harmonia-domain-entity-list.md`.
+Nhiều ca đoàn (D7, chốt 2026-10-17): ca viên gia nhập nhiều `Choir` qua `ChoirMembership`, sự kiện có nhiều `Choir` qua `LiturgicalEventChoir`. `ChoirDirector` quản lý mọi ca đoàn — không có ca trưởng riêng từng ca đoàn. Hiện mới có schema, service chưa lọc theo ca đoàn.
 
 Database provider: SQL Server. Gặp việc cần nó thì HỎI, đừng tự chọn.
 
