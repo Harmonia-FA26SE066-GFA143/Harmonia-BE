@@ -5,6 +5,7 @@ using Harmonia.Application.Exceptions;
 using Harmonia.Domain.Common;
 using Harmonia.Domain.Exceptions;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -84,6 +85,24 @@ public class GlobalExceptionHandlingMiddlewareTests
         Assert.DoesNotContain("hunter2", raw);
         Assert.DoesNotContain("InvalidOperationException", raw);
         Assert.DoesNotContain("at Harmonia", raw);
+    }
+
+    [Fact]
+    public async Task ConcurrencyException_Returns409Conflict_Async()
+    {
+        var (status, body, _) = await RunAsync(new DbUpdateConcurrencyException("0 rows affected"), _ct);
+
+        Assert.Equal(409, status);
+        Assert.Equal(ErrorCodes.Conflict, body!.Code);
+    }
+
+    [Fact]
+    public async Task DbUpdateException_OtherThanUniqueViolation_StaysInternalError_Async()
+    {
+        var (status, body, _) = await RunAsync(new DbUpdateException("FK violation"), _ct);
+
+        Assert.Equal(500, status);
+        Assert.Equal(ErrorCodes.InternalError, body!.Code);
     }
 
     [Fact]

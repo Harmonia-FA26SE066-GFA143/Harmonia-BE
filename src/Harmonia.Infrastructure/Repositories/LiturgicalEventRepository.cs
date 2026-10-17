@@ -18,7 +18,8 @@ public class LiturgicalEventRepository(HarmoniaDbContext dbContext)
     public Task<bool> ExistsBySlotAsync(
         DateOnly eventDate, TimeOnly time, Guid locationId, Guid? excludeId, CancellationToken cancellationToken) =>
         DbContext.LiturgicalEvents.AnyAsync(
-            x => x.EventDate == eventDate && x.Time == time && x.LocationId == locationId && x.Id != excludeId,
+            x => x.EventDate == eventDate && x.Time == time && x.LocationId == locationId && x.Id != excludeId
+                && x.Status != EventStatus.Cancelled,
             cancellationToken);
 
     public Task<List<LiturgicalEvent>> GetUpcomingPublishedAsync(

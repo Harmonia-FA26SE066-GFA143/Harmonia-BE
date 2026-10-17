@@ -64,6 +64,7 @@ FE hiển thị theo `code`, **không** hiển thị `message`. Bản dịch và
 | Sai role | 403 | *(body rỗng)* |
 | Chưa đổi mật khẩu lần đầu (tài khoản Admin vừa tạo) | 403 | `AUTH_PASSWORD_CHANGE_REQUIRED` → màn đổi mật khẩu |
 | Body JSON hỏng / sai kiểu | 400 | `VALIDATION_FAILED`, `errors.request` hoặc `errors.<field>` |
+| Hai request ghi đè nhau (bấm hai lần, hai người sửa cùng lúc) | 409 | `CONFLICT` → tải lại dữ liệu rồi thử lại |
 | Lỗi không lường trước | 500 | `INTERNAL_ERROR` |
 
 ### Phân trang
@@ -470,6 +471,7 @@ Chưa có kỹ năng nào → `[]`.
 - Phải có `massTypeId` **hoặc** `ceremonyTypeId`, thiếu cả hai → 400 `VALIDATION_FAILED` với
   `errors` chứa `LITURGICAL_EVENT_TYPE_REQUIRED`. `title` tối đa 200, `specialRequirements` tối đa 1000 ký tự.
 - Một ngày có nhiều sự kiện được, nhưng trùng cả ngày + giờ + địa điểm → 409 `LITURGICAL_EVENT_SLOT_TAKEN`.
+  Sự kiện đã huỷ không giữ chỗ: tạo lại sự kiện mới đúng ngày + giờ + địa điểm đó được.
 - Sự kiện mới luôn ở `Draft`. Công bố (`publish`) chuyển sang `Published`, ghi `publishedAt`, rồi gửi
   notification `type = EventPublished` cho mọi ca trưởng và ca viên đang hoạt động,
   `referenceType = "LiturgicalEvent"`, `referenceId` = id sự kiện (S-05).
@@ -1084,6 +1086,7 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 - `GET …/latest`: phiên bản mới nhất ở **mọi trạng thái**, kèm `items` và `reviews` — ca trưởng dùng để mở lại danh sách
   đang soạn. Riêng `ParishPriest` **không thấy bản `Draft`**: trả phiên bản mới nhất không phải `Draft` (ví dụ ca trưởng
   đang soạn v2 thì cha xứ nhận v1 `NeedsRevision`). Sự kiện chưa có danh sách (hoặc chỉ có `Draft`, với cha xứ) → 404.
+- `GET /api/song-lists/{id}`: cùng luật — cha xứ mở id của một bản `Draft` → 404 `SONG_LIST_NOT_FOUND`.
 - `GET …/pending`: các danh sách đang `Submitted`, bản gửi sớm nhất trước. **`items` và `reviews` ở đây luôn rỗng** —
   gọi `GET /api/song-lists/{id}` để lấy chi tiết.
 - `submit` xong, mọi `ParishPriest` đang hoạt động nhận thông báo `SongListSubmitted`; `review` xong, ca trưởng đề xuất

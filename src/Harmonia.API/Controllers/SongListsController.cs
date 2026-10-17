@@ -31,7 +31,8 @@ public class SongListsController(ISongListService songListService) : ApiControll
     [Authorize(Roles = $"{RoleNames.ChoirDirector},{RoleNames.ParishPriest}")]
     [ProducesResponseType<SongListDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
-        ToActionResult(await songListService.GetByIdAsync(id, cancellationToken));
+        ToActionResult(await songListService.GetByIdAsync(
+            id, User.IsInRole(RoleNames.ChoirDirector), cancellationToken));
 
     [HttpGet("pending")]
     [Authorize(Roles = RoleNames.ParishPriest)]

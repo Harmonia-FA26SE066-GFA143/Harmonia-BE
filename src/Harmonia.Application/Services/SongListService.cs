@@ -49,11 +49,11 @@ public class SongListService(
             : Result<SongListDto>.Success(mapper.Map<SongListDto>(songList));
     }
 
-    public async Task<Result<SongListDto>> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<Result<SongListDto>> GetByIdAsync(Guid id, bool includeDraft, CancellationToken cancellationToken)
     {
         var songList = await songListRepository.GetByIdWithDetailsAsync(id, cancellationToken);
 
-        return songList is null
+        return songList is null || (!includeDraft && songList.Status == SongListStatus.Draft)
             ? Result<SongListDto>.Failure(ErrorCodes.SongListNotFound)
             : Result<SongListDto>.Success(mapper.Map<SongListDto>(songList));
     }
@@ -290,34 +290,14 @@ public class SongListService(
     private async Task<string?> ValidateItemReferencesAsync(
         List<UpdateSongListItemRequest> items, CancellationToken cancellationToken)
     {
-        foreach (var songId in items.Select(i => i.SongId).Distinct())
-        {
-            var song = await songRepository.GetByIdAsync(songId, cancellationToken);
-            if (song is null)
-            {
-                return ErrorCodes.SongNotFound;
-            }
+        var songIds = items.Select(i => i.SongId).Distinct().ToList();
+        var songs = await songRepository.ListAsync(x => songIds.Contains(x.Id), cancellationToken);
+        if (songs.Count != songIds.Count) return ErrorCodes.SongNotFound;
+        if (songs.Any(x => !x.IsActive)) return ErrorCodes.SongInactive;
 
-            if (!song.IsActive)
-            {
-                return ErrorCodes.SongInactive;
-            }
-        }
-
-        foreach (var slotId in items.Select(i => i.SlotId).Distinct())
-        {
-            var slot = await slotRepository.GetByIdAsync(slotId, cancellationToken);
-            if (slot is null)
-            {
-                return ErrorCodes.SlotNotFound;
-            }
-
-            if (!slot.IsActive)
-            {
-                return ErrorCodes.LookupInactive;
-            }
-        }
-
-        return null;
+        var slotIds = items.Select(i => i.SlotId).Distinct().ToList();
+        var slots = await slotRepository.ListAsync(x => slotIds.Contains(x.Id), cancellationToken);
+        if (slots.Count != slotIds.Count) return ErrorCodes.SlotNotFound;
+        return slots.Any(x => !x.IsActive) ? ErrorCodes.LookupInactive : null;
     }
 }

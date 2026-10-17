@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using AutoMapper;
 using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IRepositories;
@@ -27,6 +28,8 @@ public class SongListServiceTests
     private readonly Guid _priestId = Guid.NewGuid();
     private readonly Guid _songId = Guid.NewGuid();
     private readonly Guid _slotId = Guid.NewGuid();
+    private readonly List<Song> _songRows = [];
+    private readonly List<LiturgicalSlot> _slotRows = [];
     private readonly LiturgicalEvent _event;
     private readonly List<SongListItem> _addedItems = [];
 
@@ -45,8 +48,13 @@ public class SongListServiceTests
 
         _event = new LiturgicalEvent { Id = _eventId, Status = EventStatus.Published };
         _events.GetByIdAsync(_eventId, _ct).Returns(_event);
-        _songs.GetByIdAsync(_songId, _ct).Returns(new Song { Id = _songId, IsActive = true });
-        _slots.GetByIdAsync(_slotId, _ct).Returns(new LiturgicalSlot { Id = _slotId, IsActive = true });
+        // Run the service's predicate over in-memory rows, so a missing id really is missing.
+        _songRows.Add(new Song { Id = _songId, IsActive = true });
+        _slotRows.Add(new LiturgicalSlot { Id = _slotId, IsActive = true });
+        _songs.ListAsync(Arg.Any<Expression<Func<Song, bool>>>(), _ct)
+            .Returns(ci => _songRows.Where(ci.Arg<Expression<Func<Song, bool>>>().Compile()).ToList());
+        _slots.ListAsync(Arg.Any<Expression<Func<LiturgicalSlot, bool>>>(), _ct)
+            .Returns(ci => _slotRows.Where(ci.Arg<Expression<Func<LiturgicalSlot, bool>>>().Compile()).ToList());
         _songLists.AddItemsAsync(Arg.Do<IEnumerable<SongListItem>>(items => _addedItems.AddRange(items)), _ct)
             .Returns(Task.CompletedTask);
         _users.GetActiveUserIdsByRolesAsync(
@@ -122,9 +130,23 @@ public class SongListServiceTests
     [Fact]
     public async Task GetById_Missing_ReturnsNotFound_Async()
     {
-        var result = await _sut.GetByIdAsync(Guid.NewGuid(), _ct);
+        var result = await _sut.GetByIdAsync(Guid.NewGuid(), includeDraft: true, _ct);
 
         Assert.Equal(ErrorCodes.SongListNotFound, result.Code);
+    }
+
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public async Task GetById_Draft_OnlyWithIncludeDraft_Async(bool includeDraft, bool found)
+    {
+        var draft = new SongList { Id = Guid.NewGuid(), EventId = _eventId, Status = SongListStatus.Draft };
+        _songLists.GetByIdWithDetailsAsync(draft.Id, _ct).Returns(draft);
+
+        var result = await _sut.GetByIdAsync(draft.Id, includeDraft, _ct);
+
+        Assert.Equal(found, result.IsSuccess);
+        if (!found) Assert.Equal(ErrorCodes.SongListNotFound, result.Code);
     }
 
     [Fact]
@@ -231,7 +253,7 @@ public class SongListServiceTests
     [Fact]
     public async Task Create_SongInactive_ReturnsSongInactive_Async()
     {
-        _songs.GetByIdAsync(_songId, _ct).Returns(new Song { Id = _songId, IsActive = false });
+        _songRows[0].IsActive = false;
 
         var result = await _sut.CreateAsync(NewCreateRequest(), _directorId, _ct);
 
@@ -252,7 +274,7 @@ public class SongListServiceTests
     [Fact]
     public async Task Create_SlotInactive_ReturnsLookupInactive_Async()
     {
-        _slots.GetByIdAsync(_slotId, _ct).Returns(new LiturgicalSlot { Id = _slotId, IsActive = false });
+        _slotRows[0].IsActive = false;
 
         var result = await _sut.CreateAsync(NewCreateRequest(), _directorId, _ct);
 

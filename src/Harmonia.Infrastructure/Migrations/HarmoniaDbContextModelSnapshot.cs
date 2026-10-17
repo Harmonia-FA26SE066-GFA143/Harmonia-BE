@@ -291,7 +291,8 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("MassTypeId");
 
                     b.HasIndex("EventDate", "Time", "LocationId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[Status] <> 2");
 
                     b.ToTable("LiturgicalEvents");
                 });

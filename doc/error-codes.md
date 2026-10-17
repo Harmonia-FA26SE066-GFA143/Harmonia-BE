@@ -23,13 +23,14 @@ Validation dùng `.WithErrorCode(ErrorCodes.X)` của FluentValidation.
 ## Cách lỗi đi từ BE tới response (phương án A — đã chốt 2026-09-21)
 
 Error code là hợp đồng với FE — mọi response lỗi đều có `code`. Bên trong BE, lỗi đi
-tới response theo đúng một trong bốn đường:
+tới response theo đúng một trong năm đường:
 
 | Lỗi phát hiện ở đâu | Cách truyền | Ai trả response |
 |---|---|---|
 | Request sai định dạng / thiếu trường | FluentValidation `.WithErrorCode(...)` | Pipeline validation → 400 + `errors` |
 | Service kiểm tra, lỗi **lường trước được**: không tìm thấy, trùng, sai trạng thái giữa nhiều aggregate, cần query DB | `Result<T>.Failure(ErrorCodes.X)` | Controller map `code` → HTTP |
 | Entity bị gọi vi phạm luật của chính nó | **ném** `DomainException` (có `Code`) | `GlobalExceptionHandlingMiddleware` bắt → HTTP theo bảng dưới |
+| Hai request cùng qua một bước kiểm tra rồi cùng ghi (bấm hai lần), DB chặn bằng unique index / concurrency token | `DbUpdateConcurrencyException`, hoặc `DbUpdateException` do vi phạm unique | Middleware → 409 `CONFLICT`; FE tải lại dữ liệu rồi thử lại |
 | Sự cố không lường trước (bug, DB sập) | exception tự nhiên | Middleware → 500 `INTERNAL_ERROR`, không lộ message gốc ở Production |
 
 Quy tắc ngắn: **Service chủ động kiểm tra → `Result<T>`; luật trong entity → throw.**

@@ -1327,6 +1327,30 @@ public sealed class RepositoryTests : IDisposable
         Assert.Null(await new GenericRepository<Role>(verify).GetByIdAsync(id, _ct));
     }
 
+    // ---- LiturgicalEventRepository.ExistsBySlotAsync ----
+
+    [Fact]
+    public async Task CancelledEvent_FreesItsSlot_ForTheCheckAndTheUniqueIndex_Async()
+    {
+        var location = new WorshipLocation { Id = Guid.NewGuid(), Name = "Main church" };
+        var (date, time) = (new DateOnly(2026, 12, 25), new TimeOnly(8, 0));
+        LiturgicalEvent NewEvent(EventStatus status) =>
+            new() { Id = Guid.NewGuid(), EventDate = date, Time = time, LocationId = location.Id, Status = status };
+        await using (var seed = _db.NewContext())
+        {
+            seed.AddRange(location, NewEvent(EventStatus.Cancelled));
+            await seed.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var repository = new LiturgicalEventRepository(context);
+        Assert.False(await repository.ExistsBySlotAsync(date, time, location.Id, null, _ct));
+
+        context.Add(NewEvent(EventStatus.Draft));
+        await context.SaveChangesAsync(_ct);
+        Assert.True(await repository.ExistsBySlotAsync(date, time, location.Id, null, _ct));
+    }
+
     // ---- ServiceRosterRepository ----
 
     private sealed record RosterSeed(
