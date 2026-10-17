@@ -71,10 +71,6 @@ public static class ErrorStatusMap
 
         // 5. Liturgical calendar.
         [ErrorCodes.CalendarDayNotFound] = StatusCodes.Status404NotFound,
-        [ErrorCodes.CalendarFileRequired] = StatusCodes.Status400BadRequest,
-        [ErrorCodes.CalendarFileTypeNotAllowed] = StatusCodes.Status400BadRequest,
-        [ErrorCodes.CalendarFileTooLarge] = StatusCodes.Status413PayloadTooLarge,
-        [ErrorCodes.CalendarFileInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.LiturgicalEventNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.LiturgicalEventSlotTaken] = StatusCodes.Status409Conflict,
         [ErrorCodes.LiturgicalEventAlreadyPublished] = StatusCodes.Status409Conflict,

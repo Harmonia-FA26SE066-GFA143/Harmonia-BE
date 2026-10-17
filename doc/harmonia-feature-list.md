@@ -13,8 +13,8 @@ Hệ thống Harmonia gồm **12 feature**, bao phủ toàn bộ 54 function (FE
 | --- | --- | --- |
 | F1 | Xác thực & Tài khoản cá nhân | 4 |
 | F2 | Quản lý Người dùng & Phân quyền | 3 |
-| F3 | Quản lý Thành viên & Kỹ năng | 5 |
-| F4 | Lịch Phụng vụ theo Ngày | 4 |
+| F3 | Quản lý Thành viên & Kỹ năng | 7 |
+| F4 | Lịch Phụng vụ theo Ngày | 5 |
 | F5 | Thư viện Thánh nhạc | 6 |
 | F6 | Danh sách Bài hát cho Sự kiện (Song List) | 7 |
 | F7 | Lịch tập & Xác nhận Tham gia | 4 |
@@ -50,15 +50,18 @@ Hệ thống Harmonia gồm **12 feature**, bao phủ toàn bộ 54 function (FE
 | Khai báo kỹ năng mới (bè hát, nhạc cụ, hát solo, xướng đáp ca…) | CM | UC-03 / FE-03 |
 | Theo dõi trạng thái duyệt kỹ năng | CM | UC-03 / FE-04 |
 | Duyệt / từ chối kỹ năng thành viên khai báo | CD | UC-19 / FE-25 |
+| Quản lý ca đoàn: tạo, sửa, tắt ca đoàn | CD | D7 |
+| Xem thành viên, gán / rút ca viên khỏi ca đoàn (một ca viên thuộc được nhiều ca đoàn) | CD | D7 |
 
 ## F4. Lịch Phụng vụ theo Ngày
 
 | Function | Actor | Mã |
 | --- | --- | --- |
-| Xem lịch phụng vụ theo ngày (tên ngày lễ, bậc lễ, mùa phụng vụ lấy từ API lịch Công giáo) | PP | UC-12 / FE-15 |
+| Xem lịch phụng vụ theo ngày (tên ngày lễ, bậc lễ, mùa phụng vụ lấy từ Liturgical Calendar API; cha xứ đồng bộ theo năm, tên lễ tiếng Anh) | PP | UC-12 / FE-15 |
 | Tạo sự kiện cho từng ngày: giờ, loại lễ, nghi thức, địa điểm, yêu cầu đặc biệt (1 ngày có thể có nhiều sự kiện; mùa phụng vụ được gợi ý sẵn từ API) | PP | UC-12 / FE-16 |
 | Công bố từng sự kiện, hệ thống tự thông báo cho ca trưởng | PP | UC-12 → S-05 |
 | Xem các sự kiện và lịch tập sắp tới | CM | UC-04 / FE-05 |
+| Gán ca đoàn phục vụ sự kiện (một sự kiện có nhiều ca đoàn) | CD | D7 |
 
 ## F5. Thư viện Thánh nhạc
 
@@ -154,3 +157,4 @@ Hệ thống Harmonia gồm **12 feature**, bao phủ toàn bộ 54 function (FE
 - Hồ sơ ca viên do Admin quản lý (F2). Ca trưởng chỉ xem (F3) và xếp ca viên theo bài hát (F8). Quyết định ngày 2026-09-29.
 - Lịch phụng vụ làm theo ngày, không theo tuần; FE-16a (sao chép tuần trước) đã bỏ. Quyết định ngày 2026-09-30.
 - Không có vai trò Instrumentalist: người chơi nhạc cụ là Choir Member có kỹ năng nhạc cụ đã được duyệt (F3).
+- Nhiều ca đoàn (D7, 2026-10-17): ca trưởng quản lý mọi ca đoàn, không có ca trưởng riêng từng ca đoàn. Các chức năng ca đoàn chưa có mã UC / FE riêng.

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Security.Claims;
 using Harmonia.Application.Common.Models;
+using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Domain.Common;
 using Harmonia.Domain.Entities;
 using Harmonia.Infrastructure.ExternalServices;
@@ -144,5 +145,61 @@ public class ExternalServiceTests
         var result = await GenerateAsync(new StubHttpMessageHandler(status, body));
 
         Assert.Equal(ErrorCodes.ExternalAiFailed, result.Code);
+    }
+
+    // ---- LiturgicalCalendarApiClient ----
+
+    private static Task<Result<List<CalendarDayResult>>> GetYearAsync(
+        StubHttpMessageHandler handler, int year = 2026)
+    {
+        var client = new HttpClient(handler) { BaseAddress = new Uri("https://litcal.test/") };
+        return new LiturgicalCalendarApiClient(client, NullLogger<LiturgicalCalendarApiClient>.Instance)
+            .GetYearAsync(year, TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task LiturgicalCalendar_KeepsHighestGradePerDate_SkipsVigilsAndOtherYears_Async()
+    {
+        const string body = """
+            {"litcal":[
+              {"name":"Saint Sylvester I, Pope","date":"2025-12-31T00:00:00+00:00","grade":2,"liturgical_season":"CHRISTMAS"},
+              {"name":"Thursday of the 4th Week of Advent","date":"2026-12-24T00:00:00+00:00","grade":0,"liturgical_season":"ADVENT"},
+              {"name":"Christmas Vigil Mass","date":"2026-12-24T00:00:00+00:00","grade":7,"liturgical_season":"CHRISTMAS","is_vigil_mass":true},
+              {"name":"Christmas","date":"2026-12-25T00:00:00+00:00","grade":7,"liturgical_season":"CHRISTMAS"},
+              {"name":"Saint Stephen, The First Martyr","date":"2026-12-26T00:00:00+00:00","grade":4,"liturgical_season":"CHRISTMAS"},
+              {"name":"Good Friday","date":"2026-04-03T00:00:00+00:00","grade":7,"liturgical_season":"EASTER_TRIDUUM"},
+              {"name":"Saint Ignatius of Antioch","date":"2026-10-17T00:00:00+00:00","grade":3,"liturgical_season":"ORDINARY_TIME"},
+              {"name":"29th Sunday of Ordinary Time Vigil Mass","date":"2026-10-17T00:00:00+00:00","grade":5,"liturgical_season":"ORDINARY_TIME","is_vigil_mass":true}
+            ]}
+            """;
+        var handler = new StubHttpMessageHandler(HttpStatusCode.OK, body);
+
+        var result = await GetYearAsync(handler);
+
+        Assert.Equal(
+            [
+                (new DateOnly(2026, 4, 3), "Good Friday", (string?)"Solemnity", (string?)"Lent"),
+                (new DateOnly(2026, 10, 17), "Saint Ignatius of Antioch", "Obligatory Memorial", "OrdinaryTime"),
+                (new DateOnly(2026, 12, 24), "Thursday of the 4th Week of Advent", null, "Advent"),
+                (new DateOnly(2026, 12, 25), "Christmas", "Solemnity", "Christmas"),
+                (new DateOnly(2026, 12, 26), "Saint Stephen, The First Martyr", "Feast", "Christmas"),
+            ],
+            result.Value!.Select(d => (d.Date, d.CelebrationName, d.Rank, d.SeasonName)));
+        var request = handler.LastRequest!.RequestUri!;
+        Assert.Equal("/api/v5/calendar/2026", request.AbsolutePath);
+        Assert.Contains("year_type=CIVIL", request.Query);
+        Assert.Contains("ascension=SUNDAY", request.Query);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.ServiceUnavailable, "{}")]
+    [InlineData(HttpStatusCode.OK, "not json")]
+    [InlineData(HttpStatusCode.OK, """{"litcal":[]}""")]
+    public async Task LiturgicalCalendar_ErrorOrEmptyResponse_ReturnsExternalCalendarFailed_Async(
+        HttpStatusCode status, string body)
+    {
+        var result = await GetYearAsync(new StubHttpMessageHandler(status, body));
+
+        Assert.Equal(ErrorCodes.ExternalCalendarFailed, result.Code);
     }
 }

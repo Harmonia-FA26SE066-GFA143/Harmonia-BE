@@ -104,6 +104,12 @@ public static class DependencyInjection
             // Short on purpose: RosterService falls back to rules, so a slow model only delays the answer.
             client.Timeout = TimeSpan.FromSeconds(20);
         });
+        services.AddHttpClient<ILiturgicalCalendarClient, LiturgicalCalendarApiClient>(client =>
+        {
+            client.BaseAddress = new Uri("https://litcal.johnromanodorazio.com/");
+            // A full year with readings is a few hundred KB; the priest waits for it once per year.
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
         services.AddScoped<ILiturgicalDayRepository, LiturgicalDayRepository>();
         services.AddScoped<ILiturgicalEventRepository, LiturgicalEventRepository>();
         services.AddScoped<IRehearsalRepository, RehearsalRepository>();
@@ -122,7 +128,6 @@ public static class DependencyInjection
         services.AddSingleton<IEmailSender, BrevoEmailSender>();
         services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
         services.AddScoped<DataSeeder>();
-        services.AddSingleton<ICatholicCalendarParser, CatholicCalendarParser>();
 
         return services;
     }

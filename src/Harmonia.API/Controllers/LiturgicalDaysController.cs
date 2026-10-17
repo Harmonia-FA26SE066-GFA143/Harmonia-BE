@@ -1,4 +1,3 @@
-using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Domain.Common;
@@ -25,20 +24,11 @@ public class LiturgicalDaysController(ILiturgicalDayService liturgicalDayService
     public async Task<IActionResult> GetByDateAsync(DateOnly date, CancellationToken cancellationToken) =>
         ToActionResult(await liturgicalDayService.GetByDateAsync(date, cancellationToken));
 
+    /// <summary>Fetches a civil year from the Liturgical Calendar API and overwrites the cached days of that year.</summary>
     [Authorize(Roles = RoleNames.ParishPriest)]
-    [HttpPost("import")]
-    [Consumes("multipart/form-data")]
+    [HttpPost("sync")]
     [ProducesResponseType<int>(StatusCodes.Status200OK)]
-    public async Task<IActionResult> ImportAsync(IFormFile? file, CancellationToken cancellationToken)
-    {
-        if (file is null)
-        {
-            return ToActionResult(Result<int>.Failure(ErrorCodes.CalendarFileRequired));
-        }
-
-        await using var stream = file.OpenReadStream();
-
-        return ToActionResult(
-            await liturgicalDayService.ImportAsync(stream, file.FileName, file.Length, cancellationToken));
-    }
+    public async Task<IActionResult> SyncAsync(
+        [FromBody] SyncLiturgicalDaysRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await liturgicalDayService.SyncAsync(request, cancellationToken));
 }

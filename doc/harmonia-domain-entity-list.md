@@ -67,8 +67,8 @@ Written once here instead of repeated 47 times:
 
 ## C. Liturgical calendar
 
-**8. `LiturgicalDay`** — cached result of the external Catholic calendar API for one date (FE-15, D6)
-`date` DateOnly unique · `celebrationName` string(200) · `rank` string(50)? · `seasonName` string(50)? · `fetchedAt` DateTime · no FK — `LiturgicalEvent` is matched by `eventDate = date`
+**8. `LiturgicalDay`** — cached result of the external Catholic calendar API ([Liturgical Calendar API](https://litcal.johnromanodorazio.com/), General Roman Calendar) for one date (FE-15, D6)
+`date` DateOnly unique · `celebrationName` string(200) (English — the API has no Vietnamese) · `rank` string(50)? (Solemnity | Feast | Obligatory Memorial | Optional Memorial; null on a weekday) · `seasonName` string(50)? (Advent | Christmas | Lent | Easter | OrdinaryTime) · `fetchedAt` DateTime · no FK — `LiturgicalEvent` is matched by `eventDate = date`
 
 **9. `LiturgicalEvent`** — one Mass / ceremony / special event of a day (FE-16, D6) ***auditable***
 `eventDate` DateOnly · `liturgicalSeasonId` Guid? → LiturgicalSeason (pre-filled from `LiturgicalDay.seasonName`) · `time` TimeOnly · `massTypeId` Guid? → MassType · `ceremonyTypeId` Guid? → CeremonyType · `categoryId` Guid? → EventCategory · `locationId` Guid → WorshipLocation · `title` string(200)? · `specialRequirements` string(1000)? · `status` EventStatus · `publishedAt` DateTime? · unique `(eventDate, time, locationId)` (D3)
@@ -313,3 +313,4 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 - 2026-10-10: `NotificationType.SongListSubmitted` added — Parish Priests are notified when a song list is submitted for review (F6). Appended last, stored as int, no migration.
 - 2026-10-11: `ReportFormat` enum added (21 → 22) for report export (UC-34E); `ReportExport` is now in use, no column change, no migration.
 - 2026-10-17: D7 — several choirs. `Choir`, `ChoirMembership`, `LiturgicalEventChoir` added (44 → 47); `SongList`, `Rehearsal`, `PracticeAssignment` gain nullable `choirId`. Schema only, needs a migration; `SongList` unique `(eventId, version)` unchanged until song lists are split per choir.
+- 2026-10-17: `LiturgicalDay` is filled from the Liturgical Calendar API instead of an uploaded GCatholic.org `.ics` file. The priest syncs one civil year and that year's cached days are overwritten; names are English, Epiphany / Ascension / Corpus Christi are moved to Sunday as in Vietnam. No column change, no migration.

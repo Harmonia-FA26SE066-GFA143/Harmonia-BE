@@ -65,20 +65,17 @@ Kiểm đúng 20 mục dưới đây, không phát sinh thêm. Mỗi phát hiệ
 16. Chạy đúng lệnh này, không tự nghĩ pattern khác:
 
 ```
-    rg -n '[^\x00-\x7F]' --glob '*.cs' --glob '!**/CatholicCalendarParser.cs' --glob '!**/ReportExportColumns.cs' src | rg -v -P 'Application.Services.\w+Service\.cs:\d+:(?!.*(//|Log|Exception)).*"'
+    rg -n '[^\x00-\x7F]' --glob '*.cs' --glob '!**/ReportExportColumns.cs' src | rg -v -P 'Application.Services.\w+Service\.cs:\d+:(?!.*(//|Log|Exception)).*"'
     rg -n '[^\x00-\x7F]' src/Harmonia.API/.env.example src/Harmonia.API/appsettings*.json
 ```
 
-    Ngoại lệ 1 (chốt 2026-10-06): `Application/Services/CatholicCalendarParser.cs` —
-    emoji màu và tên mùa phụng vụ tiếng Việt ở đó là chuỗi để so khớp dữ liệu từ API lịch
-    Công giáo, không phải câu hiển thị cho người dùng.
-    Ngoại lệ 2 (chốt 2026-10-11): chuỗi `Title` / `Content` của `SendNotificationRequest`
+    Ngoại lệ 1 (chốt 2026-10-11): chuỗi `Title` / `Content` của `SendNotificationRequest`
     trong `Application/Services/*Service.cs` — thông báo hiển thị nguyên văn cho người dùng.
     Vế `rg -v -P` của lệnh đầu đã lọc sẵn loại này: nó bỏ dòng có chuỗi trong
     `Application/Services/*Service.cs`, trừ dòng chứa `//`, `Log` hoặc `Exception` — nên
     comment, log, exception tiếng Việt trong cùng file vẫn bị báo. Bộ lọc không phân biệt
     được chuỗi thông báo với chuỗi khác trong service; nghi ngờ thì chạy lại không có vế lọc.
-    Ngoại lệ 3 (chốt 2026-10-11): `Application/Services/ReportExportColumns.cs` — tên báo cáo và
+    Ngoại lệ 2 (chốt 2026-10-11): `Application/Services/ReportExportColumns.cs` — tên báo cáo và
     tiêu đề cột tiếng Việt của file xuất, đi thẳng tới Admin. Loại bằng `--glob` như ngoại lệ 1.
     Không mở rộng ngoại lệ sang chỗ khác.
 

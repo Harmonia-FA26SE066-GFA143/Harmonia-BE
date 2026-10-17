@@ -410,7 +410,7 @@ Chưa có kỹ năng nào → `[]`.
 ### `LiturgicalDayDto`
 
 ```json
-{ "date": "2026-12-25", "celebrationName": "Lễ Giáng Sinh", "rank": "Lễ trọng", "seasonName": "Giáng Sinh" }
+{ "date": "2026-12-25", "celebrationName": "Christmas", "rank": "Solemnity", "seasonName": "Christmas" }
 ```
 
 ### `LiturgicalEventDto`
@@ -440,7 +440,7 @@ Chưa có kỹ năng nào → `[]`.
 |---|---|---|---|---|
 | GET | `/api/liturgical-days?fromDate=&toDate=` · mọi role | — | 200 `LiturgicalDayDto[]` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`, `REPORT_DATE_RANGE_TOO_LARGE`) |
 | GET | `/api/liturgical-days/{date}` (`date` dạng `yyyy-MM-dd`) · mọi role | — | 200 `LiturgicalDayDto` | 404 `CALENDAR_DAY_NOT_FOUND` |
-| POST | `/api/liturgical-days/import` | `multipart/form-data`: `file` (.ics) | 200 số ngày mới thêm (`int`) | 400 `CALENDAR_FILE_REQUIRED`, `CALENDAR_FILE_TYPE_NOT_ALLOWED`, `CALENDAR_FILE_INVALID` · 413 `CALENDAR_FILE_TOO_LARGE` |
+| POST | `/api/liturgical-days/sync` | `{ "year": 2027 }` | 200 số ngày đã lưu (`int`) | 400 `VALIDATION_FAILED` · 502 `EXTERNAL_CALENDAR_FAILED` |
 | GET | `/api/liturgical-events?fromDate=&toDate=&status=&pageNumber=&pageSize=` · `ParishPriest`, `ChoirDirector` | — | 200 `PagedList<LiturgicalEventListItemDto>` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`) |
 | GET | `/api/liturgical-events/{id}` | — | 200 `LiturgicalEventDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
 | POST | `/api/liturgical-events` | `{ "eventDate", "time", "liturgicalSeasonId?", "massTypeId?", "ceremonyTypeId?", "categoryId?", "locationId", "title?", "specialRequirements?" }` | 200 `LiturgicalEventDto` | 400 `VALIDATION_FAILED` (`LITURGICAL_EVENT_TYPE_REQUIRED`), `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` · 404 `LOOKUP_NOT_FOUND` · 409 `LITURGICAL_EVENT_SLOT_TAKEN`, `LOOKUP_INACTIVE` |
@@ -457,14 +457,16 @@ Chưa có kỹ năng nào → `[]`.
 
 **Ngày phụng vụ (UC-12 / FE-15)**
 
-- `GET ?fromDate=&toDate=`: cả hai bắt buộc, tính cả hai đầu, tối đa 366 ngày. Trả các ngày đã import trong khoảng,
-  sắp theo ngày; ngày chưa import thì **không có trong mảng** (không báo lỗi). Dùng để hiện tên ngày trên lịch tháng.
+- `GET ?fromDate=&toDate=`: cả hai bắt buộc, tính cả hai đầu, tối đa 366 ngày. Trả các ngày đã đồng bộ trong khoảng,
+  sắp theo ngày; ngày chưa đồng bộ thì **không có trong mảng** (không báo lỗi). Dùng để hiện tên ngày trên lịch tháng.
 
-- Ngày phụng vụ là bản cache của lịch Công giáo, nạp bằng file `.ics`. Chỉ nhận đuôi `.ics`, tối đa **2 MB**;
-  server chỉ xét đuôi và dung lượng thật, bỏ qua `Content-Type`.
-- Import chỉ **thêm** ngày chưa có; ngày đã có giữ nguyên, không ghi đè. Kết quả là số ngày mới thêm (`0` nếu
-  file không có ngày nào mới). File không đọc được hoặc không có ngày nào → 400 `CALENDAR_FILE_INVALID`.
-- `rank`, `seasonName` có thể `null`.
+- Ngày phụng vụ là bản cache của [Liturgical Calendar API](https://litcal.johnromanodorazio.com/) (lịch Rôma chung).
+  `POST /sync` với `year` (năm dương lịch, 1970–9999) gọi API rồi **ghi đè** mọi ngày đã cache của năm đó; kết quả là
+  số ngày đã lưu (365 / 366). API lỗi hoặc quá 30 giây → 502 `EXTERNAL_CALENDAR_FAILED`, cache giữ nguyên.
+- API **không có tiếng Việt**: `celebrationName` là tên tiếng Anh. Hiển Linh, Thăng Thiên, Mình Máu Thánh Chúa đã dời
+  sang Chúa nhật như ở Việt Nam. Mỗi ngày chỉ giữ lễ có bậc cao nhất, bỏ thánh lễ vọng.
+- `rank`: `Solemnity` | `Feast` | `Obligatory Memorial` | `Optional Memorial`, `null` với ngày thường.
+  `seasonName`: `Advent` | `Christmas` | `Lent` | `Easter` | `OrdinaryTime` (Tam Nhật Vượt Qua tính vào `Lent`).
 
 **Sự kiện (UC-12 / FE-16)**
 

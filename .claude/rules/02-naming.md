@@ -80,8 +80,6 @@ móc vào chúng.
   Ngoại lệ: dữ liệu seed hiển thị cho người dùng viết tiếng Việt — `Name` trong `HasData` của
   `SkillCategoryConfiguration`, `Description` trong `SystemSettingKeys`, `FullName` của Admin đầu tiên
   trong `DataSeeder` (chốt 2026-10-17). Tên role và key của setting vẫn tiếng Anh — code so khớp theo chúng.
-  Riêng `CatholicCalendarParser.cs` được giữ emoji màu và tên mùa phụng vụ tiếng Việt — đó là
-  chuỗi để so khớp dữ liệu từ API lịch Công giáo, không phải câu hiển thị (chốt 2026-10-06).
 
 ## Domain
 

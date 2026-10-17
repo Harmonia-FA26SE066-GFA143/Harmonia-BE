@@ -151,10 +151,6 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | Mã | HTTP | Tiếng Việt |
 |---|---|---|
 | `CALENDAR_DAY_NOT_FOUND` | 404 | Không tìm thấy ngày phụng vụ |
-| `CALENDAR_FILE_REQUIRED` | 400 | Vui lòng chọn tệp lịch phụng vụ (.ics) |
-| `CALENDAR_FILE_TYPE_NOT_ALLOWED` | 400 | Chỉ hỗ trợ tệp lịch định dạng .ics |
-| `CALENDAR_FILE_TOO_LARGE` | 413 | Tệp lịch vượt quá dung lượng cho phép |
-| `CALENDAR_FILE_INVALID` | 400 | Tệp lịch không hợp lệ hoặc không có ngày phụng vụ nào |
 | `LITURGICAL_EVENT_NOT_FOUND` | 404 | Không tìm thấy sự kiện |
 | `LITURGICAL_EVENT_SLOT_TAKEN` | 409 | Đã có sự kiện khác vào giờ này tại địa điểm này |
 | `LITURGICAL_EVENT_ALREADY_PUBLISHED` | 409 | Sự kiện đã công bố, không thể sửa |
@@ -366,3 +362,6 @@ xem — trả 404, để không lộ sự tồn tại của bản ghi.
 - 2026-10-17: thêm mục 15 Ca đoàn (D7) — `CHOIR_NOT_FOUND`, `CHOIR_NAME_ALREADY_EXISTS`, `CHOIR_MEMBER_INVALID`
   cho API tạo ca đoàn và gán ca viên. Thêm `CHOIR_INACTIVE`, `CHOIR_MEMBERSHIP_NOT_FOUND` cho sửa/tắt ca đoàn, rút ca viên,
   gán ca đoàn vào sự kiện. Gán ca đoàn vào sự kiện dùng lại `LITURGICAL_EVENT_NOT_FOUND`, `_CANCELLED`, `_ALREADY_PASSED`.
+- 2026-10-17: lịch phụng vụ lấy từ Liturgical Calendar API thay cho file .ics của GCatholic.org — bỏ
+  `CALENDAR_FILE_REQUIRED`, `CALENDAR_FILE_TYPE_NOT_ALLOWED`, `CALENDAR_FILE_TOO_LARGE`, `CALENDAR_FILE_INVALID`;
+  `POST /api/liturgical-days/sync` trả `EXTERNAL_CALENDAR_FAILED` (502) khi API lỗi.

@@ -7,7 +7,6 @@ using Harmonia.Domain.Common;
 using Harmonia.Domain.Entities;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,13 +15,9 @@ namespace Harmonia.Application.Services;
 
 public class LiturgicalDayService(
     ILiturgicalDayRepository liturgicalDayRepository,
-    ICatholicCalendarParser calendarParser,
+    ILiturgicalCalendarClient calendarClient,
     IMapper mapper) : ILiturgicalDayService
 {
-    private const string AllowedExtension = ".ics";
-
-    private const long MaxFileSizeBytes = 2 * 1024 * 1024;
-
     public async Task<Result<LiturgicalDayDto>> GetByDateAsync(DateOnly date, CancellationToken cancellationToken)
     {
         var liturgicalDay = await liturgicalDayRepository.GetByDateAsync(date, cancellationToken);
@@ -40,61 +35,37 @@ public class LiturgicalDayService(
         return Result<List<LiturgicalDayDto>>.Success(mapper.Map<List<LiturgicalDayDto>>(days));
     }
 
-    public async Task<Result<int>> ImportAsync(
-        Stream content,
-        string fileName,
-        long length,
-        CancellationToken cancellationToken)
+    public async Task<Result<int>> SyncAsync(SyncLiturgicalDaysRequest request, CancellationToken cancellationToken)
     {
-        // Whitelist the extension and cap the size on the server; the client's Content-Type is never trusted.
-        if (length <= 0)
+        var fetched = await calendarClient.GetYearAsync(request.Year, cancellationToken);
+        if (!fetched.IsSuccess)
         {
-            return Result<int>.Failure(ErrorCodes.CalendarFileRequired);
+            return Result<int>.Failure(fetched.Code!);
         }
 
-        if (!string.Equals(Path.GetExtension(fileName), AllowedExtension, StringComparison.OrdinalIgnoreCase))
-        {
-            return Result<int>.Failure(ErrorCodes.CalendarFileTypeNotAllowed);
-        }
-
-        if (length > MaxFileSizeBytes)
-        {
-            return Result<int>.Failure(ErrorCodes.CalendarFileTooLarge);
-        }
-
-        var parsed = await calendarParser.ParseAsync(content, cancellationToken);
-        if (!parsed.IsSuccess)
-        {
-            return Result<int>.Failure(parsed.Code!);
-        }
-
+        // Overwrite rather than skip: the cache must hold one source, and events match days by date only.
+        var cached = (await liturgicalDayRepository.GetYearForUpdateAsync(request.Year, cancellationToken))
+            .ToDictionary(x => x.Date);
         var fetchedAt = DateTime.UtcNow;
         var newDays = new List<LiturgicalDay>();
 
-        // A yearly feed can spill into the neighbouring year, so check the cache year by year.
-        foreach (var yearGroup in parsed.Value!.GroupBy(x => x.Date.Year))
+        foreach (var day in fetched.Value!)
         {
-            var existingDates = await liturgicalDayRepository.GetCachedDatesInYearAsync(yearGroup.Key, cancellationToken);
+            if (!cached.TryGetValue(day.Date, out var row))
+            {
+                row = new LiturgicalDay { Id = Guid.NewGuid(), Date = day.Date };
+                newDays.Add(row);
+            }
 
-            newDays.AddRange(yearGroup
-                .Where(x => !existingDates.Contains(x.Date))
-                .Select(x => new LiturgicalDay
-                {
-                    Id = Guid.NewGuid(),
-                    Date = x.Date,
-                    CelebrationName = x.CelebrationName,
-                    Rank = x.Rank,
-                    SeasonName = x.SeasonName,
-                    FetchedAt = fetchedAt,
-                }));
+            row.CelebrationName = day.CelebrationName;
+            row.Rank = day.Rank;
+            row.SeasonName = day.SeasonName;
+            row.FetchedAt = fetchedAt;
         }
 
-        if (newDays.Count > 0)
-        {
-            await liturgicalDayRepository.AddRangeAsync(newDays, cancellationToken);
-            await liturgicalDayRepository.SaveChangesAsync(cancellationToken);
-        }
+        await liturgicalDayRepository.AddRangeAsync(newDays, cancellationToken);
+        await liturgicalDayRepository.SaveChangesAsync(cancellationToken);
 
-        return Result<int>.Success(newDays.Count);
+        return Result<int>.Success(fetched.Value.Count);
     }
 }

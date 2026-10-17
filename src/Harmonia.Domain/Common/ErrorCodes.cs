@@ -120,14 +120,6 @@ public static class ErrorCodes
     // 5. Liturgical calendar.
     public const string CalendarDayNotFound = "CALENDAR_DAY_NOT_FOUND";
 
-    public const string CalendarFileRequired = "CALENDAR_FILE_REQUIRED";
-
-    public const string CalendarFileTypeNotAllowed = "CALENDAR_FILE_TYPE_NOT_ALLOWED";
-
-    public const string CalendarFileTooLarge = "CALENDAR_FILE_TOO_LARGE";
-
-    public const string CalendarFileInvalid = "CALENDAR_FILE_INVALID";
-
     public const string LiturgicalEventNotFound = "LITURGICAL_EVENT_NOT_FOUND";
 
     public const string LiturgicalEventSlotTaken = "LITURGICAL_EVENT_SLOT_TAKEN";

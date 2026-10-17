@@ -22,17 +22,14 @@ public class LiturgicalDayRepository(HarmoniaDbContext dbContext)
             .OrderBy(x => x.Date)
             .ToListAsync(cancellationToken);
 
-    public async Task<HashSet<DateOnly>> GetCachedDatesInYearAsync(int year, CancellationToken cancellationToken)
+    public Task<List<LiturgicalDay>> GetYearForUpdateAsync(int year, CancellationToken cancellationToken)
     {
         var start = new DateOnly(year, 1, 1);
         var end = new DateOnly(year, 12, 31);
 
-        var dates = await DbContext.LiturgicalDays
+        return DbContext.LiturgicalDays
             .Where(x => x.Date >= start && x.Date <= end)
-            .Select(x => x.Date)
             .ToListAsync(cancellationToken);
-
-        return dates.ToHashSet();
     }
 
     public async Task AddRangeAsync(IEnumerable<LiturgicalDay> liturgicalDays, CancellationToken cancellationToken) =>
