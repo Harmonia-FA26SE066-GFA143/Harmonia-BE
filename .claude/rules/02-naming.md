@@ -1,11 +1,14 @@
 # Từ điển nghiệp vụ — dùng đúng tên, không tự đặt từ đồng nghĩa
 
-Nguồn chuẩn: `doc/harmonia-domain-entity-list.md` (44 entity, 22 enum).
+Nguồn chuẩn: `doc/harmonia-domain-entity-list.md` (47 entity, 22 enum).
 Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 
 | Tiếng Việt | Tên trong code |
 |---|---|
 | tài khoản | `User` |
+| ca đoàn | `Choir` |
+| ca viên thuộc ca đoàn | `ChoirMembership` |
+| ca đoàn phục vụ sự kiện | `LiturgicalEventChoir` |
 | token đặt lại mật khẩu | `PasswordResetToken` |
 | vai trò | `Role` — 4 giá trị: Admin, ParishPriest, ChoirDirector, ChoirMember |
 | cha xứ / ban phụng vụ | `ParishPriest` |
@@ -47,8 +50,7 @@ Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 | cấu hình hệ thống | `SystemSetting` |
 | lịch sử hoạt động | `AuditLog` |
 
-**Không có entity `Choir`.** Hệ thống phục vụ một ca đoàn của một giáo xứ, chỉ có nhiều
-`WorshipLocation`. Đừng viết code dựa trên giả định nhiều ca đoàn.
+**Nhiều ca đoàn (D7, chốt 2026-10-17):** ca viên gia nhập nhiều `Choir` qua `ChoirMembership`, sự kiện có nhiều `Choir` qua `LiturgicalEventChoir`. `ChoirDirector` quản lý mọi ca đoàn — không có ca trưởng riêng từng ca đoàn. Hiện mới có schema, service chưa lọc theo ca đoàn.
 
 `LiturgicalEvent`, `MemberProfile`, `Song`, `Skill` là bốn hub — hầu hết entity khác
 móc vào chúng.

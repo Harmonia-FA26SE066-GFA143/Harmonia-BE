@@ -1,6 +1,6 @@
 # Harmonia – Domain Entity List & Attributes (for ERD, Report 3/4)
 
-44 entities derived from FE-01→FE-54 (`claude/functional-requirements-by-actor.md`), the canonical use cases (`claude/use-case-list.md`) and the daily liturgical program model (D6). Diagram: `harmonia-erd.mmd`.
+47 entities derived from FE-01→FE-54 (`claude/functional-requirements-by-actor.md`), the canonical use cases (`claude/use-case-list.md`) and the daily liturgical program model (D6). Diagram: `harmonia-erd.mmd`.
 
 Conceptual/logical level: attribute names, types and constraints. No indexes, no migration syntax.
 
@@ -14,10 +14,11 @@ Conceptual/logical level: attribute names, types and constraints. No indexes, no
 | D4 | **A rejected song list is superseded by a new version**; old versions stay as history. | 2026-09-20 | `LiturgicalEvent` 1—n `SongList`, current = highest `version` |
 | D5 | **Admin configures FE-49/FE-50 categories at runtime.** | 2026-09-20 | 9 lookup entities stay entities, not enums |
 | D6 | **Liturgical program is planned by day, not by week.** The liturgical day (celebration name, rank, season) comes from an external Catholic calendar API; the priest creates the Masses/events of each day himself; each event is published on its own. Admin still configures `LiturgicalSeason` (FE-50) — the API season only pre-fills the event's season. | 2026-09-30 | `LiturgicalWeek` removed, `LiturgicalDay` (API cache) added; publish moves to `LiturgicalEvent`; `DirectorNote.weekId` → `noteDate` |
+| D7 | **Several choirs.** A member can join several choirs and an event can be served by several choirs. The Choir Director manages every choir — no per-choir director. Schema only for now: services do not yet filter by choir. | 2026-10-17 | `Choir`, `ChoirMembership`, `LiturgicalEventChoir` added; `SongList`, `Rehearsal`, `PracticeAssignment` gain `choirId?` |
 
 ## Attribute conventions
 
-Written once here instead of repeated 43 times:
+Written once here instead of repeated 47 times:
 
 - **`BaseEntity`** — every entity has `id` (Guid, PK). Swap to `int` if the team prefers; nothing else changes.
 - **`BaseAuditableEntity`** — entities marked ***auditable*** also carry `createdAt`, `createdBy`, `updatedAt`, `updatedBy`. Matches `Harmonia.Domain/Common/`.
@@ -45,6 +46,12 @@ Written once here instead of repeated 43 times:
 **43. `PasswordResetToken`** — one-time password reset link sent by forgot-password (S-03)
 `userId` Guid → User · `tokenHash` string(500) unique · `expiresAt` DateTime (issued + 1 hour) · `usedAt` DateTime?
 
+**45. `Choir`** — one choir of the parish (D7) ***auditable***
+`name` string(100) unique · `description` string(500)? · `isActive` bool
+
+**46. `ChoirMembership`** — a member belongs to a choir (D7)
+`memberId` Guid → MemberProfile · `choirId` Guid → Choir · `joinedDate` DateOnly · `isActive` bool (false = left the choir) · unique `(memberId, choirId)`
+
 ⚪ `MemberProfile`: merge into `User` unless member records without a login are needed.
 
 ## B. Skills
@@ -65,6 +72,9 @@ Written once here instead of repeated 43 times:
 
 **9. `LiturgicalEvent`** — one Mass / ceremony / special event of a day (FE-16, D6) ***auditable***
 `eventDate` DateOnly · `liturgicalSeasonId` Guid? → LiturgicalSeason (pre-filled from `LiturgicalDay.seasonName`) · `time` TimeOnly · `massTypeId` Guid? → MassType · `ceremonyTypeId` Guid? → CeremonyType · `categoryId` Guid? → EventCategory · `locationId` Guid → WorshipLocation · `title` string(200)? · `specialRequirements` string(1000)? · `status` EventStatus · `publishedAt` DateTime? · unique `(eventDate, time, locationId)` (D3)
+
+**47. `LiturgicalEventChoir`** — a choir serving an event (D7)
+`eventId` Guid → LiturgicalEvent · `choirId` Guid → Choir · unique `(eventId, choirId)`
 
 **10. `LiturgicalSeason`** — Advent, Lent, Ordinary Time… (FE-50)
 `name` string(100) · `startDate` DateOnly · `endDate` DateOnly · `colorHex` string(7)? · `isActive` bool
@@ -100,7 +110,7 @@ Written once here instead of repeated 43 times:
 ## E. Song list & approval
 
 **22. `SongList`** — song list of one event, one row per version (D4) ***auditable***
-`eventId` Guid → LiturgicalEvent · `version` int (from 1) · `status` SongListStatus · `proposedBy` Guid → User · `previousVersionId` Guid? → SongList · `submittedAt` DateTime? · `decidedAt` DateTime? · unique `(eventId, version)`
+`eventId` Guid → LiturgicalEvent · `version` int (from 1) · `status` SongListStatus · `proposedBy` Guid → User · `previousVersionId` Guid? → SongList · `submittedAt` DateTime? · `decidedAt` DateTime? · `choirId` Guid? → Choir (D7) · unique `(eventId, version)`
 
 **23. `SongListItem`** — one song at one liturgical slot
 `songListId` Guid → SongList · `songId` Guid → Song · `slotId` Guid → LiturgicalSlot · `displayOrder` int · `note` string(500)?
@@ -139,7 +149,7 @@ Written once here instead of repeated 43 times:
 ## G. Rehearsal & practice
 
 **31. `Rehearsal`** — rehearsal session (FE-26) ***auditable***
-`eventId` Guid? → LiturgicalEvent · `locationId` Guid? → WorshipLocation · `startTime` DateTime · `endTime` DateTime · `note` string(500)?
+`eventId` Guid? → LiturgicalEvent · `locationId` Guid? → WorshipLocation · `startTime` DateTime · `endTime` DateTime · `note` string(500)? · `choirId` Guid? → Choir (D7)
 
 **32. `RehearsalAttendance`** — attendance record (FE-45/46)
 `rehearsalId` Guid → Rehearsal · `memberId` Guid → MemberProfile · `status` AttendanceStatus · `checkedBy` Guid → User · `checkedAt` DateTime · unique `(rehearsalId, memberId)`
@@ -149,7 +159,7 @@ Written once here instead of repeated 43 times:
 Not a `SongList`: no version, no review, no liturgical slot. The director edits it freely.
 
 **33. `PracticeAssignment`** — practice task from the director (FE-41) ***auditable***
-`eventId` Guid? → LiturgicalEvent · `songId` Guid? → Song · `materialId` Guid? → MusicMaterial · `title` string(200) · `instruction` string(1000)? · `scope` AssignmentScope · `dueDate` DateTime
+`eventId` Guid? → LiturgicalEvent · `songId` Guid? → Song · `materialId` Guid? → MusicMaterial · `title` string(200) · `instruction` string(1000)? · `scope` AssignmentScope · `dueDate` DateTime · `choirId` Guid? → Choir (D7)
 
 **34. ⚪ `PracticeAssignmentTarget`** — resolves scope All / SkillGroup / Individual
 `practiceAssignmentId` Guid → PracticeAssignment · `targetType` TargetType · `memberId` Guid? → MemberProfile · `skillId` Guid? → Skill
@@ -231,6 +241,11 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 - `User` 1 — n `RefreshToken`
 - `User` 1 — n `PasswordResetToken`
 
+**Choirs** *(D7)*
+- `MemberProfile` 1 — n `ChoirMembership` n — 1 `Choir`
+- `LiturgicalEvent` 1 — n `LiturgicalEventChoir` n — 1 `Choir`
+- `Choir` 1 — n `SongList` / `Rehearsal` / `PracticeAssignment` *(optional)*
+
 **Skills**
 - `SkillCategory` 1 — n `Skill`
 - `MemberProfile` 1 — n `MemberSkill` n — 1 `Skill`
@@ -276,7 +291,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 ## Reading the diagram
 
 - **Hubs** (most edges, put them in the middle): `LiturgicalEvent`, `MemberProfile`, `Song`, `Skill`.
-- **Associative** (n–n resolvers): `MemberSkill`, `SongClassification`, `SongVocalRequirement`, `SongInstrumentRequirement`, `MaterialLearningProgress`, `SongPersonnelRequirement`, `RosterAssignment`, `PracticeAssignmentTarget`, `NotificationRecipient`.
+- **Associative** (n–n resolvers): `MemberSkill`, `SongClassification`, `SongVocalRequirement`, `SongInstrumentRequirement`, `MaterialLearningProgress`, `SongPersonnelRequirement`, `RosterAssignment`, `PracticeAssignmentTarget`, `NotificationRecipient`, `ChoirMembership`, `LiturgicalEventChoir`.
 - **Lookup** (Admin-configured per D5, leaves): `Role`, `SkillCategory`, `LiturgicalSeason`, `MassType`, `CeremonyType`, `EventCategory`, `WorshipLocation`, `SongTheme`, `LiturgicalSlot`.
 - **Standalone** (no FK into the core): `SystemSetting`, `AuditLog`, `ReportExport`.
 
@@ -297,3 +312,4 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 - 2026-10-10: `RehearsalSong` added — the songs a rehearsal will practise (43 → 44).
 - 2026-10-10: `NotificationType.SongListSubmitted` added — Parish Priests are notified when a song list is submitted for review (F6). Appended last, stored as int, no migration.
 - 2026-10-11: `ReportFormat` enum added (21 → 22) for report export (UC-34E); `ReportExport` is now in use, no column change, no migration.
+- 2026-10-17: D7 — several choirs. `Choir`, `ChoirMembership`, `LiturgicalEventChoir` added (44 → 47); `SongList`, `Rehearsal`, `PracticeAssignment` gain nullable `choirId`. Schema only, needs a migration; `SongList` unique `(eventId, version)` unchanged until song lists are split per choir.

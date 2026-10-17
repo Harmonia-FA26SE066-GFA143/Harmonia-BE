@@ -55,14 +55,6 @@ public class EntityConventionTests
     }
 
     [Fact]
-    public void NoChoirEntityOrChoirId()
-    {
-        // The system serves exactly one choir.
-        Assert.DoesNotContain(Entities, t => t.Name == "Choir");
-        Assert.DoesNotContain(Entities.SelectMany(t => t.GetProperties()), p => p.Name == "ChoirId");
-    }
-
-    [Fact]
     public void Enums_HaveNoEnumSuffix()
     {
         var offenders = typeof(BaseEntity).Assembly.GetTypes()

@@ -38,6 +38,8 @@ public class LiturgicalEvent : BaseAuditableEntity
 
     public WorshipLocation Location { get; set; } = null!;
 
+    public ICollection<LiturgicalEventChoir> EventChoirs { get; set; } = [];
+
     public ICollection<SongList> SongLists { get; set; } = [];
 
     public ICollection<EventParticipation> EventParticipations { get; set; } = [];

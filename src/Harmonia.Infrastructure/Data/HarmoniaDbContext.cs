@@ -23,6 +23,12 @@ public class HarmoniaDbContext(DbContextOptions<HarmoniaDbContext> options) : Db
 
     public DbSet<MemberSkill> MemberSkills => Set<MemberSkill>();
 
+    public DbSet<Choir> Choirs => Set<Choir>();
+
+    public DbSet<ChoirMembership> ChoirMemberships => Set<ChoirMembership>();
+
+    public DbSet<LiturgicalEventChoir> LiturgicalEventChoirs => Set<LiturgicalEventChoir>();
+
     public DbSet<LiturgicalDay> LiturgicalDays => Set<LiturgicalDay>();
 
     public DbSet<LiturgicalEvent> LiturgicalEvents => Set<LiturgicalEvent>();

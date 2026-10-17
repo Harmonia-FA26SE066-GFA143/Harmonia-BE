@@ -19,11 +19,15 @@ public class PracticeAssignment : BaseAuditableEntity
 
     public DateTime DueDate { get; set; }
 
+    public Guid? ChoirId { get; set; }
+
     public LiturgicalEvent? LiturgicalEvent { get; set; }
 
     public Song? Song { get; set; }
 
     public MusicMaterial? Material { get; set; }
+
+    public Choir? Choir { get; set; }
 
     public ICollection<PracticeAssignmentTarget> Targets { get; set; } = [];
 

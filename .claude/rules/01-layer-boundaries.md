@@ -13,6 +13,7 @@
 | nghi thức (hôn phối, an táng...) | `CeremonyType` |
 | nơi cử hành | `WorshipLocation` |
 | vị trí bài trong lễ | `LiturgicalSlot` |
+| ca đoàn | `Choir` · thành viên ca đoàn `ChoirMembership` · ca đoàn phục vụ sự kiện `LiturgicalEventChoir` |
 | bài hát | `Song` |
 | tư liệu bài hát (bản nhạc, lời, audio mẫu) | `MusicMaterial` + enum `MaterialType` |
 | danh sách bài hát | `SongList` — mỗi phiên bản một dòng |
@@ -30,12 +31,12 @@
 | thông báo | `Notification` + `NotificationRecipient` |
 | kỹ năng | `Skill` · nhóm `SkillCategory` · kỹ năng của ca viên `MemberSkill` |
 
-**Hệ thống phục vụ MỘT ca đoàn.** Không có entity `Choir`, không có `ChoirId` ở đâu cả.
+**Nhiều ca đoàn (D7, chốt 2026-10-17):** ca viên gia nhập nhiều `Choir` qua `ChoirMembership`, sự kiện có nhiều `Choir` qua `LiturgicalEventChoir`. `ChoirDirector` quản lý mọi ca đoàn — không có ca trưởng riêng từng ca đoàn. Hiện mới có schema, service chưa lọc theo ca đoàn.
 
 `LiturgicalEvent` là entity trung tâm — lịch tập, danh sách bài hát, phân công phục vụ
 và xác nhận tham gia đều móc vào nó. Ba hub còn lại: `MemberProfile`, `Song`, `Skill`.
 
-Nguồn chuẩn đầy đủ 44 entity + 22 enum: `doc/harmonia-domain-entity-list.md`.
+Nguồn chuẩn đầy đủ 47 entity + 22 enum: `doc/harmonia-domain-entity-list.md`.
 Bảng trên chỉ là lối vào nhanh. Gặp thuật ngữ chưa có ở cả hai chỗ: hỏi, đừng tự dịch.
 
 ## Quy ước tên khác

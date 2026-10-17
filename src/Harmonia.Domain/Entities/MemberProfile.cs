@@ -15,6 +15,8 @@ public class MemberProfile : BaseAuditableEntity
 
     public User User { get; set; } = null!;
 
+    public ICollection<ChoirMembership> ChoirMemberships { get; set; } = [];
+
     public ICollection<MemberSkill> MemberSkills { get; set; } = [];
 
     public ICollection<MaterialLearningProgress> LearningProgresses { get; set; } = [];

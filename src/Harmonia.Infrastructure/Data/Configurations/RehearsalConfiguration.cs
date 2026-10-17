@@ -19,5 +19,10 @@ public class RehearsalConfiguration : IEntityTypeConfiguration<Rehearsal>
             .WithMany(x => x.Rehearsals)
             .HasForeignKey(x => x.LocationId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasOne(x => x.Choir)
+            .WithMany(x => x.Rehearsals)
+            .HasForeignKey(x => x.ChoirId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
