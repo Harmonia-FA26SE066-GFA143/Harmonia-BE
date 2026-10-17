@@ -184,6 +184,13 @@ public static class ErrorStatusMap
         [ErrorCodes.ExternalStorageFailed] = StatusCodes.Status502BadGateway,
         [ErrorCodes.ExternalAiFailed] = StatusCodes.Status502BadGateway,
         [ErrorCodes.ExternalCalendarFailed] = StatusCodes.Status502BadGateway,
+
+        // 15. Choir.
+        [ErrorCodes.ChoirNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.ChoirNameAlreadyExists] = StatusCodes.Status409Conflict,
+        [ErrorCodes.ChoirMemberInvalid] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.ChoirInactive] = StatusCodes.Status409Conflict,
+        [ErrorCodes.ChoirMembershipNotFound] = StatusCodes.Status404NotFound,
     };
 
     public static int StatusFor(string code, int fallback) => StatusByCode.GetValueOrDefault(code, fallback);

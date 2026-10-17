@@ -301,6 +301,16 @@ lọc theo cặp `(NotificationId, UserId)` nên "không tồn tại" và "của
 | `EXTERNAL_AI_FAILED` | 502 | Không tạo được gợi ý phân công, vui lòng thử lại |
 | `EXTERNAL_CALENDAR_FAILED` | 502 | Không lấy được lịch phụng vụ, vui lòng thử lại |
 
+## 15. Ca đoàn
+
+| Mã | HTTP | Tiếng Việt |
+|---|---|---|
+| `CHOIR_NOT_FOUND` | 404 | Không tìm thấy ca đoàn |
+| `CHOIR_NAME_ALREADY_EXISTS` | 409 | Tên ca đoàn đã tồn tại |
+| `CHOIR_MEMBER_INVALID` | 400 | Ca viên không tồn tại hoặc không còn hoạt động |
+| `CHOIR_INACTIVE` | 409 | Ca đoàn đã ngừng hoạt động, không thêm ca viên hoặc sự kiện mới được |
+| `CHOIR_MEMBERSHIP_NOT_FOUND` | 404 | Ca viên không thuộc ca đoàn này |
+
 ---
 
 ## Quy ước chọn HTTP status
@@ -353,3 +363,6 @@ xem — trả 404, để không lộ sự tồn tại của bản ghi.
 - 2026-10-11: thêm `SETTING_VALUE_OUT_OF_RANGE` (UC-33 / FE-51).
 - 2026-10-13: đổi tiền tố `PARTICIPATION_*` thành `EVENT_PARTICIPATION_*` cho 5 mã (`_NOT_FOUND`, `_ALREADY_REQUESTED`,
   `_ALREADY_RESPONDED`, `_CLOSED`, `_NOT_INVITED`) theo từ điển `EventParticipation`. FE cần đổi khoá trong bảng dịch.
+- 2026-10-17: thêm mục 15 Ca đoàn (D7) — `CHOIR_NOT_FOUND`, `CHOIR_NAME_ALREADY_EXISTS`, `CHOIR_MEMBER_INVALID`
+  cho API tạo ca đoàn và gán ca viên. Thêm `CHOIR_INACTIVE`, `CHOIR_MEMBERSHIP_NOT_FOUND` cho sửa/tắt ca đoàn, rút ca viên,
+  gán ca đoàn vào sự kiện. Gán ca đoàn vào sự kiện dùng lại `LITURGICAL_EVENT_NOT_FOUND`, `_CANCELLED`, `_ALREADY_PASSED`.

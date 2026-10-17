@@ -330,4 +330,15 @@ public static class ErrorCodes
     public const string ExternalAiFailed = "EXTERNAL_AI_FAILED";
 
     public const string ExternalCalendarFailed = "EXTERNAL_CALENDAR_FAILED";
+
+    // 15. Choir.
+    public const string ChoirNotFound = "CHOIR_NOT_FOUND";
+
+    public const string ChoirNameAlreadyExists = "CHOIR_NAME_ALREADY_EXISTS";
+
+    public const string ChoirMemberInvalid = "CHOIR_MEMBER_INVALID";
+
+    public const string ChoirInactive = "CHOIR_INACTIVE";
+
+    public const string ChoirMembershipNotFound = "CHOIR_MEMBERSHIP_NOT_FOUND";
 }

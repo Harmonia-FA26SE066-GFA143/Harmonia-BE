@@ -14,7 +14,8 @@ namespace Harmonia.API.Controllers;
 [Authorize]
 public class LiturgicalEventsController(
     ILiturgicalEventService liturgicalEventService,
-    IEventPreparationService eventPreparationService) : ApiControllerBase
+    IEventPreparationService eventPreparationService,
+    IChoirService choirService) : ApiControllerBase
 {
     /// <summary>Draft events are listed for the priest only (B23).</summary>
     [HttpGet]
@@ -68,4 +69,19 @@ public class LiturgicalEventsController(
     [ProducesResponseType<EventPreparationStatusDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPreparationStatusAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await eventPreparationService.GetStatusAsync(id, cancellationToken));
+
+    /// <summary>Choirs serving the event (D7).</summary>
+    [HttpGet("{id:guid}/choirs")]
+    [Authorize(Roles = RoleNames.ChoirDirector)]
+    [ProducesResponseType<List<ChoirDto>>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetChoirsAsync(Guid id, CancellationToken cancellationToken) =>
+        ToActionResult(await choirService.GetEventChoirsAsync(id, cancellationToken));
+
+    /// <summary>Replaces the choirs serving the event (D7).</summary>
+    [HttpPut("{id:guid}/choirs")]
+    [Authorize(Roles = RoleNames.ChoirDirector)]
+    [ProducesResponseType<List<ChoirDto>>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdateChoirsAsync(
+        Guid id, [FromBody] UpdateEventChoirsRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await choirService.UpdateEventChoirsAsync(id, request, cancellationToken));
 }

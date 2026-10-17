@@ -38,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<ISystemSettingService, SystemSettingService>();
         services.AddScoped<IRehearsalService, RehearsalService>();
         services.AddScoped<IEventParticipationService, EventParticipationService>();
+        services.AddScoped<IChoirService, ChoirService>();
 
         return services;
     }
