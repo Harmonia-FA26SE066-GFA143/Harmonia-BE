@@ -38,6 +38,8 @@ public class CloudinaryFileStorageService : IFileStorageService
         // A raw file's id must carry the extension itself, so it is already there.
         var isRaw = resourceType == ResourceType.Raw;
         var cloudinaryId = $"{RootFolder}/{folder}/{Guid.NewGuid()}{(isRaw ? extension : string.Empty)}";
+        // Dynamic-folder accounts ignore slashes in PublicId when placing assets in the Media Library.
+        var assetFolder = $"{RootFolder}/{folder}";
         // The client's original name never reaches Cloudinary; PublicId above decides the stored name.
         var file = new FileDescription("upload" + extension, content);
         var type = isPrivate ? PrivateDeliveryType : PublicDeliveryType;
@@ -47,14 +49,14 @@ public class CloudinaryFileStorageService : IFileStorageService
             UploadResult result = resourceType switch
             {
                 ResourceType.Video => await _cloudinary.UploadAsync(
-                    new VideoUploadParams { File = file, PublicId = cloudinaryId, Type = type, Overwrite = false },
+                    new VideoUploadParams { File = file, PublicId = cloudinaryId, AssetFolder = assetFolder, Type = type, Overwrite = false },
                     cancellationToken),
                 ResourceType.Raw => await _cloudinary.UploadAsync(
-                    new RawUploadParams { File = file, PublicId = cloudinaryId, Type = type, Overwrite = false },
+                    new RawUploadParams { File = file, PublicId = cloudinaryId, AssetFolder = assetFolder, Type = type, Overwrite = false },
                     "raw",
                     cancellationToken),
                 _ => await _cloudinary.UploadAsync(
-                    new ImageUploadParams { File = file, PublicId = cloudinaryId, Type = type, Overwrite = false },
+                    new ImageUploadParams { File = file, PublicId = cloudinaryId, AssetFolder = assetFolder, Type = type, Overwrite = false },
                     cancellationToken),
             };
 
