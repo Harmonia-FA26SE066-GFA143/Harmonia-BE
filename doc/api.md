@@ -770,6 +770,45 @@ dữ liệu trong khoảng lọc vẫn hiện với các số bằng 0.
 
 ---
 
+## 4f. Choirs — `api/choirs` · ca đoàn phục vụ sự kiện `api/liturgical-events/{id}/choirs` · role `ChoirDirector` (D7)
+
+Một giáo xứ có nhiều ca đoàn; ca viên gia nhập được nhiều ca đoàn, một sự kiện có nhiều ca đoàn phục vụ.
+Ca trưởng quản lý mọi ca đoàn — không có ca trưởng riêng từng ca đoàn.
+
+### `ChoirDto` / `ChoirMemberDto`
+
+```json
+{ "id": "guid", "name": "Ca đoàn Cêcilia", "description": "Ca đoàn giới trẻ", "isActive": true }
+```
+
+```json
+{ "memberId": "guid", "userId": "guid", "fullName": "Nguyễn Văn A", "email": "a@b.com", "joinedDate": "2026-10-17" }
+```
+
+| Method | Route | Role | Body / Query | Thành công | Lỗi |
+|---|---|---|---|---|---|
+| POST | `/api/choirs` | `ChoirDirector` | `{ "name", "description?" }` | 200 `ChoirDto` | 400 `VALIDATION_FAILED` · 409 `CHOIR_NAME_ALREADY_EXISTS` |
+| GET | `/api/choirs` | `ChoirDirector` | — | 200 `ChoirDto[]` (sắp theo tên, gồm cả ca đoàn đã tắt) | — |
+| PUT | `/api/choirs/{id}` | `ChoirDirector` | `{ "name", "description?", "isActive" }` | 200 `ChoirDto` | 400 `VALIDATION_FAILED` · 404 `CHOIR_NOT_FOUND` · 409 `CHOIR_NAME_ALREADY_EXISTS` |
+| GET | `/api/choirs/{id}/members` | `ChoirDirector` | — | 200 `ChoirMemberDto[]` (ca viên đang ở trong ca đoàn, sắp theo tên) | 404 `CHOIR_NOT_FOUND` |
+| POST | `/api/choirs/{id}/members` | `ChoirDirector` | `{ "memberIds": ["guid"] }` | 204 | 400 `VALIDATION_FAILED` (`CHOIR_MEMBER_INVALID`), `CHOIR_MEMBER_INVALID` · 404 `CHOIR_NOT_FOUND` · 409 `CHOIR_INACTIVE` |
+| DELETE | `/api/choirs/{id}/members/{memberId}` | `ChoirDirector` | — | 204 | 404 `CHOIR_MEMBERSHIP_NOT_FOUND` |
+| GET | `/api/liturgical-events/{id}/choirs` | `ChoirDirector` | — | 200 `ChoirDto[]` (sắp theo tên) | 404 `LITURGICAL_EVENT_NOT_FOUND` |
+| PUT | `/api/liturgical-events/{id}/choirs` | `ChoirDirector` | `{ "choirIds": ["guid"] }` | 200 `ChoirDto[]` (danh sách sau khi lưu) | 400 `VALIDATION_FAILED` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `CHOIR_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `CHOIR_INACTIVE` |
+
+- `name` bắt buộc, ≤ 100 ký tự, không trùng ca đoàn khác; `description` ≤ 500 ký tự.
+- `isActive = false` là tắt ca đoàn: giữ ca viên và sự kiện đã gán, nhưng không nhận thêm ca viên
+  (409 `CHOIR_INACTIVE`) và không gán được vào sự kiện mới.
+- `memberIds` là id `MemberProfile` (lấy từ `GET /api/member-profiles`); id trùng tự loại. Có id nào không tồn tại
+  hoặc ca viên không ở trạng thái `Active` → 400 `CHOIR_MEMBER_INVALID`, không lưu gì.
+  Ca viên đã ở trong ca đoàn thì bỏ qua; ca viên từng rời ca đoàn thì vào lại, `joinedDate` = hôm nay.
+- `DELETE .../members/{memberId}`: ca viên rời ca đoàn, lịch sử vẫn giữ; thêm lại bằng `POST .../members`.
+- `PUT /api/liturgical-events/{id}/choirs` **thay toàn bộ** danh sách ca đoàn của sự kiện; gửi `[]` là gỡ hết.
+  Sự kiện đã huỷ hoặc đã qua ngày thì không sửa được. Ca đoàn đã tắt vẫn được giữ lại nếu đã gán từ trước,
+  nhưng không thêm mới được.
+
+---
+
 ## 5. Notifications — `api/notifications` · mọi role đã đăng nhập
 
 Chỉ thao tác trên thông báo **của chính người gọi**.
