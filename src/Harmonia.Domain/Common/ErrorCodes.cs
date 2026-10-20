@@ -136,6 +136,10 @@ public static class ErrorCodes
 
     public const string LiturgicalEventDateOutsideLiturgicalSeason = "LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON";
 
+    public const string LiturgicalEventSeasonRequired = "LITURGICAL_EVENT_SEASON_REQUIRED";
+
+    public const string LiturgicalEventGenerationRangeInvalid = "LITURGICAL_EVENT_GENERATION_RANGE_INVALID";
+
     public const string LiturgicalSeasonDateOverlap = "LITURGICAL_SEASON_DATE_OVERLAP";
 
     public const string LiturgicalSeasonDateInvalid = "LITURGICAL_SEASON_DATE_INVALID";
@@ -333,4 +337,9 @@ public static class ErrorCodes
     public const string ChoirInactive = "CHOIR_INACTIVE";
 
     public const string ChoirMembershipNotFound = "CHOIR_MEMBERSHIP_NOT_FOUND";
+
+    // 16. Mass schedule.
+    public const string MassScheduleNotFound = "MASS_SCHEDULE_NOT_FOUND";
+
+    public const string MassScheduleSlotTaken = "MASS_SCHEDULE_SLOT_TAKEN";
 }

@@ -445,7 +445,8 @@ Chưa có kỹ năng nào → `[]`.
 | GET | `/api/liturgical-events/{id}` | — | 200 `LiturgicalEventDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
 | POST | `/api/liturgical-events` | `{ "eventDate", "time", "liturgicalSeasonId?", "massTypeId?", "ceremonyTypeId?", "categoryId?", "locationId", "title?", "specialRequirements?" }` | 200 `LiturgicalEventDto` | 400 `VALIDATION_FAILED` (`LITURGICAL_EVENT_TYPE_REQUIRED`), `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` · 404 `LOOKUP_NOT_FOUND` · 409 `LITURGICAL_EVENT_SLOT_TAKEN`, `LOOKUP_INACTIVE` |
 | PUT | `/api/liturgical-events/{id}` | như `POST` | 200 `LiturgicalEventDto` | 400 `VALIDATION_FAILED` (`LITURGICAL_EVENT_TYPE_REQUIRED`), `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_SLOT_TAKEN`, `LOOKUP_INACTIVE` |
-| PATCH | `/api/liturgical-events/{id}/publish` | — | 200 `LiturgicalEventDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_ALREADY_PUBLISHED`, `LITURGICAL_EVENT_CANCELLED` |
+| POST | `/api/liturgical-events/generation` | `{ "fromDate", "toDate" }` | 200 `LiturgicalEventDto[]` (các sự kiện vừa tạo) | 400 `VALIDATION_FAILED` (`LITURGICAL_EVENT_GENERATION_RANGE_INVALID`) |
+| PATCH | `/api/liturgical-events/{id}/publish` | — | 200 `LiturgicalEventDto` | 400 `LITURGICAL_EVENT_TYPE_REQUIRED`, `LITURGICAL_EVENT_SEASON_REQUIRED`, `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND` · 409 `LITURGICAL_EVENT_ALREADY_PUBLISHED`, `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `LITURGICAL_EVENT_SLOT_TAKEN`, `LOOKUP_INACTIVE` |
 | PATCH | `/api/liturgical-events/{id}/cancel` | — | 200 `LiturgicalEventDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED` |
 | GET | `/api/schedule/events` · mọi role | — | 200 `LiturgicalEventSummaryDto[]` | — |
 | GET | `/api/schedule/events/{id}` · mọi role | — | 200 `MemberEventDetailDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
@@ -478,6 +479,19 @@ Chưa có kỹ năng nào → `[]`.
   notification `type = EventPublished` cho mọi ca trưởng và ca viên đang hoạt động,
   `referenceType = "LiturgicalEvent"`, `referenceId` = id sự kiện (S-05).
 - Mỗi sự kiện công bố riêng (D6). Ca viên chỉ thấy sự kiện `Published`.
+- **Kiểm trước khi công bố** — sự kiện phải đủ và còn hợp lệ, kiểm theo thứ tự, gặp lỗi đầu tiên thì dừng:
+  chưa qua ngày (409 `LITURGICAL_EVENT_ALREADY_PASSED`) · có `massTypeId` hoặc `ceremonyTypeId` (400
+  `LITURGICAL_EVENT_TYPE_REQUIRED`) · có `liturgicalSeasonId` (400 `LITURGICAL_EVENT_SEASON_REQUIRED`) · mọi danh mục
+  còn hoạt động (409 `LOOKUP_INACTIVE` — **kể cả** mục bị tắt sau lần lưu cuối, khác với `PUT`) và ngày nằm trong mùa ·
+  ngày + giờ + địa điểm chưa bị sự kiện khác chiếm (409 `LITURGICAL_EVENT_SLOT_TAKEN`). Hai lỗi 400 ở đây trả thẳng mã,
+  không bọc trong `VALIDATION_FAILED`. Sửa bằng `PUT` rồi công bố lại.
+- **Sinh sự kiện từ giờ lễ cố định** (`POST /generation`, `ParishPriest`): `fromDate`, `toDate` tính cả hai đầu,
+  `fromDate` không trước hôm nay (giờ Việt Nam), dài tối đa 62 ngày. Với mỗi ngày trong khoảng, mỗi giờ lễ cố định
+  (mục 4g) đang bật có `dayOfWeek` trùng thứ của ngày → tạo một sự kiện `Draft` với `time`, `massTypeId`, `locationId`,
+  `title` của giờ lễ đó; `liturgicalSeasonId` = mùa đang hoạt động chứa ngày đó (không có thì `null` — phải chọn mùa trước
+  khi công bố). Bỏ qua (không báo lỗi): giờ lễ có loại lễ hoặc địa điểm đã tắt; ngày + giờ + địa điểm đã có sự kiện
+  chưa huỷ — nên gọi lại cùng khoảng không tạo trùng. Trả mảng sự kiện vừa tạo, sắp theo ngày rồi giờ; `[]` khi không
+  có gì để tạo. Không gửi thông báo.
 - Danh sách (`GET`) trả sự kiện **mọi trạng thái** (kể cả `Draft`, `Cancelled`), sắp theo ngày rồi giờ; các bộ lọc
   `fromDate`, `toDate` (bao gồm hai đầu, `yyyy-MM-dd`) và `status` kết hợp AND, đều tuỳ chọn.
 - **Kiểm danh mục (cả `POST` lẫn `PUT`)**: `liturgicalSeasonId`, `massTypeId`, `ceremonyTypeId`, `categoryId`, `locationId`
@@ -490,7 +504,7 @@ Chưa có kỹ năng nào → `[]`.
 - Huỷ (`cancel`) chuyển sang `Cancelled`, không hoàn tác được; sự kiện đã qua (trước hôm nay theo giờ Việt Nam)
   → 409 `LITURGICAL_EVENT_ALREADY_PASSED`. Nếu sự kiện đang `Published`, gửi notification `type = EventCancelled` cho mọi ca
   trưởng và ca viên đang hoạt động (`referenceType = "LiturgicalEvent"`); huỷ `Draft` thì không gửi.
-- Hiện tại `locationName` trong response của `POST` và `publish` là `null` (server chưa nạp địa điểm);
+- Hiện tại `locationName` trong response của `POST`, `generation` và `publish` là `null` (server chưa nạp địa điểm);
   lấy tên địa điểm từ `GET /api/lookups/worship-locations` theo `locationId`.
 
 **Danh sách sự kiện — `LiturgicalEventListItemDto`**
@@ -810,6 +824,39 @@ Ca trưởng quản lý mọi ca đoàn — không có ca trưởng riêng từn
   nhưng không thêm mới được.
 
 ---
+
+## 4g. Mass schedules — `api/mass-schedules` · xem: `Admin`, `ParishPriest` · sửa: `Admin` (UC-12)
+
+Giờ lễ cố định hằng tuần của giáo xứ (vd Chúa nhật 04:00 · 07:00 · 15:00). Cha xứ dùng chúng để sinh sự kiện nháp qua
+`POST /api/liturgical-events/generation` (mục 4b).
+
+### `MassScheduleDto`
+
+```json
+{
+  "id": "guid",
+  "dayOfWeek": "Sunday",
+  "time": "04:00:00",
+  "massTypeId": "guid",
+  "locationId": "guid",
+  "title": "Lễ sáng sớm",
+  "isActive": true
+}
+```
+
+`dayOfWeek`: `Sunday` | `Monday` | `Tuesday` | `Wednesday` | `Thursday` | `Friday` | `Saturday`.
+
+| Method | Route | Quyền | Body | Thành công | Lỗi |
+|---|---|---|---|---|---|
+| GET | `/api/mass-schedules` | `Admin`, `ParishPriest` | — | 200 `MassScheduleDto[]` (sắp theo thứ — Chúa nhật trước — rồi giờ) | — |
+| POST | `/api/mass-schedules` | `Admin` | `{ "dayOfWeek", "time", "massTypeId", "locationId", "title?" }` | 200 `MassScheduleDto` | 400 `VALIDATION_FAILED` · 404 `LOOKUP_NOT_FOUND` · 409 `LOOKUP_INACTIVE`, `MASS_SCHEDULE_SLOT_TAKEN` |
+| PUT | `/api/mass-schedules/{id}` | `Admin` | như `POST`, thêm `"isActive"` | 200 `MassScheduleDto` | 400 `VALIDATION_FAILED` · 404 `MASS_SCHEDULE_NOT_FOUND`, `LOOKUP_NOT_FOUND` · 409 `LOOKUP_INACTIVE`, `MASS_SCHEDULE_SLOT_TAKEN` |
+
+- `GET` trả cả giờ lễ đã tắt. **Không có xoá**: muốn bỏ thì `PUT` với `isActive: false`; giờ lễ tắt không sinh sự kiện.
+- `massTypeId`, `locationId` bắt buộc, phải trỏ tới mục có thật và đang hoạt động. Khi `PUT`, Id giữ nguyên so với hiện
+  tại vẫn được chấp nhận dù mục đã tắt. `title` tối đa 200 ký tự, được cắt khoảng trắng; chuỗi rỗng lưu thành `null`.
+- Trùng cả `dayOfWeek` + `time` + `locationId` với giờ lễ khác → 409 `MASS_SCHEDULE_SLOT_TAKEN`.
+- Sửa giờ lễ không đụng tới các sự kiện đã sinh trước đó.
 
 ## 5. Notifications — `api/notifications` · mọi role đã đăng nhập
 
@@ -1651,7 +1698,7 @@ await conn.start();
 
 ---
 
-## 9. Lookups — `api/lookups` · đọc: mọi role đã đăng nhập · ghi: `Admin` (UC-32 / FE-49, FE-50)
+## 9. Lookups — `api/lookups` · đọc: mọi role đã đăng nhập · ghi: `Admin` · `liturgical-slots` ghi thêm: `ChoirDirector` (UC-32 / FE-49, FE-50)
 
 Danh mục cho dropdown. Chỉ trả dòng **đang hoạt động**; Admin tắt một dòng thì nó biến khỏi
 danh sách (dữ liệu cũ vẫn trỏ tới nó). Không phân trang — trả mảng.
@@ -1681,13 +1728,15 @@ danh sách (dữ liệu cũ vẫn trỏ tới nó). Không phân trang — trả
 | POST · PUT `{id}` | `/api/lookups/mass-types` · `ceremony-types` · `event-categories` · `skill-categories` | `{ "name", "description?", "isActive" }` | 200 phần tử như bảng trên | 400 `VALIDATION_FAILED` · 404 `LOOKUP_NOT_FOUND` (PUT) · 409 `LOOKUP_NAME_DUPLICATE`, `LOOKUP_IN_USE` (chỉ `skill-categories`) |
 | POST · PUT `{id}` | `/api/lookups/skills` | `{ "categoryId", "name", "description?", "isActive" }` | 200 `SkillDto` | 400 `VALIDATION_FAILED` · 404 `SKILL_CATEGORY_NOT_FOUND`, `SKILL_NOT_FOUND` (PUT) · 409 `SKILL_NAME_DUPLICATE`, `LOOKUP_INACTIVE`, `SKILL_IN_USE` |
 | POST · PUT `{id}` | `/api/lookups/song-themes` | `{ "name", "description?", "isActive" }` | 200 `SongThemeDto` | 400 `VALIDATION_FAILED` · 404 `LOOKUP_NOT_FOUND` (PUT) · 409 `LOOKUP_NAME_DUPLICATE` |
-| POST · PUT `{id}` | `/api/lookups/liturgical-slots` | `{ "name", "defaultOrder", "isActive" }` | 200 `LiturgicalSlotDto` | như trên |
+| POST · PUT `{id}` | `/api/lookups/liturgical-slots` · `Admin`, `ChoirDirector` | `{ "name", "defaultOrder", "isActive" }` | 200 `LiturgicalSlotDto` | như trên |
 | POST · PUT `{id}` | `/api/lookups/worship-locations` | `{ "name", "address?", "isActive" }` | 200 `WorshipLocationDto` | như trên |
 | POST · PUT `{id}` | `/api/lookups/liturgical-seasons` | `{ "name", "startDate", "endDate", "colorHex?", "isActive" }` | 200 `LiturgicalSeasonDto` | 400 `VALIDATION_FAILED` (`LITURGICAL_SEASON_DATE_INVALID`) · 404 `LOOKUP_NOT_FOUND` (PUT) · 409 `LITURGICAL_SEASON_DATE_OVERLAP` |
 
 - `isActive` mặc định `true`. **Không có xoá**: các bảng khác đang trỏ tới danh mục, nên muốn bỏ thì gửi
   `PUT` với `isActive: false`. Bật lại bằng `isActive: true`.
 - `PUT` gửi đủ mọi trường (thay toàn bộ). `name` được cắt khoảng trắng hai đầu.
+- `liturgical-slots`: ca trưởng cũng tạo / sửa được, để thêm mục riêng (vd "Ca nguyện Đức Mẹ") cho danh sách bài hát.
+  Mục mới dùng chung cho mọi danh sách sau này. Ca trưởng không đọc được mục đã tắt (`includeInactive` chỉ cho Admin).
 - `song-themes`, `liturgical-slots`, `worship-locations`: response giờ có thêm `isActive`. Tên chủ đề tối đa 50 ký tự;
   tên vị trí phụng vụ và nơi cử hành tối đa 100; `address` tối đa 300; `defaultOrder` ≥ 0.
 - Tắt một mục không gỡ nó khỏi dữ liệu đang dùng: sự kiện, danh sách bài hát cũ vẫn giữ tham chiếu; mục đã tắt

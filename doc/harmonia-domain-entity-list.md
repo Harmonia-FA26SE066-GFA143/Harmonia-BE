@@ -1,6 +1,6 @@
 # Harmonia – Domain Entity List & Attributes (for ERD, Report 3/4)
 
-47 entities derived from FE-01→FE-54 (`claude/functional-requirements-by-actor.md`), the canonical use cases (`claude/use-case-list.md`) and the daily liturgical program model (D6). Diagram: `harmonia-erd.mmd`.
+48 entities derived from FE-01→FE-54 (`claude/functional-requirements-by-actor.md`), the canonical use cases (`claude/use-case-list.md`) and the daily liturgical program model (D6). Diagram: `harmonia-erd.mmd`.
 
 Conceptual/logical level: attribute names, types and constraints. No indexes, no migration syntax.
 
@@ -84,6 +84,9 @@ Written once here instead of repeated 47 times:
 
 **14. `WorshipLocation`** — main church, chapel… (D3)
 `name` string(100) unique · `address` string(300)? · `isActive` bool
+
+**48. `MassSchedule`** — a fixed weekly Mass time of the parish (e.g. Sunday 04:00); kept by the Admin, used by the priest to generate Draft events ***auditable***
+`dayOfWeek` DayOfWeek · `time` TimeOnly · `massTypeId` Guid → MassType · `locationId` Guid → WorshipLocation · `title` string(200)? · `isActive` bool · unique `(dayOfWeek, time, locationId)`
 
 ## D. Music library
 
@@ -255,6 +258,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 - `LiturgicalSeason` 1 — n `LiturgicalEvent`
 - `LiturgicalDay` 1 — n `LiturgicalEvent` *(matched by date, no FK)*
 - `LiturgicalEvent` n — 1 `MassType` / `CeremonyType` / `EventCategory` / `WorshipLocation`
+- `MassSchedule` n — 1 `MassType` / `WorshipLocation` *(template only, no FK to the events it generates)*
 
 **Music library**
 - `Song` 1 — n `SongClassification` → `LiturgicalSeason` | `MassType` | `CeremonyType` | `SongTheme`
@@ -314,3 +318,4 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 - 2026-10-11: `ReportFormat` enum added (21 → 22) for report export (UC-34E); `ReportExport` is now in use, no column change, no migration.
 - 2026-10-17: D7 — several choirs. `Choir`, `ChoirMembership`, `LiturgicalEventChoir` added (44 → 47); `SongList`, `Rehearsal`, `PracticeAssignment` gain nullable `choirId`. Schema only, needs a migration; `SongList` unique `(eventId, version)` unchanged until song lists are split per choir.
 - 2026-10-17: `LiturgicalDay` is filled from the Liturgical Calendar API instead of an uploaded GCatholic.org `.ics` file. The priest syncs one civil year and that year's cached days are overwritten; names are English, Epiphany / Ascension / Corpus Christi are moved to Sunday as in Vietnam. No column change, no migration.
+- 2026-10-20: `MassSchedule` added (47 → 48) — the parish's fixed weekly Mass times; `POST api/liturgical-events/generation` creates Draft events from them. Publishing an event now requires a season and active catalogs. Needs a migration.

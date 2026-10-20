@@ -1,6 +1,6 @@
 # Từ điển nghiệp vụ — dùng đúng tên, không tự đặt từ đồng nghĩa
 
-Nguồn chuẩn: `doc/harmonia-domain-entity-list.md` (47 entity, 22 enum).
+Nguồn chuẩn: `doc/harmonia-domain-entity-list.md` (48 entity, 22 enum).
 Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 
 | Tiếng Việt | Tên trong code |
@@ -25,6 +25,7 @@ Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 | loại nghi thức | `CeremonyType` |
 | loại sự kiện | `EventCategory` |
 | địa điểm cử hành | `WorshipLocation` |
+| giờ lễ cố định của giáo xứ | `MassSchedule` |
 | bài hát | `Song` |
 | chủ đề bài hát | `SongTheme` |
 | phân loại bài hát | `SongClassification` |

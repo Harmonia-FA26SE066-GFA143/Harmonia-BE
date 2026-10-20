@@ -9,6 +9,7 @@ namespace Harmonia.API.Controllers;
 /// <summary>
 /// Catalogs for dropdowns, readable by every signed-in role (active rows only). The Admin also writes them
 /// and may read switched-off rows with <c>includeInactive=true</c> (UC-32 / FE-49, FE-50).
+/// The Choir Director may also write liturgical slots, to add a custom part to a song list.
 /// </summary>
 [Route("api/lookups")]
 [Authorize]
@@ -125,13 +126,13 @@ public class LookupsController(ILookupService lookupService) : ApiControllerBase
         ToActionResult(await lookupService.GetLiturgicalSlotsAsync(ShowInactive(includeInactive), cancellationToken));
 
     [HttpPost("liturgical-slots")]
-    [Authorize(Roles = RoleNames.Admin)]
+    [Authorize(Roles = $"{RoleNames.Admin},{RoleNames.ChoirDirector}")]
     [ProducesResponseType<LiturgicalSlotDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> CreateLiturgicalSlotAsync([FromBody] SaveLiturgicalSlotRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await lookupService.SaveLiturgicalSlotAsync(null, request, cancellationToken));
 
     [HttpPut("liturgical-slots/{id:guid}")]
-    [Authorize(Roles = RoleNames.Admin)]
+    [Authorize(Roles = $"{RoleNames.Admin},{RoleNames.ChoirDirector}")]
     [ProducesResponseType<LiturgicalSlotDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateLiturgicalSlotAsync(Guid id, [FromBody] SaveLiturgicalSlotRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await lookupService.SaveLiturgicalSlotAsync(id, request, cancellationToken));

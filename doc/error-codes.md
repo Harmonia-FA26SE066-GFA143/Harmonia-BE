@@ -159,6 +159,8 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `LITURGICAL_EVENT_ALREADY_PASSED` | 409 | Sự kiện đã diễn ra |
 | `LITURGICAL_EVENT_TYPE_REQUIRED` | 400 | Phải chọn loại lễ hoặc loại nghi thức |
 | `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` | 400 | Ngày sự kiện không thuộc mùa phụng vụ đã chọn |
+| `LITURGICAL_EVENT_SEASON_REQUIRED` | 400 | Phải chọn mùa phụng vụ trước khi công bố sự kiện |
+| `LITURGICAL_EVENT_GENERATION_RANGE_INVALID` | 400 | Khoảng ngày không hợp lệ: không bắt đầu trong quá khứ và dài tối đa 62 ngày |
 | `LITURGICAL_SEASON_DATE_OVERLAP` | 409 | Khoảng thời gian trùng với mùa phụng vụ khác |
 | `LITURGICAL_SEASON_DATE_INVALID` | 400 | Ngày kết thúc phải sau ngày bắt đầu |
 
@@ -307,6 +309,13 @@ lọc theo cặp `(NotificationId, UserId)` nên "không tồn tại" và "của
 | `CHOIR_INACTIVE` | 409 | Ca đoàn đã ngừng hoạt động, không thêm ca viên hoặc sự kiện mới được |
 | `CHOIR_MEMBERSHIP_NOT_FOUND` | 404 | Ca viên không thuộc ca đoàn này |
 
+## 16. Giờ lễ cố định
+
+| Mã | HTTP | Tiếng Việt |
+|---|---|---|
+| `MASS_SCHEDULE_NOT_FOUND` | 404 | Không tìm thấy giờ lễ cố định |
+| `MASS_SCHEDULE_SLOT_TAKEN` | 409 | Đã có giờ lễ cố định khác vào thứ, giờ và nơi cử hành này |
+
 ---
 
 ## Quy ước chọn HTTP status
@@ -365,3 +374,9 @@ xem — trả 404, để không lộ sự tồn tại của bản ghi.
 - 2026-10-17: lịch phụng vụ lấy từ Liturgical Calendar API thay cho file .ics của GCatholic.org — bỏ
   `CALENDAR_FILE_REQUIRED`, `CALENDAR_FILE_TYPE_NOT_ALLOWED`, `CALENDAR_FILE_TOO_LARGE`, `CALENDAR_FILE_INVALID`;
   `POST /api/liturgical-days/sync` trả `EXTERNAL_CALENDAR_FAILED` (502) khi API lỗi.
+- 2026-10-20: thêm `LITURGICAL_EVENT_SEASON_REQUIRED`. `PATCH /api/liturgical-events/{id}/publish` kiểm lại sự kiện
+  trước khi công bố: chưa qua ngày (`LITURGICAL_EVENT_ALREADY_PASSED`), có loại lễ hoặc nghi thức
+  (`LITURGICAL_EVENT_TYPE_REQUIRED`), có mùa phụng vụ, mọi danh mục còn hoạt động (`LOOKUP_INACTIVE` — kể cả danh mục
+  bị tắt sau lần lưu cuối), ngày nằm trong mùa, giờ + nơi cử hành chưa bị chiếm (`LITURGICAL_EVENT_SLOT_TAKEN`).
+- 2026-10-20: thêm mục 16 Giờ lễ cố định — `MASS_SCHEDULE_NOT_FOUND`, `MASS_SCHEDULE_SLOT_TAKEN` cho
+  `api/mass-schedules`; `LITURGICAL_EVENT_GENERATION_RANGE_INVALID` cho `POST /api/liturgical-events/generation`.

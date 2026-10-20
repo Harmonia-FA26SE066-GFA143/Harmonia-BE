@@ -82,7 +82,9 @@
   thuộc `SkillCategory` = Instrument.
 - Chỉ `ChoirDirector` duyệt `MemberSkill`, tạo `Rehearsal`, chốt `ServiceRoster`.
   Chỉ `ParishPriest` tạo `SongListReview`. Chỉ `Admin` đụng `User`, `Role`,
-  `SystemSetting` và 9 bảng lookup. Ngoại lệ: mọi role tự sửa `User.FullName` và `User.Phone`
+  `SystemSetting`, `MassSchedule` và 9 bảng lookup. Ngoại lệ: `ChoirDirector` cũng tạo / sửa được
+  `LiturgicalSlot` để thêm mục riêng cho danh sách bài hát; `ParishPriest` đọc được `MassSchedule` và sinh
+  sự kiện nháp từ nó (chốt 2026-10-20). Ngoại lệ: mọi role tự sửa `User.FullName` và `User.Phone`
   của chính mình qua `PUT api/auth/me` (ca viên còn qua `PUT api/member-profiles/me`) (chốt 2026-10-07).
   Mọi role **đọc** được các `SystemSetting` công khai qua `GET api/system-settings/public`; key nào công khai
   do `SystemSettingKeys` trong code quyết định, không phải dữ liệu trong bảng (chốt 2026-10-11).

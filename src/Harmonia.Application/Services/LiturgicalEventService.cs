@@ -138,6 +138,12 @@ public class LiturgicalEventService(
             return Result<LiturgicalEventDto>.Failure(ErrorCodes.LiturgicalEventCancelled);
         }
 
+        var incomplete = await CheckPublishableAsync(liturgicalEvent, cancellationToken);
+        if (incomplete is not null)
+        {
+            return Result<LiturgicalEventDto>.Failure(incomplete);
+        }
+
         liturgicalEvent.Status = EventStatus.Published;
         liturgicalEvent.PublishedAt = DateTime.UtcNow;
         await liturgicalEventRepository.SaveChangesAsync(cancellationToken);
@@ -186,6 +192,33 @@ public class LiturgicalEventService(
         }
 
         return Result<LiturgicalEventDto>.Success(mapper.Map<LiturgicalEventDto>(liturgicalEvent));
+    }
+
+    /// <summary>
+    /// A published event must be complete and still valid: not past, with a type and a season, every catalog active
+    /// (a row switched off since the last save no longer passes) and the date + time + location still free.
+    /// </summary>
+    private async Task<string?> CheckPublishableAsync(LiturgicalEvent liturgicalEvent, CancellationToken cancellationToken)
+    {
+        if (liturgicalEvent.EventDate < VietnamTime.Today) return ErrorCodes.LiturgicalEventAlreadyPassed;
+        if (liturgicalEvent.MassTypeId is null && liturgicalEvent.CeremonyTypeId is null)
+        {
+            return ErrorCodes.LiturgicalEventTypeRequired;
+        }
+
+        if (liturgicalEvent.LiturgicalSeasonId is null) return ErrorCodes.LiturgicalEventSeasonRequired;
+
+        var catalogs = await lookupService.CheckEventCatalogsAsync(
+            liturgicalEvent.EventDate, liturgicalEvent.LiturgicalSeasonId, liturgicalEvent.MassTypeId,
+            liturgicalEvent.CeremonyTypeId, liturgicalEvent.CategoryId, liturgicalEvent.LocationId, null,
+            cancellationToken);
+        if (!catalogs.IsSuccess) return catalogs.Code;
+
+        return await liturgicalEventRepository.ExistsBySlotAsync(
+                liturgicalEvent.EventDate, liturgicalEvent.Time, liturgicalEvent.LocationId, liturgicalEvent.Id,
+                cancellationToken)
+            ? ErrorCodes.LiturgicalEventSlotTaken
+            : null;
     }
 
     private async Task NotifyDirectorsAndMembersAsync(

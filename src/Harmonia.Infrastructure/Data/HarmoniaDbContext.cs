@@ -37,6 +37,8 @@ public class HarmoniaDbContext(DbContextOptions<HarmoniaDbContext> options) : Db
 
     public DbSet<MassType> MassTypes => Set<MassType>();
 
+    public DbSet<MassSchedule> MassSchedules => Set<MassSchedule>();
+
     public DbSet<CeremonyType> CeremonyTypes => Set<CeremonyType>();
 
     public DbSet<EventCategory> EventCategories => Set<EventCategory>();

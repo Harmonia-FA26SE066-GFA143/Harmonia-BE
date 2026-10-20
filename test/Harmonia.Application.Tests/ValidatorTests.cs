@@ -792,4 +792,22 @@ public class ValidatorTests
             ErrorCodesOf(validator, new SearchMyParticipationHistoryRequest { FromDate = day.AddDays(1), ToDate = day }));
         Assert.Empty(ErrorCodesOf(validator, new SearchMyParticipationHistoryRequest { FromDate = day }));
     }
+
+    // ---- Generate liturgical events ----
+
+    [Theory]
+    [InlineData(0, 0, true)]
+    [InlineData(0, 61, true)]
+    [InlineData(0, 62, false)]
+    [InlineData(-1, 3, false)]
+    [InlineData(3, 2, false)]
+    public void GenerateLiturgicalEvents_RangeFromTodayUpTo62Days(int fromOffset, int toOffset, bool isValid)
+    {
+        var codes = ErrorCodesOf(new GenerateLiturgicalEventsRequestValidator(), new GenerateLiturgicalEventsRequest
+        {
+            FromDate = VietnamTime.Today.AddDays(fromOffset), ToDate = VietnamTime.Today.AddDays(toOffset),
+        });
+
+        Assert.Equal(isValid ? [] : [ErrorCodes.LiturgicalEventGenerationRangeInvalid], codes);
+    }
 }

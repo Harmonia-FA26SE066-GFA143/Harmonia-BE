@@ -439,6 +439,55 @@ namespace Harmonia.Infrastructure.Migrations
                     b.ToTable("LiturgicalSlots");
                 });
 
+            modelBuilder.Entity("Harmonia.Domain.Entities.MassSchedule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("DayOfWeek")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("LocationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("MassTypeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<TimeOnly>("Time")
+                        .HasColumnType("time");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LocationId");
+
+                    b.HasIndex("MassTypeId");
+
+                    b.HasIndex("DayOfWeek", "Time", "LocationId")
+                        .IsUnique();
+
+                    b.ToTable("MassSchedules");
+                });
+
             modelBuilder.Entity("Harmonia.Domain.Entities.MassType", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1852,6 +1901,25 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Navigation("LiturgicalEvent");
                 });
 
+            modelBuilder.Entity("Harmonia.Domain.Entities.MassSchedule", b =>
+                {
+                    b.HasOne("Harmonia.Domain.Entities.WorshipLocation", "Location")
+                        .WithMany("MassSchedules")
+                        .HasForeignKey("LocationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Harmonia.Domain.Entities.MassType", "MassType")
+                        .WithMany("MassSchedules")
+                        .HasForeignKey("MassTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Location");
+
+                    b.Navigation("MassType");
+                });
+
             modelBuilder.Entity("Harmonia.Domain.Entities.MaterialLearningProgress", b =>
                 {
                     b.HasOne("Harmonia.Domain.Entities.MusicMaterial", "Material")
@@ -2446,6 +2514,8 @@ namespace Harmonia.Infrastructure.Migrations
             modelBuilder.Entity("Harmonia.Domain.Entities.MassType", b =>
                 {
                     b.Navigation("LiturgicalEvents");
+
+                    b.Navigation("MassSchedules");
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.MemberProfile", b =>
@@ -2565,6 +2635,8 @@ namespace Harmonia.Infrastructure.Migrations
             modelBuilder.Entity("Harmonia.Domain.Entities.WorshipLocation", b =>
                 {
                     b.Navigation("LiturgicalEvents");
+
+                    b.Navigation("MassSchedules");
 
                     b.Navigation("Rehearsals");
                 });

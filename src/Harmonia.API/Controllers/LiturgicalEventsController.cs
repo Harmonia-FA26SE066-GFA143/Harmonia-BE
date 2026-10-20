@@ -15,7 +15,8 @@ namespace Harmonia.API.Controllers;
 public class LiturgicalEventsController(
     ILiturgicalEventService liturgicalEventService,
     IEventPreparationService eventPreparationService,
-    IChoirService choirService) : ApiControllerBase
+    IChoirService choirService,
+    IMassScheduleService massScheduleService) : ApiControllerBase
 {
     /// <summary>Draft events are listed for the priest only (B23).</summary>
     [HttpGet]
@@ -38,6 +39,14 @@ public class LiturgicalEventsController(
     public async Task<IActionResult> CreateAsync(
         [FromBody] CreateLiturgicalEventRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await liturgicalEventService.CreateAsync(request, cancellationToken));
+
+    /// <summary>Creates Draft events from the parish's fixed Mass times for a date range.</summary>
+    [HttpPost("generation")]
+    [Authorize(Roles = RoleNames.ParishPriest)]
+    [ProducesResponseType<List<LiturgicalEventDto>>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GenerateAsync(
+        [FromBody] GenerateLiturgicalEventsRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await massScheduleService.GenerateEventsAsync(request, cancellationToken));
 
     [HttpPut("{id:guid}")]
     [Authorize(Roles = RoleNames.ParishPriest)]

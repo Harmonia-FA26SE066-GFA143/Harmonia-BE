@@ -169,4 +169,75 @@ public class LiturgicalEventServiceTests
         Assert.Equal(ErrorCodes.LiturgicalEventAlreadyPassed, (await _sut.CancelAsync(_event.Id, _ct)).Code);
         await _repository.DidNotReceive().SaveChangesAsync(_ct);
     }
+
+    private void DraftReadyToPublish()
+    {
+        _event.Status = EventStatus.Draft;
+        _event.LiturgicalSeasonId = Guid.NewGuid();
+        _repository.GetByIdAsync(_event.Id, _ct).Returns(_event);
+    }
+
+    [Fact]
+    public async Task Publish_CompleteDraft_ChecksCatalogsAsNewAndSlot_ThenPublishes_Async()
+    {
+        DraftReadyToPublish();
+
+        var result = await _sut.PublishAsync(_event.Id, _ct);
+
+        Assert.Equal(EventStatus.Published, result.Value!.Status);
+        // current = null: a catalog switched off since the last save no longer passes.
+        await _lookups.Received(1).CheckEventCatalogsAsync(
+            _event.EventDate, _event.LiturgicalSeasonId, _event.MassTypeId, _event.CeremonyTypeId,
+            _event.CategoryId, _event.LocationId, null, _ct);
+        await _repository.Received(1).ExistsBySlotAsync(_event.EventDate, _event.Time, _event.LocationId, _event.Id, _ct);
+    }
+
+    [Fact]
+    public async Task Publish_WithoutSeason_ReturnsSeasonRequired_AndStaysDraft_Async()
+    {
+        DraftReadyToPublish();
+        _event.LiturgicalSeasonId = null;
+
+        Assert.Equal(ErrorCodes.LiturgicalEventSeasonRequired, (await _sut.PublishAsync(_event.Id, _ct)).Code);
+        Assert.Equal(EventStatus.Draft, _event.Status);
+        await _repository.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Publish_WithoutMassOrCeremonyType_ReturnsTypeRequired_Async()
+    {
+        DraftReadyToPublish();
+        _event.MassTypeId = null;
+
+        Assert.Equal(ErrorCodes.LiturgicalEventTypeRequired, (await _sut.PublishAsync(_event.Id, _ct)).Code);
+    }
+
+    [Fact]
+    public async Task Publish_PastDraft_ReturnsAlreadyPassed_Async()
+    {
+        DraftReadyToPublish();
+        _event.EventDate = VietnamTime.Today.AddDays(-1);
+
+        Assert.Equal(ErrorCodes.LiturgicalEventAlreadyPassed, (await _sut.PublishAsync(_event.Id, _ct)).Code);
+    }
+
+    [Fact]
+    public async Task Publish_InactiveCatalog_ReturnsItsCode_Async()
+    {
+        DraftReadyToPublish();
+        _lookups.CheckEventCatalogsAsync(default, default, default, default, default, default, default, default)
+            .ReturnsForAnyArgs(Result.Failure(ErrorCodes.LookupInactive));
+
+        Assert.Equal(ErrorCodes.LookupInactive, (await _sut.PublishAsync(_event.Id, _ct)).Code);
+        Assert.Equal(EventStatus.Draft, _event.Status);
+    }
+
+    [Fact]
+    public async Task Publish_SlotTaken_ReturnsSlotTaken_Async()
+    {
+        DraftReadyToPublish();
+        _repository.ExistsBySlotAsync(_event.EventDate, _event.Time, _event.LocationId, _event.Id, _ct).Returns(true);
+
+        Assert.Equal(ErrorCodes.LiturgicalEventSlotTaken, (await _sut.PublishAsync(_event.Id, _ct)).Code);
+    }
 }

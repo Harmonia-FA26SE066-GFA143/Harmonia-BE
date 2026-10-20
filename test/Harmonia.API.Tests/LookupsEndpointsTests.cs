@@ -143,7 +143,6 @@ public class LookupsEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<H
         { "ceremony-types", new { name = "Write-test ceremony", isActive = false } },
         { "event-categories", new { name = "Write-test category", isActive = false } },
         { "song-themes", new { name = "Write-test theme", isActive = false } },
-        { "liturgical-slots", new { name = "Write-test slot", defaultOrder = 9, isActive = false } },
         { "worship-locations", new { name = "Write-test location", address = "1 Test St", isActive = false } },
         { "liturgical-seasons", new { name = "Write-test season", startDate = "2040-01-01", endDate = "2040-02-01", isActive = false } },
     };
@@ -171,6 +170,21 @@ public class LookupsEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<H
         Assert.DoesNotContain(asDirector.EnumerateArray(), x => x.GetProperty("id").GetGuid() == id);
         Assert.Equal(HttpStatusCode.Forbidden, (await director.PostAsJsonAsync($"api/lookups/{catalog}", body, _ct)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await director.PutAsJsonAsync($"api/lookups/{catalog}/{id}", body, _ct)).StatusCode);
+    }
+
+    [Fact]
+    public async Task LiturgicalSlots_DirectorAndAdminWrite_PriestIsForbidden_Async()
+    {
+        var director = await factory.CreateClientAsAsync("director@test.com", _ct);
+        var priest = await factory.CreateClientAsAsync("priest@test.com", _ct);
+        var body = new { name = "Write-test slot", defaultOrder = 9, isActive = false };
+
+        var created = await director.PostAsJsonAsync("api/lookups/liturgical-slots", body, _ct);
+        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+        var id = (await created.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(_ct)).GetProperty("id").GetGuid();
+
+        Assert.Equal(HttpStatusCode.OK, (await director.PutAsJsonAsync($"api/lookups/liturgical-slots/{id}", body, _ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await priest.PostAsJsonAsync("api/lookups/liturgical-slots", body, _ct)).StatusCode);
     }
 
     [Fact]
