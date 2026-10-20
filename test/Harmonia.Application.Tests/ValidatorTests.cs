@@ -437,8 +437,8 @@ public class ValidatorTests
 
     // ---- Song list ----
 
-    private static UpdateSongListItemRequest SongListItem(Guid? slotId = null) =>
-        new() { SongId = Guid.NewGuid(), SlotId = slotId ?? Guid.NewGuid(), DisplayOrder = 1 };
+    private static UpdateSongListItemRequest SongListItem(Guid? slotId = null, Guid? songId = null) =>
+        new() { SongId = songId ?? Guid.NewGuid(), SlotId = slotId ?? Guid.NewGuid(), DisplayOrder = 1 };
 
     [Fact]
     public void CreateSongList_Valid_HasNoErrors()
@@ -457,24 +457,52 @@ public class ValidatorTests
     }
 
     [Fact]
-    public void CreateSongList_SameSlotTwice_ReturnsSlotDuplicate()
+    public void CreateSongList_SeveralSongsInOneSlot_HasNoErrors()
     {
         var slotId = Guid.NewGuid();
         var request = new CreateSongListRequest { EventId = Guid.NewGuid(), Items = [SongListItem(slotId), SongListItem(slotId)] };
+
+        Assert.Empty(ErrorCodesOf(new CreateSongListRequestValidator(), request));
+    }
+
+    [Fact]
+    public void CreateSongList_SameSongTwiceInOneSlot_ReturnsSlotDuplicate()
+    {
+        var (slotId, songId) = (Guid.NewGuid(), Guid.NewGuid());
+        var request = new CreateSongListRequest
+        {
+            EventId = Guid.NewGuid(), Items = [SongListItem(slotId, songId), SongListItem(slotId, songId)],
+        };
 
         Assert.Equal([ErrorCodes.SongListSlotDuplicate], ErrorCodesOf(new CreateSongListRequestValidator(), request));
     }
 
     [Fact]
-    public void UpdateSongListItems_NoItemsOrSameSlotTwice_ReturnsCode()
+    public void CreateSongList_SameSongInDifferentSlots_HasNoErrors()
     {
-        var slotId = Guid.NewGuid();
+        var songId = Guid.NewGuid();
+        var request = new CreateSongListRequest
+        {
+            EventId = Guid.NewGuid(), Items = [SongListItem(songId: songId), SongListItem(songId: songId)],
+        };
+
+        Assert.Empty(ErrorCodesOf(new CreateSongListRequestValidator(), request));
+    }
+
+    [Fact]
+    public void UpdateSongListItems_NoItemsOrSameSongTwiceInOneSlot_ReturnsCode()
+    {
+        var (slotId, songId) = (Guid.NewGuid(), Guid.NewGuid());
         var validator = new UpdateSongListItemsRequestValidator();
 
         Assert.Contains(ErrorCodes.SongListEmpty, ErrorCodesOf(validator, new UpdateSongListItemsRequest()));
         Assert.Equal(
             [ErrorCodes.SongListSlotDuplicate],
-            ErrorCodesOf(validator, new UpdateSongListItemsRequest { Items = [SongListItem(slotId), SongListItem(slotId)] }));
+            ErrorCodesOf(validator, new UpdateSongListItemsRequest
+            {
+                Items = [SongListItem(slotId, songId), SongListItem(slotId, songId)],
+            }));
+        Assert.Empty(ErrorCodesOf(validator, new UpdateSongListItemsRequest { Items = [SongListItem(slotId), SongListItem(slotId)] }));
     }
 
     [Theory]

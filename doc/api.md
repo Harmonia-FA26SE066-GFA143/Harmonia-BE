@@ -1165,7 +1165,8 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
   Bản mới nhất đang `Draft` / `Submitted` → `SONG_LIST_CANNOT_BE_REVISED`; đã `Approved` → `SONG_LIST_EVENT_HAS_APPROVED_VERSION`.
 - Chỉ tạo được cho sự kiện `Published`. Sự kiện `Draft` → `LITURGICAL_EVENT_NOT_PUBLISHED`, đã huỷ → `LITURGICAL_EVENT_CANCELLED`.
 - `PUT …/items` **thay cả bộ** bài, chỉ khi danh sách là phiên bản mới nhất và còn `Draft`.
-- Mỗi `slotId` chỉ xuất hiện một lần trong một danh sách (`SONG_LIST_SLOT_DUPLICATE`); `items` không được rỗng
+- Một `slotId` được có **nhiều bài** (vd Hiệp lễ hát 2 bài), xếp theo `displayOrder`; chỉ cùng một bài lặp lại trong cùng
+  một `slotId` mới bị chặn (`SONG_LIST_SLOT_DUPLICATE`), cùng một bài ở hai vị trí khác nhau vẫn được. `items` không được rỗng
   (`SONG_LIST_EMPTY`). Cả hai bắt ở validator, trả 400 `VALIDATION_FAILED`. `slotId` lấy từ `GET /api/lookups/liturgical-slots`.
 - Bài hát và vị trí phụng vụ phải đang hoạt động: bài đã tắt → `SONG_INACTIVE`, vị trí đã tắt → `LOOKUP_INACTIVE`.
 - `review`: `notes` bắt buộc khi `decision` là `Reject` hoặc `RequestRevision`; `Approve` thì tuỳ chọn.

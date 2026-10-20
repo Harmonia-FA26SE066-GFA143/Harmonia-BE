@@ -194,7 +194,7 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `SONG_LIST_ALREADY_APPROVED` | 409 | Danh sách đã được phê duyệt |
 | `SONG_LIST_EVENT_HAS_APPROVED_VERSION` | 409 | Sự kiện này đã có danh sách được duyệt |
 | `SONG_LIST_ITEM_NOT_FOUND` | 404 | Không tìm thấy bài hát trong danh sách |
-| `SONG_LIST_SLOT_DUPLICATE` | 409 | Vị trí phụng vụ này đã có bài hát |
+| `SONG_LIST_SLOT_DUPLICATE` | 409 | Bài hát này đã có trong vị trí phụng vụ này |
 | `SLOT_NOT_FOUND` | 404 | Không tìm thấy vị trí phụng vụ |
 | `SONG_LIST_CANNOT_BE_REVISED` | 409 | Chỉ tạo phiên bản mới khi danh sách bị từ chối hoặc cần sửa |
 | `REVIEW_NOTES_REQUIRED` | 400 | Vui lòng nhập ghi chú khi từ chối hoặc yêu cầu sửa |
@@ -380,3 +380,5 @@ xem — trả 404, để không lộ sự tồn tại của bản ghi.
   bị tắt sau lần lưu cuối), ngày nằm trong mùa, giờ + nơi cử hành chưa bị chiếm (`LITURGICAL_EVENT_SLOT_TAKEN`).
 - 2026-10-20: thêm mục 16 Giờ lễ cố định — `MASS_SCHEDULE_NOT_FOUND`, `MASS_SCHEDULE_SLOT_TAKEN` cho
   `api/mass-schedules`; `LITURGICAL_EVENT_GENERATION_RANGE_INVALID` cho `POST /api/liturgical-events/generation`.
+- 2026-10-20: một vị trí phụng vụ được có nhiều bài trong danh sách bài hát. `SONG_LIST_SLOT_DUPLICATE` đổi nghĩa:
+  chỉ báo khi **cùng một bài** lặp lại trong cùng một vị trí (trước: khi một vị trí có hơn một bài). FE đổi câu dịch.

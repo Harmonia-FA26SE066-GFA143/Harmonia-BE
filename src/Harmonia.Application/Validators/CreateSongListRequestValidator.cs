@@ -21,8 +21,9 @@ public class CreateSongListRequestValidator : AbstractValidator<CreateSongListRe
         });
 
         RuleFor(x => x.Items)
-            .Must(items => items.Select(i => i.SlotId).Distinct().Count() == items.Count)
+            // A slot may hold several songs (e.g. two at Communion), but the same song only once.
+            .Must(items => items.Select(i => (i.SlotId, i.SongId)).Distinct().Count() == items.Count)
             .WithErrorCode(ErrorCodes.SongListSlotDuplicate)
-            .WithMessage("Each slot may only appear once in the list.");
+            .WithMessage("A song may only appear once in the same slot.");
     }
 }

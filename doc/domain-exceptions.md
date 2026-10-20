@@ -71,7 +71,6 @@ Phương án A (đã chốt 2026-09-21): entity ném, Service **không** bắt,
 |---|---|---|---|
 | `SongInactiveException` | Thêm bài hát đã vô hiệu vào danh sách | `SONG_INACTIVE` | 409 |
 | `SongListNotEditableException` | Thêm/sửa/xoá item khi `Status ≠ Draft` | `SONG_LIST_NOT_EDITABLE` | 409 |
-| `SongListSlotDuplicateException` | Hai item trùng `SlotId` | `SONG_LIST_SLOT_DUPLICATE` | 409 |
 | `SongListEmptyException` | Gửi duyệt khi chưa có item | `SONG_LIST_EMPTY` | 400 |
 | `SongListAlreadySubmittedException` | Gửi duyệt lần hai | `SONG_LIST_ALREADY_SUBMITTED` | 409 |
 | `SongListNotSubmittedException` | Linh mục duyệt khi `Status ≠ Submitted` (gồm cả duyệt lại bản đã quyết định) | `SONG_LIST_NOT_SUBMITTED` | 409 |
