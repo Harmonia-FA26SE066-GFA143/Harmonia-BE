@@ -4,7 +4,7 @@ Conceptual diagram (mô hình khái niệm / domain model) trả lời: **hệ t
 khái niệm nghiệp vụ nào và chúng liên hệ với nhau ra sao**. Nó không phải sơ đồ cơ sở dữ
 liệu: không có kiểu dữ liệu, không có khoá chính, khoá ngoại, không có bảng kỹ thuật.
 
-Nguồn dữ liệu: `doc/harmonia-domain-entity-list.md` (44 entity, mục "Relationships for the ERD").
+Nguồn dữ liệu: `doc/harmonia-domain-entity-list.md` (48 entity, mục "Relationships for the ERD").
 Sơ đồ nộp báo cáo thì **vẽ tay** (draw.io, Astah, Visual Paradigm hoặc giấy) theo mục 3.
 Các khối Mermaid ở mục 4 chỉ là **hình mẫu để nhìn theo** — mở Markdown Preview trong
 VS Code hoặc dán vào <https://mermaid.live> để xem hình.
@@ -18,40 +18,43 @@ VS Code hoặc dán vào <https://mermaid.live> để xem hình.
 | Thuộc tính | Không, hoặc 2–3 cái tiêu biểu | Đủ, có kiểu, PK/FK | Đủ, có kiểu, method |
 | Entity kỹ thuật | Bỏ | Có | Có |
 | Bảng trung gian n–n | Vẽ thành quan hệ n–n | Vẽ thành bảng | Vẽ thành class |
-| Số ô | 15–25 | 44 | Theo layer |
+| Số ô | 15–25 | 48 | Theo layer |
 
 ## 2. Chọn khái niệm nào đưa vào
 
-Từ 44 entity, lọc theo ba luật:
+Từ 48 entity, lọc theo ba luật:
 
 1. **Bỏ entity kỹ thuật** — người dùng nghiệp vụ không gọi tên chúng:
    `RefreshToken`, `PasswordResetToken`, `AuditLog`, `SystemSetting`, `ReportExport`,
    `NotificationRecipient`, `LiturgicalDay` (chỉ là cache của API lịch).
 2. **Gộp entity trung gian thành quan hệ n–n** khi nó không mang dữ liệu nghiệp vụ riêng:
    `SongClassification`, `SongVocalRequirement`, `SongInstrumentRequirement`,
-   `PracticeAssignmentTarget`, `RehearsalSong`.
+   `PracticeAssignmentTarget`, `RehearsalSong`, `LiturgicalEventChoir` (thành `LiturgicalEvent` n–n `Choir`).
 3. **Giữ entity trung gian** khi người dùng thao tác trực tiếp trên nó hoặc nó có trạng thái:
    `MemberSkill` (được duyệt), `EventParticipation` (được xác nhận), `RosterAssignment`
    (được thay), `SongListItem`, `SongPersonnelRequirement`, `RehearsalAttendance`,
-   `MaterialLearningProgress`.
+   `MaterialLearningProgress`, `ChoirMembership` (ca trưởng thêm / cho rời ca đoàn, có ngày gia nhập).
 
 Kết quả cho Harmonia:
 
 | Nhóm | Khái niệm giữ lại |
 |---|---|
-| Người dùng | `User`, `Role`, `MemberProfile` |
+| Người dùng | `User`, `Role`, `MemberProfile`, `Choir`, `ChoirMembership` |
 | Kỹ năng | `SkillCategory`, `Skill`, `MemberSkill` |
-| Phụng vụ | `LiturgicalEvent`, `LiturgicalSeason`, `MassType`, `CeremonyType`, `EventCategory`, `WorshipLocation` |
+| Phụng vụ | `LiturgicalEvent`, `LiturgicalSeason`, `MassType`, `CeremonyType`, `EventCategory`, `WorshipLocation`, `MassSchedule` |
 | Thư viện nhạc | `Song`, `SongTheme`, `MusicMaterial`, `MaterialLearningProgress` |
 | Danh sách bài hát | `SongList`, `SongListItem`, `LiturgicalSlot`, `SongListReview` |
 | Phân công | `EventParticipation`, `SongPersonnelRequirement`, `ServiceRoster`, `RosterAssignment` |
 | Tập hát | `Rehearsal`, `RehearsalAttendance`, `PracticeAssignment`, `PracticeSubmission`, `PracticeFeedback` |
 | Liên lạc | `Notification`, `DirectorNote` |
 
-32 khái niệm là quá nhiều cho một trang. Vẽ **một sơ đồ tổng** khoảng 15 ô (mục 4.1) và
+35 khái niệm là quá nhiều cho một trang. Vẽ **một sơ đồ tổng** khoảng 15 ô (mục 4.1) và
 **sơ đồ chi tiết theo nhóm** (mục 4.2) cho những nhóm cần giải thích.
 
-Không có ô `Choir` — hệ thống phục vụ một ca đoàn. Không có ô `Instrumentalist` — nhạc công
+Có ô `Choir` (D7): giáo xứ có nhiều ca đoàn, ca viên gia nhập nhiều ca đoàn qua
+`ChoirMembership`, một sự kiện có nhiều ca đoàn phục vụ. Một `ChoirDirector` quản lý mọi ca
+đoàn — không vẽ quan hệ "ca trưởng của" giữa `User` và `Choir`. `MassSchedule` chỉ là khuôn
+mẫu giờ lễ để sinh sự kiện nháp, không nối tới `LiturgicalEvent`. Không có ô `Instrumentalist` — nhạc công
 là `MemberProfile` có `MemberSkill` thuộc `SkillCategory` nhạc cụ.
 
 ## 3. Cách vẽ tay
@@ -66,7 +69,7 @@ là `MemberProfile` có `MemberSkill` thuộc `SkillCategory` nhạc cụ.
 | Bội số | Số ghi ở **hai đầu** đường nối: `1`, `0..1`, `*`, `1..*` | Đầu nào cũng phải có |
 | Tên quan hệ | Động từ ghi giữa đường nối, kèm tam giác nhỏ ▸ chỉ chiều đọc | "có", "thuộc", "duyệt" |
 | Quan hệ với chính nó | Đường vòng ra rồi quay về cùng một ô | `SongList` – phiên bản trước |
-| Ghi chú | Hình chữ nhật gập góc, nối nét đứt | Cho quyết định mô hình (D1–D6) |
+| Ghi chú | Hình chữ nhật gập góc, nối nét đứt | Cho quyết định mô hình (D1–D7) |
 
 Không vẽ: hình thoi quan hệ kiểu Chen, ký hiệu PK/FK, mũi tên kế thừa, method.
 Nếu giảng viên yêu cầu ký hiệu **crow's foot** thì thay bội số bằng chân quạ ở đầu đường
@@ -101,8 +104,8 @@ sai nghiệp vụ thì bội số sai.
    có một đường nối.
 7. Vẽ đường nối theo bảng ở bước 2, đánh dấu dòng đã vẽ.
 8. Ghi bội số hai đầu, rồi ghi tên quan hệ.
-9. Thêm ghi chú cho những điểm người đọc hay hỏi: không có `Choir`, không có role nhạc
-   công, `SongList` mỗi phiên bản một dòng.
+9. Thêm ghi chú cho những điểm người đọc hay hỏi: nhiều ca đoàn nhưng một ca trưởng chung (D7),
+   không có role nhạc công, `SongList` mỗi phiên bản một dòng.
 
 ### Bố cục
 
@@ -123,6 +126,7 @@ classDiagram
     class User
     class Role
     class MemberProfile
+    class Choir
     class Skill
     class MemberSkill
     class LiturgicalEvent
@@ -143,6 +147,8 @@ classDiagram
     User "1" -- "0..1" MemberProfile : có hồ sơ
     MemberProfile "1" -- "*" MemberSkill : khai báo
     Skill "1" -- "*" MemberSkill : được khai
+    MemberProfile "*" -- "*" Choir : gia nhập
+    LiturgicalEvent "*" -- "*" Choir : được phục vụ bởi
     WorshipLocation "1" -- "*" LiturgicalEvent : diễn ra tại
     LiturgicalEvent "1" -- "*" SongList : có các phiên bản
     SongList "1" -- "*" SongListItem : gồm
@@ -160,6 +166,11 @@ classDiagram
     PracticeAssignment "1" -- "*" PracticeSubmission : nhận
     MemberProfile "1" -- "*" PracticeSubmission : nộp
 ```
+
+`MemberProfile — Choir` vẽ gọn thành n–n ở sơ đồ tổng; ở sơ đồ chi tiết thì tách thành ô
+`ChoirMembership` (thuộc tính `joinedDate`, `isActive`). Ba quan hệ tuỳ chọn
+`Choir "0..1" -- "*" SongList / Rehearsal / PracticeAssignment` chỉ vẽ ở sơ đồ chi tiết để
+`Choir` không quá đông đường nối.
 
 ### 4.2 Sơ đồ chi tiết — danh sách bài hát và phân công
 
@@ -209,13 +220,14 @@ classDiagram
     SongListItem "0..1" -- "*" RosterAssignment : cho bài
 ```
 
-Các nhóm còn lại (kỹ năng, thư viện nhạc, tập hát, liên lạc) vẽ theo cùng cách, lấy quan hệ
+Các nhóm còn lại (kỹ năng, ca đoàn, phụng vụ, thư viện nhạc, tập hát, liên lạc) vẽ theo cùng cách
+— nhóm phụng vụ có thêm `MassType "1" -- "*" MassSchedule` và `WorshipLocation "1" -- "*" MassSchedule`, lấy quan hệ
 từ mục "Relationships for the ERD" của `doc/harmonia-domain-entity-list.md`.
 
 ## 5. Checklist trước khi nộp sơ đồ
 
 - [ ] Mọi tên ô có trong `doc/harmonia-domain-entity-list.md`, viết đúng, số ít.
-- [ ] Không có ô `Choir`, `Instrumentalist`, `Event`, `Season`, `SheetMusic`, `Assignment`.
+- [ ] Không có ô `Instrumentalist`, `Event`, `Season`, `SheetMusic`, `Assignment`.
 - [ ] Không có entity kỹ thuật (token, log, setting).
 - [ ] Không có kiểu dữ liệu, `id`, khoá ngoại.
 - [ ] Mọi đường nối có bội số ở **cả hai đầu** và có tên quan hệ.
