@@ -74,8 +74,8 @@ Brief use case description table for Report 3 (SRS), in the form **ID / Use Case
 | UC-31 | Manage User Accounts & Roles | Admin | The Admin creates, updates and deactivates user accounts, assigns system roles (Parish Priest/Liturgy Committee, Choir Director, Choir Member, Admin) and maintains choir member profiles (personal information and membership status Active / Inactive / Left). (FE-47, FE-48) |
 | UC-32 | Configure System Categories | Admin | The Admin configures the master data of the system, including skill categories, liturgical seasons, Mass types, ceremony types and event categories. (FE-49, FE-50) |
 | UC-33 | Manage System Settings | Admin | The Admin maintains the general system settings that control how the system behaves for all users. (FE-51) |
-| UC-34 | View Reports | Admin | The Admin views reports on user activity, attendance, participation confirmation and assignment completion. (FE-52) |
-| UC-34E | Export Reports | Admin | «extend» UC-34. The Admin optionally exports the report currently being viewed, by month, by event or by liturgical season. (FE-53) |
+| UC-34 | View Reports | Admin, Choir Director | The Admin views reports on user activity, attendance, participation confirmation and assignment completion. The Choir Director views the attendance, participation confirmation and assignment completion reports, optionally narrowed to the members of one choir. (FE-52) |
+| UC-34E | Export Reports | Admin, Choir Director | «extend» UC-34. The Admin or the Choir Director optionally exports the report currently being viewed, by month, by event or by liturgical season. Only the Admin sees the export history. (FE-53) |
 | UC-35 | View Activity History / Audit Log | Admin | The Admin reviews the log of important activities such as role changes, skill approvals, song list approvals, roster confirmations, attendance updates and deleted materials. (FE-54) |
 
 ## Old → canonical numbering map

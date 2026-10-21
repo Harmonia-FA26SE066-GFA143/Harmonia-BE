@@ -1,6 +1,6 @@
 # Harmonia – Danh sách Feature & Function
 
-Hệ thống Harmonia gồm **12 feature**, bao phủ toàn bộ 54 function (FE-01 → FE-54) cùng 5 use case dùng chung (S-01 → S-05). Mỗi function ghi kèm mã FE/UC để truy vết với Report 1–3. Mã UC theo đánh số chuẩn, giống `harmonia-use-case-descriptions.md`.
+Hệ thống Harmonia gồm **14 feature**, bao phủ toàn bộ 54 function (FE-01 → FE-54), các function ca đoàn (D7), giờ lễ cố định cùng 5 use case dùng chung (S-01 → S-05). Mỗi function ghi kèm mã FE/UC để truy vết với Report 1–3. Mã UC theo đánh số chuẩn, giống `harmonia-use-case-descriptions.md`.
 
 | Mã | Actor | Nền tảng |
 | --- | --- | --- |
@@ -13,8 +13,8 @@ Hệ thống Harmonia gồm **12 feature**, bao phủ toàn bộ 54 function (FE
 | --- | --- | --- |
 | F1 | Xác thực & Tài khoản cá nhân | 4 |
 | F2 | Quản lý Người dùng & Phân quyền | 3 |
-| F3 | Quản lý Thành viên & Kỹ năng | 7 |
-| F4 | Lịch Phụng vụ theo Ngày | 5 |
+| F3 | Quản lý Thành viên & Kỹ năng | 5 |
+| F4 | Lịch Phụng vụ theo Ngày | 6 |
 | F5 | Thư viện Thánh nhạc | 6 |
 | F6 | Danh sách Bài hát cho Sự kiện (Song List) | 7 |
 | F7 | Lịch tập & Xác nhận Tham gia | 4 |
@@ -22,7 +22,9 @@ Hệ thống Harmonia gồm **12 feature**, bao phủ toàn bộ 54 function (FE
 | F9 | Bài tập Luyện tập & Chấm điểm | 8 |
 | F10 | Điểm danh & Theo dõi Chuẩn bị | 4 |
 | F11 | Thông báo & Trao đổi | 3 |
-| F12 | Báo cáo, Nhật ký & Cấu hình Hệ thống | 7 |
+| F12 | Báo cáo & Nhật ký | 6 |
+| F13 | Quản lý Ca đoàn | 3 |
+| F14 | Cấu hình Hệ thống | 3 |
 
 ## F1. Xác thực & Tài khoản cá nhân
 
@@ -50,8 +52,6 @@ Hệ thống Harmonia gồm **12 feature**, bao phủ toàn bộ 54 function (FE
 | Khai báo kỹ năng mới (bè hát, nhạc cụ, hát solo, xướng đáp ca…) | CM | UC-03 / FE-03 |
 | Theo dõi trạng thái duyệt kỹ năng | CM | UC-03 / FE-04 |
 | Duyệt / từ chối kỹ năng thành viên khai báo | CD | UC-19 / FE-25 |
-| Quản lý ca đoàn: tạo, sửa, tắt ca đoàn | CD | D7 |
-| Xem thành viên, gán / rút ca viên khỏi ca đoàn (một ca viên thuộc được nhiều ca đoàn) | CD | D7 |
 
 ## F4. Lịch Phụng vụ theo Ngày
 
@@ -61,7 +61,8 @@ Hệ thống Harmonia gồm **12 feature**, bao phủ toàn bộ 54 function (FE
 | Tạo sự kiện cho từng ngày: giờ, loại lễ, nghi thức, địa điểm, yêu cầu đặc biệt (1 ngày có thể có nhiều sự kiện; mùa phụng vụ được gợi ý sẵn từ API) | PP | UC-12 / FE-16 |
 | Công bố từng sự kiện, hệ thống tự thông báo cho ca trưởng | PP | UC-12 → S-05 |
 | Xem các sự kiện và lịch tập sắp tới | CM | UC-04 / FE-05 |
-| Gán ca đoàn phục vụ sự kiện (một sự kiện có nhiều ca đoàn) | CD | D7 |
+| Quản lý giờ lễ cố định của giáo xứ (thứ trong tuần, giờ, loại lễ, địa điểm) | AD | — |
+| Sinh sự kiện nháp từ giờ lễ cố định cho một khoảng ngày | PP | — |
 
 ## F5. Thư viện Thánh nhạc
 
@@ -138,14 +139,29 @@ Hệ thống Harmonia gồm **12 feature**, bao phủ toàn bộ 54 function (FE
 | Xem thông báo | Tất cả | S-04 |
 | Gửi ghi chú / yêu cầu cho ca trưởng (gắn với một ngày hoặc một sự kiện) | PP | UC-17 / FE-23 |
 
-## F12. Báo cáo, Nhật ký & Cấu hình Hệ thống
+## F12. Báo cáo & Nhật ký
 
 | Function | Actor | Mã |
 | --- | --- | --- |
 | Báo cáo lịch sử phục vụ, tần suất dùng bài hát, chuẩn bị sự kiện | PP | UC-16 / FE-22 |
 | Báo cáo hoạt động người dùng, điểm danh, xác nhận, hoàn thành bài tập | AD | UC-34 / FE-52 |
+| Báo cáo điểm danh, xác nhận, hoàn thành bài tập của ca viên (lọc được theo ca đoàn) | CD | UC-34 / FE-52 |
 | Xuất báo cáo theo tháng / sự kiện / mùa phụng vụ | AD | UC-34E / FE-53 |
+| Xuất 3 báo cáo theo ca viên | CD | UC-34E / FE-53 |
 | Xem lịch sử hoạt động quan trọng (Audit Log) | AD | UC-35 / FE-54 |
+
+## F13. Quản lý Ca đoàn
+
+| Function | Actor | Mã |
+| --- | --- | --- |
+| Quản lý ca đoàn: tạo, sửa, tắt ca đoàn | CD | D7 |
+| Xem thành viên, gán / rút ca viên khỏi ca đoàn (một ca viên thuộc được nhiều ca đoàn) | CD | D7 |
+| Gán ca đoàn phục vụ sự kiện (một sự kiện có nhiều ca đoàn) | CD | D7 |
+
+## F14. Cấu hình Hệ thống
+
+| Function | Actor | Mã |
+| --- | --- | --- |
 | Cấu hình danh mục kỹ năng | AD | UC-32 / FE-49 |
 | Cấu hình mùa phụng vụ, loại lễ, nghi thức, loại sự kiện | AD | UC-32 / FE-50 |
 | Quản lý cài đặt chung của hệ thống | AD | UC-33 / FE-51 |
@@ -153,8 +169,8 @@ Hệ thống Harmonia gồm **12 feature**, bao phủ toàn bộ 54 function (FE
 ## Ghi chú
 
 - Feature được gom theo nghiệp vụ, không theo actor.
-- F12 đang gộp nhiều thứ. Nếu dùng làm module để chia việc cho BE, nên tách thành "Báo cáo & Audit" và "Cấu hình hệ thống".
+- 2026-10-20: tách F12 cũ thành F12 "Báo cáo & Nhật ký" và F14 "Cấu hình Hệ thống"; gom chức năng ca đoàn (D7) từ F3, F4 về F13; thêm giờ lễ cố định vào F4. F1–F11 giữ số cũ để không lệch các tab trên Google Sheet và tham chiếu trong docs.
 - Hồ sơ ca viên do Admin quản lý (F2). Ca trưởng chỉ xem (F3) và xếp ca viên theo bài hát (F8). Quyết định ngày 2026-09-29.
 - Lịch phụng vụ làm theo ngày, không theo tuần; FE-16a (sao chép tuần trước) đã bỏ. Quyết định ngày 2026-09-30.
 - Không có vai trò Instrumentalist: người chơi nhạc cụ là Choir Member có kỹ năng nhạc cụ đã được duyệt (F3).
-- Nhiều ca đoàn (D7, 2026-10-17): ca trưởng quản lý mọi ca đoàn, không có ca trưởng riêng từng ca đoàn. Các chức năng ca đoàn chưa có mã UC / FE riêng.
+- Nhiều ca đoàn (D7, 2026-10-17): ca trưởng quản lý mọi ca đoàn, không có ca trưởng riêng từng ca đoàn. Các chức năng ca đoàn (F13) và giờ lễ cố định (F4) chưa có mã UC / FE riêng.

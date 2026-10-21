@@ -574,17 +574,17 @@ Gồm mọi trường của `LiturgicalEventDto`, thêm `liturgicalSeasonName`, 
 
 ---
 
-## 4c. Reports — `api/reports` · role `ParishPriest`, `Admin` (UC-16 / FE-22) · 4 báo cáo quản trị và xuất file: chỉ `Admin` (UC-34 / FE-52, UC-34E / FE-53)
+## 4c. Reports — `api/reports` · role `ParishPriest`, `Admin` (UC-16 / FE-22) · 4 báo cáo quản trị và xuất file: `Admin` (UC-34 / FE-52, UC-34E / FE-53) · 3 báo cáo theo ca viên và xuất chúng: thêm `ChoirDirector`
 
 | Method | Route | Role | Query | Thành công | Lỗi |
 |---|---|---|---|---|---|
 | GET | `/api/reports/service-history` | `ParishPriest`, `Admin` | `eventId`, `liturgicalSeasonId`, `fromDate`, `toDate`, `pageNumber`, `pageSize` | 200 `PagedList<ServiceHistoryDto>` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`) |
 | GET | `/api/reports/song-usage` | `ParishPriest`, `Admin` | như trên | 200 `PagedList<SongUsageDto>` | như trên |
 | GET | `/api/reports/user-activity` | `Admin` | `fromDate`, `toDate`, `pageNumber`, `pageSize` | 200 `PagedList<UserActivityDto>` | như trên |
-| GET | `/api/reports/rehearsal-attendance` | `Admin` | như `service-history` | 200 `PagedList<RehearsalAttendanceReportDto>` | như trên |
-| GET | `/api/reports/participation` | `Admin` | như `service-history` | 200 `PagedList<ParticipationReportDto>` | như trên |
-| GET | `/api/reports/assignment-completion` | `Admin` | như `service-history` | 200 `PagedList<PracticeAssignmentCompletionDto>` | như trên |
-| GET | `/api/reports/export` | `Admin` | `type`, `format`, `eventId`, `liturgicalSeasonId`, `fromDate`, `toDate` | 200 file tải về | 400 `VALIDATION_FAILED` (`REPORT_TYPE_NOT_SUPPORTED`, `REPORT_DATE_RANGE_INVALID`) · 404 `REPORT_NO_DATA` · 502 `EXTERNAL_STORAGE_FAILED` |
+| GET | `/api/reports/rehearsal-attendance` | `Admin`, `ChoirDirector` | như `service-history` + `choirId` (chỉ giữ ca viên đang thuộc ca đoàn) | 200 `PagedList<RehearsalAttendanceReportDto>` | như trên |
+| GET | `/api/reports/participation` | `Admin`, `ChoirDirector` | như `rehearsal-attendance` | 200 `PagedList<ParticipationReportDto>` | như trên |
+| GET | `/api/reports/assignment-completion` | `Admin`, `ChoirDirector` | như `rehearsal-attendance` | 200 `PagedList<PracticeAssignmentCompletionDto>` | như trên |
+| GET | `/api/reports/export` | `Admin`, `ChoirDirector` | `type`, `format`, `eventId`, `liturgicalSeasonId`, `fromDate`, `toDate`, `choirId` | 200 file tải về | 400 `VALIDATION_FAILED` (`REPORT_TYPE_NOT_SUPPORTED`, `REPORT_DATE_RANGE_INVALID`) · 400 `REPORT_TYPE_NOT_SUPPORTED` khi `ChoirDirector` chọn `type` ngoài `RehearsalAttendance`, `Participation`, `AssignmentCompletion` · 404 `REPORT_NO_DATA` · 502 `EXTERNAL_STORAGE_FAILED` |
 | GET | `/api/reports/exports` | `Admin` | `pageNumber`, `pageSize` | 200 `PagedList<ReportExportDto>` | — |
 
 - `eventId` thu hẹp báo cáo về một sự kiện; `user-activity` bỏ qua tham số này.

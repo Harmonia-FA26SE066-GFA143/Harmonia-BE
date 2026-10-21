@@ -14,9 +14,13 @@ public class ReportExportService(
     IReportService reportService,
     IReportFileWriter reportFileWriter,
     IFileStorageService fileStorageService,
-    IReportExportRepository reportExportRepository) : IReportExportService
+    IReportExportRepository reportExportRepository,
+    ICurrentUserService currentUserService) : IReportExportService
 {
     private const int ExportPageSize = 100;
+
+    private static readonly ReportType[] ChoirDirectorTypes =
+        [ReportType.RehearsalAttendance, ReportType.Participation, ReportType.AssignmentCompletion];
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -25,11 +29,17 @@ public class ReportExportService(
 
     /// <summary>What <see cref="ReportExport.Parameters"/> holds; the entity has no column for the format.</summary>
     private sealed record Parameters(
-        ReportFormat Format, Guid? EventId, Guid? LiturgicalSeasonId, DateOnly? FromDate, DateOnly? ToDate);
+        ReportFormat Format, Guid? EventId, Guid? LiturgicalSeasonId, DateOnly? FromDate, DateOnly? ToDate,
+        Guid? ChoirId = null);
 
     public async Task<Result<FileContent>> ExportAsync(
-        Guid adminUserId, ExportReportRequest request, CancellationToken cancellationToken)
+        Guid userId, ExportReportRequest request, CancellationToken cancellationToken)
     {
+        // The controller lets the Choir Director in for the per-member reports only; the type is not known to the attribute.
+        if (currentUserService.RoleName == RoleNames.ChoirDirector
+            && !(request.Type is { } type && ChoirDirectorTypes.Contains(type)))
+            return Result<FileContent>.Failure(ErrorCodes.ReportTypeNotSupported);
+
         var table = request.Type switch
         {
             ReportType.UserActivity => ReportExportColumns.UserActivity(
@@ -55,7 +65,7 @@ public class ReportExportService(
         var fileName =
             $"{request.Type}-{VietnamTime.FromUtc(exportedAt):yyyyMMdd-HHmmss}.{request.Format.ToString().ToLowerInvariant()}";
 
-        // Stored before it is handed over, so every file an Admin received is also in the history.
+        // Stored before it is handed over, so every file a user received is also in the history.
         using var upload = new MemoryStream(bytes);
         var stored = await fileStorageService.UploadAsync(
             upload, fileName, "report-exports", isPrivate: true, cancellationToken);
@@ -68,11 +78,12 @@ public class ReportExportService(
                 ReportType = request.Type!.Value,
                 Parameters = JsonSerializer.Serialize(
                     new Parameters(
-                        request.Format, request.EventId, request.LiturgicalSeasonId, request.FromDate, request.ToDate),
+                        request.Format, request.EventId, request.LiturgicalSeasonId, request.FromDate, request.ToDate,
+                        request.ChoirId),
                     JsonOptions),
                 // Private files have no usable URL, so the column keeps the id a signed URL is built from.
                 FileUrl = stored.Value!.PublicId,
-                ExportedBy = adminUserId,
+                ExportedBy = userId,
                 ExportedAt = exportedAt,
             },
             cancellationToken);

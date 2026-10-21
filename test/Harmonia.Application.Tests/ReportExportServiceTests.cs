@@ -18,6 +18,7 @@ public class ReportExportServiceTests
     private readonly IReportFileWriter _writer = Substitute.For<IReportFileWriter>();
     private readonly IFileStorageService _storage = Substitute.For<IFileStorageService>();
     private readonly IReportExportRepository _exports = Substitute.For<IReportExportRepository>();
+    private readonly ICurrentUserService _currentUser = Substitute.For<ICurrentUserService>();
     private readonly ReportExportService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly Guid _adminId = Guid.NewGuid();
@@ -30,7 +31,7 @@ public class ReportExportServiceTests
 
     public ReportExportServiceTests()
     {
-        _sut = new ReportExportService(_reports, _writer, _storage, _exports);
+        _sut = new ReportExportService(_reports, _writer, _storage, _exports, _currentUser);
         _writer.Write(Arg.Do<ReportTable>(t => _table = t), ReportFormat.Csv).Returns([1, 2, 3]);
         _storage.UploadAsync(default!, default!, default!, default, default)
             .ReturnsForAnyArgs(Result<FileUploadResponse>.Success(new FileUploadResponse(StoredId, string.Empty)));
@@ -68,6 +69,37 @@ public class ReportExportServiceTests
         Assert.Contains("\"Format\":\"Csv\"", saved.Parameters);
         Assert.Contains(_request.EventId.ToString()!, saved.Parameters);
         await _exports.Received(1).SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Export_ChoirDirector_PerMemberReport_RecordsTheExportWithTheChoir_Async()
+    {
+        _currentUser.RoleName.Returns(RoleNames.ChoirDirector);
+        _request.ChoirId = Guid.NewGuid();
+        ReturnsAttendancePages(1, ["Alice"]);
+        ReportExport? saved = null;
+        await _exports.AddAsync(Arg.Do<ReportExport>(e => saved = e), _ct);
+
+        var result = await _sut.ExportAsync(_adminId, _request, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Contains(_request.ChoirId.ToString()!, saved!.Parameters);
+    }
+
+    [Theory]
+    [InlineData(ReportType.UserActivity)]
+    [InlineData(ReportType.SongUsage)]
+    [InlineData(ReportType.ServiceHistory)]
+    public async Task Export_ChoirDirector_OtherReport_ReturnsTypeNotSupported_AndReadsNothing_Async(ReportType type)
+    {
+        _currentUser.RoleName.Returns(RoleNames.ChoirDirector);
+        _request.Type = type;
+
+        var result = await _sut.ExportAsync(_adminId, _request, _ct);
+
+        Assert.Equal(ErrorCodes.ReportTypeNotSupported, result.Code);
+        Assert.Empty(_reports.ReceivedCalls());
+        await _exports.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
     }
 
     [Fact]

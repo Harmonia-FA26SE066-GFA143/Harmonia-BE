@@ -32,6 +32,22 @@ public class ReportsEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<H
     }
 
     [Fact]
+    public async Task ChoirDirector_GetsThePerMemberReportsAndTheirExport_Only_Async()
+    {
+        var director = await factory.AddUserAsync("reports-director@test.com", RoleNames.ChoirDirector, cancellationToken: _ct);
+        var client = await factory.CreateClientAsAsync(director.Email, _ct);
+
+        foreach (var report in AdminReports.Skip(1))
+            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"api/reports/{report}", _ct)).StatusCode);
+        foreach (var report in new[] { "user-activity", "song-usage", "service-history", "exports" })
+            Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync($"api/reports/{report}", _ct)).StatusCode);
+
+        var otherType = await client.GetAsync("api/reports/export?type=UserActivity", _ct);
+        Assert.Equal(HttpStatusCode.BadRequest, otherType.StatusCode);
+        Assert.Contains(ErrorCodes.ReportTypeNotSupported, await otherType.Content.ReadAsStringAsync(_ct));
+    }
+
+    [Fact]
     public async Task UserActivity_AfterAPasswordChange_CountsIt_Async()
     {
         var admin = await factory.AddUserAsync("reports-admin2@test.com", RoleNames.Admin, cancellationToken: _ct);

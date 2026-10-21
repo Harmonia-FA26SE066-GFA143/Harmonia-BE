@@ -133,12 +133,14 @@ public class MemberProfileRepository(HarmoniaDbContext dbContext)
         SearchReportsRequest filter, CancellationToken cancellationToken)
     {
         var (eventId, seasonId, fromDate, toDate) = (filter.EventId, filter.LiturgicalSeasonId, filter.FromDate, filter.ToDate);
+        var choirId = filter.ChoirId;
         DateTime? fromUtc = fromDate is { } from ? VietnamTime.StartOfDayUtc(from) : null;
         DateTime? toUtc = toDate is { } to ? VietnamTime.StartOfDayUtc(to.AddDays(1)) : null;
 
         var query = DbContext.MemberProfiles
             .AsNoTracking()
-            .Where(x => x.Status == MemberStatus.Active);
+            .Where(x => x.Status == MemberStatus.Active
+                && (choirId == null || x.ChoirMemberships.Any(m => m.ChoirId == choirId && m.IsActive)));
 
         var totalCount = await query.CountAsync(cancellationToken);
 

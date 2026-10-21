@@ -1914,6 +1914,31 @@ public sealed class RepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task GetActiveWithActivity_ChoirId_KeepsOnlyTheChoirsActiveMembers_Async()
+    {
+        var seed = await SeedHistoryAsync();
+        var choir = new Choir { Id = Guid.NewGuid(), Name = "Choir A" };
+        var otherChoir = new Choir { Id = Guid.NewGuid(), Name = "Choir B" };
+        await using (var seedContext = _db.NewContext())
+        {
+            seedContext.AddRange(choir, otherChoir);
+            seedContext.AddRange(
+                new ChoirMembership { Id = Guid.NewGuid(), ChoirId = choir.Id, MemberId = seed.MemberId },
+                // Left the choir: the row stays as history but no longer counts.
+                new ChoirMembership { Id = Guid.NewGuid(), ChoirId = choir.Id, MemberId = seed.OtherId, IsActive = false },
+                new ChoirMembership { Id = Guid.NewGuid(), ChoirId = otherChoir.Id, MemberId = seed.OtherId });
+            await seedContext.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var page = await new MemberProfileRepository(context).GetActiveWithActivityAsync(
+            new SearchReportsRequest { ChoirId = choir.Id }, _ct);
+
+        Assert.Equal(1, page.TotalCount);
+        Assert.Equal(seed.MemberId, Assert.Single(page.Items).Id);
+    }
+
+    [Fact]
     public async Task GetForReport_PicksAssignmentsByDueDateAndSeason_WithOnlyTheGivenMembersSubmissions_Async()
     {
         var seed = await SeedHistoryAsync();

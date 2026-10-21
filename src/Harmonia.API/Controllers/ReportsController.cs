@@ -9,26 +9,31 @@ using Microsoft.AspNetCore.StaticFiles;
 
 namespace Harmonia.API.Controllers;
 
-/// <summary>Service history and song usage over past events, for the Parish Priest and the Admin (UC-16 / FE-22).</summary>
+/// <summary>
+/// Service history and song usage over past events, for the Parish Priest and the Admin (UC-16 / FE-22);
+/// the per-member reports and their export also for the Choir Director.
+/// </summary>
 [Route("api/reports")]
-[Authorize(Roles = $"{RoleNames.ParishPriest},{RoleNames.Admin}")]
+[Authorize(Roles = $"{RoleNames.ParishPriest},{RoleNames.Admin},{RoleNames.ChoirDirector}")]
 public class ReportsController(IReportService reportService, IReportExportService reportExportService) : ApiControllerBase
 {
     private static readonly FileExtensionContentTypeProvider ContentTypes = new();
 
     [HttpGet("service-history")]
+    [Authorize(Roles = $"{RoleNames.ParishPriest},{RoleNames.Admin}")]
     [ProducesResponseType<PagedList<ServiceHistoryDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetServiceHistoryAsync(
         [FromQuery] SearchReportsRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await reportService.GetServiceHistoryAsync(request, cancellationToken));
 
     [HttpGet("song-usage")]
+    [Authorize(Roles = $"{RoleNames.ParishPriest},{RoleNames.Admin}")]
     [ProducesResponseType<PagedList<SongUsageDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetSongUsageAsync(
         [FromQuery] SearchReportsRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await reportService.GetSongUsageAsync(request, cancellationToken));
 
-    // The four reports below are the Admin's (UC-34 / FE-52); the controller attribute still applies, so this narrows it.
+    // The reports below are the Admin's (UC-34 / FE-52); the three per-member ones are also the Choir Director's.
     [HttpGet("user-activity")]
     [Authorize(Roles = RoleNames.Admin)]
     [ProducesResponseType<PagedList<UserActivityDto>>(StatusCodes.Status200OK)]
@@ -37,29 +42,32 @@ public class ReportsController(IReportService reportService, IReportExportServic
         ToActionResult(await reportService.GetUserActivityAsync(request, cancellationToken));
 
     [HttpGet("rehearsal-attendance")]
-    [Authorize(Roles = RoleNames.Admin)]
+    [Authorize(Roles = $"{RoleNames.Admin},{RoleNames.ChoirDirector}")]
     [ProducesResponseType<PagedList<RehearsalAttendanceReportDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetRehearsalAttendanceAsync(
         [FromQuery] SearchReportsRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await reportService.GetRehearsalAttendanceAsync(request, cancellationToken));
 
     [HttpGet("participation")]
-    [Authorize(Roles = RoleNames.Admin)]
+    [Authorize(Roles = $"{RoleNames.Admin},{RoleNames.ChoirDirector}")]
     [ProducesResponseType<PagedList<ParticipationReportDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetParticipationAsync(
         [FromQuery] SearchReportsRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await reportService.GetParticipationAsync(request, cancellationToken));
 
     [HttpGet("assignment-completion")]
-    [Authorize(Roles = RoleNames.Admin)]
+    [Authorize(Roles = $"{RoleNames.Admin},{RoleNames.ChoirDirector}")]
     [ProducesResponseType<PagedList<PracticeAssignmentCompletionDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAssignmentCompletionAsync(
         [FromQuery] SearchReportsRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await reportService.GetAssignmentCompletionAsync(request, cancellationToken));
 
-    /// <summary>Downloads any of the six reports as a file and records the export (UC-34E / FE-53).</summary>
+    /// <summary>
+    /// Downloads a report as a file and records the export (UC-34E / FE-53). The Admin exports any of the six,
+    /// the Choir Director only the three per-member ones.
+    /// </summary>
     [HttpGet("export")]
-    [Authorize(Roles = RoleNames.Admin)]
+    [Authorize(Roles = $"{RoleNames.Admin},{RoleNames.ChoirDirector}")]
     [ProducesResponseType<FileContentResult>(StatusCodes.Status200OK)]
     public async Task<IActionResult> ExportAsync(
         [FromQuery] ExportReportRequest request, CancellationToken cancellationToken)
