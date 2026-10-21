@@ -58,7 +58,8 @@ public interface ILookupService
 
     /// <summary>
     /// Checks the catalog rows an event is about to point at: LOOKUP_NOT_FOUND for an unknown id, LOOKUP_INACTIVE
-    /// for a switched-off row, LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON when <paramref name="eventDate"/> is not inside the season.
+    /// for a switched-off row, LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON when <paramref name="eventDate"/> is not inside the season
+    /// or on the day before it starts (vigil Mass).
     /// A row <paramref name="current"/> already points at may stay even when switched off, so an old event
     /// remains editable.
     /// </summary>

@@ -497,8 +497,9 @@ Chưa có kỹ năng nào → `[]`.
 - **Kiểm danh mục (cả `POST` lẫn `PUT`)**: `liturgicalSeasonId`, `massTypeId`, `ceremonyTypeId`, `categoryId`, `locationId`
   phải trỏ tới mục có thật → nếu không 404 `LOOKUP_NOT_FOUND`; mục đã tắt (`isActive: false`) → 409 `LOOKUP_INACTIVE`.
   Lỗi không cho biết trường nào sai. Khi `PUT`, Id giữ nguyên so với sự kiện hiện tại vẫn được chấp nhận dù mục đã tắt.
-- **Ngày phải thuộc mùa**: có `liturgicalSeasonId` mà `eventDate` nằm ngoài `startDate`–`endDate` của mùa → 400
-  `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON`. Kiểm ở mọi lần lưu, nên sự kiện cũ đang lệch mùa phải chọn lại mùa (hoặc bỏ trống) mới sửa được.
+- **Ngày phải thuộc mùa**: có `liturgicalSeasonId` mà `eventDate` nằm ngoài `startDate − 1 ngày`–`endDate` của mùa → 400
+  `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON`. Cho lùi 1 ngày vì lễ vọng chiều tối thuộc mùa của ngày hôm sau:
+  mùa nhập đúng lịch (Mùa Vọng đến 24/12, Giáng Sinh từ 25/12), lễ sáng 24/12 chọn Mùa Vọng, lễ vọng tối 24/12 chọn Giáng Sinh. Kiểm ở mọi lần lưu, nên sự kiện cũ đang lệch mùa phải chọn lại mùa (hoặc bỏ trống) mới sửa được.
 - Sửa (`PUT`) được khi sự kiện `Draft` hoặc `Published`; gửi đủ mọi trường như `POST`. Sửa không đổi trạng thái,
   không gửi thông báo. Trùng ngày + giờ + địa điểm với sự kiện **khác** → 409 `LITURGICAL_EVENT_SLOT_TAKEN`.
 - Huỷ (`cancel`) chuyển sang `Cancelled`, không hoàn tác được; sự kiện đã qua (trước hôm nay theo giờ Việt Nam)

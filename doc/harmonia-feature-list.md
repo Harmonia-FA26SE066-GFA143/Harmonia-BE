@@ -61,8 +61,8 @@ Hệ thống Harmonia gồm **14 feature**, bao phủ toàn bộ 54 function (FE
 | Tạo sự kiện cho từng ngày: giờ, loại lễ, nghi thức, địa điểm, yêu cầu đặc biệt (1 ngày có thể có nhiều sự kiện; mùa phụng vụ được gợi ý sẵn từ API) | PP | UC-12 / FE-16 |
 | Công bố từng sự kiện, hệ thống tự thông báo cho ca trưởng | PP | UC-12 → S-05 |
 | Xem các sự kiện và lịch tập sắp tới | CM | UC-04 / FE-05 |
-| Quản lý giờ lễ cố định của giáo xứ (thứ trong tuần, giờ, loại lễ, địa điểm) | AD | — |
-| Sinh sự kiện nháp từ giờ lễ cố định cho một khoảng ngày | PP | — |
+| Quản lý giờ lễ cố định của giáo xứ (thứ trong tuần, giờ, loại lễ, địa điểm) | AD | UC-36 |
+| Sinh sự kiện nháp từ giờ lễ cố định cho một khoảng ngày | PP | UC-12E |
 
 ## F5. Thư viện Thánh nhạc
 
@@ -154,9 +154,9 @@ Hệ thống Harmonia gồm **14 feature**, bao phủ toàn bộ 54 function (FE
 
 | Function | Actor | Mã |
 | --- | --- | --- |
-| Quản lý ca đoàn: tạo, sửa, tắt ca đoàn | CD | D7 |
-| Xem thành viên, gán / rút ca viên khỏi ca đoàn (một ca viên thuộc được nhiều ca đoàn) | CD | D7 |
-| Gán ca đoàn phục vụ sự kiện (một sự kiện có nhiều ca đoàn) | CD | D7 |
+| Quản lý ca đoàn: tạo, sửa, tắt ca đoàn | CD | UC-37 |
+| Xem thành viên, gán / rút ca viên khỏi ca đoàn (một ca viên thuộc được nhiều ca đoàn) | CD | UC-38 |
+| Gán ca đoàn phục vụ sự kiện (một sự kiện có nhiều ca đoàn) | CD | UC-39 |
 
 ## F14. Cấu hình Hệ thống
 
@@ -173,4 +173,4 @@ Hệ thống Harmonia gồm **14 feature**, bao phủ toàn bộ 54 function (FE
 - Hồ sơ ca viên do Admin quản lý (F2). Ca trưởng chỉ xem (F3) và xếp ca viên theo bài hát (F8). Quyết định ngày 2026-09-29.
 - Lịch phụng vụ làm theo ngày, không theo tuần; FE-16a (sao chép tuần trước) đã bỏ. Quyết định ngày 2026-09-30.
 - Không có vai trò Instrumentalist: người chơi nhạc cụ là Choir Member có kỹ năng nhạc cụ đã được duyệt (F3).
-- Nhiều ca đoàn (D7, 2026-10-17): ca trưởng quản lý mọi ca đoàn, không có ca trưởng riêng từng ca đoàn. Các chức năng ca đoàn (F13) và giờ lễ cố định (F4) chưa có mã UC / FE riêng.
+- Nhiều ca đoàn (D7, 2026-10-17): ca trưởng quản lý mọi ca đoàn, không có ca trưởng riêng từng ca đoàn. Các chức năng ca đoàn (F13) và giờ lễ cố định (F4) chưa có mã FE riêng; mã UC gán ngày 2026-10-21: UC-12E, UC-36…UC-39.

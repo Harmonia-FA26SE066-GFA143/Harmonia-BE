@@ -158,7 +158,7 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `LITURGICAL_EVENT_CANCELLED` | 409 | Sự kiện đã bị huỷ |
 | `LITURGICAL_EVENT_ALREADY_PASSED` | 409 | Sự kiện đã diễn ra |
 | `LITURGICAL_EVENT_TYPE_REQUIRED` | 400 | Phải chọn loại lễ hoặc loại nghi thức |
-| `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` | 400 | Ngày sự kiện không thuộc mùa phụng vụ đã chọn |
+| `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` | 400 | Ngày sự kiện không thuộc mùa phụng vụ đã chọn (được phép sớm hơn ngày bắt đầu mùa 1 ngày cho lễ vọng) |
 | `LITURGICAL_EVENT_SEASON_REQUIRED` | 400 | Phải chọn mùa phụng vụ trước khi công bố sự kiện |
 | `LITURGICAL_EVENT_GENERATION_RANGE_INVALID` | 400 | Khoảng ngày không hợp lệ: không bắt đầu trong quá khứ và dài tối đa 62 ngày |
 | `LITURGICAL_SEASON_DATE_OVERLAP` | 409 | Khoảng thời gian trùng với mùa phụng vụ khác |

@@ -213,7 +213,8 @@ public class LookupService(
         if (error is not null) return Result.Failure(error);
 
         // Checked on every save, not only when the date or the season changed: either one moving breaks the pair.
-        return season is not null && (eventDate < season.StartDate || eventDate > season.EndDate)
+        // The day before the start is allowed: an evening vigil Mass belongs to the next day's season (24/12 evening → Christmas).
+        return season is not null && (eventDate < season.StartDate.AddDays(-1) || eventDate > season.EndDate)
             ? Result.Failure(ErrorCodes.LiturgicalEventDateOutsideLiturgicalSeason)
             : Result.Success();
     }

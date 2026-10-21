@@ -354,8 +354,19 @@ public class LookupServiceTests
         Assert.True(unchanged.IsSuccess);
     }
 
+    [Fact]
+    public async Task CheckEventCatalogs_DayBeforeTheSeasonStarts_Succeeds_ForAVigilMass_Async()
+    {
+        var season = Season(_eventDate, _eventDate.AddDays(10));
+
+        var result = await _sut.CheckEventCatalogsAsync(
+            _eventDate.AddDays(-1), season.Id, MassTypeRow().Id, null, null, Location().Id, null, _ct);
+
+        Assert.True(result.IsSuccess);
+    }
+
     [Theory]
-    [InlineData(-1)]
+    [InlineData(-2)]
     [InlineData(11)]
     public async Task CheckEventCatalogs_DateOutsideTheSeason_ReturnsEventDateOutsideSeason_EvenWhenUnchanged_Async(int offsetDays)
     {
