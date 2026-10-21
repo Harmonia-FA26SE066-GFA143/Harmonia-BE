@@ -59,13 +59,11 @@ public class RehearsalService(
             return Result<RehearsalDto>.Failure(ErrorCodes.SongInactive);
         }
 
-        var songsById = songs.ToDictionary(song => song.Id);
         var rehearsalSongs = request.Songs
             .Select((item, index) => new RehearsalSong
             {
                 Id = Guid.NewGuid(),
                 SongId = item.SongId,
-                Song = songsById[item.SongId],
                 DisplayOrder = index + 1,
                 Note = string.IsNullOrWhiteSpace(item.Note) ? null : item.Note.Trim(),
             })
@@ -85,6 +83,13 @@ public class RehearsalService(
 
         await rehearsalRepository.AddAsync(rehearsal, cancellationToken);
         await rehearsalRepository.SaveChangesAsync(cancellationToken);
+
+        // Songs come from an untracked query; attached before saving, EF would insert them again as new rows.
+        var songsById = songs.ToDictionary(song => song.Id);
+        foreach (var rehearsalSong in rehearsalSongs)
+        {
+            rehearsalSong.Song = songsById[rehearsalSong.SongId];
+        }
 
         return Result<RehearsalDto>.Success(mapper.Map<RehearsalDto>(rehearsal));
     }

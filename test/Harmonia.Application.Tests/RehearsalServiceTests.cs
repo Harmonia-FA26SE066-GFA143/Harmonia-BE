@@ -61,7 +61,13 @@ public class RehearsalServiceTests
     [Fact]
     public async Task Create_Valid_StoresRehearsalWithSongsInRequestOrder_Async()
     {
+        // An untracked Song attached at save time makes EF insert it again (409 on a real database).
+        var songsAtSave = new List<Song?>();
+        _rehearsals.When(x => x.SaveChangesAsync(_ct))
+            .Do(_ => songsAtSave.AddRange(_added.SelectMany(r => r.Songs).Select(s => s.Song)));
+
         var result = await _sut.CreateAsync(NewRequest((_gloria.Id, "  slower  "), (_kyrie.Id, " ")), _ct);
+        Assert.Equal([null, null], songsAtSave);
 
         Assert.True(result.IsSuccess);
         var rehearsal = Assert.Single(_added);
