@@ -32,6 +32,22 @@ public class ValidatorTests
         Assert.Contains(expectedCode, codes);
     }
 
+    [Fact]
+    public void Login_DeviceIdTooLong_HasError()
+    {
+        var request = new LoginRequest { Email = "a@test.com", Password = "x", DeviceId = new string('d', 101) };
+
+        Assert.NotEmpty(ErrorCodesOf(new LoginRequestValidator(), request));
+    }
+
+    [Fact]
+    public void GoogleLogin_DeviceIdTooLong_HasError()
+    {
+        var request = new GoogleLoginRequest { IdToken = "token", DeviceId = new string('d', 101) };
+
+        Assert.NotEmpty(ErrorCodesOf(new GoogleLoginRequestValidator(), request));
+    }
+
     // ---- Refresh / Logout ----
 
     [Fact]

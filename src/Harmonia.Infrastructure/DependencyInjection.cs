@@ -26,7 +26,8 @@ public static class DependencyInjection
         services.AddScoped<AuditableEntityInterceptor>();
 
         services.AddDbContext<HarmoniaDbContext>((serviceProvider, options) =>
-            options.UseSqlServer(connectionString)
+            // Azure SQL drops connections transiently (serverless resume, failover); retry instead of returning 500.
+            options.UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure())
                 .AddInterceptors(serviceProvider.GetRequiredService<AuditableEntityInterceptor>()));
 
         services.AddOptions<JwtOptions>()
