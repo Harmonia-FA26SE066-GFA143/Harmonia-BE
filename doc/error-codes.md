@@ -23,13 +23,14 @@ Validation dùng `.WithErrorCode(ErrorCodes.X)` của FluentValidation.
 ## Cách lỗi đi từ BE tới response (phương án A — đã chốt 2026-09-21)
 
 Error code là hợp đồng với FE — mọi response lỗi đều có `code`. Bên trong BE, lỗi đi
-tới response theo đúng một trong bốn đường:
+tới response theo đúng một trong năm đường:
 
 | Lỗi phát hiện ở đâu | Cách truyền | Ai trả response |
 |---|---|---|
 | Request sai định dạng / thiếu trường | FluentValidation `.WithErrorCode(...)` | Pipeline validation → 400 + `errors` |
 | Service kiểm tra, lỗi **lường trước được**: không tìm thấy, trùng, sai trạng thái giữa nhiều aggregate, cần query DB | `Result<T>.Failure(ErrorCodes.X)` | Controller map `code` → HTTP |
 | Entity bị gọi vi phạm luật của chính nó | **ném** `DomainException` (có `Code`) | `GlobalExceptionHandlingMiddleware` bắt → HTTP theo bảng dưới |
+| Hai request cùng qua một bước kiểm tra rồi cùng ghi (bấm hai lần), DB chặn bằng unique index / concurrency token | `DbUpdateConcurrencyException`, hoặc `DbUpdateException` do vi phạm unique | Middleware → 409 `CONFLICT`; FE tải lại dữ liệu rồi thử lại |
 | Sự cố không lường trước (bug, DB sập) | exception tự nhiên | Middleware → 500 `INTERNAL_ERROR`, không lộ message gốc ở Production |
 
 Quy tắc ngắn: **Service chủ động kiểm tra → `Result<T>`; luật trong entity → throw.**
@@ -82,6 +83,7 @@ Bốn mã lookup dùng chung cho 9 bảng danh mục (`Role`, `SkillCategory`,
 |---|---|---|
 | `AUTH_INVALID_CREDENTIALS` | 401 | Sai tài khoản hoặc mật khẩu |
 | `AUTH_ACCOUNT_INACTIVE` | 403 | Tài khoản đã bị vô hiệu hoá |
+| `AUTH_PASSWORD_CHANGE_REQUIRED` | 403 | Bạn cần đổi mật khẩu trước khi tiếp tục |
 | `AUTH_TOKEN_INVALID` | 401 | Phiên đăng nhập không hợp lệ |
 | `AUTH_TOKEN_EXPIRED` | 401 | Phiên đăng nhập đã hết hạn |
 | `AUTH_REFRESH_TOKEN_NOT_FOUND` | 401 | Phiên đăng nhập không tồn tại |
@@ -92,8 +94,9 @@ Bốn mã lookup dùng chung cho 9 bảng danh mục (`Role`, `SkillCategory`,
 | `AUTH_RESET_TOKEN_INVALID` | 400 | Liên kết đặt lại mật khẩu không hợp lệ |
 | `AUTH_RESET_TOKEN_EXPIRED` | 400 | Liên kết đặt lại mật khẩu đã hết hạn |
 | `AUTH_RESET_TOKEN_USED` | 400 | Liên kết đặt lại mật khẩu đã được sử dụng |
+| `AUTH_GOOGLE_TOKEN_INVALID` | 401 | Đăng nhập Google không hợp lệ, vui lòng thử lại |
 
-**Không có mã cho "email không tồn tại".** `forgot-password` luôn trả 200 dù email có
+**Không có mã cho "email không tồn tại".** `forgot-password` luôn trả 204 dù email có
 thật hay không — theo `.claude/rules/03-security.md`, để không lộ email nào đã đăng ký.
 
 Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutRequest`
@@ -105,6 +108,7 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `AUTH_EMAIL_INVALID_FORMAT` | 400 | Email không đúng định dạng |
 | `AUTH_PASSWORD_REQUIRED` | 400 | Vui lòng nhập mật khẩu |
 | `AUTH_REFRESH_TOKEN_REQUIRED` | 400 | Thiếu refresh token |
+| `AUTH_GOOGLE_TOKEN_REQUIRED` | 400 | Thiếu Google ID token |
 
 ## 2. User & Role (Admin)
 
@@ -113,6 +117,7 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `USER_NOT_FOUND` | 404 | Không tìm thấy tài khoản |
 | `USER_EMAIL_ALREADY_EXISTS` | 409 | Email này đã được sử dụng |
 | `USER_ALREADY_INACTIVE` | 409 | Tài khoản đã ở trạng thái vô hiệu |
+| `USER_ALREADY_ACTIVE` | 409 | Tài khoản đang hoạt động |
 | `USER_CANNOT_MODIFY_SELF` | 409 | Không thể tự đổi quyền hoặc vô hiệu hoá chính mình |
 | `USER_LAST_ADMIN` | 409 | Không thể xoá quyền của quản trị viên cuối cùng |
 | `ROLE_NOT_FOUND` | 404 | Không tìm thấy vai trò |
@@ -133,6 +138,7 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `SKILL_NOT_FOUND` | 404 | Không tìm thấy kỹ năng |
 | `SKILL_NAME_DUPLICATE` | 409 | Kỹ năng này đã tồn tại trong nhóm |
 | `SKILL_INACTIVE` | 409 | Kỹ năng đã bị vô hiệu hoá |
+| `SKILL_IN_USE` | 409 | Kỹ năng đang được bài hát sử dụng, không thể đổi nhóm |
 | `SKILL_CATEGORY_NOT_FOUND` | 404 | Không tìm thấy nhóm kỹ năng |
 | `MEMBER_SKILL_NOT_FOUND` | 404 | Không tìm thấy kỹ năng đã khai báo |
 | `MEMBER_SKILL_ALREADY_DECLARED` | 409 | Bạn đã khai báo kỹ năng này rồi |
@@ -144,19 +150,19 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 
 | Mã | HTTP | Tiếng Việt |
 |---|---|---|
-| `WEEK_NOT_FOUND` | 404 | Không tìm thấy tuần phụng vụ |
-| `WEEK_ALREADY_EXISTS` | 409 | Tuần này đã được tạo |
-| `WEEK_START_NOT_MONDAY` | 400 | Tuần phải bắt đầu vào thứ Hai |
-| `WEEK_ALREADY_PUBLISHED` | 409 | Tuần đã công bố, không thể sửa |
-| `WEEK_NOT_PUBLISHED` | 409 | Tuần chưa được công bố |
-| `EVENT_NOT_FOUND` | 404 | Không tìm thấy sự kiện |
-| `EVENT_SLOT_TAKEN` | 409 | Đã có sự kiện khác vào giờ này tại địa điểm này |
-| `EVENT_DATE_OUTSIDE_WEEK` | 400 | Ngày sự kiện không nằm trong tuần đã chọn |
-| `EVENT_CANCELLED` | 409 | Sự kiện đã bị huỷ |
-| `EVENT_ALREADY_PASSED` | 409 | Sự kiện đã diễn ra |
-| `EVENT_TYPE_REQUIRED` | 400 | Phải chọn loại lễ hoặc loại nghi thức |
-| `SEASON_DATE_OVERLAP` | 409 | Khoảng thời gian trùng với mùa phụng vụ khác |
-| `SEASON_DATE_INVALID` | 400 | Ngày kết thúc phải sau ngày bắt đầu |
+| `CALENDAR_DAY_NOT_FOUND` | 404 | Không tìm thấy ngày phụng vụ |
+| `LITURGICAL_EVENT_NOT_FOUND` | 404 | Không tìm thấy sự kiện |
+| `LITURGICAL_EVENT_SLOT_TAKEN` | 409 | Đã có sự kiện khác vào giờ này tại địa điểm này |
+| `LITURGICAL_EVENT_ALREADY_PUBLISHED` | 409 | Sự kiện đã công bố, không thể sửa |
+| `LITURGICAL_EVENT_NOT_PUBLISHED` | 409 | Sự kiện chưa được công bố |
+| `LITURGICAL_EVENT_CANCELLED` | 409 | Sự kiện đã bị huỷ |
+| `LITURGICAL_EVENT_ALREADY_PASSED` | 409 | Sự kiện đã diễn ra |
+| `LITURGICAL_EVENT_TYPE_REQUIRED` | 400 | Phải chọn loại lễ hoặc loại nghi thức |
+| `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` | 400 | Ngày sự kiện không thuộc mùa phụng vụ đã chọn (được phép sớm hơn ngày bắt đầu mùa 1 ngày cho lễ vọng) |
+| `LITURGICAL_EVENT_SEASON_REQUIRED` | 400 | Phải chọn mùa phụng vụ trước khi công bố sự kiện |
+| `LITURGICAL_EVENT_GENERATION_RANGE_INVALID` | 400 | Khoảng ngày không hợp lệ: không bắt đầu trong quá khứ và dài tối đa 62 ngày |
+| `LITURGICAL_SEASON_DATE_OVERLAP` | 409 | Khoảng thời gian trùng với mùa phụng vụ khác |
+| `LITURGICAL_SEASON_DATE_INVALID` | 400 | Ngày kết thúc phải sau ngày bắt đầu |
 
 ## 6. Thư viện thánh ca
 
@@ -165,9 +171,10 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `SONG_NOT_FOUND` | 404 | Không tìm thấy bài hát |
 | `SONG_INACTIVE` | 409 | Bài hát đã bị vô hiệu hoá |
 | `SONG_TITLE_DUPLICATE` | 409 | Bài hát cùng tên đã tồn tại |
-| `SONG_CLASSIFICATION_DUPLICATE` | 409 | Bài hát đã được phân loại theo mục này |
+| `SONG_CLASSIFICATION_DUPLICATE` | 400 | Bài hát đã được phân loại theo mục này |
 | `SONG_CLASSIFICATION_TARGET_INVALID` | 400 | Đối tượng phân loại không hợp lệ |
-| `SONG_SKILL_REQUIREMENT_DUPLICATE` | 409 | Kỹ năng này đã được khai báo cho bài hát |
+| `SONG_SKILL_REQUIREMENT_DUPLICATE` | 400 | Kỹ năng này đã được khai báo cho bài hát |
+| `SONG_SKILL_REQUIREMENT_CATEGORY_INVALID` | 400 | Kỹ năng không thuộc đúng nhóm bè / nhạc cụ |
 | `MATERIAL_NOT_FOUND` | 404 | Không tìm thấy tài liệu |
 | `MATERIAL_FILE_REQUIRED` | 400 | Vui lòng chọn tệp |
 | `MATERIAL_FILE_TYPE_NOT_ALLOWED` | 400 | Định dạng tệp không được hỗ trợ |
@@ -187,7 +194,7 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `SONG_LIST_ALREADY_APPROVED` | 409 | Danh sách đã được phê duyệt |
 | `SONG_LIST_EVENT_HAS_APPROVED_VERSION` | 409 | Sự kiện này đã có danh sách được duyệt |
 | `SONG_LIST_ITEM_NOT_FOUND` | 404 | Không tìm thấy bài hát trong danh sách |
-| `SONG_LIST_SLOT_DUPLICATE` | 409 | Vị trí phụng vụ này đã có bài hát |
+| `SONG_LIST_SLOT_DUPLICATE` | 409 | Bài hát này đã có trong vị trí phụng vụ này |
 | `SLOT_NOT_FOUND` | 404 | Không tìm thấy vị trí phụng vụ |
 | `SONG_LIST_CANNOT_BE_REVISED` | 409 | Chỉ tạo phiên bản mới khi danh sách bị từ chối hoặc cần sửa |
 | `REVIEW_NOTES_REQUIRED` | 400 | Vui lòng nhập ghi chú khi từ chối hoặc yêu cầu sửa |
@@ -199,11 +206,11 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 
 | Mã | HTTP | Tiếng Việt |
 |---|---|---|
-| `PARTICIPATION_NOT_FOUND` | 404 | Không tìm thấy yêu cầu tham gia |
-| `PARTICIPATION_ALREADY_REQUESTED` | 409 | Đã gửi yêu cầu cho ca viên này |
-| `PARTICIPATION_ALREADY_RESPONDED` | 409 | Bạn đã phản hồi yêu cầu này |
-| `PARTICIPATION_EVENT_PASSED` | 409 | Sự kiện đã diễn ra, không thể phản hồi |
-| `PARTICIPATION_NOT_INVITED` | 409 | Bạn chưa được mời tham gia sự kiện này |
+| `EVENT_PARTICIPATION_NOT_FOUND` | 404 | Không tìm thấy yêu cầu tham gia |
+| `EVENT_PARTICIPATION_ALREADY_REQUESTED` | 409 | Đã gửi yêu cầu cho ca viên này |
+| `EVENT_PARTICIPATION_ALREADY_RESPONDED` | 409 | Bạn đã phản hồi yêu cầu này |
+| `EVENT_PARTICIPATION_CLOSED` | 409 | Sự kiện đã diễn ra, không thể phản hồi |
+| `EVENT_PARTICIPATION_NOT_INVITED` | 409 | Bạn chưa được mời tham gia sự kiện này |
 
 ## 9. Phân công phục vụ
 
@@ -212,13 +219,14 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 | `ROSTER_NOT_FOUND` | 404 | Không tìm thấy bảng phân công |
 | `ROSTER_ALREADY_EXISTS` | 409 | Sự kiện này đã có bảng phân công |
 | `ROSTER_ALREADY_FINALIZED` | 409 | Bảng phân công đã chốt, không thể sửa |
+| `ROSTER_NOT_FINALIZED` | 409 | Bảng phân công chưa chốt, chưa thể gửi thông báo |
 | `ROSTER_SONG_LIST_NOT_APPROVED` | 409 | Phải duyệt danh sách bài hát trước khi chốt phân công |
 | `ROSTER_NO_PERSONNEL_REQUIREMENT` | 409 | Chưa khai báo nhân sự cần cho các bài hát |
 | `ROSTER_INSUFFICIENT_MEMBERS` | 409 | Không đủ người cho một số bè hoặc nhạc cụ |
-| `ASSIGNMENT_NOT_FOUND` | 404 | Không tìm thấy dòng phân công |
-| `ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED` | 409 | Ca viên chưa được duyệt kỹ năng này |
-| `ASSIGNMENT_MEMBER_NOT_CONFIRMED` | 409 | Ca viên chưa xác nhận tham gia |
-| `ASSIGNMENT_DUPLICATE` | 409 | Ca viên đã được phân công vị trí này |
+| `ROSTER_ASSIGNMENT_NOT_FOUND` | 404 | Không tìm thấy dòng phân công |
+| `ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED` | 409 | Ca viên chưa được duyệt kỹ năng này |
+| `ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED` | 409 | Ca viên chưa xác nhận tham gia (chưa phản hồi hoặc đã từ chối) |
+| `ROSTER_ASSIGNMENT_DUPLICATE` | 409 | Ca viên đã được phân công vị trí này |
 | `PERSONNEL_REQUIREMENT_NOT_FOUND` | 404 | Không tìm thấy yêu cầu nhân sự |
 | `PERSONNEL_REQUIRED_COUNT_INVALID` | 400 | Số lượng người phải lớn hơn 0 |
 | `PERSONNEL_REQUIREMENT_DUPLICATE` | 409 | Kỹ năng này đã được khai báo cho bài hát |
@@ -231,8 +239,12 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 | `REHEARSAL_TIME_INVALID` | 400 | Giờ kết thúc phải sau giờ bắt đầu |
 | `REHEARSAL_TIME_CONFLICT` | 409 | Địa điểm đã có buổi tập khác vào giờ này |
 | `REHEARSAL_ALREADY_PASSED` | 409 | Buổi tập đã diễn ra |
-| `ATTENDANCE_NOT_FOUND` | 404 | Không tìm thấy bản ghi điểm danh |
-| `ATTENDANCE_ALREADY_RECORDED` | 409 | Ca viên này đã được điểm danh |
+| `REHEARSAL_ATTENDANCE_NOT_FOUND` | 404 | Không tìm thấy bản ghi điểm danh |
+| `REHEARSAL_ATTENDANCE_ALREADY_RECORDED` | 409 | Ca viên này đã được điểm danh |
+| `REHEARSAL_NOT_STARTED` | 409 | Buổi tập chưa bắt đầu, chưa thể điểm danh |
+| `REHEARSAL_ATTENDANCE_MEMBER_DUPLICATE` | 400 | Một ca viên xuất hiện nhiều lần trong danh sách điểm danh |
+| `REHEARSAL_SONG_DUPLICATE` | 400 | Một bài hát xuất hiện nhiều lần trong danh sách bài của buổi tập |
+| `REHEARSAL_HAS_ATTENDANCE` | 409 | Buổi tập đã có điểm danh, không thể xoá |
 
 ## 11. Bài tập & bản thu
 
@@ -245,6 +257,10 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 | `PRACTICE_SUBMISSION_NOT_FOUND` | 404 | Không tìm thấy bản thu |
 | `PRACTICE_SUBMISSION_PAST_DUE` | 409 | Đã quá hạn nộp |
 | `PRACTICE_SUBMISSION_ALREADY_REVIEWED` | 409 | Bản thu này đã được nhận xét |
+| `PRACTICE_SUBMISSION_ALREADY_PASSED` | 409 | Bài tập này đã đạt, không cần nộp lại |
+| `PRACTICE_SUBMISSION_SUPERSEDED` | 409 | Ca viên đã nộp bản thu mới hơn, vui lòng chấm bản mới nhất |
+| `PRACTICE_SUBMISSION_NOT_REVIEWED` | 409 | Bản thu chưa được chấm, vui lòng chấm trước khi nhận xét thêm |
+| `PRACTICE_SUBMISSION_CONFLICT` | 409 | Bản thu vừa được nộp từ thao tác khác, vui lòng tải lại |
 | `PRACTICE_AUDIO_REQUIRED` | 400 | Vui lòng chọn tệp ghi âm |
 | `PRACTICE_AUDIO_TYPE_NOT_ALLOWED` | 400 | Định dạng ghi âm không được hỗ trợ |
 | `PRACTICE_AUDIO_TOO_LARGE` | 413 | Tệp ghi âm vượt quá dung lượng cho phép |
@@ -254,7 +270,9 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 | Mã | HTTP | Tiếng Việt |
 |---|---|---|
 | `NOTIFICATION_NOT_FOUND` | 404 | Không tìm thấy thông báo |
-| `DIRECTOR_NOTE_TARGET_REQUIRED` | 400 | Phải chọn tuần hoặc sự kiện để gửi ghi chú |
+| `DIRECTOR_NOTE_TARGET_REQUIRED` | 400 | Phải chọn ngày hoặc sự kiện để gửi ghi chú |
+| `DIRECTOR_NOTE_NOT_FOUND` | 404 | Không tìm thấy ghi chú |
+| `DIRECTOR_NOTE_RECIPIENT_INVALID` | 400 | Người nhận phải là ca trưởng đang hoạt động |
 
 **Không có mã "thông báo không dành cho bạn".** Thông báo của người khác trả
 `NOTIFICATION_NOT_FOUND` (404), vì 403 sẽ xác nhận bản ghi đó có thật. Truy vấn luôn
@@ -266,6 +284,7 @@ lọc theo cặp `(NotificationId, UserId)` nên "không tồn tại" và "của
 |---|---|---|
 | `SETTING_NOT_FOUND` | 404 | Không tìm thấy cấu hình |
 | `SETTING_VALUE_TYPE_MISMATCH` | 400 | Giá trị không đúng kiểu dữ liệu đã khai báo |
+| `SETTING_VALUE_OUT_OF_RANGE` | 400 | Giá trị nằm ngoài khoảng cho phép |
 | `REPORT_TYPE_NOT_SUPPORTED` | 400 | Loại báo cáo không được hỗ trợ |
 | `REPORT_DATE_RANGE_INVALID` | 400 | Khoảng thời gian không hợp lệ |
 | `REPORT_DATE_RANGE_TOO_LARGE` | 400 | Khoảng thời gian quá dài |
@@ -278,6 +297,24 @@ lọc theo cặp `(NotificationId, UserId)` nên "không tồn tại" và "của
 | `EXTERNAL_EMAIL_FAILED` | 502 | Không gửi được email, vui lòng thử lại |
 | `EXTERNAL_STORAGE_FAILED` | 502 | Không tải được tệp lên, vui lòng thử lại |
 | `EXTERNAL_AI_FAILED` | 502 | Không tạo được gợi ý phân công, vui lòng thử lại |
+| `EXTERNAL_CALENDAR_FAILED` | 502 | Không lấy được lịch phụng vụ, vui lòng thử lại |
+
+## 15. Ca đoàn
+
+| Mã | HTTP | Tiếng Việt |
+|---|---|---|
+| `CHOIR_NOT_FOUND` | 404 | Không tìm thấy ca đoàn |
+| `CHOIR_NAME_ALREADY_EXISTS` | 409 | Tên ca đoàn đã tồn tại |
+| `CHOIR_MEMBER_INVALID` | 400 | Ca viên không tồn tại hoặc không còn hoạt động |
+| `CHOIR_INACTIVE` | 409 | Ca đoàn đã ngừng hoạt động, không thêm ca viên hoặc sự kiện mới được |
+| `CHOIR_MEMBERSHIP_NOT_FOUND` | 404 | Ca viên không thuộc ca đoàn này |
+
+## 16. Giờ lễ cố định
+
+| Mã | HTTP | Tiếng Việt |
+|---|---|---|
+| `MASS_SCHEDULE_NOT_FOUND` | 404 | Không tìm thấy giờ lễ cố định |
+| `MASS_SCHEDULE_SLOT_TAKEN` | 409 | Đã có giờ lễ cố định khác vào thứ, giờ và nơi cử hành này |
 
 ---
 
@@ -302,7 +339,7 @@ Không bao giờ trả 403 cho trường hợp tài nguyên tồn tại nhưng n
 xem — trả 404, để không lộ sự tồn tại của bản ghi.
 
 ## Nguồn
-- 2026-09-20: tạo từ `claude/domain-entity-list.md` (42 entity, 21 enum) và các ràng
+- 2026-09-20: tạo từ `harmonia-domain-entity-list.md` (42 entity, 21 enum) và các ràng
   buộc unique / chuyển trạng thái trong đó.
 - 2026-09-21: chốt phương án A (entity ném `DomainException`, middleware bắt). Thêm mục
   "Cách lỗi đi từ BE tới response"; dời `ErrorCodes.cs` sang `Domain/Common`; thêm
@@ -315,3 +352,33 @@ xem — trả 404, để không lộ sự tồn tại của bản ghi.
   (middleware + controller) thành `API/Middlewares/ErrorStatusMap.cs`.
 - 2026-09-22: bỏ `NOTIFICATION_NOT_FOR_USER` (403). Mọi tình huống dùng tới nó đều là
   tình huống mà quy tắc "tài nguyên của người khác → 404" cấm trả 403. Đừng thêm lại.
+- 2026-09-29: đăng nhập Google (`api/auth/google`). Thêm `AUTH_GOOGLE_TOKEN_INVALID` (401) và
+  mã validate `AUTH_GOOGLE_TOKEN_REQUIRED`. Email Google chưa có tài khoản trả
+  `AUTH_INVALID_CREDENTIALS` — không tự tạo tài khoản, không lộ email đã đăng ký.
+- 2026-10-02: đồng bộ `ErrorCodes.cs` với D6 — bỏ `WEEK_NOT_FOUND`, `WEEK_ALREADY_EXISTS`,
+  `WEEK_START_NOT_MONDAY`, `WEEK_ALREADY_PUBLISHED`, `WEEK_NOT_PUBLISHED`, `EVENT_DATE_OUTSIDE_WEEK`
+  cùng 4 exception tương ứng; khai `LITURGICAL_EVENT_ALREADY_PUBLISHED`, `LITURGICAL_EVENT_NOT_PUBLISHED`,
+  `EXTERNAL_CALENDAR_FAILED`. Thêm `SONG_SKILL_REQUIREMENT_CATEGORY_INVALID` (FE-29).
+  `SONG_CLASSIFICATION_DUPLICATE`, `SONG_SKILL_REQUIREMENT_DUPLICATE` đổi 409 → 400: là mã validate field.
+  
+- 2026-10-11: thêm `SKILL_IN_USE` (đổi nhóm của kỹ năng đang được bài hát dùng). `LOOKUP_IN_USE` và
+  `LOOKUP_INACTIVE` bắt đầu được dùng cho danh mục kỹ năng (UC-32 / FE-49).
+- 2026-10-11: thêm `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON`. Tạo / sửa sự kiện bắt đầu trả `LOOKUP_NOT_FOUND`,
+  `LOOKUP_INACTIVE` khi Id danh mục (mùa, loại lễ, nghi thức, loại sự kiện, nơi cử hành) sai hoặc đã tắt.
+- 2026-10-11: thêm `SETTING_VALUE_OUT_OF_RANGE` (UC-33 / FE-51).
+- 2026-10-13: đổi tiền tố `PARTICIPATION_*` thành `EVENT_PARTICIPATION_*` cho 5 mã (`_NOT_FOUND`, `_ALREADY_REQUESTED`,
+  `_ALREADY_RESPONDED`, `_CLOSED`, `_NOT_INVITED`) theo từ điển `EventParticipation`. FE cần đổi khoá trong bảng dịch.
+- 2026-10-17: thêm mục 15 Ca đoàn (D7) — `CHOIR_NOT_FOUND`, `CHOIR_NAME_ALREADY_EXISTS`, `CHOIR_MEMBER_INVALID`
+  cho API tạo ca đoàn và gán ca viên. Thêm `CHOIR_INACTIVE`, `CHOIR_MEMBERSHIP_NOT_FOUND` cho sửa/tắt ca đoàn, rút ca viên,
+  gán ca đoàn vào sự kiện. Gán ca đoàn vào sự kiện dùng lại `LITURGICAL_EVENT_NOT_FOUND`, `_CANCELLED`, `_ALREADY_PASSED`.
+- 2026-10-17: lịch phụng vụ lấy từ Liturgical Calendar API thay cho file .ics của GCatholic.org — bỏ
+  `CALENDAR_FILE_REQUIRED`, `CALENDAR_FILE_TYPE_NOT_ALLOWED`, `CALENDAR_FILE_TOO_LARGE`, `CALENDAR_FILE_INVALID`;
+  `POST /api/liturgical-days/sync` trả `EXTERNAL_CALENDAR_FAILED` (502) khi API lỗi.
+- 2026-10-20: thêm `LITURGICAL_EVENT_SEASON_REQUIRED`. `PATCH /api/liturgical-events/{id}/publish` kiểm lại sự kiện
+  trước khi công bố: chưa qua ngày (`LITURGICAL_EVENT_ALREADY_PASSED`), có loại lễ hoặc nghi thức
+  (`LITURGICAL_EVENT_TYPE_REQUIRED`), có mùa phụng vụ, mọi danh mục còn hoạt động (`LOOKUP_INACTIVE` — kể cả danh mục
+  bị tắt sau lần lưu cuối), ngày nằm trong mùa, giờ + nơi cử hành chưa bị chiếm (`LITURGICAL_EVENT_SLOT_TAKEN`).
+- 2026-10-20: thêm mục 16 Giờ lễ cố định — `MASS_SCHEDULE_NOT_FOUND`, `MASS_SCHEDULE_SLOT_TAKEN` cho
+  `api/mass-schedules`; `LITURGICAL_EVENT_GENERATION_RANGE_INVALID` cho `POST /api/liturgical-events/generation`.
+- 2026-10-20: một vị trí phụng vụ được có nhiều bài trong danh sách bài hát. `SONG_LIST_SLOT_DUPLICATE` đổi nghĩa:
+  chỉ báo khi **cùng một bài** lặp lại trong cùng một vị trí (trước: khi một vị trí có hơn một bài). FE đổi câu dịch.

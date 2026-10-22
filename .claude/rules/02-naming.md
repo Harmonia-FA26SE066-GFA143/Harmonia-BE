@@ -1,11 +1,15 @@
 # Từ điển nghiệp vụ — dùng đúng tên, không tự đặt từ đồng nghĩa
 
-Nguồn chuẩn: `doc/harmonia-domain-entity-list.md` (42 entity, 21 enum).
+Nguồn chuẩn: `doc/harmonia-domain-entity-list.md` (48 entity, 22 enum).
 Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 
 | Tiếng Việt | Tên trong code |
 |---|---|
 | tài khoản | `User` |
+| ca đoàn | `Choir` |
+| ca viên thuộc ca đoàn | `ChoirMembership` |
+| ca đoàn phục vụ sự kiện | `LiturgicalEventChoir` |
+| token đặt lại mật khẩu | `PasswordResetToken` |
 | vai trò | `Role` — 4 giá trị: Admin, ParishPriest, ChoirDirector, ChoirMember |
 | cha xứ / ban phụng vụ | `ParishPriest` |
 | ca trưởng | `ChoirDirector` — KHÔNG dùng `ChoirLeader` |
@@ -14,13 +18,14 @@ Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 | nhóm kỹ năng | `SkillCategory` — Vocal, Instrument, Solo, Psalm, Conducting support |
 | kỹ năng | `Skill` — Soprano, Alto, Tenor, Bass, Guitar, Organ, Solo, Psalmist |
 | kỹ năng đã khai báo | `MemberSkill` |
-| tuần phụng vụ | `LiturgicalWeek` |
+| ngày phụng vụ (cache lịch Công giáo từ API ngoài) | `LiturgicalDay` — KHÔNG còn `LiturgicalWeek`, lịch lên theo ngày (D6) |
 | sự kiện / thánh lễ | `LiturgicalEvent` — KHÔNG dùng `Event` (trùng từ khoá C#) |
 | mùa phụng vụ | `LiturgicalSeason` — KHÔNG dùng `Season` |
 | loại thánh lễ | `MassType` |
 | loại nghi thức | `CeremonyType` |
 | loại sự kiện | `EventCategory` |
 | địa điểm cử hành | `WorshipLocation` |
+| giờ lễ cố định của giáo xứ | `MassSchedule` |
 | bài hát | `Song` |
 | chủ đề bài hát | `SongTheme` |
 | phân loại bài hát | `SongClassification` |
@@ -37,6 +42,7 @@ Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 | cảnh báo thiếu người | `RosterShortage` |
 | buổi tập | `Rehearsal` |
 | điểm danh | `RehearsalAttendance` — KHÔNG dùng `Attendance` trần |
+| bài hát của buổi tập | `RehearsalSong` — KHÔNG phải `SongList` (không phiên bản, không duyệt) |
 | bài tập về nhà | `PracticeAssignment` |
 | bản thu nộp | `PracticeSubmission` |
 | nhận xét của ca trưởng | `PracticeFeedback` — KHÔNG dùng `Feedback` trần |
@@ -45,8 +51,7 @@ Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 | cấu hình hệ thống | `SystemSetting` |
 | lịch sử hoạt động | `AuditLog` |
 
-**Không có entity `Choir`.** Hệ thống phục vụ một ca đoàn của một giáo xứ, chỉ có nhiều
-`WorshipLocation`. Đừng viết code dựa trên giả định nhiều ca đoàn.
+**Nhiều ca đoàn (D7, chốt 2026-10-17):** ca viên gia nhập nhiều `Choir` qua `ChoirMembership`, sự kiện có nhiều `Choir` qua `LiturgicalEventChoir`. `ChoirDirector` quản lý mọi ca đoàn — không có ca trưởng riêng từng ca đoàn. Hiện mới có schema, service chưa lọc theo ca đoàn.
 
 `LiturgicalEvent`, `MemberProfile`, `Song`, `Skill` là bốn hub — hầu hết entity khác
 móc vào chúng.
@@ -59,9 +64,23 @@ móc vào chúng.
   Ngoại lệ: method có chữ ký do framework quy định (middleware `InvokeAsync`, filter,
   `Hub`, `BackgroundService`) không thêm được token. Lấy token từ `HttpContext.RequestAborted`
   hoặc `stoppingToken` rồi truyền xuống các lời gọi bên trong.
+  Trong `test/` (xUnit v3): method `[Fact]` / `[Theory]` giữ hậu tố `_Async`
+  (`Login_ValidCredentials_ReturnsTokensAndUser_Async`). xUnit không cho method test nhận token
+  làm tham số, nên lấy từ field `_ct = TestContext.Current.CancellationToken` rồi truyền xuống
+  mọi lời gọi — analyzer `xUnit1051` cảnh báo nếu quên. Helper async trong test vẫn phải có
+  `CancellationToken cancellationToken = default` (chốt 2026-09-27).
 
 - Mọi chuỗi trong `.cs` là tiếng Anh — comment, XML doc, message exception, message log.
-  Không có ngoại lệ: message cho người dùng đi bằng mã lỗi, không bằng câu tiếng Việt.
+  Message lỗi cho người dùng đi bằng mã lỗi, không bằng câu tiếng Việt.
+  Ngoại lệ: `Title` / `Content` của `SendNotificationRequest` viết tiếng Việt ngay trong service
+  (và chuỗi test so khớp chúng) — thông báo lưu DB rồi hiển thị nguyên văn cho người dùng,
+  không có mã để FE dịch (chốt 2026-10-11). Comment, log, exception quanh đó vẫn tiếng Anh.
+  Ngoại lệ: `ReportExportColumns.cs` giữ tên báo cáo và tiêu đề cột tiếng Việt của file xuất
+  (CSV, XLSX, PDF) — file đi thẳng tới Admin, không qua FE (chốt 2026-10-11). Chuỗi tiếng Việt
+  của file xuất chỉ được nằm trong file này.
+  Ngoại lệ: dữ liệu seed hiển thị cho người dùng viết tiếng Việt — `Name` trong `HasData` của
+  `SkillCategoryConfiguration`, `Description` trong `SystemSettingKeys`, `FullName` của Admin đầu tiên
+  trong `DataSeeder` (chốt 2026-10-17). Tên role và key của setting vẫn tiếng Anh — code so khớp theo chúng.
 
 ## Domain
 
@@ -122,5 +141,7 @@ Không trả entity ra controller, không nhận entity làm tham số action.
   Luật số nhiều chỉ áp cho route đại diện một tập bản ghi. Nhóm endpoint không phải
   tài nguyên thì giữ danh từ số ít: `api/auth` (chốt 2026-09-22 — `api/auths` vô nghĩa,
   còn đổi sang `api/sessions` thì lệch khỏi `AuthController`/`AuthService`).
+  `api/schedule` cũng vậy (chốt 2026-10-13): nhóm xem tổng hợp sự kiện + buổi tập sắp tới,
+  không có entity `Schedule`; `ScheduleController` giữ số ít theo route.
 - Middleware: `<X>Middleware`. Filter: `<X>Filter`. Extension: `<X>Extensions`.
 - Hub: `<X>Hub` + interface client `I<X>Client` — `NotificationHub`, `INotificationClient`.

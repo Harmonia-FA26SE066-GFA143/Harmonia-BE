@@ -36,6 +36,8 @@ public static class ErrorCodes
 
     public const string AuthAccountInactive = "AUTH_ACCOUNT_INACTIVE";
 
+    public const string AuthPasswordChangeRequired = "AUTH_PASSWORD_CHANGE_REQUIRED";
+
     public const string AuthTokenInvalid = "AUTH_TOKEN_INVALID";
 
     public const string AuthTokenExpired = "AUTH_TOKEN_EXPIRED";
@@ -56,6 +58,8 @@ public static class ErrorCodes
 
     public const string AuthResetTokenUsed = "AUTH_RESET_TOKEN_USED";
 
+    public const string AuthGoogleTokenInvalid = "AUTH_GOOGLE_TOKEN_INVALID";
+
     // Field-level codes raised by FluentValidation; they always travel inside a 400 response's
     // "errors" map, so they never appear in ErrorStatusMap.
     public const string AuthEmailRequired = "AUTH_EMAIL_REQUIRED";
@@ -65,6 +69,8 @@ public static class ErrorCodes
     public const string AuthPasswordRequired = "AUTH_PASSWORD_REQUIRED";
 
     public const string AuthRefreshTokenRequired = "AUTH_REFRESH_TOKEN_REQUIRED";
+
+    public const string AuthGoogleTokenRequired = "AUTH_GOOGLE_TOKEN_REQUIRED";
 
     // 2. User & Role (Admin).
     public const string UserNotFound = "USER_NOT_FOUND";
@@ -78,6 +84,8 @@ public static class ErrorCodes
     public const string UserLastAdmin = "USER_LAST_ADMIN";
 
     public const string RoleNotFound = "ROLE_NOT_FOUND";
+
+    public const string UserAlreadyActive = "USER_ALREADY_ACTIVE";
 
     // 3. MemberProfile.
     public const string MemberNotFound = "MEMBER_NOT_FOUND";
@@ -95,6 +103,8 @@ public static class ErrorCodes
 
     public const string SkillInactive = "SKILL_INACTIVE";
 
+    public const string SkillInUse = "SKILL_IN_USE";
+
     public const string SkillCategoryNotFound = "SKILL_CATEGORY_NOT_FOUND";
 
     public const string MemberSkillNotFound = "MEMBER_SKILL_NOT_FOUND";
@@ -108,31 +118,31 @@ public static class ErrorCodes
     public const string MemberSkillNotApproved = "MEMBER_SKILL_NOT_APPROVED";
 
     // 5. Liturgical calendar.
-    public const string WeekNotFound = "WEEK_NOT_FOUND";
+    public const string CalendarDayNotFound = "CALENDAR_DAY_NOT_FOUND";
 
-    public const string WeekAlreadyExists = "WEEK_ALREADY_EXISTS";
+    public const string LiturgicalEventNotFound = "LITURGICAL_EVENT_NOT_FOUND";
 
-    public const string WeekStartNotMonday = "WEEK_START_NOT_MONDAY";
+    public const string LiturgicalEventSlotTaken = "LITURGICAL_EVENT_SLOT_TAKEN";
 
-    public const string WeekAlreadyPublished = "WEEK_ALREADY_PUBLISHED";
+    public const string LiturgicalEventAlreadyPublished = "LITURGICAL_EVENT_ALREADY_PUBLISHED";
 
-    public const string WeekNotPublished = "WEEK_NOT_PUBLISHED";
+    public const string LiturgicalEventNotPublished = "LITURGICAL_EVENT_NOT_PUBLISHED";
 
-    public const string EventNotFound = "EVENT_NOT_FOUND";
+    public const string LiturgicalEventCancelled = "LITURGICAL_EVENT_CANCELLED";
 
-    public const string EventSlotTaken = "EVENT_SLOT_TAKEN";
+    public const string LiturgicalEventAlreadyPassed = "LITURGICAL_EVENT_ALREADY_PASSED";
 
-    public const string EventDateOutsideWeek = "EVENT_DATE_OUTSIDE_WEEK";
+    public const string LiturgicalEventTypeRequired = "LITURGICAL_EVENT_TYPE_REQUIRED";
 
-    public const string EventCancelled = "EVENT_CANCELLED";
+    public const string LiturgicalEventDateOutsideLiturgicalSeason = "LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON";
 
-    public const string EventAlreadyPassed = "EVENT_ALREADY_PASSED";
+    public const string LiturgicalEventSeasonRequired = "LITURGICAL_EVENT_SEASON_REQUIRED";
 
-    public const string EventTypeRequired = "EVENT_TYPE_REQUIRED";
+    public const string LiturgicalEventGenerationRangeInvalid = "LITURGICAL_EVENT_GENERATION_RANGE_INVALID";
 
-    public const string SeasonDateOverlap = "SEASON_DATE_OVERLAP";
+    public const string LiturgicalSeasonDateOverlap = "LITURGICAL_SEASON_DATE_OVERLAP";
 
-    public const string SeasonDateInvalid = "SEASON_DATE_INVALID";
+    public const string LiturgicalSeasonDateInvalid = "LITURGICAL_SEASON_DATE_INVALID";
 
     // 6. Song library.
     public const string SongNotFound = "SONG_NOT_FOUND";
@@ -141,11 +151,15 @@ public static class ErrorCodes
 
     public const string SongTitleDuplicate = "SONG_TITLE_DUPLICATE";
 
+    // Field-level: raised by UpdateSongClassificationRequestValidator, never in ErrorStatusMap.
     public const string SongClassificationDuplicate = "SONG_CLASSIFICATION_DUPLICATE";
 
     public const string SongClassificationTargetInvalid = "SONG_CLASSIFICATION_TARGET_INVALID";
 
+    // Field-level, same as above.
     public const string SongSkillRequirementDuplicate = "SONG_SKILL_REQUIREMENT_DUPLICATE";
+
+    public const string SongSkillRequirementCategoryInvalid = "SONG_SKILL_REQUIREMENT_CATEGORY_INVALID";
 
     public const string MaterialNotFound = "MATERIAL_NOT_FOUND";
 
@@ -185,15 +199,15 @@ public static class ErrorCodes
     public const string ReviewNotesRequired = "REVIEW_NOTES_REQUIRED";
 
     // 8. Event participation.
-    public const string ParticipationNotFound = "PARTICIPATION_NOT_FOUND";
+    public const string EventParticipationNotFound = "EVENT_PARTICIPATION_NOT_FOUND";
 
-    public const string ParticipationAlreadyRequested = "PARTICIPATION_ALREADY_REQUESTED";
+    public const string EventParticipationAlreadyRequested = "EVENT_PARTICIPATION_ALREADY_REQUESTED";
 
-    public const string ParticipationAlreadyResponded = "PARTICIPATION_ALREADY_RESPONDED";
+    public const string EventParticipationAlreadyResponded = "EVENT_PARTICIPATION_ALREADY_RESPONDED";
 
-    public const string ParticipationEventPassed = "PARTICIPATION_EVENT_PASSED";
+    public const string EventParticipationClosed = "EVENT_PARTICIPATION_CLOSED";
 
-    public const string ParticipationNotInvited = "PARTICIPATION_NOT_INVITED";
+    public const string EventParticipationNotInvited = "EVENT_PARTICIPATION_NOT_INVITED";
 
     // 9. Service roster.
     public const string RosterNotFound = "ROSTER_NOT_FOUND";
@@ -202,19 +216,21 @@ public static class ErrorCodes
 
     public const string RosterAlreadyFinalized = "ROSTER_ALREADY_FINALIZED";
 
+    public const string RosterNotFinalized = "ROSTER_NOT_FINALIZED";
+
     public const string RosterSongListNotApproved = "ROSTER_SONG_LIST_NOT_APPROVED";
 
     public const string RosterNoPersonnelRequirement = "ROSTER_NO_PERSONNEL_REQUIREMENT";
 
     public const string RosterInsufficientMembers = "ROSTER_INSUFFICIENT_MEMBERS";
 
-    public const string AssignmentNotFound = "ASSIGNMENT_NOT_FOUND";
+    public const string RosterAssignmentNotFound = "ROSTER_ASSIGNMENT_NOT_FOUND";
 
-    public const string AssignmentMemberSkillNotApproved = "ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED";
+    public const string RosterAssignmentMemberSkillNotApproved = "ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED";
 
-    public const string AssignmentMemberNotConfirmed = "ASSIGNMENT_MEMBER_NOT_CONFIRMED";
+    public const string RosterAssignmentMemberNotConfirmed = "ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED";
 
-    public const string AssignmentDuplicate = "ASSIGNMENT_DUPLICATE";
+    public const string RosterAssignmentDuplicate = "ROSTER_ASSIGNMENT_DUPLICATE";
 
     public const string PersonnelRequirementNotFound = "PERSONNEL_REQUIREMENT_NOT_FOUND";
 
@@ -231,9 +247,17 @@ public static class ErrorCodes
 
     public const string RehearsalAlreadyPassed = "REHEARSAL_ALREADY_PASSED";
 
-    public const string AttendanceNotFound = "ATTENDANCE_NOT_FOUND";
+    public const string RehearsalAttendanceNotFound = "REHEARSAL_ATTENDANCE_NOT_FOUND";
 
-    public const string AttendanceAlreadyRecorded = "ATTENDANCE_ALREADY_RECORDED";
+    public const string RehearsalAttendanceAlreadyRecorded = "REHEARSAL_ATTENDANCE_ALREADY_RECORDED";
+
+    public const string RehearsalNotStarted = "REHEARSAL_NOT_STARTED";
+
+    public const string RehearsalAttendanceMemberDuplicate = "REHEARSAL_ATTENDANCE_MEMBER_DUPLICATE";
+
+    public const string RehearsalSongDuplicate = "REHEARSAL_SONG_DUPLICATE";
+
+    public const string RehearsalHasAttendance = "REHEARSAL_HAS_ATTENDANCE";
 
     // 11. Practice assignment & submission.
     public const string PracticeAssignmentNotFound = "PRACTICE_ASSIGNMENT_NOT_FOUND";
@@ -250,6 +274,17 @@ public static class ErrorCodes
 
     public const string PracticeSubmissionAlreadyReviewed = "PRACTICE_SUBMISSION_ALREADY_REVIEWED";
 
+    public const string PracticeSubmissionAlreadyPassed = "PRACTICE_SUBMISSION_ALREADY_PASSED";
+
+    // The member submitted a newer attempt; only the newest attempt of an assignment is reviewed.
+    public const string PracticeSubmissionSuperseded = "PRACTICE_SUBMISSION_SUPERSEDED";
+
+    // Extra feedback needs a first review: grade the submission through its feedback endpoint first.
+    public const string PracticeSubmissionNotReviewed = "PRACTICE_SUBMISSION_NOT_REVIEWED";
+
+    // Two submissions of the same assignment raced for the same attempt number; the client reloads and retries.
+    public const string PracticeSubmissionConflict = "PRACTICE_SUBMISSION_CONFLICT";
+
     public const string PracticeAudioRequired = "PRACTICE_AUDIO_REQUIRED";
 
     public const string PracticeAudioTypeNotAllowed = "PRACTICE_AUDIO_TYPE_NOT_ALLOWED";
@@ -263,10 +298,17 @@ public static class ErrorCodes
 
     public const string DirectorNoteTargetRequired = "DIRECTOR_NOTE_TARGET_REQUIRED";
 
+    // A note the caller neither sent nor received is reported as not found, for the same reason as above.
+    public const string DirectorNoteNotFound = "DIRECTOR_NOTE_NOT_FOUND";
+
+    public const string DirectorNoteRecipientInvalid = "DIRECTOR_NOTE_RECIPIENT_INVALID";
+
     // 13. System settings & reports.
     public const string SettingNotFound = "SETTING_NOT_FOUND";
 
     public const string SettingValueTypeMismatch = "SETTING_VALUE_TYPE_MISMATCH";
+
+    public const string SettingValueOutOfRange = "SETTING_VALUE_OUT_OF_RANGE";
 
     public const string ReportTypeNotSupported = "REPORT_TYPE_NOT_SUPPORTED";
 
@@ -283,6 +325,21 @@ public static class ErrorCodes
 
     public const string ExternalAiFailed = "EXTERNAL_AI_FAILED";
 
-    public const string UserAlreadyActive = "USER_ALREADY_ACTIVE";
+    public const string ExternalCalendarFailed = "EXTERNAL_CALENDAR_FAILED";
 
+    // 15. Choir.
+    public const string ChoirNotFound = "CHOIR_NOT_FOUND";
+
+    public const string ChoirNameAlreadyExists = "CHOIR_NAME_ALREADY_EXISTS";
+
+    public const string ChoirMemberInvalid = "CHOIR_MEMBER_INVALID";
+
+    public const string ChoirInactive = "CHOIR_INACTIVE";
+
+    public const string ChoirMembershipNotFound = "CHOIR_MEMBERSHIP_NOT_FOUND";
+
+    // 16. Mass schedule.
+    public const string MassScheduleNotFound = "MASS_SCHEDULE_NOT_FOUND";
+
+    public const string MassScheduleSlotTaken = "MASS_SCHEDULE_SLOT_TAKEN";
 }
