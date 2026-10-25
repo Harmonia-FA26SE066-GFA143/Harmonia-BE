@@ -1,5 +1,6 @@
 using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
+using Harmonia.Domain.Enums;
 
 namespace Harmonia.Application.Interfaces.IServices;
 
@@ -13,6 +14,12 @@ public interface IReportExportService
     /// </summary>
     Task<Result<FileContent>> ExportAsync(
         Guid userId, ExportReportRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The columns of a report in order, with the same Vietnamese titles as its exported file, so a client can
+    /// head its table from them. REPORT_TYPE_NOT_SUPPORTED for a type the export does not know.
+    /// </summary>
+    Result<List<ReportColumnDto>> GetColumns(ReportType type);
 
     /// <summary>Every Admin's past exports, newest first.</summary>
     Task<Result<PagedList<ReportExportDto>>> GetExportsAsync(PagingRequest request, CancellationToken cancellationToken);

@@ -68,6 +68,8 @@ public class PracticeAssignmentRepository(HarmoniaDbContext dbContext)
 
         var items = await query
             .Include(x => x.Targets)
+            .Include(x => x.Materials)
+            .AsSplitQuery()
             .OrderByDescending(x => x.DueDate)
             .ThenBy(x => x.Id)
             .Skip((filter.PageNumber - 1) * filter.PageSize)
@@ -152,6 +154,7 @@ public class PracticeAssignmentRepository(HarmoniaDbContext dbContext)
             .Include(x => x.LiturgicalEvent)
             .Include(x => x.Song)
             .Include(x => x.Material)
+            .Include(x => x.Materials).ThenInclude(x => x.Material)
             .Include(x => x.Submissions.Where(s => s.MemberId == memberId).OrderByDescending(s => s.AttemptNo).Take(1))
             .AsSplitQuery();
 }

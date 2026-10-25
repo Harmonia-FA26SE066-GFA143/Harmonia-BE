@@ -73,6 +73,21 @@ public class MusicMaterialsController(IMusicMaterialService musicMaterialService
         Guid id, [FromBody] UpdateMusicMaterialRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await musicMaterialService.UpdateAsync(id, request, cancellationToken));
 
+    [HttpPut("{id:guid}/file")]
+    [Authorize(Roles = RoleNames.ChoirDirector)]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType<MusicMaterialDto>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ReplaceFileAsync(
+        Guid id, [FromForm] ReplaceMusicMaterialFileRequest request, IFormFile? file, CancellationToken cancellationToken)
+    {
+        if (file is null)
+            return ToActionResult(await musicMaterialService.ReplaceFileAsync(id, request, null, cancellationToken));
+
+        await using var content = file.OpenReadStream();
+        return ToActionResult(await musicMaterialService.ReplaceFileAsync(
+            id, request, new FileContent(content, file.FileName, file.Length), cancellationToken));
+    }
+
     [HttpDelete("{id:guid}")]
     [Authorize(Roles = RoleNames.ChoirDirector)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

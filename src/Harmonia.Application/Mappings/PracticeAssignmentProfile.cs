@@ -15,7 +15,10 @@ public class PracticeAssignmentProfile : Profile
                 .Select(t => t.SkillId!.Value)))
             .ForMember(dest => dest.MemberIds, opt => opt.MapFrom(src => src.Targets
                 .Where(t => t.TargetType == TargetType.Member)
-                .Select(t => t.MemberId!.Value)));
+                .Select(t => t.MemberId!.Value)))
+            .ForMember(dest => dest.MaterialIds, opt => opt.MapFrom(src => src.Materials
+                .OrderBy(m => m.DisplayOrder)
+                .Select(m => m.MaterialId)));
 
         // Submissions arrives filtered to the calling member's newest row; the ordering keeps it safe if not.
         // The "!" member chains are null-safe: AutoMapper maps null when LiturgicalEvent, Song or Material is null.
@@ -26,6 +29,12 @@ public class PracticeAssignmentProfile : Profile
             .ForMember(dest => dest.SongTitle, opt => opt.MapFrom(src => src.Song!.Title))
             .ForMember(dest => dest.MaterialTitle, opt => opt.MapFrom(src => src.Material!.Title))
             .ForMember(dest => dest.MaterialType, opt => opt.MapFrom(src => src.Material!.MaterialType))
+            .ForMember(dest => dest.Materials, opt => opt.MapFrom(src => src.Materials
+                .OrderBy(m => m.DisplayOrder)
+                .Select(m => new PracticeAssignmentMaterialDto
+                {
+                    Id = m.MaterialId, Title = m.Material.Title, MaterialType = m.Material.MaterialType,
+                })))
             .ForMember(dest => dest.LatestSubmissionStatus, opt => opt.MapFrom(src => src.Submissions
                 .OrderByDescending(s => s.AttemptNo).Select(s => (SubmissionStatus?)s.Status).FirstOrDefault()))
             .ForMember(dest => dest.LatestSubmittedAt, opt => opt.MapFrom(src => src.Submissions

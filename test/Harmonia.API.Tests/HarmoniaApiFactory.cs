@@ -48,6 +48,7 @@ public sealed class HarmoniaApiFactory : WebApplicationFactory<AuthController>
     public HarmoniaApiFactory()
     {
         _connection.Open();
+        TestDbCollations.Register(_connection);
 
         // The schema must exist before Program.cs runs DataSeeder at startup.
         using (var context = new HarmoniaDbContext(

@@ -48,6 +48,30 @@ public sealed class DataSeederTests : IDisposable
     }
 
     [Fact]
+    public async Task SeedAsync_EmptyTranslations_LoadsTheBundledNamesOnce_AndNotAfterTheAdminDeletesOne_Async()
+    {
+        await SeedAsync(_ct);
+
+        await using (var context = _db.NewContext())
+        {
+            var christmas = await context.LiturgicalNameTranslations
+                .Where(x => x.EnglishName == "Christmas")
+                .ToDictionaryAsync(x => x.Kind, x => x.VietnameseName, _ct);
+            Assert.Equal(230, await context.LiturgicalNameTranslations.CountAsync(_ct));
+            Assert.Equal("Chúa Giáng Sinh", christmas[LiturgicalNameKind.Celebration]);
+            Assert.Equal("Mùa Giáng Sinh", christmas[LiturgicalNameKind.Season]);
+
+            context.LiturgicalNameTranslations.Remove(await context.LiturgicalNameTranslations.FirstAsync(_ct));
+            await context.SaveChangesAsync(_ct);
+        }
+
+        await SeedAsync(_ct);
+
+        await using var verify = _db.NewContext();
+        Assert.Equal(229, await verify.LiturgicalNameTranslations.CountAsync(_ct));
+    }
+
+    [Fact]
     public async Task SeedAsync_RunTwice_AddsNothingMore_Async()
     {
         await SeedAsync(_ct);
@@ -106,6 +130,35 @@ public sealed class DataSeederTests : IDisposable
         var profile = await context.MemberProfiles.SingleAsync(_ct);
         Assert.Equal(member.Id, profile.UserId);
         Assert.Equal(MemberStatus.Active, profile.Status);
+    }
+
+    [Fact]
+    public async Task SeedAsync_AssignmentWithSingleMaterialColumn_GetsItAsItsFirstMaterialRow_Async()
+    {
+        var song = new Song { Id = Guid.NewGuid(), Title = "Song" };
+        var material = new MusicMaterial
+        {
+            Id = Guid.NewGuid(), SongId = song.Id, Title = "Sheet", MaterialType = MaterialType.SheetMusic,
+            FilePublicId = "harmonia/sheet.pdf", FileName = "sheet.pdf",
+        };
+        PracticeAssignment Assignment(Guid? materialId) => new()
+        {
+            Id = Guid.NewGuid(), Title = "Practice", MaterialId = materialId, DueDate = DateTime.UtcNow.AddDays(1),
+        };
+        var old = Assignment(material.Id);
+        var withoutMaterial = Assignment(null);
+        await using (var seedContext = _db.NewContext())
+        {
+            seedContext.AddRange(song, material, old, withoutMaterial);
+            await seedContext.SaveChangesAsync(_ct);
+        }
+
+        await SeedAsync(_ct);
+        await SeedAsync(_ct);
+
+        await using var context = _db.NewContext();
+        var row = await context.PracticeAssignmentMaterials.SingleAsync(_ct);
+        Assert.Equal((old.Id, material.Id, 0), (row.PracticeAssignmentId, row.MaterialId, row.DisplayOrder));
     }
 
     [Fact]

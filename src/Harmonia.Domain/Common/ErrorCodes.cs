@@ -120,6 +120,10 @@ public static class ErrorCodes
     // 5. Liturgical calendar.
     public const string CalendarDayNotFound = "CALENDAR_DAY_NOT_FOUND";
 
+    public const string LiturgicalNameTranslationNotFound = "LITURGICAL_NAME_TRANSLATION_NOT_FOUND";
+
+    public const string LiturgicalNameTranslationDuplicate = "LITURGICAL_NAME_TRANSLATION_DUPLICATE";
+
     public const string LiturgicalEventNotFound = "LITURGICAL_EVENT_NOT_FOUND";
 
     public const string LiturgicalEventSlotTaken = "LITURGICAL_EVENT_SLOT_TAKEN";
@@ -150,6 +154,8 @@ public static class ErrorCodes
     public const string SongInactive = "SONG_INACTIVE";
 
     public const string SongTitleDuplicate = "SONG_TITLE_DUPLICATE";
+
+    public const string SongInUse = "SONG_IN_USE";
 
     // Field-level: raised by UpdateSongClassificationRequestValidator, never in ErrorStatusMap.
     public const string SongClassificationDuplicate = "SONG_CLASSIFICATION_DUPLICATE";

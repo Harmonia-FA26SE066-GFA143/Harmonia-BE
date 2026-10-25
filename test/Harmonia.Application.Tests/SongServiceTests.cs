@@ -1,4 +1,5 @@
 using AutoMapper;
+using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IRepositories;
 using Harmonia.Application.Mappings;
@@ -28,6 +29,25 @@ public class SongServiceTests
             }, NullLoggerFactory.Instance)
             .CreateMapper();
         _sut = new SongService(_repository, mapper);
+        _repository.GetStatsAsync(default!, default, default).ReturnsForAnyArgs(new Dictionary<Guid, SongStats>());
+    }
+
+    [Fact]
+    public async Task GetById_AddsLibraryStats_WithEveryMaterialType_Async()
+    {
+        var song = StubSong();
+        var lastUsed = new DateOnly(2026, 10, 18);
+        _repository.GetStatsAsync(Arg.Is<IReadOnlyCollection<Guid>>(ids => ids.Single() == song.Id), Arg.Any<DateOnly>(), _ct)
+            .Returns(new Dictionary<Guid, SongStats>
+            {
+                [song.Id] = new(new Dictionary<MaterialType, int> { [MaterialType.SheetMusic] = 2 }, true, 3, lastUsed),
+            });
+
+        var dto = (await _sut.GetByIdAsync(song.Id, _ct)).Value!;
+
+        Assert.Equal((2, 0, true, 3, lastUsed), (dto.MaterialCounts[MaterialType.SheetMusic],
+            dto.MaterialCounts[MaterialType.SampleAudio], dto.IsClassified, dto.TimesUsed, dto.LastUsedDate));
+        Assert.Equal(Enum.GetValues<MaterialType>().Length, dto.MaterialCounts.Count);
     }
 
     private Song StubSong(bool isActive = true)
@@ -129,6 +149,19 @@ public class SongServiceTests
         Assert.False(song.IsActive);
         _repository.DidNotReceiveWithAnyArgs().Remove(default!);
         await _repository.Received(1).SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Delete_InUse_ReturnsSongInUseAndKeepsSong_Async()
+    {
+        var song = StubSong();
+        _repository.IsInUseAsync(song.Id, _ct).Returns(true);
+
+        var result = await _sut.DeleteAsync(song.Id, _ct);
+
+        Assert.Equal(ErrorCodes.SongInUse, result.Code);
+        Assert.True(song.IsActive);
+        await _repository.DidNotReceiveWithAnyArgs().SaveChangesAsync(_ct);
     }
 
     [Fact]

@@ -250,4 +250,85 @@ public class ReportServiceTests
             (4, 1, 1, 1, 1),
             (row.AssignedCount, row.PassedCount, row.NeedsRevisionCount, row.AwaitingReviewCount, row.NotSubmittedCount));
     }
+
+    // ---- Activity trend ----
+
+    /// <summary>Noon in Vietnam on <paramref name="day"/>, as the UTC value the database holds.</summary>
+    private static DateTime VietnamNoonUtc(DateOnly day) => VietnamTime.StartOfDayUtc(day).AddHours(12);
+
+    [Fact]
+    public async Task ActivityTrend_ByMonth_BucketsAttendanceAndPracticeAndKeepsEmptyMonths_Async()
+    {
+        var member = new MemberProfile { Id = Guid.NewGuid(), User = new User { FullName = "Alice" } };
+        RehearsalAttendance Attendance(DateOnly day, AttendanceStatus status, Guid rehearsalId) => new()
+        {
+            RehearsalId = rehearsalId, Status = status,
+            Rehearsal = new Rehearsal { Id = rehearsalId, StartTime = VietnamNoonUtc(day) },
+        };
+        var (r1, r2) = (Guid.NewGuid(), Guid.NewGuid());
+        member.RehearsalAttendances =
+        [
+            Attendance(new DateOnly(2026, 8, 5), AttendanceStatus.Present, r1),
+            Attendance(new DateOnly(2026, 8, 20), AttendanceStatus.Absent, r2),
+            Attendance(new DateOnly(2026, 10, 1), AttendanceStatus.Late, Guid.NewGuid()),
+        ];
+        _members.GetActiveWithActivityAsync(Arg.Any<SearchReportsRequest>(), null, _ct)
+            .Returns(new PagedList<MemberProfile>([member], 1, 100, 1));
+        _assignments.GetForReportAsync(Arg.Any<SearchReportsRequest>(), Arg.Any<IReadOnlyCollection<Guid>>(), _ct).Returns(
+        [
+            new PracticeAssignment
+            {
+                Id = Guid.NewGuid(), Scope = AssignmentScope.All, DueDate = VietnamNoonUtc(new DateOnly(2026, 8, 31)),
+                Submissions = [new PracticeSubmission { MemberId = member.Id, AttemptNo = 1, Status = SubmissionStatus.Passed }],
+            },
+        ]);
+
+        var rows = (await _sut.GetActivityTrendAsync(new SearchActivityTrendRequest
+        {
+            GroupBy = ReportPeriod.Month, FromDate = new DateOnly(2026, 8, 3), ToDate = new DateOnly(2026, 10, 10),
+        }, _ct)).Value!;
+
+        Assert.Equal(
+            [(new DateOnly(2026, 8, 3), new DateOnly(2026, 8, 31)), (new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 30)),
+                (new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 10))],
+            rows.Select(x => (x.PeriodStart, x.PeriodEnd)));
+        Assert.Equal((2, 1, 1, 0.5, 1, 1, 1.0), (rows[0].RehearsalsRecorded, rows[0].PresentCount, rows[0].AbsentCount,
+            rows[0].AttendanceRate, rows[0].AssignmentsDue, rows[0].PassedCount, rows[0].CompletionRate));
+        Assert.Equal((0, (double?)null, (double?)null), (rows[1].RehearsalsRecorded, rows[1].AttendanceRate, rows[1].CompletionRate));
+        Assert.Equal((1, 1.0), (rows[2].LateCount, rows[2].AttendanceRate));
+    }
+
+    [Fact]
+    public async Task ActivityTrend_ByWeek_StartsOnMonday_Async()
+    {
+        _members.GetActiveWithActivityAsync(Arg.Any<SearchReportsRequest>(), null, _ct)
+            .Returns(new PagedList<MemberProfile>([], 1, 100, 0));
+        _assignments.GetForReportAsync(Arg.Any<SearchReportsRequest>(), Arg.Any<IReadOnlyCollection<Guid>>(), _ct).Returns([]);
+
+        // 2026-10-21 is a Wednesday.
+        var rows = (await _sut.GetActivityTrendAsync(new SearchActivityTrendRequest
+        {
+            GroupBy = ReportPeriod.Week, FromDate = new DateOnly(2026, 10, 21), ToDate = new DateOnly(2026, 10, 27),
+        }, _ct)).Value!;
+
+        Assert.Equal(
+            [(new DateOnly(2026, 10, 21), new DateOnly(2026, 10, 25)), (new DateOnly(2026, 10, 26), new DateOnly(2026, 10, 27))],
+            rows.Select(x => (x.PeriodStart, x.PeriodEnd)));
+    }
+
+    [Fact]
+    public async Task ActivityTrend_DirectorFilteringByAnotherDirectorsChoir_ReturnsChoirNotFound_Async()
+    {
+        var scope = ChoirScopeFakes.Unrestricted();
+        scope.GetDirectedChoirIdsAsync(_ct).Returns([Guid.NewGuid()]);
+        var sut = new ReportService(
+            _events, _songs, _users, _members, _assignments, Substitute.For<ICurrentUserService>(), scope);
+
+        var result = await sut.GetActivityTrendAsync(new SearchActivityTrendRequest
+        {
+            FromDate = new DateOnly(2026, 1, 1), ToDate = new DateOnly(2026, 12, 31), ChoirId = Guid.NewGuid(),
+        }, _ct);
+
+        Assert.Equal(ErrorCodes.ChoirNotFound, result.Code);
+    }
 }

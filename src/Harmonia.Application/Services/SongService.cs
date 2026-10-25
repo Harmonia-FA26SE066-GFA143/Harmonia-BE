@@ -17,7 +17,7 @@ public class SongService(ISongRepository songRepository, IMapper mapper) : ISong
         var page = await songRepository.SearchAsync(keyword, request, cancellationToken);
 
         return Result<PagedList<SongDto>>.Success(new PagedList<SongDto>(
-            mapper.Map<List<SongDto>>(page.Items), page.PageNumber, page.PageSize, page.TotalCount));
+            await ToDtosAsync(page.Items, cancellationToken), page.PageNumber, page.PageSize, page.TotalCount));
     }
 
     public async Task<Result<SongDto>> GetByIdAsync(Guid id, CancellationToken cancellationToken)
@@ -26,7 +26,7 @@ public class SongService(ISongRepository songRepository, IMapper mapper) : ISong
 
         return song is null
             ? Result<SongDto>.Failure(ErrorCodes.SongNotFound)
-            : Result<SongDto>.Success(mapper.Map<SongDto>(song));
+            : Result<SongDto>.Success((await ToDtosAsync([song], cancellationToken))[0]);
     }
 
     public async Task<Result<SongDto>> CreateAsync(CreateSongRequest request, CancellationToken cancellationToken)
@@ -39,7 +39,7 @@ public class SongService(ISongRepository songRepository, IMapper mapper) : ISong
 
         await songRepository.AddAsync(song, cancellationToken);
         await songRepository.SaveChangesAsync(cancellationToken);
-        return Result<SongDto>.Success(mapper.Map<SongDto>(song));
+        return Result<SongDto>.Success((await ToDtosAsync([song], cancellationToken))[0]);
     }
 
     public async Task<Result<SongDto>> UpdateAsync(Guid id, UpdateSongRequest request, CancellationToken cancellationToken)
@@ -54,13 +54,14 @@ public class SongService(ISongRepository songRepository, IMapper mapper) : ISong
             return Result<SongDto>.Failure(ErrorCodes.SongTitleDuplicate);
 
         await songRepository.SaveChangesAsync(cancellationToken);
-        return Result<SongDto>.Success(mapper.Map<SongDto>(song));
+        return Result<SongDto>.Success((await ToDtosAsync([song], cancellationToken))[0]);
     }
 
     public async Task<Result> DeleteAsync(Guid id, CancellationToken cancellationToken)
     {
         var song = await GetActiveAsync(id, cancellationToken);
         if (song is null) return Result.Failure(ErrorCodes.SongNotFound);
+        if (await songRepository.IsInUseAsync(id, cancellationToken)) return Result.Failure(ErrorCodes.SongInUse);
 
         song.IsActive = false;
         await songRepository.SaveChangesAsync(cancellationToken);
@@ -191,5 +192,24 @@ public class SongService(ISongRepository songRepository, IMapper mapper) : ISong
     {
         var song = await songRepository.GetByIdAsync(id, cancellationToken);
         return song is { IsActive: true } ? song : null;
+    }
+
+    /// <summary>Maps the songs and adds their library stats; a song the stats query missed shows zeros.</summary>
+    private async Task<List<SongDto>> ToDtosAsync(IReadOnlyList<Song> songs, CancellationToken cancellationToken)
+    {
+        var dtos = mapper.Map<List<SongDto>>(songs);
+        var stats = await songRepository.GetStatsAsync(songs.Select(x => x.Id).ToList(), VietnamTime.Today, cancellationToken);
+
+        foreach (var dto in dtos)
+        {
+            var songStats = stats.GetValueOrDefault(dto.Id);
+            dto.MaterialCounts = Enum.GetValues<MaterialType>()
+                .ToDictionary(t => t, t => songStats?.MaterialCounts.GetValueOrDefault(t) ?? 0);
+            dto.IsClassified = songStats?.IsClassified ?? false;
+            dto.TimesUsed = songStats?.TimesUsed ?? 0;
+            dto.LastUsedDate = songStats?.LastUsedDate;
+        }
+
+        return dtos;
     }
 }

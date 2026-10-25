@@ -50,7 +50,8 @@ public class MemberProfileRepository(HarmoniaDbContext dbContext)
 
         if (keyword is not null)
         {
-            query = query.Where(x => x.User.FullName.Contains(keyword) || x.User.Email.Contains(keyword));
+            query = query.Where(x => EF.Functions.Collate(x.User.FullName, HarmoniaDbContext.SearchCollation).Contains(keyword)
+                || x.User.Email.Contains(keyword));
         }
 
         if (filter.Status is { } status)
@@ -174,6 +175,7 @@ public class MemberProfileRepository(HarmoniaDbContext dbContext)
                 && (toUtc == null || a.Rehearsal.StartTime < toUtc)
                 && (eventId == null || a.Rehearsal.EventId == eventId)
                 && (seasonId == null || a.Rehearsal.LiturgicalEvent!.LiturgicalSeasonId == seasonId)))
+                .ThenInclude(a => a.Rehearsal)
             .Include(x => x.EventParticipations.Where(p =>
                 p.LiturgicalEvent.Status == EventStatus.Published
                 && (fromDate == null || p.LiturgicalEvent.EventDate >= fromDate)

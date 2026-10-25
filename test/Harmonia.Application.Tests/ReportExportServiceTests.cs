@@ -47,6 +47,23 @@ public class ReportExportServiceTests
             names.Select(n => new RehearsalAttendanceReportDto { FullName = n, PresentCount = 2 }).ToList(), 1, 100, totalCount));
 
     [Fact]
+    public void GetColumns_EveryType_MatchesTheExportedFileHeadings()
+    {
+        foreach (var type in Enum.GetValues<ReportType>())
+        {
+            var columns = _sut.GetColumns(type).Value!;
+
+            Assert.Equal(ReportExportColumns.Of(type)!.Select(c => c.Title), columns.Select(c => c.Title));
+            Assert.All(columns, c => Assert.False(string.IsNullOrWhiteSpace(c.Key)));
+        }
+
+        Assert.Equal(
+            ["fullName", "presentCount", "lateCount", "absentCount", "excusedCount"],
+            _sut.GetColumns(ReportType.RehearsalAttendance).Value!.Select(c => c.Key));
+        Assert.Equal(ErrorCodes.ReportTypeNotSupported, _sut.GetColumns((ReportType)99).Code);
+    }
+
+    [Fact]
     public async Task Export_GathersEveryPage_StoresTheFile_AndRecordsTheExport_Async()
     {
         ReturnsAttendancePages(2, ["Alice"], ["Bob"]);

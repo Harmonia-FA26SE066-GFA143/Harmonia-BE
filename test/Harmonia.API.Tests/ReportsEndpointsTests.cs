@@ -48,6 +48,33 @@ public class ReportsEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<H
     }
 
     [Fact]
+    public async Task ActivityTrend_DirectorGetsOneRowPerMonth_AndNeedsADateRange_Async()
+    {
+        var director = await factory.AddUserAsync("reports-trend@test.com", RoleNames.ChoirDirector, cancellationToken: _ct);
+        var client = await factory.CreateClientAsAsync(director.Email, _ct);
+
+        var rows = await client.GetFromJsonAsync<JsonElement>(
+            "api/reports/activity-trend?groupBy=Month&fromDate=2026-01-01&toDate=2026-12-31", _ct);
+        var missingRange = await client.GetAsync("api/reports/activity-trend?groupBy=Month", _ct);
+
+        Assert.Equal(12, rows.GetArrayLength());
+        Assert.Equal(HttpStatusCode.BadRequest, missingRange.StatusCode);
+        Assert.Contains(ErrorCodes.ReportDateRangeInvalid, await missingRange.Content.ReadAsStringAsync(_ct));
+    }
+
+    [Fact]
+    public async Task Columns_ReturnTheExportHeadingsByTypeName_Async()
+    {
+        var director = await factory.AddUserAsync("reports-columns@test.com", RoleNames.ChoirDirector, cancellationToken: _ct);
+        var client = await factory.CreateClientAsAsync(director.Email, _ct);
+
+        var columns = await client.GetFromJsonAsync<JsonElement>("api/reports/columns/RehearsalAttendance", _ct);
+
+        Assert.Equal("fullName", columns[0].GetProperty("key").GetString());
+        Assert.Equal("Họ tên", columns[0].GetProperty("title").GetString());
+    }
+
+    [Fact]
     public async Task UserActivity_AfterAPasswordChange_CountsIt_Async()
     {
         var admin = await factory.AddUserAsync("reports-admin2@test.com", RoleNames.Admin, cancellationToken: _ct);

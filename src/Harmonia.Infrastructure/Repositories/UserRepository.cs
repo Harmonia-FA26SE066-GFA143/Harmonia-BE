@@ -2,6 +2,7 @@ using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IRepositories;
 using Harmonia.Domain.Entities;
+using Harmonia.Domain.Enums;
 using Harmonia.Infrastructure.Data;
 using Harmonia.Infrastructure.Data.Interceptors;
 using Microsoft.EntityFrameworkCore;
@@ -151,6 +152,26 @@ public class UserRepository(HarmoniaDbContext dbContext)
         return DbContext.Users
             .Where(x => EF.Constant(roleNamesList).Contains(x.Role.Name) && x.IsActive)
             .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<List<Guid>?> GetActiveUserIdsOfEventChoirsAsync(Guid eventId, CancellationToken cancellationToken)
+    {
+        var choirs = DbContext.LiturgicalEventChoirs.Where(x => x.EventId == eventId).Select(x => x.Choir);
+        if (!await choirs.AnyAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        var memberUserIds = choirs
+            .SelectMany(c => c.Memberships)
+            .Where(m => m.IsActive && m.Member.Status == MemberStatus.Active)
+            .Select(m => m.Member.UserId);
+        var directorIds = choirs.Where(c => c.DirectorId != null).Select(c => c.DirectorId!.Value);
+
+        return await DbContext.Users
+            .Where(u => u.IsActive && (memberUserIds.Contains(u.Id) || directorIds.Contains(u.Id)))
+            .Select(u => u.Id)
             .ToListAsync(cancellationToken);
     }
 

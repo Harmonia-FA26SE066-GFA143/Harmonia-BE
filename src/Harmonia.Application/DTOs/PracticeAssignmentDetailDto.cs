@@ -27,11 +27,15 @@ public class PracticeAssignmentDetailDto
 
     public string? SongTitle { get; set; }
 
+    /// <summary>The first of <see cref="Materials"/>, for clients that show one material.</summary>
     public Guid? MaterialId { get; set; }
 
     public string? MaterialTitle { get; set; }
 
     public MaterialType? MaterialType { get; set; }
+
+    /// <summary>Every attached material in the order the director chose; empty when none.</summary>
+    public List<PracticeAssignmentMaterialDto> Materials { get; set; } = [];
 
     /// <summary>Null when the member has not submitted yet.</summary>
     public SubmissionStatus? LatestSubmissionStatus { get; set; }

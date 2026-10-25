@@ -14,6 +14,15 @@ public class SystemSettingDto
 
     public SettingDataType DataType { get; set; }
 
+    /// <summary>Short Vietnamese label for the settings page; the key when the code no longer defines it.</summary>
+    public string DisplayName { get; set; } = string.Empty;
+
+    /// <summary>Vietnamese name of the section the setting is shown in.</summary>
+    public string Group { get; set; } = string.Empty;
+
+    /// <summary>Position on the settings page across all groups; lower comes first.</summary>
+    public int Order { get; set; }
+
     public string? Description { get; set; }
 
     /// <summary>True when every signed-in role may read the setting.</summary>

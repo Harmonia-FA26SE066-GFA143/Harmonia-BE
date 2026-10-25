@@ -22,11 +22,24 @@ public class SystemSettingsEndpointsTests(HarmoniaApiFactory factory) : IClassFi
         var visible = await GetAsync(member, "api/system-settings/public", _ct);
         var allAsMember = await member.GetAsync("api/system-settings", _ct);
 
-        Assert.Equal(SystemSettingKeys.All.Select(x => x.Key).Order(StringComparer.Ordinal), all.Select(x => x.Key));
+        Assert.Equal(SystemSettingKeys.All.Select(x => x.Key), all.Select(x => x.Key));
         Assert.Equal(
-            [SystemSettingKeys.ChoirName, SystemSettingKeys.ParishName, SystemSettingKeys.SystemAnnouncement],
+            [
+                SystemSettingKeys.ParishName, SystemSettingKeys.ChoirName, SystemSettingKeys.ContactEmail,
+                SystemSettingKeys.SystemAnnouncement,
+            ],
             visible.Select(x => x.Key));
         Assert.Equal(HttpStatusCode.Forbidden, allAsMember.StatusCode);
+    }
+
+    [Fact]
+    public async Task ReadPublic_WithoutSigningIn_ReturnsOnlyTheKeysForVisitors_Async()
+    {
+        var visible = await GetAsync(factory.CreateClient(), "api/system-settings/public", _ct);
+
+        Assert.Equal(
+            [SystemSettingKeys.ParishName, SystemSettingKeys.ChoirName, SystemSettingKeys.ContactEmail],
+            visible.Select(x => x.Key));
     }
 
     [Fact]

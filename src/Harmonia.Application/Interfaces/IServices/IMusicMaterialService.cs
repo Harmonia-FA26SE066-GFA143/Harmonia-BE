@@ -42,6 +42,16 @@ public interface IMusicMaterialService
     /// <summary>Changes title and target skill only; the file, type and id stay, so learning progress is kept.</summary>
     Task<Result<MusicMaterialDto>> UpdateAsync(Guid id, UpdateMusicMaterialRequest request, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Swaps the stored file of an active material under the same type rules as an upload; the id, title, type,
+    /// target skill and practice assignments stay. Members' learning progress is kept unless
+    /// <see cref="ReplaceMusicMaterialFileRequest.ResetProgress"/> is set. The old file is removed from storage.
+    /// MATERIAL_NOT_FOUND, MATERIAL_FILE_REQUIRED, MATERIAL_FILE_TYPE_NOT_ALLOWED, MATERIAL_FILE_TOO_LARGE,
+    /// EXTERNAL_STORAGE_FAILED.
+    /// </summary>
+    Task<Result<MusicMaterialDto>> ReplaceFileAsync(
+        Guid id, ReplaceMusicMaterialFileRequest request, FileContent? file, CancellationToken cancellationToken);
+
     /// <summary>Soft delete: sets IsActive to false and keeps the stored file, which learning progress still points at.</summary>
     Task<Result> DeleteAsync(Guid id, CancellationToken cancellationToken);
 }

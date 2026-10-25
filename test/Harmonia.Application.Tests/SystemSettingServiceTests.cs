@@ -39,22 +39,52 @@ public class SystemSettingServiceTests
             .Returns(call => rows.Where(call.Arg<Expression<Func<SystemSetting, bool>>>().Compile()).ToList());
 
     [Fact]
-    public async Task GetAll_ReturnsEverySettingByKey_WithTheRangeAndVisibilityOfItsDefinition_Async()
+    public async Task GetAll_ReturnsEverySettingInPageOrder_WithTheLabelRangeAndVisibilityOfItsDefinition_Async()
     {
         var all = (await _sut.GetAllAsync(_ct)).Value!;
 
         Assert.Equal([SystemSettingKeys.ParishName, SystemSettingKeys.RosterRecentServiceDays], all.Select(x => x.Key));
         Assert.Equal((true, null, null), (all[0].IsPublic, all[0].MinValue, all[0].MaxValue));
+        Assert.Equal(("Tên giáo xứ", "Thông tin chung", 0), (all[0].DisplayName, all[0].Group, all[0].Order));
         Assert.Equal((_days.Id, "60", SettingDataType.Int, false, 1, 365),
             (all[1].Id, all[1].Value, all[1].DataType, all[1].IsPublic, all[1].MinValue!.Value, all[1].MaxValue!.Value));
+        Assert.Equal("Phân công", all[1].Group);
+        Assert.True(all[1].Order > all[0].Order);
     }
 
     [Fact]
-    public async Task GetPublic_ReturnsOnlyKeysMarkedPublicInCode_Async()
+    public async Task GetPublic_SignedIn_ReturnsOnlyKeysMarkedPublicInCode_Async()
     {
-        var visible = (await _sut.GetPublicAsync(_ct)).Value!;
+        var visible = (await _sut.GetPublicAsync(isSignedIn: true, _ct)).Value!;
 
         Assert.Equal(SystemSettingKeys.ParishName, Assert.Single(visible).Key);
+    }
+
+    [Fact]
+    public async Task GetPublic_Anonymous_HidesPublicKeysNotMarkedAnonymous_Async()
+    {
+        var announcement = new SystemSetting
+        {
+            Id = Guid.NewGuid(), Key = SystemSettingKeys.SystemAnnouncement, Value = "Hop ca doan", DataType = SettingDataType.String,
+        };
+        Rows(_days, _parish, announcement);
+
+        var signedIn = (await _sut.GetPublicAsync(isSignedIn: true, _ct)).Value!;
+        var anonymous = (await _sut.GetPublicAsync(isSignedIn: false, _ct)).Value!;
+
+        Assert.Equal([SystemSettingKeys.ParishName, SystemSettingKeys.SystemAnnouncement], signedIn.Select(x => x.Key));
+        Assert.Equal(SystemSettingKeys.ParishName, Assert.Single(anonymous).Key);
+    }
+
+    [Fact]
+    public void Definitions_AnonymousImpliesPublic_AndEveryKeyHasALabelAndGroup()
+    {
+        Assert.All(SystemSettingKeys.All, x =>
+        {
+            Assert.True(!x.IsAnonymous || x.IsPublic, x.Key);
+            Assert.False(string.IsNullOrWhiteSpace(x.DisplayName), x.Key);
+            Assert.False(string.IsNullOrWhiteSpace(x.Group), x.Key);
+        });
     }
 
     [Fact]

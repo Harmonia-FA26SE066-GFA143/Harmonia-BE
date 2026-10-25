@@ -9,6 +9,10 @@ public class PracticeAssignment : BaseAuditableEntity
 
     public Guid? SongId { get; set; }
 
+    /// <summary>
+    /// The first of <see cref="Materials"/>, kept for clients that read a single material. Every attached material,
+    /// this one included, is in <see cref="Materials"/>.
+    /// </summary>
     public Guid? MaterialId { get; set; }
 
     public string Title { get; set; } = string.Empty;
@@ -30,6 +34,8 @@ public class PracticeAssignment : BaseAuditableEntity
     public Choir? Choir { get; set; }
 
     public ICollection<PracticeAssignmentTarget> Targets { get; set; } = [];
+
+    public ICollection<PracticeAssignmentMaterial> Materials { get; set; } = [];
 
     public ICollection<PracticeSubmission> Submissions { get; set; } = [];
 

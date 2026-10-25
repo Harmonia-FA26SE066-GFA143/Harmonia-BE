@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Domain.Common;
 using Harmonia.Domain.Entities;
@@ -28,6 +29,56 @@ public class DataSeeder(
         await SeedFirstAdminAsync(cancellationToken);
         await SeedMissingMemberProfilesAsync(cancellationToken);
         await SeedSystemSettingsAsync(cancellationToken);
+        await SeedMissingAssignmentMaterialsAsync(cancellationToken);
+        await SeedLiturgicalNameTranslationsAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Loads the first Vietnamese calendar names (taken over from the Web's own table) into an empty table. Only once:
+    /// afterwards the list is the Admin's, and a row the Admin deleted must not come back on the next start.
+    /// </summary>
+    private async Task SeedLiturgicalNameTranslationsAsync(CancellationToken cancellationToken)
+    {
+        if (await dbContext.LiturgicalNameTranslations.AnyAsync(cancellationToken))
+        {
+            return;
+        }
+
+        await using var stream = typeof(DataSeeder).Assembly.GetManifestResourceStream("LiturgicalNameTranslations.json")
+            ?? throw new InvalidOperationException("Embedded resource LiturgicalNameTranslations.json is missing.");
+        var byKind = await JsonSerializer.DeserializeAsync<Dictionary<LiturgicalNameKind, Dictionary<string, string>>>(
+            stream, cancellationToken: cancellationToken) ?? [];
+
+        dbContext.LiturgicalNameTranslations.AddRange(byKind.SelectMany(kind => kind.Value.Select(name =>
+            new LiturgicalNameTranslation
+            {
+                Id = Guid.NewGuid(), Kind = kind.Key, EnglishName = name.Key, VietnameseName = name.Value,
+            })));
+        await dbContext.SaveChangesAsync(cancellationToken);
+        logger.LogInformation("Seeded {Count} liturgical name translations.", byKind.Sum(x => x.Value.Count));
+    }
+
+    /// <summary>
+    /// Assignments created when one material was a column of PracticeAssignment get that material as their first
+    /// PracticeAssignmentMaterial row, so readers of the list see it too.
+    /// </summary>
+    private async Task SeedMissingAssignmentMaterialsAsync(CancellationToken cancellationToken)
+    {
+        var assignments = await dbContext.PracticeAssignments
+            .Where(x => x.MaterialId != null && !x.Materials.Any())
+            .Select(x => new { x.Id, MaterialId = x.MaterialId!.Value })
+            .ToListAsync(cancellationToken);
+        if (assignments.Count == 0)
+        {
+            return;
+        }
+
+        dbContext.PracticeAssignmentMaterials.AddRange(assignments.Select(x => new PracticeAssignmentMaterial
+        {
+            Id = Guid.NewGuid(), PracticeAssignmentId = x.Id, MaterialId = x.MaterialId, DisplayOrder = 0,
+        }));
+        await dbContext.SaveChangesAsync(cancellationToken);
+        logger.LogInformation("Seeded {Count} practice assignment materials from the single material column.", assignments.Count);
     }
 
     /// <summary>Adds the settings of SystemSettingKeys the database lacks. Existing rows keep the Admin's values.</summary>

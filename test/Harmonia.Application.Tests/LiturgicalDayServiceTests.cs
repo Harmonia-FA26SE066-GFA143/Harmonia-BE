@@ -7,6 +7,7 @@ using Harmonia.Application.Mappings;
 using Harmonia.Application.Services;
 using Harmonia.Domain.Common;
 using Harmonia.Domain.Entities;
+using Harmonia.Domain.Enums;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
@@ -16,6 +17,7 @@ public class LiturgicalDayServiceTests
 {
     private readonly ILiturgicalDayRepository _days = Substitute.For<ILiturgicalDayRepository>();
     private readonly ILiturgicalCalendarClient _calendar = Substitute.For<ILiturgicalCalendarClient>();
+    private readonly ILiturgicalNameTranslationRepository _translations = Substitute.For<ILiturgicalNameTranslationRepository>();
     private readonly LiturgicalDayService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly List<LiturgicalDay> _cached = [];
@@ -25,8 +27,14 @@ public class LiturgicalDayServiceTests
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<LiturgicalDayProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new LiturgicalDayService(_days, _calendar, mapper);
+        _sut = new LiturgicalDayService(_days, _calendar, _translations, mapper);
 
+        _translations.GetAllAsync(_ct).Returns(new Dictionary<(LiturgicalNameKind, string), string>
+        {
+            [(LiturgicalNameKind.Celebration, "Christmas")] = "Chúa Giáng Sinh",
+            [(LiturgicalNameKind.Rank, "Solemnity")] = "Lễ trọng",
+            [(LiturgicalNameKind.Season, "Christmas")] = "Mùa Giáng Sinh",
+        });
         _days.GetYearForUpdateAsync(Arg.Any<int>(), _ct).Returns(_ => _cached.ToList());
         _days.AddRangeAsync(Arg.Do<IEnumerable<LiturgicalDay>>(_added.AddRange), _ct).Returns(Task.CompletedTask);
     }
@@ -49,6 +57,26 @@ public class LiturgicalDayServiceTests
         Assert.Equal(
             (date, "Christmas", "Solemnity", "Christmas"),
             (result.Value!.Date, result.Value.CelebrationName, result.Value.Rank, result.Value.SeasonName));
+        // The same English word reads differently as a celebration and as a season.
+        Assert.Equal(
+            ("Chúa Giáng Sinh", "Lễ trọng", "Mùa Giáng Sinh"),
+            (result.Value.CelebrationNameVi, result.Value.RankVi, result.Value.SeasonNameVi));
+    }
+
+    [Theory]
+    [InlineData("29th Sunday of Ordinary Time", "Chúa nhật XXIX Thường niên")]
+    [InlineData("Tuesday of the 2nd Week of Advent", "Thứ Ba tuần II Mùa Vọng")]
+    [InlineData("Third Sunday of Lent", "Chúa nhật III Mùa Chay")]
+    [InlineData("Saint New To The Calendar", "Saint New To The Calendar")]
+    public async Task GetRange_NameWithoutRow_UsesThePatternOrStaysEnglish_Async(string english, string vietnamese)
+    {
+        var date = new DateOnly(2026, 10, 18);
+        _days.GetRangeAsync(date, date, _ct).Returns([new LiturgicalDay { Date = date, CelebrationName = english }]);
+
+        var day = Assert.Single((await _sut.GetRangeAsync(new SearchLiturgicalDaysRequest { FromDate = date, ToDate = date }, _ct)).Value!);
+
+        Assert.Equal(vietnamese, day.CelebrationNameVi);
+        Assert.Null(day.RankVi);
     }
 
     [Fact]

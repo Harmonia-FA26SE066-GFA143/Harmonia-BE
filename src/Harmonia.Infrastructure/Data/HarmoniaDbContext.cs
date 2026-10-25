@@ -7,6 +7,12 @@ namespace Harmonia.Infrastructure.Data;
 
 public class HarmoniaDbContext(DbContextOptions<HarmoniaDbContext> options) : DbContext(options)
 {
+    /// <summary>
+    /// Collation keyword searches compare under: ignores case and Vietnamese diacritics ("con buoc" finds
+    /// "Con Bước", "duc" finds "Đức"). Vietnamese_100_CI_AI does not: it keeps ư, ơ, đ as letters of their own.
+    /// </summary>
+    public const string SearchCollation = "Latin1_General_100_CI_AI";
+
     public DbSet<User> Users => Set<User>();
 
     public DbSet<Role> Roles => Set<Role>();
@@ -30,6 +36,8 @@ public class HarmoniaDbContext(DbContextOptions<HarmoniaDbContext> options) : Db
     public DbSet<LiturgicalEventChoir> LiturgicalEventChoirs => Set<LiturgicalEventChoir>();
 
     public DbSet<LiturgicalDay> LiturgicalDays => Set<LiturgicalDay>();
+
+    public DbSet<LiturgicalNameTranslation> LiturgicalNameTranslations => Set<LiturgicalNameTranslation>();
 
     public DbSet<LiturgicalEvent> LiturgicalEvents => Set<LiturgicalEvent>();
 
@@ -86,6 +94,8 @@ public class HarmoniaDbContext(DbContextOptions<HarmoniaDbContext> options) : Db
     public DbSet<PracticeAssignment> PracticeAssignments => Set<PracticeAssignment>();
 
     public DbSet<PracticeAssignmentTarget> PracticeAssignmentTargets => Set<PracticeAssignmentTarget>();
+
+    public DbSet<PracticeAssignmentMaterial> PracticeAssignmentMaterials => Set<PracticeAssignmentMaterial>();
 
     public DbSet<PracticeSubmission> PracticeSubmissions => Set<PracticeSubmission>();
 

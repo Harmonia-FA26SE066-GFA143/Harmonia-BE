@@ -21,9 +21,10 @@ public class SongRepository(HarmoniaDbContext dbContext)
         // ponytail: LIKE '%keyword%' scans the table; add a full-text index if the library grows large.
         if (keyword is not null)
         {
-            query = query.Where(x => x.Title.Contains(keyword)
-                || (x.Composer != null && x.Composer.Contains(keyword))
-                || (x.Lyricist != null && x.Lyricist.Contains(keyword)));
+            const string collation = HarmoniaDbContext.SearchCollation;
+            query = query.Where(x => EF.Functions.Collate(x.Title, collation).Contains(keyword)
+                || (x.Composer != null && EF.Functions.Collate(x.Composer, collation).Contains(keyword))
+                || (x.Lyricist != null && EF.Functions.Collate(x.Lyricist, collation).Contains(keyword)));
         }
 
         query = WhereClassifiedAs(query, ClassificationTarget.LiturgicalSeason, filter.LiturgicalSeasonId);
@@ -35,6 +36,16 @@ public class SongRepository(HarmoniaDbContext dbContext)
         {
             query = query.Where(x => x.VocalRequirements.Any(r => r.SkillId == skillId)
                 || x.InstrumentRequirements.Any(r => r.SkillId == skillId));
+        }
+
+        if (filter.IsClassified is { } isClassified)
+        {
+            query = query.Where(x => x.Classifications.Any() == isClassified);
+        }
+
+        if (filter.MissingMaterialType is { } missingType)
+        {
+            query = query.Where(x => !x.MusicMaterials.Any(m => m.IsActive && m.MaterialType == missingType));
         }
 
         var totalCount = await query.CountAsync(cancellationToken);
@@ -54,6 +65,42 @@ public class SongRepository(HarmoniaDbContext dbContext)
         DbContext.Songs.AnyAsync(
             x => x.IsActive && x.Title == title && x.Composer == composer && x.Id != excludeSongId,
             cancellationToken);
+
+    public async Task<Dictionary<Guid, SongStats>> GetStatsAsync(
+        IReadOnlyCollection<Guid> ids, DateOnly today, CancellationToken cancellationToken)
+    {
+        // Same events as GetUsageAsync, so the library and the report agree.
+        var events = DbContext.LiturgicalEvents
+            .Where(e => e.Status == EventStatus.Published && e.EventDate < today);
+
+        var rows = await DbContext.Songs
+            .AsNoTracking()
+            .Where(s => ids.Contains(s.Id))
+            .Select(s => new
+            {
+                s.Id,
+                MaterialTypes = s.MusicMaterials.Where(m => m.IsActive).Select(m => m.MaterialType).ToList(),
+                IsClassified = s.Classifications.Any(),
+                TimesUsed = events.Count(e => e.SongLists.Any(
+                    l => l.Status == SongListStatus.Approved && l.Items.Any(i => i.SongId == s.Id))),
+                LastUsedDate = events
+                    .Where(e => e.SongLists.Any(
+                        l => l.Status == SongListStatus.Approved && l.Items.Any(i => i.SongId == s.Id)))
+                    .Max(e => (DateOnly?)e.EventDate),
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows.ToDictionary(
+            x => x.Id,
+            x => new SongStats(
+                Enum.GetValues<MaterialType>().ToDictionary(t => t, t => x.MaterialTypes.Count(m => m == t)),
+                x.IsClassified, x.TimesUsed, x.LastUsedDate));
+    }
+
+    public async Task<bool> IsInUseAsync(Guid id, CancellationToken cancellationToken) =>
+        await DbContext.SongListItems.AnyAsync(x => x.SongId == id, cancellationToken)
+        || await DbContext.RehearsalSongs.AnyAsync(x => x.SongId == id, cancellationToken)
+        || await DbContext.PracticeAssignments.AnyAsync(x => x.SongId == id, cancellationToken);
 
     public Task<Song?> GetWithClassificationAsync(Guid id, CancellationToken cancellationToken) =>
         DbContext.Songs

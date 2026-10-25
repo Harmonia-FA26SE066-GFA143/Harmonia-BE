@@ -38,7 +38,12 @@ public class MusicMaterialRepository(HarmoniaDbContext dbContext)
         var query = VisibleToMember(memberId);
 
         // ponytail: LIKE '%keyword%' scans the table; add a full-text index if the library grows large.
-        if (keyword is not null) query = query.Where(x => x.Song.Title.Contains(keyword) || x.Title.Contains(keyword));
+        if (keyword is not null)
+        {
+            const string collation = HarmoniaDbContext.SearchCollation;
+            query = query.Where(x => EF.Functions.Collate(x.Song.Title, collation).Contains(keyword)
+                || EF.Functions.Collate(x.Title, collation).Contains(keyword));
+        }
         if (filter.SongId is { } songId) query = query.Where(x => x.SongId == songId);
         if (filter.SkillId is { } skillId) query = query.Where(x => x.TargetSkillId == skillId);
         if (filter.MaterialType is { } materialType) query = query.Where(x => x.MaterialType == materialType);

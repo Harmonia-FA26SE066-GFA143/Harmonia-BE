@@ -12,6 +12,8 @@ public static class SystemSettingKeys
 
     public const string ChoirName = "Choir.Name";
 
+    public const string ContactEmail = "Contact.Email";
+
     public const string SystemAnnouncement = "System.Announcement";
 
     public const string RosterRecentServiceDays = "Roster.RecentServiceDays";
@@ -22,20 +24,25 @@ public static class SystemSettingKeys
 
     public const string RehearsalAttendanceOpensMinutesBefore = "Rehearsal.AttendanceOpensMinutesBefore";
 
+    // In the order the settings page shows them; the index is SystemSettingDto.Order.
     public static readonly IReadOnlyList<SystemSettingDefinition> All =
     [
-        new(ParishName, SettingDataType.String, string.Empty, "Tên giáo xứ, hiển thị trên ứng dụng.", IsPublic: true),
-        new(ChoirName, SettingDataType.String, string.Empty, "Tên ca đoàn, hiển thị trên ứng dụng.", IsPublic: true),
-        new(SystemAnnouncement, SettingDataType.String, string.Empty,
+        new(ParishName, SettingDataType.String, string.Empty, "Tên giáo xứ", "Thông tin chung",
+            "Tên giáo xứ, hiển thị trên ứng dụng.", IsPublic: true, IsAnonymous: true),
+        new(ChoirName, SettingDataType.String, string.Empty, "Tên ca đoàn", "Thông tin chung",
+            "Tên ca đoàn, hiển thị trên ứng dụng.", IsPublic: true, IsAnonymous: true),
+        new(ContactEmail, SettingDataType.String, string.Empty, "Email liên hệ", "Thông tin chung",
+            "Email liên hệ hiển thị ở trang chủ và trang đăng nhập.", IsPublic: true, IsAnonymous: true),
+        new(SystemAnnouncement, SettingDataType.String, string.Empty, "Thông báo hệ thống", "Thông tin chung",
             "Thông báo hiển thị cho mọi người dùng; để trống thì không hiển thị.", IsPublic: true),
-        new(RosterRecentServiceDays, SettingDataType.Int, "60",
+        new(RosterRecentServiceDays, SettingDataType.Int, "60", "Số ngày tính là phục vụ gần đây", "Phân công",
             "Số ngày gần nhất được tính là đã phục vụ gần đây khi đề xuất phân công.", MinValue: 1, MaxValue: 365),
-        new(RosterAiSuggestionEnabled, SettingDataType.Bool, "true",
+        new(RosterAiSuggestionEnabled, SettingDataType.Bool, "true", "Đề xuất phân công bằng AI", "Phân công",
             "Có dùng AI để đề xuất phân công không; tắt thì chỉ dùng quy tắc có sẵn."),
-        new(PracticeAllowLateSubmission, SettingDataType.Bool, "false",
+        new(PracticeAllowLateSubmission, SettingDataType.Bool, "false", "Cho nộp bản thu trễ hạn", "Luyện tập",
             "Cho phép ca viên nộp bản thu sau hạn của bài tập."),
-        new(RehearsalAttendanceOpensMinutesBefore, SettingDataType.Int, "0",
-            "Số phút trước giờ bắt đầu buổi tập được phép điểm danh.", MinValue: 0, MaxValue: 120),
+        new(RehearsalAttendanceOpensMinutesBefore, SettingDataType.Int, "0", "Mở điểm danh trước giờ tập (phút)",
+            "Buổi tập", "Số phút trước giờ bắt đầu buổi tập được phép điểm danh.", MinValue: 0, MaxValue: 120),
     ];
 
     public static SystemSettingDefinition? Find(string key) => All.FirstOrDefault(x => x.Key == key);

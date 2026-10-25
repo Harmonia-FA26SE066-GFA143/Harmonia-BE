@@ -71,6 +71,8 @@ public static class ErrorStatusMap
 
         // 5. Liturgical calendar.
         [ErrorCodes.CalendarDayNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.LiturgicalNameTranslationNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.LiturgicalNameTranslationDuplicate] = StatusCodes.Status409Conflict,
         [ErrorCodes.LiturgicalEventNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.LiturgicalEventSlotTaken] = StatusCodes.Status409Conflict,
         [ErrorCodes.LiturgicalEventAlreadyPublished] = StatusCodes.Status409Conflict,
@@ -88,6 +90,7 @@ public static class ErrorStatusMap
         [ErrorCodes.SongNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.SongInactive] = StatusCodes.Status409Conflict,
         [ErrorCodes.SongTitleDuplicate] = StatusCodes.Status409Conflict,
+        [ErrorCodes.SongInUse] = StatusCodes.Status409Conflict,
         [ErrorCodes.SongClassificationTargetInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.SongSkillRequirementCategoryInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.MaterialNotFound] = StatusCodes.Status404NotFound,

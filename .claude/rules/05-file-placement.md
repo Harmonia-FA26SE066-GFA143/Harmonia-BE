@@ -31,7 +31,7 @@
 
   | Thư mục | Chứa | KHÔNG chứa |
   |---|---|---|
-  | `Data/` | `HarmoniaDbContext`, `DataSeeder` (role + Admin đầu tiên, dữ liệu demo), extension truy vấn EF (`ToPagedListAsync`) | Repository |
+  | `Data/` | `HarmoniaDbContext`, `DataSeeder` (role + Admin đầu tiên, dữ liệu demo), extension truy vấn EF (`ToPagedListAsync`), file JSON nhúng mà `DataSeeder` nạp (`LiturgicalNameTranslations.json`) | Repository |
   | `Data/Configurations/` | `IEntityTypeConfiguration<T>`, seed cố định qua `HasData()` (lookup) | Dữ liệu demo, role |
   | `Data/Interceptors/` | EF interceptor (audit, …) | Logic nghiệp vụ |
   | `Migrations/` | Migration EF sinh ra | Bất cứ file nào viết tay — không tạo, không sửa |

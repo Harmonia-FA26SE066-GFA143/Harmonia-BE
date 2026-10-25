@@ -13,7 +13,11 @@ public class PracticeAssignmentDto
 
     public Guid? SongId { get; set; }
 
+    /// <summary>The first of <see cref="MaterialIds"/>, for clients that read one material.</summary>
     public Guid? MaterialId { get; set; }
+
+    /// <summary>Every attached material in order; empty when none.</summary>
+    public List<Guid> MaterialIds { get; set; } = [];
 
     public string Title { get; set; } = string.Empty;
 

@@ -200,6 +200,84 @@ public class MusicMaterialServiceTests
         await _materials.Received(1).SaveChangesAsync(_ct);
     }
 
+    private MusicMaterial StubAudioMaterial()
+    {
+        var material = new MusicMaterial
+        {
+            Id = Guid.NewGuid(), SongId = _song.Id, Title = "Alto", MaterialType = MaterialType.SampleAudio,
+            FilePublicId = "harmonia/old.mp3", FileName = "old.mp3", FileSizeBytes = 10, IsActive = true,
+        };
+        _materials.GetByIdAsync(material.Id, _ct).Returns(material);
+        return material;
+    }
+
+    [Fact]
+    public async Task ReplaceFile_KeepsTheMaterialAndProgress_AndDeletesTheOldFile_Async()
+    {
+        var material = StubAudioMaterial();
+
+        var result = await _sut.ReplaceFileAsync(
+            material.Id, new ReplaceMusicMaterialFileRequest(), NewFile("new.m4a", 2048), _ct);
+
+        Assert.Equal(material.Id, result.Value!.Id);
+        Assert.Equal(
+            ("harmonia/music-materials/sample-audio/stored.m4a", "new.m4a", 2048L, "Alto"),
+            (material.FilePublicId, material.FileName, material.FileSizeBytes, material.Title));
+        await _materials.Received(1).SaveChangesAsync(_ct);
+        await _storage.Received(1).DeleteAsync("harmonia/old.mp3", true, Arg.Any<CancellationToken>());
+        await _progresses.DidNotReceiveWithAnyArgs().ListAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task ReplaceFile_ResetProgress_RemovesMembersMarks_Async()
+    {
+        var material = StubAudioMaterial();
+        var mark = new MaterialLearningProgress { Id = Guid.NewGuid(), MaterialId = material.Id };
+        _progresses.ListAsync(default!, default).ReturnsForAnyArgs([mark]);
+
+        await _sut.ReplaceFileAsync(
+            material.Id, new ReplaceMusicMaterialFileRequest { ResetProgress = true }, NewFile("new.mp3"), _ct);
+
+        _progresses.Received(1).Remove(mark);
+        await _materials.Received(1).SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task ReplaceFile_TypeNotAllowedForTheMaterial_KeepsTheOldFile_Async()
+    {
+        var material = StubAudioMaterial();
+
+        var result = await _sut.ReplaceFileAsync(material.Id, new ReplaceMusicMaterialFileRequest(), NewFile("sheet.pdf"), _ct);
+
+        Assert.Equal(ErrorCodes.MaterialFileTypeNotAllowed, result.Code);
+        Assert.Equal("harmonia/old.mp3", material.FilePublicId);
+        await _storage.DidNotReceiveWithAnyArgs().UploadAsync(default!, default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task ReplaceFile_SaveFails_DeletesTheNewFileAndKeepsTheOld_Async()
+    {
+        var material = StubAudioMaterial();
+        _materials.SaveChangesAsync(_ct).ThrowsAsync(new InvalidOperationException("save failed"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _sut.ReplaceFileAsync(material.Id, new ReplaceMusicMaterialFileRequest(), NewFile("new.mp3"), _ct));
+
+        await _storage.Received(1).DeleteAsync("harmonia/music-materials/sample-audio/stored.mp3", true, Arg.Any<CancellationToken>());
+        await _storage.DidNotReceive().DeleteAsync("harmonia/old.mp3", Arg.Any<bool>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ReplaceFile_DeletedMaterial_ReturnsMaterialNotFound_Async()
+    {
+        var material = StubAudioMaterial();
+        material.IsActive = false;
+
+        var result = await _sut.ReplaceFileAsync(material.Id, new ReplaceMusicMaterialFileRequest(), NewFile("new.mp3"), _ct);
+
+        Assert.Equal(ErrorCodes.MaterialNotFound, result.Code);
+    }
+
     [Fact]
     public async Task Update_ClearsTargetSkill_WhenNull_Async()
     {

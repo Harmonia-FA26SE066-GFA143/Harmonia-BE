@@ -5,6 +5,7 @@ using Harmonia.Application.Interfaces.IRepositories;
 using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Domain.Common;
 using Harmonia.Domain.Entities;
+using Harmonia.Domain.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,6 +17,7 @@ namespace Harmonia.Application.Services;
 public class LiturgicalDayService(
     ILiturgicalDayRepository liturgicalDayRepository,
     ILiturgicalCalendarClient calendarClient,
+    ILiturgicalNameTranslationRepository translationRepository,
     IMapper mapper) : ILiturgicalDayService
 {
     public async Task<Result<LiturgicalDayDto>> GetByDateAsync(DateOnly date, CancellationToken cancellationToken)
@@ -24,7 +26,7 @@ public class LiturgicalDayService(
 
         return liturgicalDay is null
             ? Result<LiturgicalDayDto>.Failure(ErrorCodes.CalendarDayNotFound)
-            : Result<LiturgicalDayDto>.Success(mapper.Map<LiturgicalDayDto>(liturgicalDay));
+            : Result<LiturgicalDayDto>.Success((await ToDtosAsync([liturgicalDay], cancellationToken))[0]);
     }
 
     public async Task<Result<List<LiturgicalDayDto>>> GetRangeAsync(
@@ -32,7 +34,26 @@ public class LiturgicalDayService(
     {
         var days = await liturgicalDayRepository.GetRangeAsync(request.FromDate, request.ToDate, cancellationToken);
 
-        return Result<List<LiturgicalDayDto>>.Success(mapper.Map<List<LiturgicalDayDto>>(days));
+        return Result<List<LiturgicalDayDto>>.Success(await ToDtosAsync(days, cancellationToken));
+    }
+
+    // Translated on read, not on sync, so an Admin's edit shows at once without syncing the year again.
+    private async Task<List<LiturgicalDayDto>> ToDtosAsync(
+        IReadOnlyList<LiturgicalDay> days, CancellationToken cancellationToken)
+    {
+        var table = await translationRepository.GetAllAsync(cancellationToken);
+        var dtos = mapper.Map<List<LiturgicalDayDto>>(days);
+
+        foreach (var dto in dtos)
+        {
+            dto.CelebrationNameVi = LiturgicalNamePatterns.Translate(LiturgicalNameKind.Celebration, dto.CelebrationName, table);
+            dto.RankVi = dto.Rank is null ? null : LiturgicalNamePatterns.Translate(LiturgicalNameKind.Rank, dto.Rank, table);
+            dto.SeasonNameVi = dto.SeasonName is null
+                ? null
+                : LiturgicalNamePatterns.Translate(LiturgicalNameKind.Season, dto.SeasonName, table);
+        }
+
+        return dtos;
     }
 
     public async Task<Result<int>> SyncAsync(SyncLiturgicalDaysRequest request, CancellationToken cancellationToken)

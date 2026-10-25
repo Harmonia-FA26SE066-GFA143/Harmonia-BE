@@ -20,6 +20,19 @@ public interface ISongRepository : IGenericRepository<Song>
     /// </summary>
     Task<bool> ExistsByTitleAsync(string title, string? composer, Guid? excludeSongId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// <see cref="SongStats"/> of the given songs keyed by id, usage counted before <paramref name="today"/>.
+    /// Ids that do not exist are absent.
+    /// </summary>
+    Task<Dictionary<Guid, SongStats>> GetStatsAsync(
+        IReadOnlyCollection<Guid> ids, DateOnly today, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// True when a song list (any version or status), a rehearsal programme or a practice assignment holds the song,
+    /// so deleting it would leave a reference to an inactive song behind.
+    /// </summary>
+    Task<bool> IsInUseAsync(Guid id, CancellationToken cancellationToken);
+
     /// <summary>Tracked song with its classifications and vocal / instrument requirements (each with its Skill).</summary>
     Task<Song?> GetWithClassificationAsync(Guid id, CancellationToken cancellationToken);
 

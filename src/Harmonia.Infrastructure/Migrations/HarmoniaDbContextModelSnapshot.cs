@@ -393,6 +393,45 @@ namespace Harmonia.Infrastructure.Migrations
                     b.ToTable("LiturgicalEventChoirs");
                 });
 
+            modelBuilder.Entity("Harmonia.Domain.Entities.LiturgicalNameTranslation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("EnglishName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("VietnameseName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Kind", "EnglishName")
+                        .IsUnique();
+
+                    b.ToTable("LiturgicalNameTranslations");
+                });
+
             modelBuilder.Entity("Harmonia.Domain.Entities.LiturgicalSeason", b =>
                 {
                     b.Property<Guid>("Id")
@@ -840,6 +879,31 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("SongId");
 
                     b.ToTable("PracticeAssignments");
+                });
+
+            modelBuilder.Entity("Harmonia.Domain.Entities.PracticeAssignmentMaterial", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("MaterialId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("PracticeAssignmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MaterialId");
+
+                    b.HasIndex("PracticeAssignmentId", "MaterialId")
+                        .IsUnique();
+
+                    b.ToTable("PracticeAssignmentMaterials");
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.PracticeAssignmentTarget", b =>
@@ -2072,6 +2136,25 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Navigation("Song");
                 });
 
+            modelBuilder.Entity("Harmonia.Domain.Entities.PracticeAssignmentMaterial", b =>
+                {
+                    b.HasOne("Harmonia.Domain.Entities.MusicMaterial", "Material")
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Harmonia.Domain.Entities.PracticeAssignment", "PracticeAssignment")
+                        .WithMany("Materials")
+                        .HasForeignKey("PracticeAssignmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Material");
+
+                    b.Navigation("PracticeAssignment");
+                });
+
             modelBuilder.Entity("Harmonia.Domain.Entities.PracticeAssignmentTarget", b =>
                 {
                     b.HasOne("Harmonia.Domain.Entities.MemberProfile", "Member")
@@ -2565,6 +2648,8 @@ namespace Harmonia.Infrastructure.Migrations
 
             modelBuilder.Entity("Harmonia.Domain.Entities.PracticeAssignment", b =>
                 {
+                    b.Navigation("Materials");
+
                     b.Navigation("Submissions");
 
                     b.Navigation("Targets");

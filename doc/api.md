@@ -415,8 +415,16 @@ Chưa có kỹ năng nào → `[]`.
 ### `LiturgicalDayDto`
 
 ```json
-{ "date": "2026-12-25", "celebrationName": "Christmas", "rank": "Solemnity", "seasonName": "Christmas" }
+{
+  "date": "2026-12-25", "celebrationName": "Christmas", "rank": "Solemnity", "seasonName": "Christmas",
+  "celebrationNameVi": "Chúa Giáng Sinh", "rankVi": "Lễ trọng", "seasonNameVi": "Mùa Giáng Sinh"
+}
 ```
+
+- `celebrationName`, `rank`, `seasonName` giữ nguyên tiếng Anh của lịch (dùng làm mã). FE hiển thị các trường `…Vi`.
+- `…Vi` lấy theo thứ tự: bản dịch Admin quản lý (mục 4h) → quy tắc mẫu cho tên lễ (vd. "29th Sunday of Ordinary Time"
+  → "Chúa nhật XXIX Thường niên") → tiếng Anh nguyên văn khi chưa có bản dịch. Dịch lúc đọc nên Admin sửa là thấy ngay,
+  không cần đồng bộ lại năm.
 
 ### `LiturgicalEventDto`
 
@@ -591,6 +599,8 @@ Gồm mọi trường của `LiturgicalEventDto`, thêm `liturgicalSeasonName`, 
 | GET | `/api/reports/participation` | `Admin`, `ChoirDirector` | như `rehearsal-attendance` | 200 `PagedList<ParticipationReportDto>` | như `rehearsal-attendance` |
 | GET | `/api/reports/assignment-completion` | `Admin`, `ChoirDirector` | như `rehearsal-attendance` | 200 `PagedList<PracticeAssignmentCompletionDto>` | như `rehearsal-attendance` |
 | GET | `/api/reports/export` | `Admin`, `ChoirDirector` | `type`, `format`, `eventId`, `liturgicalSeasonId`, `fromDate`, `toDate`, `choirId` | 200 file tải về | 400 `VALIDATION_FAILED` (`REPORT_TYPE_NOT_SUPPORTED`, `REPORT_DATE_RANGE_INVALID`) · 400 `REPORT_TYPE_NOT_SUPPORTED` khi `ChoirDirector` chọn `type` ngoài `RehearsalAttendance`, `Participation`, `AssignmentCompletion` · 404 `REPORT_NO_DATA`, `CHOIR_NOT_FOUND` · 502 `EXTERNAL_STORAGE_FAILED` |
+| GET | `/api/reports/activity-trend` | `Admin`, `ChoirDirector` | `groupBy` (`Week` \| `Month` \| `Year`, mặc định `Month`), `fromDate`, `toDate` (bắt buộc, tối đa 3 năm), `choirId` | 200 `ActivityTrendDto[]`: mỗi kỳ một dòng, cũ trước, có cả kỳ trống | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`) · 404 `CHOIR_NOT_FOUND` (như `rehearsal-attendance`) |
+| GET | `/api/reports/columns/{type}` | `ParishPriest`, `Admin`, `ChoirDirector` | `type` = tên `ReportType` (vd. `RehearsalAttendance`) | 200 `ReportColumnDto[]` (`key`, `title`): cột theo thứ tự, tiêu đề tiếng Việt trùng với file xuất | 400 `REPORT_TYPE_NOT_SUPPORTED` |
 | GET | `/api/reports/exports` | `Admin` | `pageNumber`, `pageSize` | 200 `PagedList<ReportExportDto>` | — |
 
 - `eventId` thu hẹp báo cáo về một sự kiện; `user-activity` bỏ qua tham số này.
@@ -598,6 +608,27 @@ Gồm mọi trường của `LiturgicalEventDto`, thêm `liturgicalSeasonName`, 
   `fromDate` > `toDate` → 400, mã `REPORT_DATE_RANGE_INVALID` ở trường `toDate`.
 - `service-history` và `song-usage` chỉ xét sự kiện `Published` **trước hôm nay** (giờ Việt Nam).
 - Role khác gọi vào → `403` body rỗng.
+
+### Thống kê theo kỳ — `activity-trend`
+
+Một request cho cả năm thay vì cộng dồn từng buổi tập ở FE. Cùng nhóm ca viên với ba báo cáo theo ca viên
+(ca trưởng: ca viên mình quản lý; `choirId` thu hẹp về một ca đoàn). Tuần bắt đầu thứ Hai; mọi ngày theo giờ Việt Nam;
+kỳ đầu và kỳ cuối bị cắt theo `fromDate` / `toDate`.
+
+```json
+{
+  "periodStart": "2026-08-01", "periodEnd": "2026-08-31",
+  "rehearsalsRecorded": 4, "presentCount": 30, "lateCount": 3, "absentCount": 5, "excusedCount": 2,
+  "attendanceRate": 0.825,
+  "assignmentsDue": 2, "assignedCount": 20, "passedCount": 14, "needsRevisionCount": 2,
+  "awaitingReviewCount": 1, "notSubmittedCount": 3, "completionRate": 0.7
+}
+```
+
+- Điểm danh: buổi tập **bắt đầu** trong kỳ. `rehearsalsRecorded` = số buổi có ít nhất một lượt điểm danh.
+  `attendanceRate` = (`present` + `late`) / tổng lượt điểm danh, `null` khi kỳ không có lượt nào.
+- Luyện tập: bài tập **hạn nộp** trong kỳ, xét lần nộp mới nhất của từng ca viên được giao (như `assignment-completion`).
+  `assignedCount` = số cặp ca viên–bài tập; `completionRate` = `passed` / `assigned`, `null` khi không có bài.
 
 ### Xuất báo cáo (UC-34E / FE-53)
 
@@ -755,29 +786,31 @@ dữ liệu trong khoảng lọc vẫn hiện với các số bằng 0.
 
 ---
 
-## 4e. System settings — `api/system-settings` · sửa: `Admin` · đọc cài đặt công khai: mọi role (UC-33 / FE-51)
+## 4e. System settings — `api/system-settings` · sửa: `Admin` · đọc cài đặt công khai: mọi role, một phần không cần đăng nhập (UC-33 / FE-51)
 
 | Method | Route | Role | Body | Thành công | Lỗi |
 |---|---|---|---|---|---|
 | GET | `/api/system-settings` | `Admin` | — | 200 `SystemSettingDto[]` | — |
-| GET | `/api/system-settings/public` | mọi role | — | 200 `SystemSettingDto[]` (chỉ key công khai) | — |
+| GET | `/api/system-settings/public` | mọi role · **không cần đăng nhập** | — | 200 `SystemSettingDto[]`: đã đăng nhập → mọi key công khai; chưa đăng nhập → chỉ `Parish.Name`, `Choir.Name`, `Contact.Email` | — |
 | PUT | `/api/system-settings/{id}` | `Admin` | `{ "value" }` | 200 `SystemSettingDto` | 400 `VALIDATION_FAILED`, `SETTING_VALUE_TYPE_MISMATCH`, `SETTING_VALUE_OUT_OF_RANGE` · 404 `SETTING_NOT_FOUND` |
 
 ```json
 {
   "id": "guid", "key": "Roster.RecentServiceDays", "value": "60", "dataType": "Int",
-  "description": "How many days back a service counts as recent when suggesting a roster.",
+  "displayName": "Số ngày tính là phục vụ gần đây", "group": "Phân công", "order": 4,
+  "description": "Số ngày gần nhất được tính là đã phục vụ gần đây khi đề xuất phân công.",
   "isPublic": false, "minValue": 1, "maxValue": 365
 }
 ```
 
-- Danh sách sắp theo `key`. **Bộ key do hệ thống định nghĩa**: Admin chỉ sửa `value`, không tạo, không xoá, không đổi kiểu.
+- Danh sách sắp theo `order` (thứ tự trên trang cấu hình, xuyên suốt các nhóm). `displayName` và `group` là tiếng Việt,
+  FE hiển thị nguyên văn. **Bộ key do hệ thống định nghĩa**: Admin chỉ sửa `value`, không tạo, không xoá, không đổi kiểu.
 - `value` luôn là **chuỗi**, đọc theo `dataType`: `Int` → `"42"`, `Bool` → `"true"` / `"false"`, `String` → nguyên văn
   (được để rỗng), `Json` → một giá trị JSON hợp lệ. Server cắt khoảng trắng hai đầu và chuẩn hoá (`" 042 "` → `"42"`,
   `"True"` → `"true"`). Tối đa 1000 ký tự.
 - Sai kiểu → 400 `SETTING_VALUE_TYPE_MISMATCH`. Số nguyên ngoài `minValue`–`maxValue` → 400 `SETTING_VALUE_OUT_OF_RANGE`.
   `minValue`, `maxValue` là `null` với key không phải số.
-- `description` là tiếng Anh, chỉ để tham khảo; FE đặt nhãn tiếng Việt theo `key`.
+- `description` là câu giải thích tiếng Việt, hiển thị dưới ô nhập.
 - Mọi thay đổi được ghi vào nhật ký hoạt động (`entityType` = `SystemSetting`).
 
 | `key` | Kiểu | Mặc định | Công khai | Tác dụng |
@@ -894,6 +927,31 @@ Giờ lễ cố định hằng tuần của giáo xứ (vd Chúa nhật 04:00 ·
 - Trùng cả `dayOfWeek` + `time` + `locationId` với giờ lễ khác → 409 `MASS_SCHEDULE_SLOT_TAKEN`.
 - Sửa giờ lễ không đụng tới các sự kiện đã sinh trước đó.
 
+## 4h. Liturgical name translations — `api/liturgical-name-translations` · role `Admin`
+
+Tên tiếng Việt cho các từ tiếng Anh của lịch phụng vụ. Mọi role đọc kết quả qua các trường `…Vi` của `LiturgicalDayDto`.
+
+```json
+{ "id": "guid", "kind": "Celebration", "englishName": "Christ the King", "vietnameseName": "Đức Giêsu Kitô, Vua Vũ Trụ" }
+```
+
+| Method | Route | Body | Thành công | Lỗi |
+|---|---|---|---|---|
+| GET | `/api/liturgical-name-translations?keyword=&kind=&pageNumber=&pageSize=` | — | 200 `PagedList<LiturgicalNameTranslationDto>` | — |
+| GET | `/api/liturgical-name-translations/missing` | — | 200 `[{ "kind", "englishName" }]` — tên của các ngày đã đồng bộ còn hiện tiếng Anh | — |
+| POST | `/api/liturgical-name-translations` | `{ "kind", "englishName", "vietnameseName" }` | 200 `LiturgicalNameTranslationDto` | 400 `VALIDATION_FAILED` · 409 `LITURGICAL_NAME_TRANSLATION_DUPLICATE` |
+| PUT | `/api/liturgical-name-translations/{id}` | như POST | 200 `LiturgicalNameTranslationDto` | 400 `VALIDATION_FAILED` · 404 `LITURGICAL_NAME_TRANSLATION_NOT_FOUND` · 409 `LITURGICAL_NAME_TRANSLATION_DUPLICATE` |
+| DELETE | `/api/liturgical-name-translations/{id}` | — | 204 | 404 `LITURGICAL_NAME_TRANSLATION_NOT_FOUND` |
+
+- `kind`: `Celebration` (tên lễ) · `Rank` (`Solemnity`, `Feast`, `Obligatory Memorial`, `Optional Memorial`) ·
+  `Season` (`Advent`, `Christmas`, `Lent`, `Easter`, `OrdinaryTime`). Cùng một từ có thể khác nghĩa theo `kind`
+  ("Christmas" là lễ Chúa Giáng Sinh và cũng là Mùa Giáng Sinh), nên duy nhất theo cặp `kind` + `englishName`.
+- `englishName` phải đúng nguyên văn như lịch trả (lấy từ `GET missing`); hai tên ≤ 200 ký tự, được cắt khoảng trắng.
+- Lần khởi động đầu, bảng rỗng được nạp sẵn 230 bản dịch (221 tên lễ chuyển từ Web + 4 bậc lễ + 5 mùa). Sau đó danh sách
+  thuộc về Admin: dòng đã xoá không được nạp lại.
+- Ngày thường và Chúa nhật theo mẫu (thứ trong tuần, tuần thứ mấy của mùa) được dịch bằng quy tắc, không cần dòng
+  trong bảng; thêm dòng cùng tên thì dòng của Admin được ưu tiên.
+
 ## 5. Notifications — `api/notifications` · mọi role đã đăng nhập
 
 Chỉ thao tác trên thông báo **của chính người gọi**.
@@ -980,26 +1038,40 @@ Thư viện bài hát và phân loại bài hát (UC-21 / FE-27, FE-29).
   "lyricist": null,
   "musicalKey": "G",
   "tempo": "Andante",
-  "notes": null
+  "notes": null,
+  "materialCounts": { "SheetMusic": 1, "Lyrics": 0, "SampleAudio": 2, "RehearsalMaterial": 0 },
+  "isClassified": true,
+  "timesUsed": 3,
+  "lastUsedDate": "2026-10-18"
 }
 ```
 
+- `materialCounts`: số tài liệu đang hoạt động theo từng `MaterialType`, đủ mọi loại (0 khi chưa có).
+- `isClassified`: bài đã có ít nhất một mùa phụng vụ, loại lễ, nghi thức hoặc chủ đề.
+- `timesUsed` / `lastUsedDate`: đếm như báo cáo `song-usage` — sự kiện `Published` đã qua có danh sách `Approved`
+  chứa bài; `lastUsedDate` là `null` khi `timesUsed` = 0.
+
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
-| GET | `/api/songs?keyword=&liturgicalSeasonId=&massTypeId=&ceremonyTypeId=&songThemeId=&skillId=&pageNumber=1&pageSize=20` | — | 200 `PagedList<SongDto>` | — |
+| GET | `/api/songs?keyword=&liturgicalSeasonId=&massTypeId=&ceremonyTypeId=&songThemeId=&skillId=&isClassified=&missingMaterialType=&pageNumber=1&pageSize=20` | — | 200 `PagedList<SongDto>` | — |
 | GET | `/api/songs/{id}` | — | 200 `SongDto` | 404 `SONG_NOT_FOUND` |
 | POST | `/api/songs` | `{ "title", "composer", "lyricist", "musicalKey", "tempo", "notes" }` | 200 `SongDto` | 400 `VALIDATION_FAILED` · 409 `SONG_TITLE_DUPLICATE` |
 | PUT | `/api/songs/{id}` | như POST | 200 `SongDto` | 400 `VALIDATION_FAILED` · 404 `SONG_NOT_FOUND` · 409 `SONG_TITLE_DUPLICATE` |
-| DELETE | `/api/songs/{id}` | — | 204 | 404 `SONG_NOT_FOUND` |
+| DELETE | `/api/songs/{id}` | — | 204 | 404 `SONG_NOT_FOUND` · 409 `SONG_IN_USE` |
 | GET | `/api/songs/{id}/classification` | — | 200 `SongClassificationDto` | 404 `SONG_NOT_FOUND` |
 | PUT | `/api/songs/{id}/classification` | `UpdateSongClassificationRequest` | 200 `SongClassificationDto` | 400 `VALIDATION_FAILED`, `SONG_CLASSIFICATION_DUPLICATE`, `SONG_SKILL_REQUIREMENT_DUPLICATE`, `SONG_CLASSIFICATION_TARGET_INVALID`, `SONG_SKILL_REQUIREMENT_CATEGORY_INVALID` · 404 `SONG_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE` |
 
-- `keyword` tìm trong `title`, `composer`, `lyricist`; kết quả sắp theo `title`.
+- `keyword` tìm trong `title`, `composer`, `lyricist`, **không phân biệt hoa thường và dấu tiếng Việt**
+  ("con buoc" ra "Con Bước", "duc" ra "Đức"); kết quả sắp theo `title`. Tìm ca viên theo tên
+  (`/api/member-profiles`) và tìm tài liệu (`/api/music-materials/mine`) cũng không phân biệt dấu.
+- `isClassified=false` chỉ lấy bài chưa phân loại (`true`: đã phân loại). `missingMaterialType=SampleAudio` chỉ lấy bài
+  chưa có tài liệu đang hoạt động thuộc loại đó.
 - Chỉ `title` bắt buộc (≤ 200). `composer`, `lyricist` ≤ 150 · `musicalKey` ≤ 10 · `tempo` ≤ 50 ·
   `notes` ≤ 1000. Chuỗi được trim, chuỗi rỗng lưu thành `null`.
 - `SONG_TITLE_DUPLICATE`: đã có bài cùng `title` **và** cùng `composer` (cùng tên khác nhạc sĩ vẫn được).
 - `DELETE` là xoá mềm, không khôi phục được: bài biến khỏi danh sách và mọi route theo `id`
-  trả `SONG_NOT_FOUND`; danh sách bài hát cũ vẫn giữ tham chiếu. Tạo lại bài cùng tên được.
+  trả `SONG_NOT_FOUND`. Tạo lại bài cùng tên được. Bài **đã được dùng** — nằm trong một danh sách bài hát bất kỳ
+  (kể cả bản nháp hay bị từ chối), một buổi tập hoặc một bài luyện tập — không xoá được: 409 `SONG_IN_USE`.
 - Bộ lọc phân loại của `GET /api/songs` đều tuỳ chọn và kết hợp theo AND. `skillId` khớp bài có
   yêu cầu bè **hoặc** nhạc cụ là skill đó.
 
@@ -1096,6 +1168,7 @@ Tư liệu của bài hát: bản nhạc, lời, audio mẫu, tài liệu tập 
 | PUT | `/api/music-materials/{id}/learning-progress` · chỉ `ChoirMember` | `{ "status": "Learned" }` | 200 `MaterialLearningProgressDto` | 400 `VALIDATION_FAILED` (`errors.status`: `MATERIAL_LEARNING_STATUS_INVALID`) · 404 `MEMBER_NOT_FOUND`, `MATERIAL_NOT_FOUND` |
 | GET | `/api/music-materials/{id}/learning-progress?status=&pageNumber=1&pageSize=20` · chỉ `ChoirDirector` | — | 200 `PagedList<MaterialLearningProgressDetailDto>` | 404 `MATERIAL_NOT_FOUND` |
 | PUT | `/api/music-materials/{id}` | `{ "title", "targetSkillId" }` | 200 `MusicMaterialDto` | 400 `VALIDATION_FAILED` · 404 `MATERIAL_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE` |
+| PUT | `/api/music-materials/{id}/file` | `multipart/form-data`: `file`, `resetProgress?` (mặc định `false`) | 200 `MusicMaterialDto` — giữ nguyên `id`, tiêu đề, loại, kỹ năng đích và bài luyện tập đang gắn; file cũ bị xoá khỏi kho. `resetProgress=true` xoá đánh dấu "đã học / cần luyện thêm" của ca viên với tài liệu này | 400 `MATERIAL_FILE_REQUIRED`, `MATERIAL_FILE_TYPE_NOT_ALLOWED` (theo loại hiện có của tài liệu) · 404 `MATERIAL_NOT_FOUND` · 413 `MATERIAL_FILE_TOO_LARGE` · 502 `EXTERNAL_STORAGE_FAILED` |
 | DELETE | `/api/music-materials/{id}` | — | 204 | 404 `MATERIAL_NOT_FOUND` |
 
 - `materialType`: `SheetMusic` | `Lyrics` | `SampleAudio` | `RehearsalMaterial` (gửi tên hoặc số).
@@ -1369,6 +1442,7 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
   "eventId": "guid | null",
   "songId": "guid | null",
   "materialId": "guid | null",
+  "materialIds": ["guid", "guid"],
   "title": "Tập bài Nhập lễ",
   "instruction": "Thu âm bè Soprano, đoạn điệp khúc | null",
   "scope": "SkillGroup",
@@ -1381,7 +1455,7 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 | Method | Path | Body | Thành công | Lỗi |
 |---|---|---|---|---|
 | GET | `/api/practice-assignments?eventId=&pageNumber=&pageSize=` | — | 200 `PagedList<PracticeAssignmentDto>` | — |
-| POST | `/api/practice-assignments` | `{ "choirId", "title", "instruction?", "scope", "dueDate", "eventId?", "songId?", "materialId?", "skillIds?", "memberIds?" }` | 200 `PracticeAssignmentDto` | 400 `VALIDATION_FAILED` (`PRACTICE_DUE_DATE_IN_PAST`, `PRACTICE_TARGET_REQUIRED`) · 404 `LITURGICAL_EVENT_NOT_FOUND`, `SONG_NOT_FOUND`, `MATERIAL_NOT_FOUND`, `SKILL_NOT_FOUND`, `MEMBER_NOT_FOUND`, `CHOIR_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `CHOIR_INACTIVE`, `CHOIR_NOT_SERVING_EVENT`, `SONG_INACTIVE`, `SKILL_INACTIVE` |
+| POST | `/api/practice-assignments` | `{ "choirId", "title", "instruction?", "scope", "dueDate", "eventId?", "songId?", "materialIds?", "materialId?", "skillIds?", "memberIds?" }` | 200 `PracticeAssignmentDto` | 400 `VALIDATION_FAILED` (`PRACTICE_DUE_DATE_IN_PAST`, `PRACTICE_TARGET_REQUIRED`) · 404 `LITURGICAL_EVENT_NOT_FOUND`, `SONG_NOT_FOUND`, `MATERIAL_NOT_FOUND`, `SKILL_NOT_FOUND`, `MEMBER_NOT_FOUND`, `CHOIR_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `CHOIR_INACTIVE`, `CHOIR_NOT_SERVING_EVENT`, `SONG_INACTIVE`, `SKILL_INACTIVE` |
 
 - `GET`: bài tập ca trưởng đã giao, tất cả hoặc của một sự kiện (`eventId`), hạn nộp muộn nhất trước.
   Tên bài hát / tư liệu lấy theo `songId` / `materialId`; bài nộp của từng bài tập xem ở `GET …/{id}/submissions`.
@@ -1390,8 +1464,11 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
   - `SkillGroup`: `skillIds` bắt buộc. Người nhận là ca viên đang hoạt động đã được **duyệt** ít nhất một skill trong danh sách.
   - `Individual`: `memberIds` (id hồ sơ ca viên) bắt buộc. Ca viên không còn hoạt động → 404 `MEMBER_NOT_FOUND`.
 - `title` tối đa 200 ký tự, `instruction` tối đa 1000. `dueDate` là UTC, phải sau thời điểm gửi.
-- `eventId`, `songId`, `materialId` đều tuỳ chọn. Sự kiện đã huỷ → 409 `LITURGICAL_EVENT_CANCELLED`. Tư liệu đã tắt, hoặc
-  không thuộc `songId` khi gửi cả hai → 404 `MATERIAL_NOT_FOUND`.
+- `eventId`, `songId`, `materialIds` đều tuỳ chọn. Sự kiện đã huỷ → 409 `LITURGICAL_EVENT_CANCELLED`.
+- **Nhiều tư liệu** (vd. bản nhạc + audio mẫu): gửi `materialIds` theo thứ tự hiển thị; id trùng bị bỏ. Một tư liệu
+  đã tắt, không tồn tại, hoặc không thuộc `songId` khi có `songId` → 404 `MATERIAL_NOT_FOUND`, không lưu gì.
+  `materialId` (một tư liệu) vẫn nhận cho client cũ và bị bỏ qua khi có `materialIds`. Trong response, `materialId` là
+  phần tử đầu của `materialIds`.
 - Tạo xong, mỗi ca viên được giao nhận một thông báo `AssignmentNotice`, `referenceType = "PracticeAssignment"`,
   `referenceId` = id bài tập.
 
@@ -1415,6 +1492,10 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
   "materialId": "guid | null",
   "materialTitle": "string | null",
   "materialType": "SheetMusic | null",
+  "materials": [
+    { "id": "guid", "title": "Bản nhạc", "materialType": "SheetMusic" },
+    { "id": "guid", "title": "Audio bè Soprano", "materialType": "SampleAudio" }
+  ],
   "latestSubmissionStatus": "Submitted | null",
   "latestSubmittedAt": "2026-10-10T09:00:00Z | null",
   "isOverdue": false,
@@ -1447,7 +1528,8 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
   `PRACTICE_SUBMISSION_ALREADY_PASSED` (lần mới nhất đã `Passed`) hoặc `PRACTICE_SUBMISSION_PAST_DUE` (quá `dueDate`
   và setting `Practice.AllowLateSubmission` đang tắt). Server đã xét setting; FE bật / tắt nút nộp theo field này,
   không tự suy từ `isOverdue`.
-- Mở file tư liệu qua `api/music-materials` bằng `materialId`.
+- `materials`: mọi tư liệu gắn với bài tập, theo thứ tự ca trưởng chọn; `[]` khi không có. `materialId` / `materialTitle` /
+  `materialType` là tư liệu đầu tiên, giữ cho app cũ. Mở file qua `api/music-materials` bằng `id` của từng tư liệu.
 
 `MyPracticeAssignmentCountsResponse` (`GET mine/counts`) — số bài tập ca viên đang nhận, theo lần nộp mới nhất:
 

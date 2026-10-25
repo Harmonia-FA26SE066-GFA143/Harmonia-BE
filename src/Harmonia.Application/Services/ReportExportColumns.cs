@@ -1,6 +1,7 @@
 using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
 using Harmonia.Domain.Common;
+using Harmonia.Domain.Enums;
 
 namespace Harmonia.Application.Services;
 
@@ -11,6 +12,18 @@ namespace Harmonia.Application.Services;
 /// </summary>
 public static class ReportExportColumns
 {
+    /// <summary>The columns of <paramref name="type"/> without any row; null for a type with no export.</summary>
+    public static IReadOnlyList<(string Key, string Title)>? Of(ReportType type) => type switch
+    {
+        ReportType.UserActivity => UserActivity([]).Columns,
+        ReportType.RehearsalAttendance => RehearsalAttendance([]).Columns,
+        ReportType.Participation => Participation([]).Columns,
+        ReportType.AssignmentCompletion => AssignmentCompletion([]).Columns,
+        ReportType.SongUsage => SongUsage([]).Columns,
+        ReportType.ServiceHistory => ServiceHistory([]).Columns,
+        _ => null,
+    };
+
     public static ReportTable UserActivity(IEnumerable<UserActivityDto> rows) => Table(
         "Hoạt động tài khoản", rows,
         ("fullName", "Họ tên", x => x.FullName),

@@ -50,6 +50,12 @@ public interface IUserRepository : IGenericRepository<User>
 
     Task<List<Guid>> GetActiveUserIdsByRolesAsync(IReadOnlyCollection<string> roleNames, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Active users of the choirs serving the event: the members active in one of them and their directors.
+    /// Null when no choir serves the event, so the caller can fall back to the whole parish.
+    /// </summary>
+    Task<List<Guid>?> GetActiveUserIdsOfEventChoirsAsync(Guid eventId, CancellationToken cancellationToken);
+
     /// <summary>Read-only active users of the role, with Role loaded, ordered by name.</summary>
     Task<List<User>> GetActiveByRoleAsync(string roleName, CancellationToken cancellationToken);
 }

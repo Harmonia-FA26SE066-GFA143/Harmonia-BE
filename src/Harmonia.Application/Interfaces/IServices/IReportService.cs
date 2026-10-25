@@ -29,4 +29,11 @@ public interface IReportService
     /// <summary>Admin only (UC-34 / FE-52). Active members, ordered by name; assignments are picked by due date.</summary>
     Task<Result<PagedList<PracticeAssignmentCompletionDto>>> GetAssignmentCompletionAsync(
         SearchReportsRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Admin and Choir Director: attendance and practice totals of the same members as the per-member reports, one row
+    /// per week, month or year of the range, oldest first, empty periods included. CHOIR_NOT_FOUND as there.
+    /// </summary>
+    Task<Result<List<ActivityTrendDto>>> GetActivityTrendAsync(
+        SearchActivityTrendRequest request, CancellationToken cancellationToken);
 }

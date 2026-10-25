@@ -3,6 +3,7 @@ using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Domain.Common;
+using Harmonia.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
@@ -81,6 +82,19 @@ public class ReportsController(IReportService reportService, IReportExportServic
             ContentTypes.TryGetContentType(file.FileName, out var contentType) ? contentType : "application/octet-stream",
             file.FileName);
     }
+
+    /// <summary>Attendance and practice totals per week, month or year of a date range, for the same members as the per-member reports.</summary>
+    [HttpGet("activity-trend")]
+    [Authorize(Roles = $"{RoleNames.Admin},{RoleNames.ChoirDirector}")]
+    [ProducesResponseType<List<ActivityTrendDto>>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetActivityTrendAsync(
+        [FromQuery] SearchActivityTrendRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await reportService.GetActivityTrendAsync(request, cancellationToken));
+
+    /// <summary>Column keys and Vietnamese titles of a report, the same ones its export uses.</summary>
+    [HttpGet("columns/{type}")]
+    [ProducesResponseType<List<ReportColumnDto>>(StatusCodes.Status200OK)]
+    public IActionResult GetColumns(ReportType type) => ToActionResult(reportExportService.GetColumns(type));
 
     [HttpGet("exports")]
     [Authorize(Roles = RoleNames.Admin)]

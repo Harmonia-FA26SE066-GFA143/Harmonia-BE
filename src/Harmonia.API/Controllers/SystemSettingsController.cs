@@ -8,7 +8,8 @@ namespace Harmonia.API.Controllers;
 
 /// <summary>
 /// General system settings (UC-33 / FE-51). Only the Admin lists and edits them; every signed-in role reads the
-/// few that are public, such as the parish name.
+/// few that are public, such as the parish name; a visitor who has not signed in reads the ones the landing and
+/// sign-in pages show.
 /// </summary>
 [Route("api/system-settings")]
 [Authorize]
@@ -21,9 +22,11 @@ public class SystemSettingsController(ISystemSettingService systemSettingService
         ToActionResult(await systemSettingService.GetAllAsync(cancellationToken));
 
     [HttpGet("public")]
+    [AllowAnonymous]
     [ProducesResponseType<List<SystemSettingDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPublicAsync(CancellationToken cancellationToken) =>
-        ToActionResult(await systemSettingService.GetPublicAsync(cancellationToken));
+        ToActionResult(await systemSettingService.GetPublicAsync(
+            User.Identity?.IsAuthenticated == true, cancellationToken));
 
     [HttpPut("{id:guid}")]
     [Authorize(Roles = RoleNames.Admin)]

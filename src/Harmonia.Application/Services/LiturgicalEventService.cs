@@ -226,8 +226,10 @@ public class LiturgicalEventService(
     private async Task NotifyDirectorsAndMembersAsync(
         LiturgicalEvent liturgicalEvent, NotificationType type, string title, string content, CancellationToken cancellationToken)
     {
-        var recipientUserIds = await userRepository.GetActiveUserIdsByRolesAsync(
-            [RoleNames.ChoirDirector, RoleNames.ChoirMember], cancellationToken);
+        // An event with choirs concerns only them (D8); one without stays a parish-wide announcement.
+        var recipientUserIds = await userRepository.GetActiveUserIdsOfEventChoirsAsync(liturgicalEvent.Id, cancellationToken)
+            ?? await userRepository.GetActiveUserIdsByRolesAsync(
+                [RoleNames.ChoirDirector, RoleNames.ChoirMember], cancellationToken);
 
         await notificationService.SendAsync(
             new SendNotificationRequest(

@@ -66,7 +66,8 @@ public interface IMemberProfileRepository : IGenericRepository<MemberProfile>
     /// Read-only page of active members, ordered by name, with <see cref="MemberProfile.User"/> loaded and
     /// <see cref="MemberProfile.MemberSkills"/> holding only approved skills. The event, season and date range of
     /// <paramref name="filter"/> narrow the loaded rows, not the members:
-    /// <see cref="MemberProfile.RehearsalAttendances"/> holds rows of rehearsals starting inside the range, and
+    /// <see cref="MemberProfile.RehearsalAttendances"/> holds rows of rehearsals starting inside the range (each with its
+    /// Rehearsal), and
     /// <see cref="MemberProfile.EventParticipations"/> rows of Published events dated inside it.
     /// A rehearsal without an event matches no season. <see cref="MemberProfile.ChoirMemberships"/> holds active rows.
     /// With <paramref name="directorUserId"/>, only members that director manages (see <see cref="IsManagedByDirectorAsync"/>).

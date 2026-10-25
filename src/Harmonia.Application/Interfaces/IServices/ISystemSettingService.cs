@@ -9,11 +9,14 @@ namespace Harmonia.Application.Interfaces.IServices;
 /// </summary>
 public interface ISystemSettingService
 {
-    /// <summary>Every setting, ordered by key. Admin only.</summary>
+    /// <summary>Every setting, in the order of the settings page. Admin only.</summary>
     Task<Result<List<SystemSettingDto>>> GetAllAsync(CancellationToken cancellationToken);
 
-    /// <summary>The settings marked public, ordered by key.</summary>
-    Task<Result<List<SystemSettingDto>>> GetPublicAsync(CancellationToken cancellationToken);
+    /// <summary>
+    /// The settings marked public for a signed-in caller; for a visitor who has not signed in, only those also
+    /// marked anonymous. In the order of the settings page.
+    /// </summary>
+    Task<Result<List<SystemSettingDto>>> GetPublicAsync(bool isSignedIn, CancellationToken cancellationToken);
 
     /// <summary>
     /// SETTING_NOT_FOUND for an unknown id, SETTING_VALUE_OUT_OF_RANGE for an Int outside the key's range.

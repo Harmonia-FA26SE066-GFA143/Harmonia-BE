@@ -14,8 +14,14 @@ public class CreatePracticeAssignmentRequest
 
     public Guid? SongId { get; set; }
 
-    /// <summary>When <see cref="SongId"/> is also set, the material must belong to that song.</summary>
+    /// <summary>
+    /// Older single-material form; ignored when <see cref="MaterialIds"/> is sent. When <see cref="SongId"/> is also
+    /// set, the material must belong to that song.
+    /// </summary>
     public Guid? MaterialId { get; set; }
+
+    /// <summary>Materials to attach, in display order, e.g. sheet music and sample audio; each follows the rule of <see cref="MaterialId"/>.</summary>
+    public List<Guid>? MaterialIds { get; set; }
 
     public string Title { get; set; } = string.Empty;
 

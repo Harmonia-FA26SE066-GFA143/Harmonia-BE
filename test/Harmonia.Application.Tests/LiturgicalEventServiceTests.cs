@@ -143,6 +143,19 @@ public class LiturgicalEventServiceTests
     }
 
     [Fact]
+    public async Task Cancel_EventWithChoirs_NotifiesOnlyTheirPeople_Async()
+    {
+        var choirPeople = new List<Guid> { Guid.NewGuid() };
+        _users.GetActiveUserIdsOfEventChoirsAsync(_event.Id, _ct).Returns(choirPeople);
+
+        await _sut.CancelAsync(_event.Id, _ct);
+
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(x => x.RecipientUserIds == choirPeople), _ct);
+        await _users.DidNotReceiveWithAnyArgs().GetActiveUserIdsByRolesAsync(default!, default);
+    }
+
+    [Fact]
     public async Task Cancel_DraftEvent_CancelsWithoutNotification_Async()
     {
         _event.Status = EventStatus.Draft;

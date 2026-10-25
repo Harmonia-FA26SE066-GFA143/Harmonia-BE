@@ -8,6 +8,10 @@ public class LiturgicalDayProfile : Profile
 {
     public LiturgicalDayProfile()
     {
-        CreateMap<LiturgicalDay, LiturgicalDayDto>();
+        // The Vietnamese names come from the translation table, so the service fills them.
+        CreateMap<LiturgicalDay, LiturgicalDayDto>()
+            .ForMember(dest => dest.CelebrationNameVi, opt => opt.Ignore())
+            .ForMember(dest => dest.RankVi, opt => opt.Ignore())
+            .ForMember(dest => dest.SeasonNameVi, opt => opt.Ignore());
     }
 }

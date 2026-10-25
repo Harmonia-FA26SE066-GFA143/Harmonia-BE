@@ -228,16 +228,58 @@ public class PracticeAssignmentServiceTests
         await AssertNothingSavedAsync();
     }
 
+    /// <summary>Runs the service's predicate over the given materials, like the database would.</summary>
+    private void Materials(params MusicMaterial[] materials) =>
+        _materials.ListAsync(Arg.Any<Expression<Func<MusicMaterial, bool>>>(), _ct)
+            .Returns(ci => materials.Where(ci.Arg<Expression<Func<MusicMaterial, bool>>>().Compile()).ToList());
+
     [Fact]
     public async Task Create_MaterialOfAnotherSong_ReturnsMaterialNotFound_Async()
     {
-        var song = new Song { Id = Guid.NewGuid(), Title = "Song" };
-        var material = new MusicMaterial { Id = Guid.NewGuid(), SongId = Guid.NewGuid() };
+        var song = new Song { Id = Guid.NewGuid(), Title = "Song", IsActive = true };
+        var material = new MusicMaterial { Id = Guid.NewGuid(), SongId = Guid.NewGuid(), IsActive = true };
         _songs.GetByIdAsync(song.Id, _ct).Returns(song);
-        _materials.GetByIdAsync(material.Id, _ct).Returns(material);
+        Materials(material);
         var request = Request(AssignmentScope.All);
         request.SongId = song.Id;
         request.MaterialId = material.Id;
+
+        var result = await _sut.CreateAsync(request, _ct);
+
+        Assert.Equal(ErrorCodes.MaterialNotFound, result.Code);
+        await AssertNothingSavedAsync();
+    }
+
+    [Fact]
+    public async Task Create_SeveralMaterials_AttachesThemInOrder_AndTheFirstFillsMaterialId_Async()
+    {
+        var song = new Song { Id = Guid.NewGuid(), Title = "Song", IsActive = true };
+        var sheet = new MusicMaterial { Id = Guid.NewGuid(), SongId = song.Id, IsActive = true };
+        var audio = new MusicMaterial { Id = Guid.NewGuid(), SongId = song.Id, IsActive = true };
+        _songs.GetByIdAsync(song.Id, _ct).Returns(song);
+        Materials(sheet, audio);
+        var request = Request(AssignmentScope.All);
+        request.SongId = song.Id;
+        request.MaterialIds = [audio.Id, sheet.Id, audio.Id];
+
+        var result = await _sut.CreateAsync(request, _ct);
+
+        Assert.Equal([audio.Id, sheet.Id], result.Value!.MaterialIds);
+        Assert.Equal(audio.Id, result.Value.MaterialId);
+        await _assignments.Received(1).AddAsync(
+            Arg.Is<PracticeAssignment>(x => x.MaterialId == audio.Id
+                && x.Materials.OrderBy(m => m.DisplayOrder).Select(m => m.MaterialId).SequenceEqual(new[] { audio.Id, sheet.Id })),
+            _ct);
+    }
+
+    [Fact]
+    public async Task Create_OneOfSeveralMaterialsDeleted_ReturnsMaterialNotFound_Async()
+    {
+        var sheet = new MusicMaterial { Id = Guid.NewGuid(), SongId = Guid.NewGuid(), IsActive = true };
+        var deleted = new MusicMaterial { Id = Guid.NewGuid(), SongId = sheet.SongId, IsActive = false };
+        Materials(sheet, deleted);
+        var request = Request(AssignmentScope.All);
+        request.MaterialIds = [sheet.Id, deleted.Id];
 
         var result = await _sut.CreateAsync(request, _ct);
 

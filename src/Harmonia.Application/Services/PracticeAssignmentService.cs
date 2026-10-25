@@ -58,6 +58,7 @@ public class PracticeAssignmentService(
         var choirMembers = await memberProfileRepository.ListAsync(
             x => choirMemberIds.Contains(x.Id) && x.Status == MemberStatus.Active, cancellationToken);
         var choirUserIds = choirMembers.Select(x => x.UserId).ToHashSet();
+        var materialIds = MaterialIdsOf(request);
 
         var assignment = new PracticeAssignment
         {
@@ -65,11 +66,14 @@ public class PracticeAssignmentService(
             ChoirId = request.ChoirId,
             EventId = request.EventId,
             SongId = request.SongId,
-            MaterialId = request.MaterialId,
+            MaterialId = materialIds.Count > 0 ? materialIds[0] : null,
             Title = request.Title,
             Instruction = request.Instruction,
             Scope = request.Scope,
             DueDate = request.DueDate,
+            Materials = materialIds
+                .Select((id, i) => new PracticeAssignmentMaterial { Id = Guid.NewGuid(), MaterialId = id, DisplayOrder = i })
+                .ToList(),
         };
 
         List<Guid> recipientUserIds;
@@ -294,12 +298,12 @@ public class PracticeAssignmentService(
             if (!song.IsActive) return ErrorCodes.SongInactive;
         }
 
-        if (request.MaterialId is { } materialId)
+        var materialIds = MaterialIdsOf(request);
+        if (materialIds.Count > 0)
         {
-            var material = await musicMaterialRepository.GetByIdAsync(materialId, cancellationToken);
-            if (material is null
-                || !material.IsActive
-                || (request.SongId.HasValue && material.SongId != request.SongId))
+            var materials = await musicMaterialRepository.ListAsync(x => materialIds.Contains(x.Id), cancellationToken);
+            if (materials.Count != materialIds.Count
+                || materials.Any(m => !m.IsActive || (request.SongId.HasValue && m.SongId != request.SongId)))
             {
                 return ErrorCodes.MaterialNotFound;
             }
@@ -307,4 +311,8 @@ public class PracticeAssignmentService(
 
         return null;
     }
+
+    /// <summary>MaterialIds when sent, else the older single MaterialId; duplicates dropped, order kept.</summary>
+    private static List<Guid> MaterialIdsOf(CreatePracticeAssignmentRequest request) =>
+        (request.MaterialIds ?? (request.MaterialId is { } id ? [id] : [])).Distinct().ToList();
 }

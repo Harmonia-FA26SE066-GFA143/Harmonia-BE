@@ -143,6 +143,51 @@ public class MusicMaterialService(
         return Result<MusicMaterialDto>.Success(ToDto<MusicMaterialDto>(material));
     }
 
+    public async Task<Result<MusicMaterialDto>> ReplaceFileAsync(
+        Guid id, ReplaceMusicMaterialFileRequest request, FileContent? file, CancellationToken cancellationToken)
+    {
+        var material = await musicMaterialRepository.GetByIdAsync(id, cancellationToken);
+        if (material is not { IsActive: true }) return Result<MusicMaterialDto>.Failure(ErrorCodes.MaterialNotFound);
+
+        if (CheckFile(material.MaterialType, file) is { } fileError)
+            return Result<MusicMaterialDto>.Failure(fileError);
+
+        var upload = await fileStorageService.UploadAsync(
+            file!.Content, file.FileName, FolderFor(material.MaterialType), isPrivate: true, cancellationToken);
+        if (!upload.IsSuccess) return Result<MusicMaterialDto>.Failure(upload.Code!);
+
+        var oldPublicId = material.FilePublicId;
+        var newPublicId = upload.Value!.PublicId;
+        var fileName = Path.GetFileName(file.FileName);
+        material.FilePublicId = newPublicId;
+        material.FileName = fileName.Length > MaxFileNameLength ? fileName[^MaxFileNameLength..] : fileName;
+        material.FileSizeBytes = file.Length;
+
+        if (request.ResetProgress)
+        {
+            foreach (var progress in await learningProgressRepository.ListAsync(x => x.MaterialId == id, cancellationToken))
+                learningProgressRepository.Remove(progress);
+        }
+
+        try
+        {
+            await musicMaterialRepository.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            // The row still points at the old file, so the new one is the orphan; same cleanup as UploadAsync.
+            await fileStorageService.DeleteAsync(newPublicId, isPrivate: true, CancellationToken.None);
+            throw;
+        }
+
+        // Best effort: nothing points at the old file any more, and a failed delete is logged by the storage service.
+        await fileStorageService.DeleteAsync(oldPublicId, isPrivate: true, CancellationToken.None);
+
+        if (material.TargetSkillId is { } skillId)
+            material.TargetSkill = await skillRepository.GetByIdAsync(skillId, cancellationToken);
+        return Result<MusicMaterialDto>.Success(ToDto<MusicMaterialDto>(material));
+    }
+
     public async Task<Result> DeleteAsync(Guid id, CancellationToken cancellationToken)
     {
         var material = await musicMaterialRepository.GetByIdAsync(id, cancellationToken);

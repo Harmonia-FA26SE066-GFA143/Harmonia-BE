@@ -3,6 +3,7 @@ using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IRepositories;
 using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Domain.Common;
+using Harmonia.Domain.Entities;
 using Harmonia.Domain.Enums;
 
 namespace Harmonia.Application.Services;
@@ -16,6 +17,9 @@ public class ReportService(
     ICurrentUserService currentUser,
     IChoirScopeService choirScope) : IReportService
 {
+    // The page size cap of PagingRequest; the trend walks every page of members.
+    private const int TrendPageSize = 100;
+
     /// <summary>
     /// The per-member reports of a Choir Director cover only the members they manage (D8), and a choirId filter must
     /// be one of their own choirs (CHOIR_NOT_FOUND otherwise). Other roles see every member.
@@ -166,6 +170,95 @@ public class ReportService(
                 NotSubmittedCount = latestStatuses.Count(s => s is null or SubmissionStatus.Overdue),
             };
         });
+    }
+
+    public async Task<Result<List<ActivityTrendDto>>> GetActivityTrendAsync(
+        SearchActivityTrendRequest request, CancellationToken cancellationToken)
+    {
+        var (from, to) = (request.FromDate!.Value, request.ToDate!.Value);
+        var filter = new SearchReportsRequest
+        {
+            ChoirId = request.ChoirId, FromDate = from, ToDate = to, PageSize = TrendPageSize,
+        };
+
+        var (directorUserId, scopeError) = await GetMemberScopeAsync(filter, cancellationToken);
+        if (scopeError is not null) return Result<List<ActivityTrendDto>>.Failure(scopeError);
+
+        var members = new List<MemberProfile>();
+        for (filter.PageNumber = 1; ; filter.PageNumber++)
+        {
+            var page = await memberProfileRepository.GetActiveWithActivityAsync(filter, directorUserId, cancellationToken);
+            members.AddRange(page.Items);
+            if (page.Items.Count == 0 || members.Count >= page.TotalCount) break;
+        }
+
+        var assignments = await practiceAssignmentRepository.GetForReportAsync(
+            filter, members.Select(m => m.Id).ToList(), cancellationToken);
+
+        var attendances = members
+            .SelectMany(m => m.RehearsalAttendances)
+            .Select(a => (Day: DateOnly.FromDateTime(VietnamTime.FromUtc(a.Rehearsal.StartTime)), a.RehearsalId, a.Status))
+            .ToList();
+        var received = assignments
+            .SelectMany(a => members.Where(m => EventPreparationService.Receives(a, m)).Select(m => (
+                Day: DateOnly.FromDateTime(VietnamTime.FromUtc(a.DueDate)),
+                AssignmentId: a.Id,
+                Latest: a.Submissions.Where(s => s.MemberId == m.Id)
+                    .OrderByDescending(s => s.AttemptNo).Select(s => (SubmissionStatus?)s.Status).FirstOrDefault())))
+            .ToList();
+
+        var rows = Periods(request.GroupBy, from, to).Select(period =>
+        {
+            var inAttendance = attendances.Where(a => a.Day >= period.Start && a.Day <= period.End).ToList();
+            var inPractice = received.Where(r => r.Day >= period.Start && r.Day <= period.End).ToList();
+            var attended = inAttendance.Count(a => a.Status is AttendanceStatus.Present or AttendanceStatus.Late);
+            var passed = inPractice.Count(r => r.Latest == SubmissionStatus.Passed);
+
+            return new ActivityTrendDto
+            {
+                PeriodStart = period.Start,
+                PeriodEnd = period.End,
+                RehearsalsRecorded = inAttendance.Select(a => a.RehearsalId).Distinct().Count(),
+                PresentCount = inAttendance.Count(a => a.Status == AttendanceStatus.Present),
+                LateCount = inAttendance.Count(a => a.Status == AttendanceStatus.Late),
+                AbsentCount = inAttendance.Count(a => a.Status == AttendanceStatus.Absent),
+                ExcusedCount = inAttendance.Count(a => a.Status == AttendanceStatus.Excused),
+                AttendanceRate = inAttendance.Count == 0 ? null : (double)attended / inAttendance.Count,
+                AssignmentsDue = inPractice.Select(r => r.AssignmentId).Distinct().Count(),
+                AssignedCount = inPractice.Count,
+                PassedCount = passed,
+                NeedsRevisionCount = inPractice.Count(r => r.Latest == SubmissionStatus.NeedsRevision),
+                AwaitingReviewCount = inPractice.Count(r => r.Latest == SubmissionStatus.Submitted),
+                NotSubmittedCount = inPractice.Count(r => r.Latest is null or SubmissionStatus.Overdue),
+                CompletionRate = inPractice.Count == 0 ? null : (double)passed / inPractice.Count,
+            };
+        }).ToList();
+
+        return Result<List<ActivityTrendDto>>.Success(rows);
+    }
+
+    /// <summary>Consecutive periods covering <paramref name="from"/>..<paramref name="to"/>, clipped to that range.</summary>
+    private static IEnumerable<(DateOnly Start, DateOnly End)> Periods(ReportPeriod groupBy, DateOnly from, DateOnly to)
+    {
+        var start = groupBy switch
+        {
+            // DayOfWeek counts from Sunday; weeks here start on Monday.
+            ReportPeriod.Week => from.AddDays(-(((int)from.DayOfWeek + 6) % 7)),
+            ReportPeriod.Month => new DateOnly(from.Year, from.Month, 1),
+            _ => new DateOnly(from.Year, 1, 1),
+        };
+
+        while (start <= to)
+        {
+            var next = groupBy switch
+            {
+                ReportPeriod.Week => start.AddDays(7),
+                ReportPeriod.Month => start.AddMonths(1),
+                _ => start.AddYears(1),
+            };
+            yield return (start < from ? from : start, next.AddDays(-1) > to ? to : next.AddDays(-1));
+            start = next;
+        }
     }
 
     private static Result<PagedList<TDto>> ToPage<TSource, TDto>(PagedList<TSource> page, Func<TSource, TDto> map) =>

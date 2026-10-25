@@ -14,10 +14,13 @@ public class SystemSettingService(IGenericRepository<SystemSetting> systemSettin
     public async Task<Result<List<SystemSettingDto>>> GetAllAsync(CancellationToken cancellationToken) =>
         Result<List<SystemSettingDto>>.Success(ToDtos(await systemSettings.ListAsync(x => true, cancellationToken)));
 
-    public async Task<Result<List<SystemSettingDto>>> GetPublicAsync(CancellationToken cancellationToken)
+    public async Task<Result<List<SystemSettingDto>>> GetPublicAsync(bool isSignedIn, CancellationToken cancellationToken)
     {
-        // The public flag lives in code, not in the table, so a row cannot be exposed by editing the database.
-        var publicKeys = SystemSettingKeys.All.Where(x => x.IsPublic).Select(x => x.Key).ToList();
+        // The public flags live in code, not in the table, so a row cannot be exposed by editing the database.
+        var publicKeys = SystemSettingKeys.All
+            .Where(x => x.IsPublic && (isSignedIn || x.IsAnonymous))
+            .Select(x => x.Key)
+            .ToList();
         var rows = await systemSettings.ListAsync(x => publicKeys.Contains(x.Key), cancellationToken);
 
         return Result<List<SystemSettingDto>>.Success(ToDtos(rows));
@@ -66,7 +69,7 @@ public class SystemSettingService(IGenericRepository<SystemSetting> systemSettin
         .DefaultValue;
 
     private static List<SystemSettingDto> ToDtos(IEnumerable<SystemSetting> rows) =>
-        rows.OrderBy(x => x.Key, StringComparer.Ordinal).Select(ToDto).ToList();
+        rows.Select(ToDto).OrderBy(x => x.Order).ThenBy(x => x.Key, StringComparer.Ordinal).ToList();
 
     private static SystemSettingDto ToDto(SystemSetting setting)
     {
@@ -77,6 +80,10 @@ public class SystemSettingService(IGenericRepository<SystemSetting> systemSettin
             Key = setting.Key,
             Value = setting.Value,
             DataType = setting.DataType,
+            // A row whose key left the code is labelled by its key and goes last.
+            DisplayName = definition?.DisplayName ?? setting.Key,
+            Group = definition?.Group ?? string.Empty,
+            Order = definition is null ? int.MaxValue : SystemSettingKeys.All.ToList().IndexOf(definition),
             Description = setting.Description,
             IsPublic = definition?.IsPublic ?? false,
             MinValue = definition?.MinValue,

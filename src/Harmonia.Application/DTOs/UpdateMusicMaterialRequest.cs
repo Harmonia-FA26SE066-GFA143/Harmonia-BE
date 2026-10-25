@@ -1,8 +1,8 @@
 namespace Harmonia.Application.DTOs;
 
 /// <summary>
-/// Metadata only. The file and the material type stay as uploaded: a new file or type is a
-/// different material, so it is deleted and uploaded again.
+/// Metadata only. A new file goes through PUT {id}/file (<see cref="ReplaceMusicMaterialFileRequest"/>); a new
+/// type is a different material, so it is deleted and uploaded again.
 /// </summary>
 public class UpdateMusicMaterialRequest
 {

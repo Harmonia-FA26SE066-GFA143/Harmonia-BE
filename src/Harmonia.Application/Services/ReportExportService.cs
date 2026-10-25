@@ -92,6 +92,12 @@ public class ReportExportService(
         return Result<FileContent>.Success(new FileContent(new MemoryStream(bytes), fileName, bytes.Length));
     }
 
+    public Result<List<ReportColumnDto>> GetColumns(ReportType type) =>
+        ReportExportColumns.Of(type) is { } columns
+            ? Result<List<ReportColumnDto>>.Success(
+                columns.Select(c => new ReportColumnDto { Key = c.Key, Title = c.Title }).ToList())
+            : Result<List<ReportColumnDto>>.Failure(ErrorCodes.ReportTypeNotSupported);
+
     public async Task<Result<PagedList<ReportExportDto>>> GetExportsAsync(
         PagingRequest request, CancellationToken cancellationToken)
     {

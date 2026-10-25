@@ -601,6 +601,38 @@ public sealed class RepositoryTests : IDisposable
         Assert.Equal(2, page.TotalCount);
     }
 
+    [Fact]
+    public async Task GetActiveUserIdsOfEventChoirs_ReturnsActiveMembersAndDirectorOfServingChoirs_OrNullWithoutChoir_Async()
+    {
+        var scope = await SeedDirectorScopeAsync(_ct);
+        var location = new WorshipLocation { Id = Guid.NewGuid(), Name = "Main church" };
+        LiturgicalEvent NewEvent(int hour) => new()
+        {
+            Id = Guid.NewGuid(), EventDate = VietnamTime.Today.AddDays(3), Time = new TimeOnly(hour, 0),
+            LocationId = location.Id, Status = EventStatus.Published,
+        };
+        var served = NewEvent(7);
+        var unserved = NewEvent(9);
+        await using (var seed = _db.NewContext())
+        {
+            var mine = await seed.Choirs.SingleAsync(x => x.Name == "Mine", _ct);
+            seed.AddRange(location, served, unserved);
+            seed.LiturgicalEventChoirs.Add(new LiturgicalEventChoir { Id = Guid.NewGuid(), EventId = served.Id, ChoirId = mine.Id });
+            await seed.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var userIdOf = await context.MemberProfiles.ToDictionaryAsync(x => x.Id, x => x.UserId, _ct);
+        var repository = new UserRepository(context);
+
+        var recipients = await repository.GetActiveUserIdsOfEventChoirsAsync(served.Id, _ct);
+
+        Assert.Equal(
+            new[] { scope.MeId, userIdOf[scope.InMine], userIdOf[scope.InBoth] }.Order(),
+            recipients!.Order());
+        Assert.Null(await repository.GetActiveUserIdsOfEventChoirsAsync(unserved.Id, _ct));
+    }
+
     private sealed record DirectorScope(
         Guid MeId, Guid SkillId, Guid InMine, Guid InTheirs, Guid InBoth, Guid NoChoir, Guid LeftMine);
 
@@ -825,6 +857,40 @@ public sealed class RepositoryTests : IDisposable
         return new MaterialSeed(member.Id, alto.Id, bass.Id, seasonId, kinhHoaBinh.Id);
     }
 
+    [Fact]
+    public async Task SongSearch_LibraryFilters_UseClassificationAndActiveMaterials_Async()
+    {
+        await SeedMaterialsAsync(_ct);
+        await using var context = _db.NewContext();
+        var repository = new SongRepository(context);
+        async Task<IEnumerable<string>> TitlesAsync(SearchSongsRequest filter) =>
+            (await repository.SearchAsync(null, filter, _ct)).Items.Select(x => x.Title);
+
+        Assert.Equal(["Ave Maria"], await TitlesAsync(new SearchSongsRequest { IsClassified = false }));
+        Assert.Equal(["Kinh Hoa Binh"], await TitlesAsync(new SearchSongsRequest { IsClassified = true }));
+        // Ave Maria's lyrics are deleted, so it lacks lyrics too.
+        Assert.Equal(
+            ["Ave Maria", "Kinh Hoa Binh"], await TitlesAsync(new SearchSongsRequest { MissingMaterialType = MaterialType.Lyrics }));
+        Assert.Empty(await TitlesAsync(new SearchSongsRequest { MissingMaterialType = MaterialType.SheetMusic }));
+    }
+
+    [Fact]
+    public async Task SongStats_CountActiveMaterialsByType_AndClassification_Async()
+    {
+        var seed = await SeedMaterialsAsync(_ct);
+        await using var context = _db.NewContext();
+        var aveMariaId = (await context.Songs.SingleAsync(x => x.Title == "Ave Maria", _ct)).Id;
+
+        var stats = await new SongRepository(context).GetStatsAsync([seed.KinhHoaBinhId, aveMariaId], VietnamTime.Today, _ct);
+
+        Assert.True(stats[seed.KinhHoaBinhId].IsClassified);
+        Assert.False(stats[aveMariaId].IsClassified);
+        Assert.Equal(
+            (1, 1, 0, 0),
+            (stats[aveMariaId].MaterialCounts[MaterialType.SheetMusic], stats[aveMariaId].MaterialCounts[MaterialType.SampleAudio],
+                stats[aveMariaId].MaterialCounts[MaterialType.Lyrics], stats[aveMariaId].TimesUsed));
+    }
+
     private static MemberSkill NewMemberSkill(Guid memberId, Guid skillId, ApprovalStatus status) =>
         new() { Id = Guid.NewGuid(), MemberId = memberId, SkillId = skillId, Status = status, DeclaredAt = DateTime.UtcNow };
 
@@ -1001,6 +1067,30 @@ public sealed class RepositoryTests : IDisposable
         await context.SaveChangesAsync(_ct);
 
         return new PracticeSeed(member.Id, forAll.Id, forMember.Id, forApprovedSkill.Id, forPendingSkill.Id, forOtherMember.Id, overdue.Id);
+    }
+
+    [Fact]
+    public async Task PracticeAssignment_GetByIdForMember_LoadsEveryAttachedMaterial_Async()
+    {
+        var seed = await SeedPracticeAsync();
+        var song = new Song { Id = Guid.NewGuid(), Title = "Song" };
+        var sheet = NewMaterial(song.Id, MaterialType.SheetMusic, "Sheet", null);
+        var audio = NewMaterial(song.Id, MaterialType.SampleAudio, "Audio", null);
+        await using (var seedContext = _db.NewContext())
+        {
+            seedContext.AddRange(song, sheet, audio);
+            seedContext.PracticeAssignmentMaterials.AddRange(
+                new PracticeAssignmentMaterial { Id = Guid.NewGuid(), PracticeAssignmentId = seed.ForAll, MaterialId = audio.Id, DisplayOrder = 1 },
+                new PracticeAssignmentMaterial { Id = Guid.NewGuid(), PracticeAssignmentId = seed.ForAll, MaterialId = sheet.Id, DisplayOrder = 0 });
+            await seedContext.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var assignment = await new PracticeAssignmentRepository(context).GetByIdForMemberAsync(seed.ForAll, seed.MemberId, _ct);
+
+        Assert.Equal(
+            ["Sheet", "Audio"],
+            assignment!.Materials.OrderBy(x => x.DisplayOrder).Select(x => x.Material.Title));
     }
 
     [Fact]
@@ -1733,6 +1823,32 @@ public sealed class RepositoryTests : IDisposable
         await context.SaveChangesAsync(_ct);
 
         return new ReportSeed(kyrie.Id, gloria.Id, unused.Id, recent.Id, older.Id);
+    }
+
+    [Fact]
+    public async Task IsInUse_AnySongListVersion_CountsAsUse_Async()
+    {
+        var seed = await SeedReportsAsync();
+        await using var context = _db.NewContext();
+        var repository = new SongRepository(context);
+        var deletedId = (await context.Songs.SingleAsync(x => x.Title == "Deleted", _ct)).Id;
+
+        Assert.True(await repository.IsInUseAsync(seed.KyrieId, _ct));
+        // Only in a rejected list, still referenced.
+        Assert.True(await repository.IsInUseAsync(seed.UnusedId, _ct));
+        Assert.False(await repository.IsInUseAsync(deletedId, _ct));
+    }
+
+    [Fact]
+    public async Task SongStats_UsageMatchesTheSongUsageReport_Async()
+    {
+        var seed = await SeedReportsAsync();
+        await using var context = _db.NewContext();
+
+        var stats = await new SongRepository(context).GetStatsAsync([seed.KyrieId, seed.UnusedId], VietnamTime.Today, _ct);
+
+        Assert.Equal((2, VietnamTime.Today.AddDays(-3)), (stats[seed.KyrieId].TimesUsed, stats[seed.KyrieId].LastUsedDate));
+        Assert.Equal((0, (DateOnly?)null), (stats[seed.UnusedId].TimesUsed, stats[seed.UnusedId].LastUsedDate));
     }
 
     [Fact]

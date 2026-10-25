@@ -151,6 +151,8 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | Mã | HTTP | Tiếng Việt |
 |---|---|---|
 | `CALENDAR_DAY_NOT_FOUND` | 404 | Không tìm thấy ngày phụng vụ |
+| `LITURGICAL_NAME_TRANSLATION_NOT_FOUND` | 404 | Không tìm thấy bản dịch tên phụng vụ |
+| `LITURGICAL_NAME_TRANSLATION_DUPLICATE` | 409 | Tên tiếng Anh này đã có bản dịch |
 | `LITURGICAL_EVENT_NOT_FOUND` | 404 | Không tìm thấy sự kiện |
 | `LITURGICAL_EVENT_SLOT_TAKEN` | 409 | Đã có sự kiện khác vào giờ này tại địa điểm này |
 | `LITURGICAL_EVENT_ALREADY_PUBLISHED` | 409 | Sự kiện đã công bố, không thể sửa |
@@ -171,6 +173,7 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `SONG_NOT_FOUND` | 404 | Không tìm thấy bài hát |
 | `SONG_INACTIVE` | 409 | Bài hát đã bị vô hiệu hoá |
 | `SONG_TITLE_DUPLICATE` | 409 | Bài hát cùng tên đã tồn tại |
+| `SONG_IN_USE` | 409 | Bài hát đã được dùng trong danh sách bài hát, buổi tập hoặc bài luyện tập, không thể xoá |
 | `SONG_CLASSIFICATION_DUPLICATE` | 400 | Bài hát đã được phân loại theo mục này |
 | `SONG_CLASSIFICATION_TARGET_INVALID` | 400 | Đối tượng phân loại không hợp lệ |
 | `SONG_SKILL_REQUIREMENT_DUPLICATE` | 400 | Kỹ năng này đã được khai báo cho bài hát |

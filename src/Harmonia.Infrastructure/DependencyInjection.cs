@@ -112,6 +112,7 @@ public static class DependencyInjection
             client.Timeout = TimeSpan.FromSeconds(30);
         });
         services.AddScoped<ILiturgicalDayRepository, LiturgicalDayRepository>();
+        services.AddScoped<ILiturgicalNameTranslationRepository, LiturgicalNameTranslationRepository>();
         services.AddScoped<ILiturgicalEventRepository, LiturgicalEventRepository>();
         services.AddScoped<IRehearsalRepository, RehearsalRepository>();
         services.AddScoped<IPracticeAssignmentRepository, PracticeAssignmentRepository>();

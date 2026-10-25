@@ -14,7 +14,7 @@ namespace Harmonia.API.Tests;
 /// </summary>
 public partial class ApiConventionTests
 {
-    // 03-security.md: no public registration; only these five may skip authentication.
+    // 03-security.md: no public registration; only these six may skip authentication.
     private static readonly HashSet<string> AnonymousWhitelist =
     [
         $"{nameof(AuthController)}.{nameof(AuthController.LoginAsync)}",
@@ -22,6 +22,7 @@ public partial class ApiConventionTests
         $"{nameof(AuthController)}.{nameof(AuthController.RefreshAsync)}",
         $"{nameof(AuthController)}.{nameof(AuthController.ForgotPasswordAsync)}",
         $"{nameof(AuthController)}.{nameof(AuthController.ResetPasswordAsync)}",
+        $"{nameof(SystemSettingsController)}.{nameof(SystemSettingsController.GetPublicAsync)}",
     ];
 
     private static readonly Assembly ApiAssembly = typeof(AuthController).Assembly;

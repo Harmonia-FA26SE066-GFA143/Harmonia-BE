@@ -35,8 +35,9 @@
 ## Tài khoản & mật khẩu
 
 - Tài khoản do `Admin` tạo và gán role. **KHÔNG có đăng ký công khai** —
-  chỉ `login`, `google`, `refresh`, `forgot-password` và `reset-password` là `[AllowAnonymous]`
-  (`reset-password`: người dùng đã quên mật khẩu, danh tính xác minh bằng token trong email).
+  chỉ `login`, `google`, `refresh`, `forgot-password`, `reset-password` và `GET api/system-settings/public`
+  là `[AllowAnonymous]` (`reset-password`: người dùng đã quên mật khẩu, danh tính xác minh bằng token trong email;
+  `system-settings/public`: trang chủ và trang đăng nhập cần tên giáo xứ và email liên hệ, chốt 2026-10-25).
 - Đăng nhập Google (`api/auth/google`) chỉ khớp `User` có sẵn theo email đã xác minh —
   KHÔNG tự tạo tài khoản. Email chưa có tài khoản trả `AUTH_INVALID_CREDENTIALS`.
 - Mật khẩu lưu ở `User.passwordHash`, dùng `PasswordHasher<T>` hoặc BCrypt.
@@ -88,6 +89,8 @@
   của chính mình qua `PUT api/auth/me` (ca viên còn qua `PUT api/member-profiles/me`) (chốt 2026-10-07).
   Mọi role **đọc** được các `SystemSetting` công khai qua `GET api/system-settings/public`; key nào công khai
   do `SystemSettingKeys` trong code quyết định, không phải dữ liệu trong bảng (chốt 2026-10-11).
+  Người chưa đăng nhập chỉ đọc được key có `IsAnonymous` (tên giáo xứ, tên ca đoàn, email liên hệ) — không đặt
+  `IsAnonymous` cho key chứa thông tin nội bộ như thông báo hệ thống (chốt 2026-10-25).
 - Chỉ `Admin` tạo / sửa `Choir` và gán ca trưởng. `ChoirDirector` chỉ xem và quản lý ca viên của ca đoàn có
   `DirectorId` là mình; ca đoàn của ca trưởng khác trả **404** `CHOIR_NOT_FOUND` (D8, chốt 2026-10-25).
   Ca trưởng **quản lý** ca viên đang ở ca đoàn của mình hoặc chưa ở ca đoàn nào

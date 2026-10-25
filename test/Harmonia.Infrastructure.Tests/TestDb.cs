@@ -23,6 +23,7 @@ public sealed class TestDb : IDisposable
     public TestDb()
     {
         _connection.Open();
+        TestDbCollations.Register(_connection);
         using var context = NewContext();
         context.Database.EnsureCreated();
     }

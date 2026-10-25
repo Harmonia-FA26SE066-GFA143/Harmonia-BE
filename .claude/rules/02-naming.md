@@ -1,6 +1,6 @@
 # Từ điển nghiệp vụ — dùng đúng tên, không tự đặt từ đồng nghĩa
 
-Nguồn chuẩn: `doc/harmonia-domain-entity-list.md` (48 entity, 22 enum).
+Nguồn chuẩn: `doc/harmonia-domain-entity-list.md` (50 entity, 24 enum).
 Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 
 | Tiếng Việt | Tên trong code |
@@ -19,6 +19,7 @@ Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 | kỹ năng | `Skill` — Soprano, Alto, Tenor, Bass, Guitar, Organ, Solo, Psalmist |
 | kỹ năng đã khai báo | `MemberSkill` |
 | ngày phụng vụ (cache lịch Công giáo từ API ngoài) | `LiturgicalDay` — KHÔNG còn `LiturgicalWeek`, lịch lên theo ngày (D6) |
+| bản dịch tên lễ / bậc lễ / mùa của lịch | `LiturgicalNameTranslation` + enum `LiturgicalNameKind` |
 | sự kiện / thánh lễ | `LiturgicalEvent` — KHÔNG dùng `Event` (trùng từ khoá C#) |
 | mùa phụng vụ | `LiturgicalSeason` — KHÔNG dùng `Season` |
 | loại thánh lễ | `MassType` |
@@ -44,6 +45,7 @@ Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 | điểm danh | `RehearsalAttendance` — KHÔNG dùng `Attendance` trần |
 | bài hát của buổi tập | `RehearsalSong` — KHÔNG phải `SongList` (không phiên bản, không duyệt) |
 | bài tập về nhà | `PracticeAssignment` |
+| tài liệu gắn với bài tập | `PracticeAssignmentMaterial` |
 | bản thu nộp | `PracticeSubmission` |
 | nhận xét của ca trưởng | `PracticeFeedback` — KHÔNG dùng `Feedback` trần |
 | thông báo | `Notification` / `NotificationRecipient` |
@@ -79,8 +81,11 @@ móc vào chúng.
   (CSV, XLSX, PDF) — file đi thẳng tới Admin, không qua FE (chốt 2026-10-11). Chuỗi tiếng Việt
   của file xuất chỉ được nằm trong file này.
   Ngoại lệ: dữ liệu seed hiển thị cho người dùng viết tiếng Việt — `Name` trong `HasData` của
-  `SkillCategoryConfiguration`, `Description` trong `SystemSettingKeys`, `FullName` của Admin đầu tiên
+  `SkillCategoryConfiguration`, `DisplayName` / `Group` / `Description` trong `SystemSettingKeys`, `FullName` của Admin đầu tiên
   trong `DataSeeder` (chốt 2026-10-17). Tên role và key của setting vẫn tiếng Anh — code so khớp theo chúng.
+  Ngoại lệ: `LiturgicalNamePatterns.cs` giữ quy tắc dịch tiếng Việt cho tên lễ theo mẫu (thứ trong tuần, Chúa nhật
+  đánh số) — là ngữ pháp, không phải dữ liệu Admin sửa (chốt 2026-10-25). Bản dịch từng tên nằm trong bảng
+  `LiturgicalNameTranslation`, dữ liệu nạp lần đầu ở `Infrastructure/Data/LiturgicalNameTranslations.json`, không ở `.cs`.
 
 ## Domain
 
