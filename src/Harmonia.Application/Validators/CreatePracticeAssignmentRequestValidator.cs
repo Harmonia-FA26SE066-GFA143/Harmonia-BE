@@ -9,6 +9,7 @@ public class CreatePracticeAssignmentRequestValidator : AbstractValidator<Create
 {
     public CreatePracticeAssignmentRequestValidator()
     {
+        RuleFor(x => x.ChoirId).NotEmpty();
         RuleFor(x => x.Title).NotEmpty().MaximumLength(200);
         RuleFor(x => x.Instruction).MaximumLength(1000);
         RuleFor(x => x.Scope).IsInEnum();

@@ -308,6 +308,10 @@ lọc theo cặp `(NotificationId, UserId)` nên "không tồn tại" và "của
 | `CHOIR_MEMBER_INVALID` | 400 | Ca viên không tồn tại hoặc không còn hoạt động |
 | `CHOIR_INACTIVE` | 409 | Ca đoàn đã ngừng hoạt động, không thêm ca viên hoặc sự kiện mới được |
 | `CHOIR_MEMBERSHIP_NOT_FOUND` | 404 | Ca viên không thuộc ca đoàn này |
+| `CHOIR_DIRECTOR_INVALID` | 400 | Người được chọn không phải ca trưởng đang hoạt động |
+| `CHOIR_NOT_SERVING_EVENT` | 409 | Ca đoàn này không phục vụ sự kiện đã chọn |
+| `CHOIR_LEAD_INVALID` | 400 | Ca đoàn phụ trách phải là một trong các ca đoàn phục vụ sự kiện |
+| `CHOIR_NOT_LEAD` | 403 | Chỉ ca trưởng của ca đoàn phụ trách mới được thực hiện thao tác này |
 
 ## 16. Giờ lễ cố định
 
@@ -382,3 +386,8 @@ xem — trả 404, để không lộ sự tồn tại của bản ghi.
   `api/mass-schedules`; `LITURGICAL_EVENT_GENERATION_RANGE_INVALID` cho `POST /api/liturgical-events/generation`.
 - 2026-10-20: một vị trí phụng vụ được có nhiều bài trong danh sách bài hát. `SONG_LIST_SLOT_DUPLICATE` đổi nghĩa:
   chỉ báo khi **cùng một bài** lặp lại trong cùng một vị trí (trước: khi một vị trí có hơn một bài). FE đổi câu dịch.
+- 2026-10-25: thêm `CHOIR_DIRECTOR_INVALID` (D8) — Admin gán ca trưởng cho ca đoàn mà người được chọn không phải
+  tài khoản `ChoirDirector` đang hoạt động. Ca trưởng gọi API của ca đoàn không thuộc mình nhận `CHOIR_NOT_FOUND`.
+- 2026-10-25: thêm `CHOIR_NOT_SERVING_EVENT`, `CHOIR_LEAD_INVALID`, `CHOIR_NOT_LEAD` (D8). Ca trưởng chỉ quản lý ca đoàn
+  của mình; bản ghi ngoài phạm vi trả mã `_NOT_FOUND` sẵn có của từng tài nguyên. Ca trưởng ca đoàn phục vụ nhưng
+  không phụ trách mà sửa danh sách bài / phân công / lời mời nhận 403 `CHOIR_NOT_LEAD`.

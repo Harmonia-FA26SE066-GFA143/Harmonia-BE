@@ -32,7 +32,7 @@ public class UpcomingScheduleServiceTests
                 },
                 NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new UpcomingScheduleService(_events, _rehearsals, _members, mapper);
+        _sut = new UpcomingScheduleService(_events, _rehearsals, _members, ChoirScopeFakes.Unrestricted(), mapper);
     }
 
     [Fact]
@@ -92,10 +92,10 @@ public class UpcomingScheduleServiceTests
         };
         var withoutLocation = new Rehearsal { Id = Guid.NewGuid(), StartTime = start.AddDays(1), EndTime = start.AddDays(1).AddHours(1) };
         var fromTimes = new List<DateTime>();
-        _rehearsals.GetUpcomingAsync(Arg.Do<DateTime>(fromTimes.Add), _ct).Returns([withLocation, withoutLocation]);
+        _rehearsals.GetUpcomingAsync(Arg.Do<DateTime>(fromTimes.Add), null, _ct).Returns([withLocation, withoutLocation]);
         var before = DateTime.UtcNow;
 
-        var result = await _sut.GetUpcomingRehearsalsAsync(_ct);
+        var result = await _sut.GetUpcomingRehearsalsAsync(Guid.NewGuid(), _ct);
 
         Assert.InRange(Assert.Single(fromTimes), before, DateTime.UtcNow);
         Assert.True(result.IsSuccess);
@@ -263,7 +263,7 @@ public class UpcomingScheduleServiceTests
             Id = Guid.NewGuid(), StartTime = start, EndTime = start.AddHours(2), Location = _church, Note = "Bring folders",
             Attendances = [new RehearsalAttendance { MemberId = member.Id, Status = AttendanceStatus.Excused }],
         };
-        _rehearsals.GetVisibleForMemberAsync(rehearsal.Id, member.Id, _ct).Returns(rehearsal);
+        _rehearsals.GetVisibleForMemberAsync(rehearsal.Id, member.Id, Arg.Any<IReadOnlyCollection<Guid>?>(), _ct).Returns(rehearsal);
 
         var result = await _sut.GetRehearsalDetailAsync(member.UserId, rehearsal.Id, _ct);
 

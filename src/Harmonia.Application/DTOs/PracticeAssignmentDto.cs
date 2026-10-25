@@ -6,6 +6,9 @@ public class PracticeAssignmentDto
 {
     public Guid Id { get; set; }
 
+    /// <summary>Null on assignments created before choirs were scoped (D8).</summary>
+    public Guid? ChoirId { get; set; }
+
     public Guid? EventId { get; set; }
 
     public Guid? SongId { get; set; }

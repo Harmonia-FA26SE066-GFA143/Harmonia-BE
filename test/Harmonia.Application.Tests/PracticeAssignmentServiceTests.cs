@@ -27,6 +27,7 @@ public class PracticeAssignmentServiceTests
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
     private readonly IFileStorageService _storage = Substitute.For<IFileStorageService>();
     private readonly ISystemSettingService _settings = Substitute.For<ISystemSettingService>();
+    private readonly IChoirScopeService _scope = ChoirScopeFakes.Unrestricted();
     private readonly PracticeAssignmentService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
 
@@ -45,7 +46,7 @@ public class PracticeAssignmentServiceTests
             .CreateMapper();
         _sut = new PracticeAssignmentService(
             _assignments, _events, _songs, _materials, _skills, _members, _memberSkills, _submissions,
-            _notifications, _storage, _settings, mapper);
+            _notifications, _storage, _settings, _scope, mapper);
 
         _storage.UploadAsync(default!, default!, default!, default, default)
             .ReturnsForAnyArgs(Result<FileUploadResponse>.Success(new FileUploadResponse(StoredAudio, "unused")));
@@ -57,12 +58,15 @@ public class PracticeAssignmentServiceTests
         MemberProfile[] members = [_activeMember, _leftMember];
         _members.ListAsync(Arg.Any<Expression<Func<MemberProfile, bool>>>(), _ct)
             .Returns(ci => members.Where(ci.Arg<Expression<Func<MemberProfile, bool>>>().Compile()).ToList());
+        // Both members are in the assignment's choir; the Active filter still drops the one who left.
+        _scope.GetChoirMemberIdsAsync(Arg.Any<Guid?>(), _ct).Returns([_activeMember.Id, _leftMember.Id]);
         _skills.ListAsync(Arg.Any<Expression<Func<Skill, bool>>>(), _ct)
             .Returns(ci => new[] { _soprano }.Where(ci.Arg<Expression<Func<Skill, bool>>>().Compile()).ToList());
     }
 
     private static CreatePracticeAssignmentRequest Request(AssignmentScope scope) => new()
     {
+        ChoirId = Guid.NewGuid(),
         Title = "Learn the entrance hymn",
         Scope = scope,
         DueDate = DateTime.UtcNow.AddDays(3),
@@ -94,12 +98,13 @@ public class PracticeAssignmentServiceTests
     }
 
     [Fact]
-    public async Task Create_SkillGroupScope_SavesSkillTargetsAndNotifiesSkillHolders_Async()
+    public async Task Create_SkillGroupScope_SavesSkillTargetsAndNotifiesSkillHoldersOfTheChoir_Async()
     {
-        var holderUserId = Guid.NewGuid();
+        var holderUserId = _activeMember.UserId;
+        var holderOutsideChoir = Guid.NewGuid();
         _memberSkills.GetActiveMemberUserIdsBySkillsAsync(
                 Arg.Is<IReadOnlyCollection<Guid>>(x => x.SequenceEqual(new[] { _soprano.Id })), _ct)
-            .Returns([holderUserId]);
+            .Returns([holderUserId, holderOutsideChoir]);
         var request = Request(AssignmentScope.SkillGroup);
         request.SkillIds = [_soprano.Id, _soprano.Id];
 
@@ -121,6 +126,29 @@ public class PracticeAssignmentServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal([_activeMember.Id], result.Value!.MemberIds);
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(x => x.RecipientUserIds.SequenceEqual(new[] { _activeMember.UserId })), _ct);
+    }
+
+    [Fact]
+    public async Task Create_IndividualScope_MemberOutsideTheChoir_ReturnsMemberNotFound_Async()
+    {
+        _scope.GetChoirMemberIdsAsync(Arg.Any<Guid?>(), _ct).Returns([_leftMember.Id]);
+        var request = Request(AssignmentScope.Individual);
+        request.MemberIds = [_activeMember.Id];
+
+        var result = await _sut.CreateAsync(request, _ct);
+
+        Assert.Equal(ErrorCodes.MemberNotFound, result.Code);
+        await AssertNothingSavedAsync();
+    }
+
+    [Fact]
+    public async Task Create_AllScope_NotifiesOnlyActiveMembersOfTheChoir_Async()
+    {
+        var result = await _sut.CreateAsync(Request(AssignmentScope.All), _ct);
+
+        Assert.True(result.IsSuccess);
         await _notifications.Received(1).SendAsync(
             Arg.Is<SendNotificationRequest>(x => x.RecipientUserIds.SequenceEqual(new[] { _activeMember.UserId })), _ct);
     }

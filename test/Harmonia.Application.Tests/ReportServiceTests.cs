@@ -1,7 +1,9 @@
 using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IRepositories;
+using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Application.Services;
+using Harmonia.Domain.Common;
 using Harmonia.Domain.Entities;
 using Harmonia.Domain.Enums;
 using NSubstitute;
@@ -19,7 +21,8 @@ public class ReportServiceTests
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly SearchReportsRequest _request = new();
 
-    public ReportServiceTests() => _sut = new ReportService(_events, _songs, _users, _members, _assignments);
+    public ReportServiceTests() => _sut = new ReportService(
+        _events, _songs, _users, _members, _assignments, Substitute.For<ICurrentUserService>(), ChoirScopeFakes.Unrestricted());
 
     private void ReturnsEvents(params LiturgicalEvent[] events) =>
         _events.GetServiceHistoryAsync(_request, Arg.Any<DateOnly>(), _ct)
@@ -121,7 +124,7 @@ public class ReportServiceTests
     private MemberProfile ReturnsMember(MemberProfile member)
     {
         member.User = new User { FullName = "Alice" };
-        _members.GetActiveWithActivityAsync(_request, _ct).Returns(new PagedList<MemberProfile>([member], 1, 20, 1));
+        _members.GetActiveWithActivityAsync(_request, null, _ct).Returns(new PagedList<MemberProfile>([member], 1, 20, 1));
         return member;
     }
 
@@ -143,6 +146,37 @@ public class ReportServiceTests
             (user.Id, "Alice", "a@test.com", "ChoirMember", true, lastLogin),
             (row.UserId, row.FullName, row.Email, row.RoleName, row.IsActive, row.LastLoginAt!.Value));
         Assert.Equal((1, 2, 3, 4), (row.PasswordChangeCount, row.PasswordResetCount, row.AccountChangeCount, row.ActionCount));
+    }
+
+    [Fact]
+    public async Task PerMemberReports_DirectorFilteringByAnotherDirectorsChoir_ReturnsChoirNotFound_Async()
+    {
+        var scope = ChoirScopeFakes.Unrestricted();
+        scope.GetDirectedChoirIdsAsync(_ct).Returns([Guid.NewGuid()]);
+        var sut = new ReportService(
+            _events, _songs, _users, _members, _assignments, Substitute.For<ICurrentUserService>(), scope);
+        var request = new SearchReportsRequest { ChoirId = Guid.NewGuid() };
+
+        Assert.Equal(ErrorCodes.ChoirNotFound, (await sut.GetRehearsalAttendanceAsync(request, _ct)).Code);
+        Assert.Equal(ErrorCodes.ChoirNotFound, (await sut.GetParticipationAsync(request, _ct)).Code);
+        Assert.Equal(ErrorCodes.ChoirNotFound, (await sut.GetAssignmentCompletionAsync(request, _ct)).Code);
+    }
+
+    [Fact]
+    public async Task PerMemberReports_Director_AreLimitedToTheMembersTheyManage_Async()
+    {
+        var directorId = Guid.NewGuid();
+        var currentUser = Substitute.For<ICurrentUserService>();
+        currentUser.UserId.Returns(directorId);
+        var scope = ChoirScopeFakes.Unrestricted();
+        scope.GetDirectedChoirIdsAsync(_ct).Returns([Guid.NewGuid()]);
+        var sut = new ReportService(_events, _songs, _users, _members, _assignments, currentUser, scope);
+        _members.GetActiveWithActivityAsync(_request, directorId, _ct).Returns(new PagedList<MemberProfile>([], 1, 20, 0));
+
+        var result = await sut.GetParticipationAsync(_request, _ct);
+
+        Assert.True(result.IsSuccess);
+        await _members.Received(1).GetActiveWithActivityAsync(_request, directorId, _ct);
     }
 
     [Fact]

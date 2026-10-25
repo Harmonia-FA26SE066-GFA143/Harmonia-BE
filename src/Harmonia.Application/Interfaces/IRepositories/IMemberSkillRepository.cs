@@ -32,10 +32,12 @@ public interface IMemberSkillRepository : IGenericRepository<MemberSkill>
         Guid memberId, ApprovalStatus? status, PagingRequest paging, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Read-only page of every Pending declaration, oldest first, with <see cref="MemberSkill.Skill"/>
+    /// Read-only page of Pending declarations of members the Choir Director manages (see
+    /// <see cref="IMemberProfileRepository.IsManagedByDirectorAsync"/>), oldest first, with <see cref="MemberSkill.Skill"/>
     /// and its Category, and <see cref="MemberSkill.Member"/> and its User loaded.
     /// </summary>
-    Task<PagedList<MemberSkill>> GetPendingAsync(PagingRequest paging, CancellationToken cancellationToken);
+    Task<PagedList<MemberSkill>> GetPendingAsync(
+        Guid directorUserId, PagingRequest paging, CancellationToken cancellationToken);
 
     /// <summary>
     /// Tracked, with <see cref="MemberSkill.Skill"/> and its Category, and <see cref="MemberSkill.Member"/>

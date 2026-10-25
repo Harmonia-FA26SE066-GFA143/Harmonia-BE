@@ -55,7 +55,7 @@ public class MusicMaterialsController(IMusicMaterialService musicMaterialService
     [ProducesResponseType<PagedList<MaterialLearningProgressDetailDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetLearningProgressAsync(
         Guid id, [FromQuery] SearchMaterialLearningProgressRequest request, CancellationToken cancellationToken) =>
-        ToActionResult(await musicMaterialService.GetLearningProgressAsync(id, request, cancellationToken));
+        ToActionResult(await musicMaterialService.GetLearningProgressAsync(User.GetUserId(), id, request, cancellationToken));
 
     /// <summary>Marks the material as learned or as needing practice for the calling member (UC-08 / FE-09).</summary>
     [HttpPut("{id:guid}/learning-progress")]

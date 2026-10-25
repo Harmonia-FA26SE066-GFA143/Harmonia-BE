@@ -36,6 +36,13 @@ public class MemberProfileRepository(HarmoniaDbContext dbContext)
             .Include(x => x.User)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
+    public Task<bool> IsManagedByDirectorAsync(Guid memberId, Guid directorUserId, CancellationToken cancellationToken) =>
+        DbContext.MemberProfiles.AnyAsync(
+            x => x.Id == memberId
+                && (!x.ChoirMemberships.Any(m => m.IsActive)
+                    || x.ChoirMemberships.Any(m => m.IsActive && m.Choir.DirectorId == directorUserId)),
+            cancellationToken);
+
     public async Task<PagedList<MemberProfile>> SearchAsync(
         string? keyword, SearchMemberProfilesRequest filter, CancellationToken cancellationToken)
     {
@@ -74,11 +81,15 @@ public class MemberProfileRepository(HarmoniaDbContext dbContext)
     }
 
     public async Task<PagedList<MemberProfile>> GetLearnersOfMaterialAsync(
-        Guid materialId, Guid? targetSkillId, SearchMaterialLearningProgressRequest filter, CancellationToken cancellationToken)
+        Guid materialId, Guid? targetSkillId, Guid directorUserId, SearchMaterialLearningProgressRequest filter,
+        CancellationToken cancellationToken)
     {
+        // Same rule as IsManagedByDirectorAsync.
         var query = DbContext.MemberProfiles
             .AsNoTracking()
-            .Where(x => x.Status == MemberStatus.Active);
+            .Where(x => x.Status == MemberStatus.Active)
+            .Where(x => !x.ChoirMemberships.Any(m => m.IsActive)
+                || x.ChoirMemberships.Any(m => m.IsActive && m.Choir.DirectorId == directorUserId));
 
         if (targetSkillId is { } skillId)
         {
@@ -107,10 +118,13 @@ public class MemberProfileRepository(HarmoniaDbContext dbContext)
         return new PagedList<MemberProfile>(items, filter.PageNumber, filter.PageSize, totalCount);
     }
 
-    public Task<List<MemberProfile>> GetAttendanceRosterAsync(Guid rehearsalId, CancellationToken cancellationToken) =>
+    public Task<List<MemberProfile>> GetAttendanceRosterAsync(
+        Guid rehearsalId, Guid? choirId, CancellationToken cancellationToken) =>
         DbContext.MemberProfiles
             .AsNoTracking()
-            .Where(x => x.Status == MemberStatus.Active || x.RehearsalAttendances.Any(a => a.RehearsalId == rehearsalId))
+            .Where(x => (x.Status == MemberStatus.Active
+                    && (choirId == null || x.ChoirMemberships.Any(m => m.ChoirId == choirId && m.IsActive)))
+                || x.RehearsalAttendances.Any(a => a.RehearsalId == rehearsalId))
             .Include(x => x.User)
             .Include(x => x.RehearsalAttendances.Where(a => a.RehearsalId == rehearsalId))
             .OrderBy(x => x.User.FullName)
@@ -121,7 +135,10 @@ public class MemberProfileRepository(HarmoniaDbContext dbContext)
         DbContext.MemberProfiles
             .AsNoTracking()
             .Where(x => x.Status == MemberStatus.Active)
+            .Where(x => !DbContext.LiturgicalEventChoirs.Any(e => e.EventId == eventId)
+                || x.ChoirMemberships.Any(m => m.IsActive && m.Choir.EventChoirs.Any(e => e.EventId == eventId)))
             .Include(x => x.User)
+            .Include(x => x.ChoirMemberships.Where(m => m.IsActive))
             .Include(x => x.MemberSkills.Where(s => s.Status == ApprovalStatus.Approved))
             .Include(x => x.EventParticipations.Where(p => p.EventId == eventId))
             .OrderBy(x => x.User.FullName)
@@ -130,22 +147,27 @@ public class MemberProfileRepository(HarmoniaDbContext dbContext)
             .ToListAsync(cancellationToken);
 
     public async Task<PagedList<MemberProfile>> GetActiveWithActivityAsync(
-        SearchReportsRequest filter, CancellationToken cancellationToken)
+        SearchReportsRequest filter, Guid? directorUserId, CancellationToken cancellationToken)
     {
         var (eventId, seasonId, fromDate, toDate) = (filter.EventId, filter.LiturgicalSeasonId, filter.FromDate, filter.ToDate);
         var choirId = filter.ChoirId;
         DateTime? fromUtc = fromDate is { } from ? VietnamTime.StartOfDayUtc(from) : null;
         DateTime? toUtc = toDate is { } to ? VietnamTime.StartOfDayUtc(to.AddDays(1)) : null;
 
+        // The director rule is the same as IsManagedByDirectorAsync.
         var query = DbContext.MemberProfiles
             .AsNoTracking()
             .Where(x => x.Status == MemberStatus.Active
-                && (choirId == null || x.ChoirMemberships.Any(m => m.ChoirId == choirId && m.IsActive)));
+                && (choirId == null || x.ChoirMemberships.Any(m => m.ChoirId == choirId && m.IsActive))
+                && (directorUserId == null
+                    || !x.ChoirMemberships.Any(m => m.IsActive)
+                    || x.ChoirMemberships.Any(m => m.IsActive && m.Choir.DirectorId == directorUserId)));
 
         var totalCount = await query.CountAsync(cancellationToken);
 
         var items = await query
             .Include(x => x.User)
+            .Include(x => x.ChoirMemberships.Where(m => m.IsActive))
             .Include(x => x.MemberSkills.Where(s => s.Status == ApprovalStatus.Approved))
             .Include(x => x.RehearsalAttendances.Where(a =>
                 (fromUtc == null || a.Rehearsal.StartTime >= fromUtc)

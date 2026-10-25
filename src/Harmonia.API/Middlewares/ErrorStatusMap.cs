@@ -189,6 +189,10 @@ public static class ErrorStatusMap
         [ErrorCodes.ChoirMemberInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.ChoirInactive] = StatusCodes.Status409Conflict,
         [ErrorCodes.ChoirMembershipNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.ChoirDirectorInvalid] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.ChoirNotServingEvent] = StatusCodes.Status409Conflict,
+        [ErrorCodes.ChoirLeadInvalid] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.ChoirNotLead] = StatusCodes.Status403Forbidden,
 
         // 16. Mass schedule.
         [ErrorCodes.MassScheduleNotFound] = StatusCodes.Status404NotFound,

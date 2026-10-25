@@ -37,7 +37,7 @@ public class LiturgicalEventServiceTests
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<LiturgicalEventProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new LiturgicalEventService(_repository, _users, _notifications, _lookups, mapper);
+        _sut = new LiturgicalEventService(_repository, _users, _notifications, _lookups, ChoirScopeFakes.Unrestricted(), mapper);
         _lookups.CheckEventCatalogsAsync(default, default, default, default, default, default, default, default)
             .ReturnsForAnyArgs(Result.Success());
         _repository.GetWithLocationAsync(_event.Id, _ct).Returns(_event);

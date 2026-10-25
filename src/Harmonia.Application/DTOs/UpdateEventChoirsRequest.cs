@@ -7,4 +7,7 @@ namespace Harmonia.Application.DTOs;
 public class UpdateEventChoirsRequest
 {
     public List<Guid> ChoirIds { get; set; } = [];
+
+    /// <summary>The lead choir (D8): required when <see cref="ChoirIds"/> is not empty, and must be one of them.</summary>
+    public Guid? LeadChoirId { get; set; }
 }

@@ -11,7 +11,11 @@ public interface IUpcomingScheduleService
 {
     Task<Result<List<LiturgicalEventSummaryDto>>> GetUpcomingEventsAsync(CancellationToken cancellationToken);
 
-    Task<Result<List<RehearsalSummaryDto>>> GetUpcomingRehearsalsAsync(CancellationToken cancellationToken);
+    /// <summary>
+    /// Upcoming rehearsals: a choir member sees those of their own choirs, a director those of the choirs they lead,
+    /// both plus rehearsals with no choir (D8); other roles see every one.
+    /// </summary>
+    Task<Result<List<RehearsalSummaryDto>>> GetUpcomingRehearsalsAsync(Guid userId, CancellationToken cancellationToken);
 
     /// <summary>Upcoming events where the calling member serves, once the roster is finalized and they are notified.</summary>
     Task<Result<List<MyAssignedEventDto>>> GetMyAssignmentsAsync(Guid userId, CancellationToken cancellationToken);

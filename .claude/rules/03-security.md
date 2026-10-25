@@ -88,6 +88,14 @@
   của chính mình qua `PUT api/auth/me` (ca viên còn qua `PUT api/member-profiles/me`) (chốt 2026-10-07).
   Mọi role **đọc** được các `SystemSetting` công khai qua `GET api/system-settings/public`; key nào công khai
   do `SystemSettingKeys` trong code quyết định, không phải dữ liệu trong bảng (chốt 2026-10-11).
+- Chỉ `Admin` tạo / sửa `Choir` và gán ca trưởng. `ChoirDirector` chỉ xem và quản lý ca viên của ca đoàn có
+  `DirectorId` là mình; ca đoàn của ca trưởng khác trả **404** `CHOIR_NOT_FOUND` (D8, chốt 2026-10-25).
+  Ca trưởng **quản lý** ca viên đang ở ca đoàn của mình hoặc chưa ở ca đoàn nào
+  (`IMemberProfileRepository.IsManagedByDirectorAsync`): chỉ xem / sửa hồ sơ và duyệt kỹ năng của những ca viên đó,
+  còn lại trả 404. Tìm kiếm ca viên vẫn trả toàn giáo xứ để thêm người vào ca đoàn.
+  Buổi tập, bài tập, sự kiện, danh sách bài, phân công, lời mời: kiểm qua `IChoirScopeService` — ngoài phạm vi
+  trả 404, ca đoàn phục vụ nhưng không phụ trách mà sửa trả 403 `CHOIR_NOT_LEAD`. Chỉ `ParishPriest` gán ca đoàn
+  và ca đoàn phụ trách cho sự kiện. Thêm endpoint mới cho ca trưởng thì phải gọi scope service tương ứng.
 - **Kiểm quyền hai tầng**: attribute chặn theo role, service chặn theo quyền sở hữu bản ghi.
   `ICurrentUserService` cho biết ai đang gọi.
 - Ca viên chỉ đọc/sửa bản ghi **của chính mình**: `MemberSkill`, `EventParticipation`,

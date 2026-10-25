@@ -69,11 +69,15 @@ public class MemberSkillRepository(HarmoniaDbContext dbContext)
         return new PagedList<MemberSkill>(items, paging.PageNumber, paging.PageSize, totalCount);
     }
 
-    public async Task<PagedList<MemberSkill>> GetPendingAsync(PagingRequest paging, CancellationToken cancellationToken)
+    public async Task<PagedList<MemberSkill>> GetPendingAsync(
+        Guid directorUserId, PagingRequest paging, CancellationToken cancellationToken)
     {
+        // Same rule as MemberProfileRepository.IsManagedByDirectorAsync.
         var query = DbContext.MemberSkills
             .AsNoTracking()
-            .Where(x => x.Status == ApprovalStatus.Pending);
+            .Where(x => x.Status == ApprovalStatus.Pending
+                && (!x.Member.ChoirMemberships.Any(m => m.IsActive)
+                    || x.Member.ChoirMemberships.Any(m => m.IsActive && m.Choir.DirectorId == directorUserId)));
 
         var totalCount = await query.CountAsync(cancellationToken);
 

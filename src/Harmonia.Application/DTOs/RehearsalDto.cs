@@ -7,6 +7,9 @@ public class RehearsalDto
 {
     public Guid Id { get; set; }
 
+    /// <summary>Null on rehearsals created before choirs were scoped (D8).</summary>
+    public Guid? ChoirId { get; set; }
+
     public Guid? EventId { get; set; }
 
     public Guid? LocationId { get; set; }

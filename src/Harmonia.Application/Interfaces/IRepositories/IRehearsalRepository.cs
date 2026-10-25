@@ -10,18 +10,28 @@ namespace Harmonia.Application.Interfaces.IRepositories;
 
 public interface IRehearsalRepository : IGenericRepository<Rehearsal>
 {
-    /// <summary>Rehearsals not ended at <paramref name="fromTime"/> (an ongoing one included), earliest first.</summary>
-    /// <summary>Rehearsals not yet over that are standalone or belong to a Published event.</summary>
-    Task<List<Rehearsal>> GetUpcomingAsync(DateTime fromTime, CancellationToken cancellationToken);
+    /// <summary>
+    /// Rehearsals not ended at <paramref name="fromTime"/> (an ongoing one included), earliest first, that are standalone
+    /// or belong to a Published event. When <paramref name="choirIds"/> is set, only rehearsals of those choirs or of
+    /// no choir.
+    /// </summary>
+    Task<List<Rehearsal>> GetUpcomingAsync(
+        DateTime fromTime, IReadOnlyCollection<Guid>? choirIds, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Read-only rehearsal that is standalone or belongs to a Published event, null otherwise. Location and Songs.Song
+    /// Read-only rehearsal that is standalone or belongs to a Published event, and belongs to one of
+    /// <paramref name="choirIds"/> or to no choir when that is set; null otherwise. Location and Songs.Song
     /// are loaded; Attendances holds only the member's row.
     /// </summary>
-    Task<Rehearsal?> GetVisibleForMemberAsync(Guid id, Guid memberId, CancellationToken cancellationToken);
+    Task<Rehearsal?> GetVisibleForMemberAsync(
+        Guid id, Guid memberId, IReadOnlyCollection<Guid>? choirIds, CancellationToken cancellationToken);
 
-    /// <summary>Read-only page, newest start first, with Location and Songs (with Song) loaded.</summary>
-    Task<PagedList<Rehearsal>> SearchAsync(SearchRehearsalsRequest filter, CancellationToken cancellationToken);
+    /// <summary>
+    /// Read-only page, newest start first, with Location and Songs (with Song) loaded. When <paramref name="choirIds"/>
+    /// is set, only rehearsals of those choirs or of no choir.
+    /// </summary>
+    Task<PagedList<Rehearsal>> SearchAsync(
+        SearchRehearsalsRequest filter, IReadOnlyCollection<Guid>? choirIds, CancellationToken cancellationToken);
 
     /// <summary>Tracked, with Location and Songs (with Song) loaded.</summary>
     Task<Rehearsal?> GetWithDetailsForUpdateAsync(Guid id, CancellationToken cancellationToken);

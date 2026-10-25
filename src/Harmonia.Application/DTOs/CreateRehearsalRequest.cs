@@ -5,6 +5,9 @@ namespace Harmonia.Application.DTOs;
 
 public class CreateRehearsalRequest
 {
+    /// <summary>A choir the calling director leads (D8); when <see cref="EventId"/> is set it must serve that event.</summary>
+    public Guid ChoirId { get; set; }
+
     public Guid? EventId { get; set; }
 
     public Guid? LocationId { get; set; }

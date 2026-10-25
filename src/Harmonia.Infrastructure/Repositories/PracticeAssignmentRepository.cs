@@ -54,9 +54,12 @@ public class PracticeAssignmentRepository(HarmoniaDbContext dbContext)
     }
 
     public async Task<PagedList<PracticeAssignment>> SearchAsync(
-        SearchPracticeAssignmentsRequest filter, CancellationToken cancellationToken)
+        SearchPracticeAssignmentsRequest filter, IReadOnlyCollection<Guid>? choirIds, CancellationToken cancellationToken)
     {
         var query = DbContext.PracticeAssignments.AsNoTracking();
+
+        if (choirIds is not null)
+            query = query.Where(x => x.ChoirId == null || choirIds.Contains(x.ChoirId.Value));
 
         if (filter.EventId is { } eventId)
             query = query.Where(x => x.EventId == eventId);
@@ -130,11 +133,14 @@ public class PracticeAssignmentRepository(HarmoniaDbContext dbContext)
     /// <summary>
     /// Scope All, a target naming the member, or a target skill the member holds approved today. Skill targets
     /// follow the member's current skills, so a newly approved skill also brings its earlier assignments.
+    /// An assignment of a choir (D8) reaches only that choir's active members.
     /// EventPreparationService.Receives repeats this rule in memory; change both together.
     /// </summary>
     private IQueryable<PracticeAssignment> VisibleToMember(Guid memberId) =>
         DbContext.PracticeAssignments
             .AsNoTracking()
+            .Where(x => x.ChoirId == null
+                || DbContext.ChoirMemberships.Any(m => m.ChoirId == x.ChoirId && m.MemberId == memberId && m.IsActive))
             .Where(x => x.Scope == AssignmentScope.All
                 || x.Targets.Any(t => t.MemberId == memberId
                     || DbContext.MemberSkills.Any(ms => ms.MemberId == memberId

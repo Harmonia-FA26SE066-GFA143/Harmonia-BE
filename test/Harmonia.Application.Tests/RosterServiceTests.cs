@@ -41,7 +41,7 @@ public class RosterServiceTests
             cfg.AddProfile<ServiceRosterProfile>();
         }, NullLoggerFactory.Instance).CreateMapper();
         _currentUser.UserId.Returns(_directorId);
-        _sut = new RosterService(_repository, _generator, _currentUser, _notifications, _settings, mapper);
+        _sut = new RosterService(_repository, _generator, _currentUser, _notifications, _settings, ChoirScopeFakes.Unrestricted(), mapper);
         _settings.GetIntAsync(SystemSettingKeys.RosterRecentServiceDays, _ct).Returns(60);
         _settings.GetBoolAsync(SystemSettingKeys.RosterAiSuggestionEnabled, _ct).Returns(true);
 

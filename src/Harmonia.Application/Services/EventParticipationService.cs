@@ -19,6 +19,7 @@ public class EventParticipationService(
     ILiturgicalEventRepository liturgicalEventRepository,
     IMemberProfileRepository memberProfileRepository,
     INotificationService notificationService,
+    IChoirScopeService choirScope,
     IMapper mapper) : IEventParticipationService
 {
     public async Task<Result<List<EventParticipationDto>>> SendRequestsAsync(
@@ -28,6 +29,12 @@ public class EventParticipationService(
         if (liturgicalEvent is null)
         {
             return Result<List<EventParticipationDto>>.Failure(ErrorCodes.LiturgicalEventNotFound);
+        }
+
+        if (await choirScope.CheckCanLeadEventAsync(
+                liturgicalEvent.Id, ErrorCodes.LiturgicalEventNotFound, cancellationToken) is { } scopeError)
+        {
+            return Result<List<EventParticipationDto>>.Failure(scopeError);
         }
 
         if (liturgicalEvent.Status == EventStatus.Cancelled)
@@ -103,7 +110,7 @@ public class EventParticipationService(
         Guid eventId, CancellationToken cancellationToken)
     {
         var liturgicalEvent = await liturgicalEventRepository.GetByIdAsync(eventId, cancellationToken);
-        if (liturgicalEvent is null)
+        if (liturgicalEvent is null || !await choirScope.CanViewEventAsync(eventId, cancellationToken))
         {
             return Result<EventParticipationSummaryDto>.Failure(ErrorCodes.LiturgicalEventNotFound);
         }
@@ -197,16 +204,19 @@ public class EventParticipationService(
 
     /// <summary>
     /// Explicit ids must all exist, be active and not be invited yet. Without ids, everyone active
-    /// who has no request yet is picked, so re-sending after new members join is safe.
+    /// who has no request yet is picked, so re-sending after new members join is safe. When choirs serve the event
+    /// (D8), only their members can be invited: others count as missing, and the default pick covers only them.
     /// </summary>
     private async Task<Result<List<MemberProfile>>> ResolveInviteesAsync(
         Guid eventId, List<Guid>? requestedIds, CancellationToken cancellationToken)
     {
+        var eventMemberIds = await choirScope.GetEventMemberIdsAsync(eventId, cancellationToken);
+
         if (requestedIds is { Count: > 0 })
         {
             var ids = requestedIds.Distinct().ToList();
             var members = await memberProfileRepository.GetByIdsWithUserAsync(ids, cancellationToken);
-            if (members.Count != ids.Count)
+            if (members.Count != ids.Count || (eventMemberIds is not null && ids.Any(id => !eventMemberIds.Contains(id))))
             {
                 return Result<List<MemberProfile>>.Failure(ErrorCodes.MemberNotFound);
             }
@@ -226,7 +236,9 @@ public class EventParticipationService(
             return Result<List<MemberProfile>>.Success(members);
         }
 
-        var active = await memberProfileRepository.GetAllActiveWithUserAsync(cancellationToken);
+        var active = (await memberProfileRepository.GetAllActiveWithUserAsync(cancellationToken))
+            .Where(member => eventMemberIds is null || eventMemberIds.Contains(member.Id))
+            .ToList();
         var requested = (await participationRepository.GetRequestedMemberIdsAsync(
             eventId, active.Select(member => member.Id).ToList(), cancellationToken)).ToHashSet();
 

@@ -18,6 +18,7 @@ public class RehearsalAttendanceServiceTests
     private readonly IRehearsalRepository _rehearsals = Substitute.For<IRehearsalRepository>();
     private readonly IMemberProfileRepository _members = Substitute.For<IMemberProfileRepository>();
     private readonly ISystemSettingService _settings = Substitute.For<ISystemSettingService>();
+    private readonly IChoirScopeService _scope = ChoirScopeFakes.Unrestricted();
     private readonly RehearsalAttendanceService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly Guid _directorUserId = Guid.NewGuid();
@@ -29,7 +30,7 @@ public class RehearsalAttendanceServiceTests
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<MemberProfileProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new RehearsalAttendanceService(_rehearsals, _members, _settings, mapper);
+        _sut = new RehearsalAttendanceService(_rehearsals, _members, _settings, _scope, mapper);
 
         _rehearsal = new Rehearsal
         {
@@ -151,7 +152,7 @@ public class RehearsalAttendanceServiceTests
     {
         var checkedAt = DateTime.UtcNow;
         _bob.RehearsalAttendances.Add(new RehearsalAttendance { MemberId = _bob.Id, Status = AttendanceStatus.Late, CheckedAt = checkedAt });
-        _members.GetAttendanceRosterAsync(_rehearsal.Id, _ct).Returns([_alice, _bob]);
+        _members.GetAttendanceRosterAsync(_rehearsal.Id, null, _ct).Returns([_alice, _bob]);
 
         var result = await _sut.GetAttendancesAsync(_rehearsal.Id, _ct);
 

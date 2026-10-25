@@ -12,8 +12,27 @@ public class ReportService(
     ISongRepository songRepository,
     IUserRepository userRepository,
     IMemberProfileRepository memberProfileRepository,
-    IPracticeAssignmentRepository practiceAssignmentRepository) : IReportService
+    IPracticeAssignmentRepository practiceAssignmentRepository,
+    ICurrentUserService currentUser,
+    IChoirScopeService choirScope) : IReportService
 {
+    /// <summary>
+    /// The per-member reports of a Choir Director cover only the members they manage (D8), and a choirId filter must
+    /// be one of their own choirs (CHOIR_NOT_FOUND otherwise). Other roles see every member.
+    /// </summary>
+    private async Task<(Guid? DirectorUserId, string? Error)> GetMemberScopeAsync(
+        SearchReportsRequest request, CancellationToken cancellationToken)
+    {
+        if (await choirScope.GetDirectedChoirIdsAsync(cancellationToken) is not { } directed)
+        {
+            return (null, null);
+        }
+
+        return request.ChoirId is { } choirId && !directed.Contains(choirId)
+            ? (null, ErrorCodes.ChoirNotFound)
+            : (currentUser.UserId, null);
+    }
+
     public async Task<Result<PagedList<ServiceHistoryDto>>> GetServiceHistoryAsync(
         SearchReportsRequest request, CancellationToken cancellationToken)
     {
@@ -81,9 +100,13 @@ public class ReportService(
         });
 
     public async Task<Result<PagedList<RehearsalAttendanceReportDto>>> GetRehearsalAttendanceAsync(
-        SearchReportsRequest request, CancellationToken cancellationToken) =>
-        ToPage(
-            await memberProfileRepository.GetActiveWithActivityAsync(request, cancellationToken),
+        SearchReportsRequest request, CancellationToken cancellationToken)
+    {
+        var (directorUserId, scopeError) = await GetMemberScopeAsync(request, cancellationToken);
+        if (scopeError is not null) return Result<PagedList<RehearsalAttendanceReportDto>>.Failure(scopeError);
+
+        return ToPage(
+            await memberProfileRepository.GetActiveWithActivityAsync(request, directorUserId, cancellationToken),
             member => new RehearsalAttendanceReportDto
             {
                 MemberId = member.Id,
@@ -93,11 +116,16 @@ public class ReportService(
                 AbsentCount = member.RehearsalAttendances.Count(a => a.Status == AttendanceStatus.Absent),
                 ExcusedCount = member.RehearsalAttendances.Count(a => a.Status == AttendanceStatus.Excused),
             });
+    }
 
     public async Task<Result<PagedList<ParticipationReportDto>>> GetParticipationAsync(
-        SearchReportsRequest request, CancellationToken cancellationToken) =>
-        ToPage(
-            await memberProfileRepository.GetActiveWithActivityAsync(request, cancellationToken),
+        SearchReportsRequest request, CancellationToken cancellationToken)
+    {
+        var (directorUserId, scopeError) = await GetMemberScopeAsync(request, cancellationToken);
+        if (scopeError is not null) return Result<PagedList<ParticipationReportDto>>.Failure(scopeError);
+
+        return ToPage(
+            await memberProfileRepository.GetActiveWithActivityAsync(request, directorUserId, cancellationToken),
             member => new ParticipationReportDto
             {
                 MemberId = member.Id,
@@ -107,11 +135,15 @@ public class ReportService(
                 DeclinedCount = member.EventParticipations.Count(p => p.Status == ParticipationStatus.Declined),
                 UnsureCount = member.EventParticipations.Count(p => p.Status == ParticipationStatus.Unsure),
             });
+    }
 
     public async Task<Result<PagedList<PracticeAssignmentCompletionDto>>> GetAssignmentCompletionAsync(
         SearchReportsRequest request, CancellationToken cancellationToken)
     {
-        var page = await memberProfileRepository.GetActiveWithActivityAsync(request, cancellationToken);
+        var (directorUserId, scopeError) = await GetMemberScopeAsync(request, cancellationToken);
+        if (scopeError is not null) return Result<PagedList<PracticeAssignmentCompletionDto>>.Failure(scopeError);
+
+        var page = await memberProfileRepository.GetActiveWithActivityAsync(request, directorUserId, cancellationToken);
         var assignments = await practiceAssignmentRepository.GetForReportAsync(
             request, page.Items.Select(m => m.Id).ToList(), cancellationToken);
 

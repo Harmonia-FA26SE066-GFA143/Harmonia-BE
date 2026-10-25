@@ -79,17 +79,17 @@ public class LiturgicalEventsController(
     public async Task<IActionResult> GetPreparationStatusAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await eventPreparationService.GetStatusAsync(id, cancellationToken));
 
-    /// <summary>Choirs serving the event (D7).</summary>
+    /// <summary>Choirs serving the event and which one leads it (D7, D8).</summary>
     [HttpGet("{id:guid}/choirs")]
-    [Authorize(Roles = RoleNames.ChoirDirector)]
-    [ProducesResponseType<List<ChoirDto>>(StatusCodes.Status200OK)]
+    [Authorize(Roles = $"{RoleNames.ParishPriest},{RoleNames.ChoirDirector}")]
+    [ProducesResponseType<List<LiturgicalEventChoirDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetChoirsAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await choirService.GetEventChoirsAsync(id, cancellationToken));
 
-    /// <summary>Replaces the choirs serving the event (D7).</summary>
+    /// <summary>Replaces the choirs serving the event and sets the lead choir (D7, D8).</summary>
     [HttpPut("{id:guid}/choirs")]
-    [Authorize(Roles = RoleNames.ChoirDirector)]
-    [ProducesResponseType<List<ChoirDto>>(StatusCodes.Status200OK)]
+    [Authorize(Roles = RoleNames.ParishPriest)]
+    [ProducesResponseType<List<LiturgicalEventChoirDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateChoirsAsync(
         Guid id, [FromBody] UpdateEventChoirsRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await choirService.UpdateEventChoirsAsync(id, request, cancellationToken));

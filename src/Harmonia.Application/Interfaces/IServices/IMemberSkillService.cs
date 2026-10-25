@@ -29,18 +29,23 @@ public interface IMemberSkillService
     /// </summary>
     Task<Result<MemberSkillDto>> GetMineByIdAsync(Guid userId, Guid id, CancellationToken cancellationToken);
 
-    /// <summary>Pending declarations of every member, oldest first, for the Choir Director to review (UC-19).</summary>
-    Task<Result<PagedList<MemberSkillDetailDto>>> GetPendingAsync(PagingRequest paging, CancellationToken cancellationToken);
+    /// <summary>
+    /// Pending declarations of the members the Choir Director manages (D8), oldest first, for them to review (UC-19).
+    /// </summary>
+    Task<Result<PagedList<MemberSkillDetailDto>>> GetPendingAsync(
+        Guid directorUserId, PagingRequest paging, CancellationToken cancellationToken);
 
     /// <summary>
     /// The Choir Director approves a Pending declaration and the member is notified. A declaration that
-    /// is no longer Pending fails with MEMBER_SKILL_ALREADY_REVIEWED.
+    /// is no longer Pending fails with MEMBER_SKILL_ALREADY_REVIEWED; one of a member the director does not
+    /// manage (D8) fails with MEMBER_SKILL_NOT_FOUND.
     /// </summary>
     Task<Result<MemberSkillDetailDto>> ApproveAsync(Guid directorUserId, Guid id, CancellationToken cancellationToken);
 
     /// <summary>
     /// The Choir Director rejects a Pending declaration with a reason and the member is notified.
-    /// A declaration that is no longer Pending fails with MEMBER_SKILL_ALREADY_REVIEWED.
+    /// A declaration that is no longer Pending fails with MEMBER_SKILL_ALREADY_REVIEWED; one of a member the
+    /// director does not manage (D8) fails with MEMBER_SKILL_NOT_FOUND.
     /// </summary>
     Task<Result<MemberSkillDetailDto>> RejectAsync(
         Guid directorUserId, Guid id, RejectMemberSkillRequest request, CancellationToken cancellationToken);

@@ -13,17 +13,20 @@ public class RehearsalAttendanceService(
     IRehearsalRepository rehearsalRepository,
     IMemberProfileRepository memberProfileRepository,
     ISystemSettingService systemSettingService,
+    IChoirScopeService choirScope,
     IMapper mapper) : IRehearsalAttendanceService
 {
     public async Task<Result<List<RehearsalAttendanceDto>>> GetAttendancesAsync(
         Guid rehearsalId, CancellationToken cancellationToken)
     {
-        if (await rehearsalRepository.GetByIdAsync(rehearsalId, cancellationToken) is null)
+        var rehearsal = await rehearsalRepository.GetByIdAsync(rehearsalId, cancellationToken);
+        if (rehearsal is null || !await choirScope.CanManageChoirAsync(rehearsal.ChoirId, cancellationToken))
         {
             return Result<List<RehearsalAttendanceDto>>.Failure(ErrorCodes.RehearsalNotFound);
         }
 
-        var members = await memberProfileRepository.GetAttendanceRosterAsync(rehearsalId, cancellationToken);
+        var members = await memberProfileRepository.GetAttendanceRosterAsync(
+            rehearsalId, rehearsal.ChoirId, cancellationToken);
 
         return Result<List<RehearsalAttendanceDto>>.Success(mapper.Map<List<RehearsalAttendanceDto>>(members));
     }
@@ -32,7 +35,10 @@ public class RehearsalAttendanceService(
         Guid directorUserId, Guid rehearsalId, RecordRehearsalAttendancesRequest request, CancellationToken cancellationToken)
     {
         var rehearsal = await rehearsalRepository.GetWithAttendancesForUpdateAsync(rehearsalId, cancellationToken);
-        if (rehearsal is null) return Result.Failure(ErrorCodes.RehearsalNotFound);
+        if (rehearsal is null || !await choirScope.CanManageChoirAsync(rehearsal.ChoirId, cancellationToken))
+        {
+            return Result.Failure(ErrorCodes.RehearsalNotFound);
+        }
 
         var now = DateTime.UtcNow;
         var opensMinutesBefore = await systemSettingService.GetIntAsync(
@@ -42,6 +48,14 @@ public class RehearsalAttendanceService(
         var memberIds = request.Items.Select(i => i.MemberId).ToList();
         var members = await memberProfileRepository.ListAsync(x => memberIds.Contains(x.Id), cancellationToken);
         if (members.Count != memberIds.Count) return Result.Failure(ErrorCodes.MemberNotFound);
+
+        // Outside the rehearsal's choir reads as not found, unless already recorded here (they left the choir since).
+        if (await choirScope.GetChoirMemberIdsAsync(rehearsal.ChoirId, cancellationToken) is { } choirMemberIds
+            && memberIds.Any(id => !choirMemberIds.Contains(id) && rehearsal.Attendances.All(a => a.MemberId != id)))
+        {
+            return Result.Failure(ErrorCodes.MemberNotFound);
+        }
+
         if (members.Any(m => m.Status != MemberStatus.Active)) return Result.Failure(ErrorCodes.MemberNotActive);
 
         foreach (var item in request.Items)

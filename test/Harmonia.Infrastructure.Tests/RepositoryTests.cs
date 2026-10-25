@@ -565,6 +565,82 @@ public sealed class RepositoryTests : IDisposable
         Assert.All(member.MemberSkills, s => Assert.NotNull(s.Skill.Category));
     }
 
+    // ---- Director scope (D8): MemberProfileRepository.IsManagedByDirectorAsync, MemberSkillRepository.GetPendingAsync ----
+
+    [Fact]
+    public async Task IsManagedByDirector_OwnChoirOrNoChoir_ButNotAnotherDirectorsChoir_Async()
+    {
+        var scope = await SeedDirectorScopeAsync(_ct);
+        await using var context = _db.NewContext();
+        var repository = new MemberProfileRepository(context);
+
+        Assert.True(await repository.IsManagedByDirectorAsync(scope.InMine, scope.MeId, _ct));
+        Assert.True(await repository.IsManagedByDirectorAsync(scope.InBoth, scope.MeId, _ct));
+        Assert.True(await repository.IsManagedByDirectorAsync(scope.NoChoir, scope.MeId, _ct));
+        Assert.True(await repository.IsManagedByDirectorAsync(scope.LeftMine, scope.MeId, _ct));
+        Assert.False(await repository.IsManagedByDirectorAsync(scope.InTheirs, scope.MeId, _ct));
+        Assert.False(await repository.IsManagedByDirectorAsync(Guid.NewGuid(), scope.MeId, _ct));
+    }
+
+    [Fact]
+    public async Task GetPendingSkills_KeepsOnlyMembersTheDirectorManages_Async()
+    {
+        var scope = await SeedDirectorScopeAsync(_ct);
+        await using (var context = _db.NewContext())
+        {
+            context.MemberSkills.AddRange(
+                new[] { scope.InMine, scope.InTheirs, scope.NoChoir }
+                    .Select(id => NewMemberSkill(id, scope.SkillId, ApprovalStatus.Pending)));
+            await context.SaveChangesAsync(_ct);
+        }
+
+        await using var readContext = _db.NewContext();
+        var page = await new MemberSkillRepository(readContext).GetPendingAsync(scope.MeId, new PagingRequest(), _ct);
+
+        Assert.Equal(["In Mine", "No Choir"], page.Items.Select(x => x.Member.User.FullName).Order());
+        Assert.Equal(2, page.TotalCount);
+    }
+
+    private sealed record DirectorScope(
+        Guid MeId, Guid SkillId, Guid InMine, Guid InTheirs, Guid InBoth, Guid NoChoir, Guid LeftMine);
+
+    /// <summary>
+    /// Choir "Mine" led by me, "Theirs" by another director, and one member per case: active in Mine, active in
+    /// Theirs, active in both, in no choir, and one who left Mine.
+    /// </summary>
+    private async Task<DirectorScope> SeedDirectorScopeAsync(CancellationToken cancellationToken = default)
+    {
+        var me = await _db.AddUserAsync("me@test.com", RoleNames.ChoirDirector, cancellationToken);
+        var other = await _db.AddUserAsync("other@test.com", RoleNames.ChoirDirector, cancellationToken);
+        var inMine = await AddMemberAsync("In Mine", MemberStatus.Active, [], cancellationToken);
+        var inTheirs = await AddMemberAsync("In Theirs", MemberStatus.Active, [], cancellationToken);
+        var inBoth = await AddMemberAsync("In Both", MemberStatus.Active, [], cancellationToken);
+        var noChoir = await AddMemberAsync("No Choir", MemberStatus.Active, [], cancellationToken);
+        var leftMine = await AddMemberAsync("Left Mine", MemberStatus.Active, [], cancellationToken);
+        var skill = new Skill { Id = Guid.NewGuid(), CategoryId = SkillCategoryIds.Vocal, Name = "Tenor", IsActive = true };
+        var mine = new Choir { Id = Guid.NewGuid(), Name = "Mine", DirectorId = me.Id };
+        var theirs = new Choir { Id = Guid.NewGuid(), Name = "Theirs", DirectorId = other.Id };
+
+        await using var context = _db.NewContext();
+        context.Skills.Add(skill);
+        context.Choirs.AddRange(mine, theirs);
+        context.ChoirMemberships.AddRange(
+            NewMembership(mine.Id, inMine),
+            NewMembership(theirs.Id, inTheirs),
+            NewMembership(mine.Id, inBoth),
+            NewMembership(theirs.Id, inBoth),
+            NewMembership(mine.Id, leftMine, isActive: false));
+        await context.SaveChangesAsync(cancellationToken);
+
+        return new DirectorScope(me.Id, skill.Id, inMine, inTheirs, inBoth, noChoir, leftMine);
+
+        static ChoirMembership NewMembership(Guid choirId, Guid memberId, bool isActive = true) => new()
+        {
+            Id = Guid.NewGuid(), ChoirId = choirId, MemberId = memberId, JoinedDate = new DateOnly(2026, 1, 1),
+            IsActive = isActive,
+        };
+    }
+
     private async Task<PagedList<MemberProfile>> SearchMembersAsync(
         SearchMemberProfilesRequest filter, CancellationToken cancellationToken = default)
     {
@@ -577,7 +653,7 @@ public sealed class RepositoryTests : IDisposable
     {
         await using var context = _db.NewContext();
         return await new MemberProfileRepository(context)
-            .GetLearnersOfMaterialAsync(materialId, targetSkillId, filter, cancellationToken);
+            .GetLearnersOfMaterialAsync(materialId, targetSkillId, Guid.NewGuid(), filter, cancellationToken);
     }
 
     /// <summary>Adds a member whose given skills are approved; returns the member id.</summary>
@@ -1147,7 +1223,7 @@ public sealed class RepositoryTests : IDisposable
         await using var context = _db.NewContext();
 
         var page = await new PracticeSubmissionRepository(context)
-            .SearchAsync(seed.AssignmentId, new SearchPracticeSubmissionsRequest(), _ct);
+            .SearchAsync(seed.AssignmentId, new SearchPracticeSubmissionsRequest(), null, _ct);
 
         Assert.Equal([seed.AnNewest, seed.BinhNewest], page.Items.Select(x => x.Id));
         Assert.Equal("An", page.Items[0].Member.User.FullName);
@@ -1161,7 +1237,7 @@ public sealed class RepositoryTests : IDisposable
         await using var context = _db.NewContext();
 
         var page = await new PracticeSubmissionRepository(context)
-            .SearchAsync(seed.AssignmentId, new SearchPracticeSubmissionsRequest { AllAttempts = true }, _ct);
+            .SearchAsync(seed.AssignmentId, new SearchPracticeSubmissionsRequest { AllAttempts = true }, null, _ct);
 
         Assert.Equal([seed.AnNewest, seed.BinhNewest, seed.BinhOld], page.Items.Select(x => x.Id));
     }
@@ -1173,7 +1249,7 @@ public sealed class RepositoryTests : IDisposable
         await using var context = _db.NewContext();
 
         var page = await new PracticeSubmissionRepository(context)
-            .SearchAsync(null, new SearchPracticeSubmissionsRequest { Status = SubmissionStatus.Submitted }, _ct);
+            .SearchAsync(null, new SearchPracticeSubmissionsRequest { Status = SubmissionStatus.Submitted }, null, _ct);
 
         Assert.Equal([seed.OtherAssignmentSubmission, seed.BinhNewest], page.Items.Select(x => x.Id));
         Assert.Equal(2, page.TotalCount);
@@ -1187,7 +1263,7 @@ public sealed class RepositoryTests : IDisposable
 
         // Binh's attempt 1 is NeedsRevision but attempt 2 supersedes it.
         var page = await new PracticeSubmissionRepository(context)
-            .SearchAsync(null, new SearchPracticeSubmissionsRequest { Status = SubmissionStatus.NeedsRevision }, _ct);
+            .SearchAsync(null, new SearchPracticeSubmissionsRequest { Status = SubmissionStatus.NeedsRevision }, null, _ct);
 
         Assert.Empty(page.Items);
     }
@@ -1735,7 +1811,11 @@ public sealed class RepositoryTests : IDisposable
             await using var context = _db.NewContext();
             var service = new Harmonia.Application.Services.RehearsalSongService(
                 new RehearsalRepository(context), new GenericRepository<Song>(context),
-                new LiturgicalEventRepository(context), new SongListRepository(context), mapper);
+                new LiturgicalEventRepository(context), new SongListRepository(context),
+                new Harmonia.Application.Services.ChoirScopeService(
+                    new GenericRepository<Choir>(context), new GenericRepository<ChoirMembership>(context),
+                    new GenericRepository<LiturgicalEventChoir>(context), _db.CurrentUser),
+                mapper);
             var result = await service.UpdateAsync(
                 rehearsal.Id,
                 new UpdateRehearsalSongsRequest
@@ -1758,7 +1838,7 @@ public sealed class RepositoryTests : IDisposable
 
         await using var check = _db.NewContext();
         Assert.Equal(2, await check.RehearsalSongs.CountAsync(x => x.RehearsalId == rehearsal.Id, _ct));
-        var upcoming = Assert.Single(await new RehearsalRepository(check).GetUpcomingAsync(DateTime.UtcNow, _ct));
+        var upcoming = Assert.Single(await new RehearsalRepository(check).GetUpcomingAsync(DateTime.UtcNow, null, _ct));
         var summary = mapper.Map<RehearsalSummaryDto>(upcoming);
         Assert.Equal(["Gloria", "Sanctus"], summary.Songs.Select(s => s.SongTitle));
     }
@@ -1825,7 +1905,7 @@ public sealed class RepositoryTests : IDisposable
         async Task<MemberProfile> MemberAsync(SearchReportsRequest filter)
         {
             await using var context = _db.NewContext();
-            var page = await new MemberProfileRepository(context).GetActiveWithActivityAsync(filter, _ct);
+            var page = await new MemberProfileRepository(context).GetActiveWithActivityAsync(filter, null, _ct);
             Assert.Equal(2, page.TotalCount);
             return page.Items.Single(m => m.Id == seed.MemberId);
         }
@@ -1908,7 +1988,7 @@ public sealed class RepositoryTests : IDisposable
         }
 
         await using var context = _db.NewContext();
-        var page = await new MemberProfileRepository(context).GetActiveWithActivityAsync(new SearchReportsRequest(), _ct);
+        var page = await new MemberProfileRepository(context).GetActiveWithActivityAsync(new SearchReportsRequest(), null, _ct);
 
         Assert.Equal(seed.MemberId, Assert.Single(page.Items).Id);
     }
@@ -1932,7 +2012,7 @@ public sealed class RepositoryTests : IDisposable
 
         await using var context = _db.NewContext();
         var page = await new MemberProfileRepository(context).GetActiveWithActivityAsync(
-            new SearchReportsRequest { ChoirId = choir.Id }, _ct);
+            new SearchReportsRequest { ChoirId = choir.Id }, null, _ct);
 
         Assert.Equal(1, page.TotalCount);
         Assert.Equal(seed.MemberId, Assert.Single(page.Items).Id);
@@ -2114,8 +2194,8 @@ public sealed class RepositoryTests : IDisposable
         await using var context = _db.NewContext();
         var repository = new LiturgicalEventRepository(context);
 
-        var all = await repository.SearchAsync(new SearchLiturgicalEventsRequest(), true, _ct);
-        var published = await repository.SearchAsync(new SearchLiturgicalEventsRequest(), false, _ct);
+        var all = await repository.SearchAsync(new SearchLiturgicalEventsRequest(), true, null, _ct);
+        var published = await repository.SearchAsync(new SearchLiturgicalEventsRequest(), false, null, _ct);
 
         Assert.Equal(3, all.TotalCount);
         Assert.Equal([seed.DraftOnlyEventId, seed.MixedEventId], published.Items.Select(x => x.Id));
@@ -2158,13 +2238,13 @@ public sealed class RepositoryTests : IDisposable
         await using var context = _db.NewContext();
         var repository = new RehearsalRepository(context);
 
-        Assert.Equal([ongoing.Id], (await repository.GetUpcomingAsync(now, _ct)).Select(x => x.Id));
-        var page = await repository.SearchAsync(new SearchRehearsalsRequest(), _ct);
+        Assert.Equal([ongoing.Id], (await repository.GetUpcomingAsync(now, null, _ct)).Select(x => x.Id));
+        var page = await repository.SearchAsync(new SearchRehearsalsRequest(), null, _ct);
         Assert.Equal([ongoing.Id, ended.Id], page.Items.Select(x => x.Id));
         // Filter by the parish date the ended rehearsal starts on.
         var endedDate = DateOnly.FromDateTime(VietnamTime.FromUtc(ended.StartTime));
         var filtered = await repository.SearchAsync(
-            new SearchRehearsalsRequest { FromDate = endedDate, ToDate = endedDate }, _ct);
+            new SearchRehearsalsRequest { FromDate = endedDate, ToDate = endedDate }, null, _ct);
         Assert.Equal([ended.Id], filtered.Items.Select(x => x.Id));
     }
 }

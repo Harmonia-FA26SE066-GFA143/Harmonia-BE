@@ -42,7 +42,7 @@ public class MemberSkillsController(IMemberSkillService memberSkillService) : Ap
     [ProducesResponseType<PagedList<MemberSkillDetailDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPendingAsync(
         [FromQuery] PagingRequest paging, CancellationToken cancellationToken) =>
-        ToActionResult(await memberSkillService.GetPendingAsync(paging, cancellationToken));
+        ToActionResult(await memberSkillService.GetPendingAsync(User.GetUserId(), paging, cancellationToken));
 
     [HttpPatch("{id:guid}/approve")]
     [Authorize(Roles = RoleNames.ChoirDirector)]

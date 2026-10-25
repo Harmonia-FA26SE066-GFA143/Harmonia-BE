@@ -338,6 +338,14 @@ public static class ErrorCodes
 
     public const string ChoirMembershipNotFound = "CHOIR_MEMBERSHIP_NOT_FOUND";
 
+    public const string ChoirDirectorInvalid = "CHOIR_DIRECTOR_INVALID";
+
+    public const string ChoirNotServingEvent = "CHOIR_NOT_SERVING_EVENT";
+
+    public const string ChoirLeadInvalid = "CHOIR_LEAD_INVALID";
+
+    public const string ChoirNotLead = "CHOIR_NOT_LEAD";
+
     // 16. Mass schedule.
     public const string MassScheduleNotFound = "MASS_SCHEDULE_NOT_FOUND";
 

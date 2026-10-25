@@ -24,6 +24,7 @@ public class MusicMaterialServiceTests
     private readonly IFileStorageService _storage = Substitute.For<IFileStorageService>();
     private readonly MusicMaterialService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
+    private readonly Guid _directorUserId = Guid.NewGuid();
     private readonly Song _song = new() { Id = Guid.NewGuid(), Title = "Kinh Hoa Binh", IsActive = true };
 
     public MusicMaterialServiceTests()
@@ -323,10 +324,10 @@ public class MusicMaterialServiceTests
             LearningProgresses = [new MaterialLearningProgress { Status = LearningStatus.Learned, UpdatedAt = updatedAt }],
         };
         var unmarked = new MemberProfile { Id = Guid.NewGuid(), User = new User { FullName = "Binh" } };
-        _members.GetLearnersOfMaterialAsync(material.Id, skillId, request, _ct)
+        _members.GetLearnersOfMaterialAsync(material.Id, skillId, _directorUserId, request, _ct)
             .Returns(new PagedList<MemberProfile>([marked, unmarked], 1, 20, 2));
 
-        var result = await _sut.GetLearningProgressAsync(material.Id, request, _ct);
+        var result = await _sut.GetLearningProgressAsync(_directorUserId, material.Id, request, _ct);
 
         Assert.Equal(2, result.Value!.TotalCount);
         var rows = result.Value.Items;
@@ -344,10 +345,10 @@ public class MusicMaterialServiceTests
         var materialId = Guid.NewGuid();
         if (exists) _materials.GetByIdAsync(materialId, _ct).Returns(new MusicMaterial { Id = materialId, IsActive = false });
 
-        var result = await _sut.GetLearningProgressAsync(materialId, new SearchMaterialLearningProgressRequest(), _ct);
+        var result = await _sut.GetLearningProgressAsync(_directorUserId, materialId, new SearchMaterialLearningProgressRequest(), _ct);
 
         Assert.Equal(ErrorCodes.MaterialNotFound, result.Code);
-        await _members.DidNotReceiveWithAnyArgs().GetLearnersOfMaterialAsync(default, default, default!, _ct);
+        await _members.DidNotReceiveWithAnyArgs().GetLearnersOfMaterialAsync(default, default, default, default!, _ct);
     }
 
     [Theory]

@@ -12,5 +12,10 @@ public class ChoirConfiguration : IEntityTypeConfiguration<Choir>
         builder.Property(x => x.Description).HasMaxLength(500);
 
         builder.HasIndex(x => x.Name).IsUnique();
+
+        builder.HasOne(x => x.Director)
+            .WithMany()
+            .HasForeignKey(x => x.DirectorId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

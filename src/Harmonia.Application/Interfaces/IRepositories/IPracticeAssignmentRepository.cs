@@ -9,7 +9,8 @@ public interface IPracticeAssignmentRepository : IGenericRepository<PracticeAssi
 {
     /// <summary>
     /// Read-only page of the assignments the member currently receives: scope All, a target naming the member,
-    /// or a target skill the member holds approved today. Ordered by due date, earliest first.
+    /// or a target skill the member holds approved today, and for an assignment of a choir only while the member is
+    /// active in it (D8). Ordered by due date, earliest first.
     /// <see cref="PracticeAssignment.Song"/>, <see cref="PracticeAssignment.Material"/> and
     /// <see cref="PracticeAssignment.LiturgicalEvent"/> are loaded; <see cref="PracticeAssignment.Submissions"/>
     /// holds only the member's newest submission, if any.
@@ -17,9 +18,12 @@ public interface IPracticeAssignmentRepository : IGenericRepository<PracticeAssi
     Task<PagedList<PracticeAssignment>> GetForMemberAsync(
         Guid memberId, SearchMyPracticeAssignmentsRequest filter, CancellationToken cancellationToken);
 
-    /// <summary>Read-only page of every assignment (or those of one event), latest due date first, with Targets loaded.</summary>
+    /// <summary>
+    /// Read-only page of every assignment (or those of one event), latest due date first, with Targets loaded.
+    /// When <paramref name="choirIds"/> is set, only assignments of those choirs or of no choir.
+    /// </summary>
     Task<PagedList<PracticeAssignment>> SearchAsync(
-        SearchPracticeAssignmentsRequest filter, CancellationToken cancellationToken);
+        SearchPracticeAssignmentsRequest filter, IReadOnlyCollection<Guid>? choirIds, CancellationToken cancellationToken);
 
     /// <summary>Due date and the member's newest attempt status of every assignment the member receives.</summary>
     Task<List<(DateTime DueDate, SubmissionStatus? LatestStatus)>> GetProgressForMemberAsync(

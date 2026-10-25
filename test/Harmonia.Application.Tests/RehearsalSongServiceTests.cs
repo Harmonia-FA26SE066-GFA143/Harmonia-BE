@@ -28,7 +28,7 @@ public class RehearsalSongServiceTests
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<RehearsalSongProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new RehearsalSongService(_rehearsals, _songs, _events, _songLists, mapper);
+        _sut = new RehearsalSongService(_rehearsals, _songs, _events, _songLists, ChoirScopeFakes.Unrestricted(), mapper);
 
         _rehearsals.GetByIdAsync(_rehearsal.Id, _ct).Returns(_rehearsal);
         _rehearsals.GetWithSongsForUpdateAsync(_rehearsal.Id, _ct).Returns(_rehearsal);

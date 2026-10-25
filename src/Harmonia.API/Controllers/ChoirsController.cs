@@ -6,12 +6,16 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Harmonia.API.Controllers;
 
-/// <summary>Choirs of the parish and their members (D7), managed by the Choir Director.</summary>
+/// <summary>
+/// Choirs of the parish and their members (D7). The Admin creates choirs and assigns their director;
+/// each Choir Director sees and manages the members of their own choirs.
+/// </summary>
 [Route("api/choirs")]
-[Authorize(Roles = RoleNames.ChoirDirector)]
+[Authorize(Roles = $"{RoleNames.Admin},{RoleNames.ChoirDirector}")]
 public class ChoirsController(IChoirService choirService) : ApiControllerBase
 {
     [HttpPost]
+    [Authorize(Roles = RoleNames.Admin)]
     [ProducesResponseType<ChoirDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> CreateAsync(
         [FromBody] CreateChoirRequest request, CancellationToken cancellationToken) =>
@@ -23,6 +27,7 @@ public class ChoirsController(IChoirService choirService) : ApiControllerBase
         ToActionResult(await choirService.GetAllAsync(cancellationToken));
 
     [HttpPut("{id:guid}")]
+    [Authorize(Roles = RoleNames.Admin)]
     [ProducesResponseType<ChoirDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateAsync(
         Guid id, [FromBody] UpdateChoirRequest request, CancellationToken cancellationToken) =>

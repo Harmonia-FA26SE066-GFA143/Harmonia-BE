@@ -33,10 +33,12 @@ public interface ILiturgicalEventRepository : IGenericRepository<LiturgicalEvent
 
     /// <summary>
     /// Read-only page of events ordered by date then time; Draft events only when <paramref name="includeDrafts"/>.
+    /// When <paramref name="choirIds"/> is set, only events one of those choirs serves or no choir serves yet (D8).
     /// Location, LiturgicalSeason, MassType, CeremonyType and every SongLists version are loaded.
     /// </summary>
     Task<PagedList<LiturgicalEvent>> SearchAsync(
-        SearchLiturgicalEventsRequest filter, bool includeDrafts, CancellationToken cancellationToken);
+        SearchLiturgicalEventsRequest filter, bool includeDrafts, IReadOnlyCollection<Guid>? choirIds,
+        CancellationToken cancellationToken);
 
     /// <summary>Tracked event with its Location loaded.</summary>
     Task<LiturgicalEvent?> GetWithLocationAsync(Guid id, CancellationToken cancellationToken);

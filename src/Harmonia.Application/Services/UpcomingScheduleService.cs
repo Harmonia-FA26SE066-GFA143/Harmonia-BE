@@ -15,6 +15,7 @@ public class UpcomingScheduleService(
     ILiturgicalEventRepository liturgicalEventRepository,
     IRehearsalRepository rehearsalRepository,
     IMemberProfileRepository memberProfileRepository,
+    IChoirScopeService choirScope,
     IMapper mapper) : IUpcomingScheduleService
 {
     public async Task<Result<List<MyAssignedEventDto>>> GetMyAssignmentsAsync(
@@ -58,11 +59,27 @@ public class UpcomingScheduleService(
         Guid userId, Guid rehearsalId, CancellationToken cancellationToken)
     {
         var memberId = await GetMemberIdAsync(userId, cancellationToken);
-        var rehearsal = await rehearsalRepository.GetVisibleForMemberAsync(rehearsalId, memberId, cancellationToken);
+        var rehearsal = await rehearsalRepository.GetVisibleForMemberAsync(
+            rehearsalId, memberId, await GetVisibleChoirIdsAsync(userId, cancellationToken), cancellationToken);
 
         return rehearsal is null
             ? Result<MemberRehearsalDetailDto>.Failure(ErrorCodes.RehearsalNotFound)
             : Result<MemberRehearsalDetailDto>.Success(mapper.Map<MemberRehearsalDetailDto>(rehearsal));
+    }
+
+    /// <summary>
+    /// A choir member sees the rehearsals of their own choirs (and those with no choir); a director those of the
+    /// choirs they lead; other roles every rehearsal.
+    /// </summary>
+    private async Task<IReadOnlyCollection<Guid>?> GetVisibleChoirIdsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        if (await choirScope.GetDirectedChoirIdsAsync(cancellationToken) is { } directed)
+        {
+            return directed;
+        }
+
+        var profile = await memberProfileRepository.GetByUserIdAsync(userId, cancellationToken);
+        return profile is null ? null : await choirScope.GetMemberChoirIdsAsync(profile.Id, cancellationToken);
     }
 
     // Other roles have no profile; Guid.Empty matches no row, so their own-row sections come back empty.
@@ -80,9 +97,10 @@ public class UpcomingScheduleService(
     }
 
     public async Task<Result<List<RehearsalSummaryDto>>> GetUpcomingRehearsalsAsync(
-        CancellationToken cancellationToken)
+        Guid userId, CancellationToken cancellationToken)
     {
-        var rehearsals = await rehearsalRepository.GetUpcomingAsync(DateTime.UtcNow, cancellationToken);
+        var rehearsals = await rehearsalRepository.GetUpcomingAsync(
+            DateTime.UtcNow, await GetVisibleChoirIdsAsync(userId, cancellationToken), cancellationToken);
 
         return Result<List<RehearsalSummaryDto>>.Success(mapper.Map<List<RehearsalSummaryDto>>(rehearsals));
     }

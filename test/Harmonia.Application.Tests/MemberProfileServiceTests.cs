@@ -27,6 +27,47 @@ public class MemberProfileServiceTests
         _members.GetByUserIdAsync(_userId, _ct).Returns(_member);
     }
 
+    [Fact]
+    public async Task GetById_MemberTheDirectorDoesNotManage_ReturnsNotFound_Async()
+    {
+        var directorId = Guid.NewGuid();
+        _members.IsManagedByDirectorAsync(_member.Id, directorId, _ct).Returns(false);
+
+        var result = await _sut.GetByIdAsync(directorId, _member.Id, _ct);
+
+        Assert.Equal(ErrorCodes.MemberNotFound, result.Code);
+        await _members.DidNotReceive().GetWithUserAsync(Arg.Any<Guid>(), _ct);
+    }
+
+    [Fact]
+    public async Task Update_MemberTheDirectorDoesNotManage_ReturnsNotFound_AndSavesNothing_Async()
+    {
+        var directorId = Guid.NewGuid();
+        _members.IsManagedByDirectorAsync(_member.Id, directorId, _ct).Returns(false);
+
+        var result = await _sut.UpdateAsync(
+            directorId, _member.Id, new UpdateMemberProfileRequest { Status = MemberStatus.Left }, _ct);
+
+        Assert.Equal(ErrorCodes.MemberNotFound, result.Code);
+        await _members.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Update_MemberTheDirectorManages_Saves_Async()
+    {
+        var directorId = Guid.NewGuid();
+        _member.User = new User { Id = _userId };
+        _members.IsManagedByDirectorAsync(_member.Id, directorId, _ct).Returns(true);
+        _members.GetWithUserAsync(_member.Id, _ct).Returns(_member);
+
+        var result = await _sut.UpdateAsync(
+            directorId, _member.Id, new UpdateMemberProfileRequest { Status = MemberStatus.Inactive }, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(MemberStatus.Inactive, _member.Status);
+        await _members.Received(1).SaveChangesAsync(_ct);
+    }
+
     private void HistoryPage(params LiturgicalEvent[] events) =>
         _events.GetHistoryForMemberAsync(_member.Id, _request, Arg.Any<DateOnly>(), _ct)
             .Returns(new PagedList<LiturgicalEvent>(events, 1, 20, events.Length));

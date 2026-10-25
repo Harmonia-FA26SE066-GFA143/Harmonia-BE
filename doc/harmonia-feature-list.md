@@ -173,4 +173,4 @@ Hệ thống Harmonia gồm **14 feature**, bao phủ toàn bộ 54 function (FE
 - Hồ sơ ca viên do Admin quản lý (F2). Ca trưởng chỉ xem (F3) và xếp ca viên theo bài hát (F8). Quyết định ngày 2026-09-29.
 - Lịch phụng vụ làm theo ngày, không theo tuần; FE-16a (sao chép tuần trước) đã bỏ. Quyết định ngày 2026-09-30.
 - Không có vai trò Instrumentalist: người chơi nhạc cụ là Choir Member có kỹ năng nhạc cụ đã được duyệt (F3).
-- Nhiều ca đoàn (D7, 2026-10-17): ca trưởng quản lý mọi ca đoàn, không có ca trưởng riêng từng ca đoàn. Các chức năng ca đoàn (F13) và giờ lễ cố định (F4) chưa có mã FE riêng; mã UC gán ngày 2026-10-21: UC-12E, UC-36…UC-39.
+- Nhiều ca đoàn (D7, 2026-10-17; D8, 2026-10-25): mỗi ca đoàn một ca trưởng do Admin gán, ca trưởng chỉ quản lý ca đoàn của mình. Các chức năng ca đoàn (F13) và giờ lễ cố định (F4) chưa có mã FE riêng; mã UC gán ngày 2026-10-21: UC-12E, UC-36…UC-39.

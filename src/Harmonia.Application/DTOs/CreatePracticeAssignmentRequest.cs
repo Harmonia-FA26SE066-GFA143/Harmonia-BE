@@ -4,6 +4,12 @@ namespace Harmonia.Application.DTOs;
 
 public class CreatePracticeAssignmentRequest
 {
+    /// <summary>
+    /// A choir the calling director leads (D8); when <see cref="EventId"/> is set it must serve that event. Every scope
+    /// stays inside the choir: All is the whole choir, and skill or member targets reach only its members.
+    /// </summary>
+    public Guid ChoirId { get; set; }
+
     public Guid? EventId { get; set; }
 
     public Guid? SongId { get; set; }

@@ -13,7 +13,8 @@ public class EventPreparationService(
     IMemberProfileRepository memberProfileRepository,
     IRehearsalRepository rehearsalRepository,
     IPracticeAssignmentRepository practiceAssignmentRepository,
-    IRosterService rosterService) : IEventPreparationService
+    IRosterService rosterService,
+    IChoirScopeService choirScope) : IEventPreparationService
 {
     public async Task<Result<EventPreparationStatusDto>> GetStatusAsync(Guid eventId, CancellationToken cancellationToken)
     {
@@ -63,7 +64,8 @@ public class EventPreparationService(
     public async Task<Result<List<EventPreparationProgressDto>>> GetProgressAsync(
         Guid eventId, CancellationToken cancellationToken)
     {
-        if (await liturgicalEventRepository.GetByIdAsync(eventId, cancellationToken) is null)
+        if (await liturgicalEventRepository.GetByIdAsync(eventId, cancellationToken) is null
+            || !await choirScope.CanViewEventAsync(eventId, cancellationToken))
         {
             return Result<List<EventPreparationProgressDto>>.Failure(ErrorCodes.LiturgicalEventNotFound);
         }
@@ -101,9 +103,11 @@ public class EventPreparationService(
     }
 
     // Same rule as PracticeAssignmentRepository.VisibleToMember: scope All, a target naming the member,
-    // or a target skill the member holds approved today. MemberSkills holds only approved skills here.
+    // or a target skill the member holds approved today, and an assignment of a choir only for its active members.
+    // MemberSkills holds only approved skills and ChoirMemberships only active rows here.
     internal static bool Receives(PracticeAssignment assignment, MemberProfile member) =>
-        assignment.Scope == AssignmentScope.All
-        || assignment.Targets.Any(t => t.MemberId == member.Id
-            || member.MemberSkills.Any(ms => ms.SkillId == t.SkillId));
+        (assignment.ChoirId is null || member.ChoirMemberships.Any(m => m.ChoirId == assignment.ChoirId))
+        && (assignment.Scope == AssignmentScope.All
+            || assignment.Targets.Any(t => t.MemberId == member.Id
+                || member.MemberSkills.Any(ms => ms.SkillId == t.SkillId)));
 }

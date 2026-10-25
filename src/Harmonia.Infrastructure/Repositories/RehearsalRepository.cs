@@ -16,17 +16,20 @@ namespace Harmonia.Infrastructure.Repositories;
 public class RehearsalRepository(HarmoniaDbContext dbContext)
     : GenericRepository<Rehearsal>(dbContext), IRehearsalRepository
 {
-    public Task<List<Rehearsal>> GetUpcomingAsync(DateTime fromTime, CancellationToken cancellationToken) =>
+    public Task<List<Rehearsal>> GetUpcomingAsync(
+        DateTime fromTime, IReadOnlyCollection<Guid>? choirIds, CancellationToken cancellationToken) =>
         DbContext.Rehearsals
             .Include(x => x.Location)
             .Include(x => x.Songs).ThenInclude(s => s.Song)
             .Where(x => x.EndTime >= fromTime)
+            .Where(x => choirIds == null || x.ChoirId == null || choirIds.Contains(x.ChoirId.Value))
             .Where(x => x.LiturgicalEvent == null || x.LiturgicalEvent.Status == EventStatus.Published)
             .OrderBy(x => x.StartTime)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
 
-    public Task<Rehearsal?> GetVisibleForMemberAsync(Guid id, Guid memberId, CancellationToken cancellationToken) =>
+    public Task<Rehearsal?> GetVisibleForMemberAsync(
+        Guid id, Guid memberId, IReadOnlyCollection<Guid>? choirIds, CancellationToken cancellationToken) =>
         DbContext.Rehearsals
             .AsNoTracking()
             .Include(x => x.Location)
@@ -34,13 +37,20 @@ public class RehearsalRepository(HarmoniaDbContext dbContext)
             .Include(x => x.Attendances.Where(a => a.MemberId == memberId))
             .AsSplitQuery()
             .FirstOrDefaultAsync(
-                x => x.Id == id && (x.LiturgicalEvent == null || x.LiturgicalEvent.Status == EventStatus.Published),
+                x => x.Id == id
+                    && (x.LiturgicalEvent == null || x.LiturgicalEvent.Status == EventStatus.Published)
+                    && (choirIds == null || x.ChoirId == null || choirIds.Contains(x.ChoirId.Value)),
                 cancellationToken);
 
     public async Task<PagedList<Rehearsal>> SearchAsync(
-        SearchRehearsalsRequest filter, CancellationToken cancellationToken)
+        SearchRehearsalsRequest filter, IReadOnlyCollection<Guid>? choirIds, CancellationToken cancellationToken)
     {
         var query = DbContext.Rehearsals.AsNoTracking();
+
+        if (choirIds is not null)
+        {
+            query = query.Where(x => x.ChoirId == null || choirIds.Contains(x.ChoirId.Value));
+        }
 
         if (filter.EventId is { } eventId)
         {

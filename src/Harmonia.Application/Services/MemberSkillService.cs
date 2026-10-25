@@ -81,9 +81,9 @@ public class MemberSkillService(
     }
 
     public async Task<Result<PagedList<MemberSkillDetailDto>>> GetPendingAsync(
-        PagingRequest paging, CancellationToken cancellationToken)
+        Guid directorUserId, PagingRequest paging, CancellationToken cancellationToken)
     {
-        var page = await memberSkillRepository.GetPendingAsync(paging, cancellationToken);
+        var page = await memberSkillRepository.GetPendingAsync(directorUserId, paging, cancellationToken);
 
         return Result<PagedList<MemberSkillDetailDto>>.Success(new PagedList<MemberSkillDetailDto>(
             mapper.Map<List<MemberSkillDetailDto>>(page.Items), page.PageNumber, page.PageSize, page.TotalCount));
@@ -101,7 +101,12 @@ public class MemberSkillService(
         Guid directorUserId, Guid id, ApprovalStatus decision, string? rejectReason, CancellationToken cancellationToken)
     {
         var memberSkill = await memberSkillRepository.GetForReviewAsync(id, cancellationToken);
-        if (memberSkill is null) return Result<MemberSkillDetailDto>.Failure(ErrorCodes.MemberSkillNotFound);
+        if (memberSkill is null
+            || !await memberProfileRepository.IsManagedByDirectorAsync(memberSkill.MemberId, directorUserId, cancellationToken))
+        {
+            return Result<MemberSkillDetailDto>.Failure(ErrorCodes.MemberSkillNotFound);
+        }
+
         if (memberSkill.Status != ApprovalStatus.Pending)
         {
             return Result<MemberSkillDetailDto>.Failure(ErrorCodes.MemberSkillAlreadyReviewed);

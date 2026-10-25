@@ -21,6 +21,7 @@ public class PracticeAssignmentService(
     INotificationService notificationService,
     IFileStorageService fileStorageService,
     ISystemSettingService systemSettingService,
+    IChoirScopeService choirScope,
     IMapper mapper) : IPracticeAssignmentService
 {
     public const long MaxAudioSizeBytes = 20 * 1024 * 1024;
@@ -30,7 +31,8 @@ public class PracticeAssignmentService(
     public async Task<Result<PagedList<PracticeAssignmentDto>>> SearchAsync(
         SearchPracticeAssignmentsRequest request, CancellationToken cancellationToken)
     {
-        var page = await practiceAssignmentRepository.SearchAsync(request, cancellationToken);
+        var choirIds = await choirScope.GetDirectedChoirIdsAsync(cancellationToken);
+        var page = await practiceAssignmentRepository.SearchAsync(request, choirIds, cancellationToken);
 
         return Result<PagedList<PracticeAssignmentDto>>.Success(new PagedList<PracticeAssignmentDto>(
             mapper.Map<List<PracticeAssignmentDto>>(page.Items), page.PageNumber, page.PageSize, page.TotalCount));
@@ -45,9 +47,22 @@ public class PracticeAssignmentService(
             return Result<PracticeAssignmentDto>.Failure(referenceError);
         }
 
+        if (await choirScope.CheckChoirForNewRecordAsync(request.ChoirId, request.EventId, cancellationToken)
+            is { } choirError)
+        {
+            return Result<PracticeAssignmentDto>.Failure(choirError);
+        }
+
+        // Every scope stays inside the choir: All means the whole choir, targets must be its members.
+        var choirMemberIds = (await choirScope.GetChoirMemberIdsAsync(request.ChoirId, cancellationToken))!;
+        var choirMembers = await memberProfileRepository.ListAsync(
+            x => choirMemberIds.Contains(x.Id) && x.Status == MemberStatus.Active, cancellationToken);
+        var choirUserIds = choirMembers.Select(x => x.UserId).ToHashSet();
+
         var assignment = new PracticeAssignment
         {
             Id = Guid.NewGuid(),
+            ChoirId = request.ChoirId,
             EventId = request.EventId,
             SongId = request.SongId,
             MaterialId = request.MaterialId,
@@ -77,17 +92,18 @@ public class PracticeAssignmentService(
                 assignment.Targets = skillIds
                     .Select(id => new PracticeAssignmentTarget { Id = Guid.NewGuid(), TargetType = TargetType.Skill, SkillId = id })
                     .ToList();
-                recipientUserIds = await memberSkillRepository.GetActiveMemberUserIdsBySkillsAsync(skillIds, cancellationToken);
+                recipientUserIds = (await memberSkillRepository.GetActiveMemberUserIdsBySkillsAsync(skillIds, cancellationToken))
+                    .Where(choirUserIds.Contains)
+                    .ToList();
                 break;
             }
 
             case AssignmentScope.Individual:
             {
                 var memberIds = request.MemberIds!.Distinct().ToList();
-                var members = await memberProfileRepository.ListAsync(
-                    x => memberIds.Contains(x.Id) && x.Status == MemberStatus.Active, cancellationToken);
+                var members = choirMembers.Where(x => memberIds.Contains(x.Id)).ToList();
 
-                // An inactive or departed member counts as missing, same as an unknown id.
+                // An inactive or departed member, or one outside the choir, counts as missing, same as an unknown id.
                 if (members.Count != memberIds.Count)
                 {
                     return Result<PracticeAssignmentDto>.Failure(ErrorCodes.MemberNotFound);
@@ -101,11 +117,8 @@ public class PracticeAssignmentService(
             }
 
             default:
-            {
-                var members = await memberProfileRepository.ListAsync(x => x.Status == MemberStatus.Active, cancellationToken);
-                recipientUserIds = members.Select(x => x.UserId).ToList();
+                recipientUserIds = choirUserIds.ToList();
                 break;
-            }
         }
 
         await practiceAssignmentRepository.AddAsync(assignment, cancellationToken);

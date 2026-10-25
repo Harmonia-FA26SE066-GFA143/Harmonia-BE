@@ -27,7 +27,7 @@ public class SongPersonnelRequirementServiceTests
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<SongPersonnelRequirementProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
         _currentUser.RoleName.Returns(RoleNames.ChoirDirector);
-        _sut = new SongPersonnelRequirementService(_repository, _currentUser, mapper);
+        _sut = new SongPersonnelRequirementService(_repository, _currentUser, ChoirScopeFakes.Unrestricted(), mapper);
     }
 
     private SongListItem StubItem(

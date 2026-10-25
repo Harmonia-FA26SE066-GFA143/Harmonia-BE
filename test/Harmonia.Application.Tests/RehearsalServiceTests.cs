@@ -23,6 +23,8 @@ public class RehearsalServiceTests
     private readonly IGenericRepository<Song> _songs = Substitute.For<IGenericRepository<Song>>();
     private readonly IUserRepository _users = Substitute.For<IUserRepository>();
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
+    private readonly IMemberProfileRepository _members = Substitute.For<IMemberProfileRepository>();
+    private readonly IChoirScopeService _scope = ChoirScopeFakes.Unrestricted();
     private readonly RehearsalService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly List<Rehearsal> _added = [];
@@ -42,7 +44,7 @@ public class RehearsalServiceTests
                 },
                 NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new RehearsalService(_rehearsals, _events, _locations, _songs, _users, _notifications, mapper);
+        _sut = new RehearsalService(_rehearsals, _events, _locations, _songs, _users, _members, _scope, _notifications, mapper);
 
         _events.GetByIdAsync(_event.Id, _ct).Returns(_event);
         _locations.GetByIdAsync(_hall.Id, _ct).Returns(_hall);
@@ -215,6 +217,31 @@ public class RehearsalServiceTests
 
         Assert.Equal(ErrorCodes.RehearsalAlreadyPassed, (await _sut.UpdateAsync(rehearsal.Id, UpdateRequest(), _ct)).Code);
         await _rehearsals.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Update_RehearsalOfAnotherDirectorsChoir_ReturnsNotFound_Async()
+    {
+        var rehearsal = Existing(Start);
+        rehearsal.ChoirId = Guid.NewGuid();
+        _scope.CanManageChoirAsync(rehearsal.ChoirId, _ct).Returns(false);
+
+        var result = await _sut.UpdateAsync(rehearsal.Id, UpdateRequest(), _ct);
+
+        Assert.Equal(ErrorCodes.RehearsalNotFound, result.Code);
+        await _rehearsals.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Create_ChoirRejectedByScope_ReturnsItsCode_AndSavesNothing_Async()
+    {
+        var request = NewRequest();
+        _scope.CheckChoirForNewRecordAsync(request.ChoirId, request.EventId, _ct).Returns(ErrorCodes.ChoirNotServingEvent);
+
+        var result = await _sut.CreateAsync(request, _ct);
+
+        Assert.Equal(ErrorCodes.ChoirNotServingEvent, result.Code);
+        Assert.Empty(_added);
     }
 
     [Fact]

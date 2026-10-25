@@ -277,6 +277,7 @@ public class ValidatorTests
 
     private static CreatePracticeAssignmentRequest PracticeAssignment(AssignmentScope scope) => new()
     {
+        ChoirId = Guid.NewGuid(),
         Title = "Learn the entrance hymn",
         Scope = scope,
         DueDate = DateTime.UtcNow.AddDays(3),
@@ -666,10 +667,28 @@ public class ValidatorTests
 
     private static CreateRehearsalRequest NewRehearsal(params Guid[] songIds) => new()
     {
+        ChoirId = Guid.NewGuid(),
         StartTime = new DateTime(2026, 12, 1, 12, 0, 0, DateTimeKind.Utc),
         EndTime = new DateTime(2026, 12, 1, 14, 0, 0, DateTimeKind.Utc),
         Songs = songIds.Select(id => new UpdateRehearsalSongRequest { SongId = id }).ToList(),
     };
+
+    [Fact]
+    public void UpdateEventChoirs_LeadMustBeOneOfTheChoirs_AndEmptyListTakesNoLead()
+    {
+        var validator = new UpdateEventChoirsRequestValidator();
+        var a = Guid.NewGuid();
+        var b = Guid.NewGuid();
+
+        Assert.Empty(ErrorCodesOf(validator, new UpdateEventChoirsRequest { ChoirIds = [a, b], LeadChoirId = b }));
+        Assert.Empty(ErrorCodesOf(validator, new UpdateEventChoirsRequest { ChoirIds = [] }));
+        Assert.Equal([ErrorCodes.ChoirLeadInvalid],
+            ErrorCodesOf(validator, new UpdateEventChoirsRequest { ChoirIds = [a] }));
+        Assert.Equal([ErrorCodes.ChoirLeadInvalid],
+            ErrorCodesOf(validator, new UpdateEventChoirsRequest { ChoirIds = [a], LeadChoirId = Guid.NewGuid() }));
+        Assert.Equal([ErrorCodes.ChoirLeadInvalid],
+            ErrorCodesOf(validator, new UpdateEventChoirsRequest { ChoirIds = [], LeadChoirId = a }));
+    }
 
     [Fact]
     public void CreateRehearsal_ValidWithOrWithoutSongs_HasNoErrors()

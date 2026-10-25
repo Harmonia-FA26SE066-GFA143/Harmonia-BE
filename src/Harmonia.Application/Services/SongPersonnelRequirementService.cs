@@ -10,7 +10,10 @@ using Harmonia.Domain.Enums;
 namespace Harmonia.Application.Services;
 
 public class SongPersonnelRequirementService(
-    ISongListItemRepository songListItemRepository, ICurrentUserService currentUser, IMapper mapper) : ISongPersonnelRequirementService
+    ISongListItemRepository songListItemRepository,
+    ICurrentUserService currentUser,
+    IChoirScopeService choirScope,
+    IMapper mapper) : ISongPersonnelRequirementService
 {
     public async Task<Result<List<SongPersonnelRequirementDto>>> GetAsync(Guid songListItemId, CancellationToken cancellationToken)
     {
@@ -28,6 +31,10 @@ public class SongPersonnelRequirementService(
         if (item is null) return Result<List<SongPersonnelRequirementDto>>.Failure(ErrorCodes.SongListItemNotFound);
 
         var songList = item.SongList;
+        if (await choirScope.CheckCanLeadEventAsync(
+                songList.EventId, ErrorCodes.SongListItemNotFound, cancellationToken) is { } scopeError)
+            return Result<List<SongPersonnelRequirementDto>>.Failure(scopeError);
+
         if (!await songListItemRepository.IsLatestVersionAsync(songList.EventId, songList.Version, cancellationToken))
             return Result<List<SongPersonnelRequirementDto>>.Failure(ErrorCodes.SongListNotLatestVersion);
 

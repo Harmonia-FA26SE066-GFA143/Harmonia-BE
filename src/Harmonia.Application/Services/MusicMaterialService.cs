@@ -100,14 +100,15 @@ public class MusicMaterialService(
     }
 
     public async Task<Result<PagedList<MaterialLearningProgressDetailDto>>> GetLearningProgressAsync(
-        Guid materialId, SearchMaterialLearningProgressRequest request, CancellationToken cancellationToken)
+        Guid directorUserId, Guid materialId, SearchMaterialLearningProgressRequest request,
+        CancellationToken cancellationToken)
     {
         var material = await musicMaterialRepository.GetByIdAsync(materialId, cancellationToken);
         if (material is not { IsActive: true })
             return Result<PagedList<MaterialLearningProgressDetailDto>>.Failure(ErrorCodes.MaterialNotFound);
 
         var page = await memberProfileRepository.GetLearnersOfMaterialAsync(
-            material.Id, material.TargetSkillId, request, cancellationToken);
+            material.Id, material.TargetSkillId, directorUserId, request, cancellationToken);
         return Result<PagedList<MaterialLearningProgressDetailDto>>.Success(new PagedList<MaterialLearningProgressDetailDto>(
             mapper.Map<List<MaterialLearningProgressDetailDto>>(page.Items), page.PageNumber, page.PageSize, page.TotalCount));
     }

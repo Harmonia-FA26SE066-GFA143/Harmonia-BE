@@ -25,11 +25,12 @@ public interface IMusicMaterialService
         Guid userId, SearchMusicMaterialsRequest request, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Learning status of every active member expected to learn the material, for the Choir Director (UC-08 / FE-09).
-    /// Members who never marked it show as NotStarted.
+    /// Learning status of every active member expected to learn the material, for the Choir Director (UC-08 / FE-09),
+    /// limited to the members that director manages (D8). Members who never marked it show as NotStarted.
     /// </summary>
     Task<Result<PagedList<MaterialLearningProgressDetailDto>>> GetLearningProgressAsync(
-        Guid materialId, SearchMaterialLearningProgressRequest request, CancellationToken cancellationToken);
+        Guid directorUserId, Guid materialId, SearchMaterialLearningProgressRequest request,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Marks a material as learned or as needing practice for the calling member (UC-08 / FE-09).

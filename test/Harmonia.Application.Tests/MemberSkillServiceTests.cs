@@ -37,6 +37,7 @@ public class MemberSkillServiceTests
         _members.GetByUserIdAsync(_userId, _ct).Returns(_member);
         _memberSkills.GetSkillWithCategoryAsync(_tenor.Id, _ct).Returns(_tenor);
         _memberSkills.TryAddAsync(Arg.Any<MemberSkill>(), _ct).Returns(true);
+        _members.IsManagedByDirectorAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), _ct).Returns(true);
         _memberSkills.GetWithSkillAsync(Arg.Any<Guid>(), _ct).Returns(call => new MemberSkill
         {
             Id = call.Arg<Guid>(), MemberId = _member.Id, SkillId = _tenor.Id, Skill = _tenor,
@@ -281,6 +282,20 @@ public class MemberSkillServiceTests
         Assert.Equal(ErrorCodes.MemberSkillAlreadyReviewed, result.Code);
         await _memberSkills.DidNotReceive().TrySaveReviewAsync(Arg.Any<MemberSkill>(), _ct);
         await _notifications.DidNotReceive().SendAsync(Arg.Any<SendNotificationRequest>(), _ct);
+    }
+
+    [Fact]
+    public async Task Approve_MemberOfAnotherDirectorsChoir_ReturnsNotFound_AndSavesNothing_Async()
+    {
+        var row = StubForReview(ApprovalStatus.Pending);
+        var directorId = Guid.NewGuid();
+        _members.IsManagedByDirectorAsync(row.MemberId, directorId, _ct).Returns(false);
+
+        var result = await _sut.ApproveAsync(directorId, row.Id, _ct);
+
+        Assert.Equal(ErrorCodes.MemberSkillNotFound, result.Code);
+        Assert.Equal(ApprovalStatus.Pending, row.Status);
+        await _memberSkills.DidNotReceive().TrySaveReviewAsync(Arg.Any<MemberSkill>(), _ct);
     }
 
     [Fact]

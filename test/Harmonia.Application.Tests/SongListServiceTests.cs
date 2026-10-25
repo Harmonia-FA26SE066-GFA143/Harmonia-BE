@@ -44,7 +44,7 @@ public class SongListServiceTests
                 },
                 NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new SongListService(_songLists, _events, _songs, _slots, _users, _notifications, mapper);
+        _sut = new SongListService(_songLists, _events, _songs, _slots, _users, _notifications, ChoirScopeFakes.Unrestricted(), mapper);
 
         _event = new LiturgicalEvent { Id = _eventId, Status = EventStatus.Published };
         _events.GetByIdAsync(_eventId, _ct).Returns(_event);
@@ -161,6 +161,36 @@ public class SongListServiceTests
     }
 
     // ---- Create ----
+
+    [Fact]
+    public async Task Create_DirectorOfAServingChoirThatDoesNotLead_ReturnsNotLead_AndSavesNothing_Async()
+    {
+        var scope = ChoirScopeFakes.Unrestricted();
+        scope.CheckCanLeadEventAsync(_eventId, Arg.Any<string>(), _ct).Returns(ErrorCodes.ChoirNotLead);
+        var sut = new SongListService(
+            _songLists, _events, _songs, _slots, _users, _notifications, scope, Substitute.For<AutoMapper.IMapper>());
+
+        var result = await sut.CreateAsync(NewCreateRequest(), _directorId, _ct);
+
+        Assert.Equal(ErrorCodes.ChoirNotLead, result.Code);
+        await _songLists.DidNotReceive().AddAsync(Arg.Any<SongList>(), _ct);
+    }
+
+    [Fact]
+    public async Task Create_StoresTheLeadChoir_Async()
+    {
+        var leadChoirId = Guid.NewGuid();
+        var scope = ChoirScopeFakes.Unrestricted();
+        scope.GetLeadChoirIdAsync(_eventId, _ct).Returns(leadChoirId);
+        var sut = new SongListService(
+            _songLists, _events, _songs, _slots, _users, _notifications, scope, Substitute.For<AutoMapper.IMapper>());
+        SongList? added = null;
+        _songLists.AddAsync(Arg.Do<SongList>(s => added = s), _ct).Returns(Task.CompletedTask);
+
+        await sut.CreateAsync(NewCreateRequest(), _directorId, _ct);
+
+        Assert.Equal(leadChoirId, added!.ChoirId);
+    }
 
     [Fact]
     public async Task Create_FirstVersion_StoresDraftWithItems_Async()

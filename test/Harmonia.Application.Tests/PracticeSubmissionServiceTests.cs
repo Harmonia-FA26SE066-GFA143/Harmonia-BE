@@ -20,6 +20,7 @@ public class PracticeSubmissionServiceTests
     private readonly IFileStorageService _storage = Substitute.For<IFileStorageService>();
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
     private readonly IMemberProfileRepository _members = Substitute.For<IMemberProfileRepository>();
+    private readonly IChoirScopeService _scope = ChoirScopeFakes.Unrestricted();
     private readonly PracticeSubmissionService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
 
@@ -40,7 +41,7 @@ public class PracticeSubmissionServiceTests
                 },
                 NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new PracticeSubmissionService(_submissions, _assignments, _members, _notifications, _storage, mapper);
+        _sut = new PracticeSubmissionService(_submissions, _assignments, _members, _notifications, _storage, _scope, mapper);
         _storage.GetSignedUrl(Arg.Any<string>()).Returns(call => $"signed:{call.Arg<string>()}");
 
         _submission = new PracticeSubmission
@@ -71,7 +72,7 @@ public class PracticeSubmissionServiceTests
     {
         var request = new SearchPracticeSubmissionsRequest();
         _assignments.GetByIdAsync(_assignment.Id, _ct).Returns(_assignment);
-        _submissions.SearchAsync(_assignment.Id, request, _ct)
+        _submissions.SearchAsync(_assignment.Id, request, null, _ct)
             .Returns(new PagedList<PracticeSubmission>([_submission], 1, 20, 1));
 
         var result = await _sut.GetByAssignmentAsync(_assignment.Id, request, _ct);
@@ -86,14 +87,14 @@ public class PracticeSubmissionServiceTests
         var result = await _sut.GetByAssignmentAsync(Guid.NewGuid(), new SearchPracticeSubmissionsRequest(), _ct);
 
         Assert.Equal(ErrorCodes.PracticeAssignmentNotFound, result.Code);
-        await _submissions.DidNotReceiveWithAnyArgs().SearchAsync(default, default!, default);
+        await _submissions.DidNotReceiveWithAnyArgs().SearchAsync(default, default!, default, default);
     }
 
     [Fact]
     public async Task Search_SearchesEveryAssignment_Async()
     {
         var request = new SearchPracticeSubmissionsRequest { Status = SubmissionStatus.Submitted };
-        _submissions.SearchAsync(null, request, _ct)
+        _submissions.SearchAsync(null, request, null, _ct)
             .Returns(new PagedList<PracticeSubmission>([_submission], 1, 20, 1));
 
         var result = await _sut.SearchAsync(request, _ct);

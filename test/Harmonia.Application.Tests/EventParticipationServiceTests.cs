@@ -37,7 +37,7 @@ public class EventParticipationServiceTests
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<EventParticipationProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new EventParticipationService(_participations, _events, _members, _notifications, mapper);
+        _sut = new EventParticipationService(_participations, _events, _members, _notifications, ChoirScopeFakes.Unrestricted(), mapper);
 
         _events.GetByIdAsync(_event.Id, _ct).Returns(_event);
         _members.GetAllActiveWithUserAsync(_ct).Returns([_anna, _ben]);

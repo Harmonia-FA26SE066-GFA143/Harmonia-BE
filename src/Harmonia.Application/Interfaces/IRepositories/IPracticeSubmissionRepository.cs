@@ -18,10 +18,12 @@ public interface IPracticeSubmissionRepository : IGenericRepository<PracticeSubm
     /// with each Reviewer. Only each member's newest attempt per assignment
     /// unless <see cref="SearchPracticeSubmissionsRequest.AllAttempts"/> is set; the status filter applies after that.
     /// With <paramref name="assignmentId"/>: that assignment only, ordered by member name then newest attempt first.
-    /// Without it: every assignment, oldest submission first (the review queue).
+    /// Without it: every assignment, oldest submission first (the review queue). When <paramref name="choirIds"/> is
+    /// set, only submissions to assignments of those choirs or of no choir.
     /// </summary>
     Task<PagedList<PracticeSubmission>> SearchAsync(
-        Guid? assignmentId, SearchPracticeSubmissionsRequest filter, CancellationToken cancellationToken);
+        Guid? assignmentId, SearchPracticeSubmissionsRequest filter, IReadOnlyCollection<Guid>? choirIds,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Read-only page of every attempt of one member, newest submission first, optionally for one assignment.

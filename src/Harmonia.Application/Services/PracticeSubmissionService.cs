@@ -15,28 +15,36 @@ public class PracticeSubmissionService(
     IMemberProfileRepository memberProfileRepository,
     INotificationService notificationService,
     IFileStorageService fileStorageService,
+    IChoirScopeService choirScope,
     IMapper mapper) : IPracticeSubmissionService
 {
     public async Task<Result<PagedList<PracticeSubmissionDetailDto>>> GetByAssignmentAsync(
         Guid assignmentId, SearchPracticeSubmissionsRequest request, CancellationToken cancellationToken)
     {
-        if (await practiceAssignmentRepository.GetByIdAsync(assignmentId, cancellationToken) is null)
+        var assignment = await practiceAssignmentRepository.GetByIdAsync(assignmentId, cancellationToken);
+        if (assignment is null || !await choirScope.CanManageChoirAsync(assignment.ChoirId, cancellationToken))
             return Result<PagedList<PracticeSubmissionDetailDto>>.Failure(ErrorCodes.PracticeAssignmentNotFound);
 
-        var page = await practiceSubmissionRepository.SearchAsync(assignmentId, request, cancellationToken);
+        var page = await practiceSubmissionRepository.SearchAsync(assignmentId, request, null, cancellationToken);
         return Result<PagedList<PracticeSubmissionDetailDto>>.Success(ToDtoPage(page));
     }
 
     public async Task<Result<PagedList<PracticeSubmissionDetailDto>>> SearchAsync(
         SearchPracticeSubmissionsRequest request, CancellationToken cancellationToken)
     {
-        var page = await practiceSubmissionRepository.SearchAsync(null, request, cancellationToken);
+        var choirIds = await choirScope.GetDirectedChoirIdsAsync(cancellationToken);
+        var page = await practiceSubmissionRepository.SearchAsync(null, request, choirIds, cancellationToken);
         return Result<PagedList<PracticeSubmissionDetailDto>>.Success(ToDtoPage(page));
     }
 
     public async Task<Result<PracticeSubmissionDetailDto>> GetByIdAsync(Guid id, CancellationToken cancellationToken)
     {
         var submission = await practiceSubmissionRepository.GetWithMemberAsync(id, cancellationToken);
+        if (submission is not null
+            && !await choirScope.CanManageChoirAsync(submission.PracticeAssignment.ChoirId, cancellationToken))
+        {
+            submission = null;
+        }
 
         return submission is null
             ? Result<PracticeSubmissionDetailDto>.Failure(ErrorCodes.PracticeSubmissionNotFound)
@@ -47,7 +55,11 @@ public class PracticeSubmissionService(
         Guid directorUserId, Guid id, ReviewPracticeSubmissionRequest request, CancellationToken cancellationToken)
     {
         var submission = await practiceSubmissionRepository.GetForReviewAsync(id, cancellationToken);
-        if (submission is null) return Result<PracticeSubmissionReviewDto>.Failure(ErrorCodes.PracticeSubmissionNotFound);
+        if (submission is null
+            || !await choirScope.CanManageChoirAsync(submission.PracticeAssignment.ChoirId, cancellationToken))
+        {
+            return Result<PracticeSubmissionReviewDto>.Failure(ErrorCodes.PracticeSubmissionNotFound);
+        }
 
         if (!await practiceSubmissionRepository.IsLatestAttemptAsync(submission, cancellationToken))
             return Result<PracticeSubmissionReviewDto>.Failure(ErrorCodes.PracticeSubmissionSuperseded);
@@ -80,7 +92,11 @@ public class PracticeSubmissionService(
         Guid directorUserId, Guid id, AddPracticeFeedbackRequest request, CancellationToken cancellationToken)
     {
         var submission = await practiceSubmissionRepository.GetForReviewAsync(id, cancellationToken);
-        if (submission is null) return Result<PracticeSubmissionDetailDto>.Failure(ErrorCodes.PracticeSubmissionNotFound);
+        if (submission is null
+            || !await choirScope.CanManageChoirAsync(submission.PracticeAssignment.ChoirId, cancellationToken))
+        {
+            return Result<PracticeSubmissionDetailDto>.Failure(ErrorCodes.PracticeSubmissionNotFound);
+        }
 
         // The first review goes through ReviewAsync, which also enforces the newest-attempt rule.
         if (submission.Status is not (SubmissionStatus.Passed or SubmissionStatus.NeedsRevision))

@@ -26,7 +26,7 @@ public class EventPreparationServiceTests
 
     public EventPreparationServiceTests()
     {
-        _sut = new EventPreparationService(_events, _members, _rehearsals, _assignments, _roster);
+        _sut = new EventPreparationService(_events, _members, _rehearsals, _assignments, _roster, ChoirScopeFakes.Unrestricted());
 
         _alice = new MemberProfile { Id = Guid.NewGuid(), User = new User { FullName = "Alice" } };
         _bob = new MemberProfile

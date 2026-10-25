@@ -10,6 +10,11 @@ public class Choir : BaseAuditableEntity
 
     public bool IsActive { get; set; } = true;
 
+    /// <summary>The one Choir Director who manages this choir; null until the Admin assigns one.</summary>
+    public Guid? DirectorId { get; set; }
+
+    public User? Director { get; set; }
+
     public ICollection<ChoirMembership> Memberships { get; set; } = [];
 
     public ICollection<LiturgicalEventChoir> EventChoirs { get; set; } = [];

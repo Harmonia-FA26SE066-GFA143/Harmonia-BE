@@ -90,9 +90,12 @@ public class MemberProfileService(
             mapper.Map<List<MemberProfileSummaryDto>>(page.Items), page.PageNumber, page.PageSize, page.TotalCount));
     }
 
-    public async Task<Result<MemberProfileDto>> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<Result<MemberProfileDto>> GetByIdAsync(
+        Guid directorUserId, Guid id, CancellationToken cancellationToken)
     {
-        var profile = await memberProfileRepository.GetWithUserAsync(id, cancellationToken);
+        var profile = await memberProfileRepository.IsManagedByDirectorAsync(id, directorUserId, cancellationToken)
+            ? await memberProfileRepository.GetWithUserAsync(id, cancellationToken)
+            : null;
 
         return profile is null
             ? Result<MemberProfileDto>.Failure(ErrorCodes.MemberNotFound)
@@ -100,9 +103,11 @@ public class MemberProfileService(
     }
 
     public async Task<Result<MemberProfileDto>> UpdateAsync(
-        Guid id, UpdateMemberProfileRequest request, CancellationToken cancellationToken)
+        Guid directorUserId, Guid id, UpdateMemberProfileRequest request, CancellationToken cancellationToken)
     {
-        var profile = await memberProfileRepository.GetWithUserAsync(id, cancellationToken);
+        var profile = await memberProfileRepository.IsManagedByDirectorAsync(id, directorUserId, cancellationToken)
+            ? await memberProfileRepository.GetWithUserAsync(id, cancellationToken)
+            : null;
         if (profile is null)
         {
             return Result<MemberProfileDto>.Failure(ErrorCodes.MemberNotFound);

@@ -15,6 +15,7 @@ public class RosterService(
     ICurrentUserService currentUser,
     INotificationService notificationService,
     ISystemSettingService systemSettingService,
+    IChoirScopeService choirScope,
     IMapper mapper) : IRosterService
 {
     private sealed record Candidate(Guid MemberId, SkillLevel? Level, int RecentServiceCount);
@@ -32,6 +33,9 @@ public class RosterService(
     {
         var liturgicalEvent = await rosterRepository.GetEventWithRosterAsync(request.EventId, cancellationToken);
         if (liturgicalEvent is null) return Result<RosterSuggestionResponse>.Failure(ErrorCodes.LiturgicalEventNotFound);
+        if (await choirScope.CheckCanLeadEventAsync(liturgicalEvent.Id, ErrorCodes.LiturgicalEventNotFound, cancellationToken)
+            is { } scopeError)
+            return Result<RosterSuggestionResponse>.Failure(scopeError);
         if (EventNotEditableCode(liturgicalEvent) is { } eventError) return Result<RosterSuggestionResponse>.Failure(eventError);
 
         var songList = await rosterRepository.GetApprovedSongListAsync(request.EventId, cancellationToken);
@@ -106,7 +110,8 @@ public class RosterService(
     public async Task<Result<List<RosterShortageDto>>> GetShortagesAsync(Guid eventId, CancellationToken cancellationToken)
     {
         var liturgicalEvent = await rosterRepository.GetEventWithRosterAsync(eventId, cancellationToken);
-        if (liturgicalEvent is null) return Result<List<RosterShortageDto>>.Failure(ErrorCodes.LiturgicalEventNotFound);
+        if (liturgicalEvent is null || !await choirScope.CanViewEventAsync(eventId, cancellationToken))
+            return Result<List<RosterShortageDto>>.Failure(ErrorCodes.LiturgicalEventNotFound);
 
         var songList = await rosterRepository.GetApprovedSongListAsync(eventId, cancellationToken);
         if (songList is null) return Result<List<RosterShortageDto>>.Failure(ErrorCodes.RosterSongListNotApproved);
@@ -119,7 +124,8 @@ public class RosterService(
     public async Task<Result<ServiceRosterDto>> GetByEventAsync(Guid eventId, CancellationToken cancellationToken)
     {
         var liturgicalEvent = await rosterRepository.GetEventWithRosterAsync(eventId, cancellationToken);
-        if (liturgicalEvent is null) return Result<ServiceRosterDto>.Failure(ErrorCodes.LiturgicalEventNotFound);
+        if (liturgicalEvent is null || !await choirScope.CanViewEventAsync(eventId, cancellationToken))
+            return Result<ServiceRosterDto>.Failure(ErrorCodes.LiturgicalEventNotFound);
         if (liturgicalEvent.ServiceRoster is not { } roster) return Result<ServiceRosterDto>.Failure(ErrorCodes.RosterNotFound);
 
         var assignments = await rosterRepository.GetAssignmentsAsync(roster.Id, cancellationToken);
@@ -135,6 +141,9 @@ public class RosterService(
     {
         var roster = await rosterRepository.GetRosterWithEventAsync(rosterId, cancellationToken);
         if (roster is null) return Result<ServiceRosterDto>.Failure(ErrorCodes.RosterNotFound);
+        if (await choirScope.CheckCanLeadEventAsync(roster.EventId, ErrorCodes.RosterNotFound, cancellationToken)
+            is { } scopeError)
+            return Result<ServiceRosterDto>.Failure(scopeError);
         if (RosterNotEditableCode(roster) is { } rosterError) return Result<ServiceRosterDto>.Failure(rosterError);
 
         var songList = await rosterRepository.GetApprovedSongListAsync(roster.EventId, cancellationToken);
@@ -171,6 +180,9 @@ public class RosterService(
     {
         var roster = await rosterRepository.GetRosterForNotificationAsync(rosterId, cancellationToken);
         if (roster is null) return Result.Failure(ErrorCodes.RosterNotFound);
+        if (await choirScope.CheckCanLeadEventAsync(roster.EventId, ErrorCodes.RosterNotFound, cancellationToken)
+            is { } scopeError)
+            return Result.Failure(scopeError);
         if (EventNotEditableCode(roster.LiturgicalEvent) is { } eventError) return Result.Failure(eventError);
         if (roster.Status != RosterStatus.Finalized) return Result.Failure(ErrorCodes.RosterNotFinalized);
 
@@ -231,6 +243,9 @@ public class RosterService(
     {
         var liturgicalEvent = await rosterRepository.GetEventWithRosterAsync(request.EventId, cancellationToken);
         if (liturgicalEvent is null) return Result<RosterAssignmentDto>.Failure(ErrorCodes.LiturgicalEventNotFound);
+        if (await choirScope.CheckCanLeadEventAsync(liturgicalEvent.Id, ErrorCodes.LiturgicalEventNotFound, cancellationToken)
+            is { } scopeError)
+            return Result<RosterAssignmentDto>.Failure(scopeError);
         if (EventNotEditableCode(liturgicalEvent) is { } eventError) return Result<RosterAssignmentDto>.Failure(eventError);
 
         var roster = liturgicalEvent.ServiceRoster;
@@ -264,6 +279,9 @@ public class RosterService(
         var roster = await rosterRepository.GetRosterByAssignmentAsync(assignmentId, cancellationToken);
         var old = roster?.Assignments.FirstOrDefault(x => x.Id == assignmentId && x.Status == RosterAssignmentStatus.Active);
         if (roster is null || old is null) return Result<RosterAssignmentDto>.Failure(ErrorCodes.RosterAssignmentNotFound);
+        if (await choirScope.CheckCanLeadEventAsync(roster.EventId, ErrorCodes.RosterAssignmentNotFound, cancellationToken)
+            is { } scopeError)
+            return Result<RosterAssignmentDto>.Failure(scopeError);
         if (RosterNotEditableCode(roster) is { } rosterError) return Result<RosterAssignmentDto>.Failure(rosterError);
 
         var memberError = await MemberNotAssignableCodeAsync(
@@ -284,6 +302,9 @@ public class RosterService(
         var roster = await rosterRepository.GetRosterByAssignmentAsync(assignmentId, cancellationToken);
         var assignment = roster?.Assignments.FirstOrDefault(x => x.Id == assignmentId && x.Status == RosterAssignmentStatus.Active);
         if (roster is null || assignment is null) return Result.Failure(ErrorCodes.RosterAssignmentNotFound);
+        if (await choirScope.CheckCanLeadEventAsync(roster.EventId, ErrorCodes.RosterAssignmentNotFound, cancellationToken)
+            is { } scopeError)
+            return Result.Failure(scopeError);
         if (RosterNotEditableCode(roster) is { } rosterError) return Result.Failure(rosterError);
 
         // A line it replaced keeps its Replaced status; the FK clears its ReplacedByAssignmentId.
@@ -317,6 +338,11 @@ public class RosterService(
 
         var member = await rosterRepository.GetMemberForAssignmentAsync(memberId, skillId, eventId, cancellationToken);
         if (member is null) return ErrorCodes.MemberNotFound;
+
+        // Only members of the choirs serving the event can serve it (D8); others read as not found.
+        if (await choirScope.GetEventMemberIdsAsync(eventId, cancellationToken) is { } eventMemberIds
+            && !eventMemberIds.Contains(memberId))
+            return ErrorCodes.MemberNotFound;
         if (member.Status != MemberStatus.Active) return ErrorCodes.MemberNotActive;
         if (member.MemberSkills.Count == 0) return ErrorCodes.RosterAssignmentMemberSkillNotApproved;
         if (member.EventParticipations.Count == 0) return ErrorCodes.RosterAssignmentMemberNotConfirmed;
@@ -350,6 +376,8 @@ public class RosterService(
     {
         var skillIds = requirements.Select(x => x.Requirement.SkillId).Distinct().ToList();
         var candidateSkills = await rosterRepository.GetCandidateSkillsAsync(liturgicalEvent.Id, skillIds, cancellationToken);
+        if (await choirScope.GetEventMemberIdsAsync(liturgicalEvent.Id, cancellationToken) is { } eventMemberIds)
+            candidateSkills = candidateSkills.Where(x => eventMemberIds.Contains(x.MemberId)).ToList();
 
         var memberIds = candidateSkills.Select(x => x.MemberId).Distinct().ToList();
         var recentServiceDays = await systemSettingService.GetIntAsync(

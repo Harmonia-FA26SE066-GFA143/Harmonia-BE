@@ -51,7 +51,7 @@ Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 | cấu hình hệ thống | `SystemSetting` |
 | lịch sử hoạt động | `AuditLog` |
 
-**Nhiều ca đoàn (D7, chốt 2026-10-17):** ca viên gia nhập nhiều `Choir` qua `ChoirMembership`, sự kiện có nhiều `Choir` qua `LiturgicalEventChoir`. `ChoirDirector` quản lý mọi ca đoàn — không có ca trưởng riêng từng ca đoàn. Hiện mới có schema, service chưa lọc theo ca đoàn.
+**Nhiều ca đoàn (D7, chốt 2026-10-17):** ca viên gia nhập nhiều `Choir` qua `ChoirMembership`, sự kiện có nhiều `Choir` qua `LiturgicalEventChoir`. Mỗi `Choir` có **một** ca trưởng (`Choir.DirectorId`, Admin gán); một `ChoirDirector` phụ trách được nhiều ca đoàn và chỉ quản lý ca đoàn của mình — ca đoàn của người khác trả 404 (D8, chốt 2026-10-25). Sự kiện nhiều ca đoàn do **ca đoàn phụ trách** (`LiturgicalEventChoir.IsLead`, cha xứ chọn) lập danh sách bài, mời và phân công; ca đoàn phục vụ khác chỉ xem. Mọi service kiểm phạm vi qua `IChoirScopeService`; bản ghi chưa gắn ca đoàn thì ca trưởng nào cũng quản lý được.
 
 `LiturgicalEvent`, `MemberProfile`, `Song`, `Skill` là bốn hub — hầu hết entity khác
 móc vào chúng.

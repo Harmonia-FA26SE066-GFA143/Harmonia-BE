@@ -8,6 +8,7 @@ public class CreateRehearsalRequestValidator : AbstractValidator<CreateRehearsal
 {
     public CreateRehearsalRequestValidator()
     {
+        RuleFor(x => x.ChoirId).NotEmpty();
         RuleFor(x => x.StartTime).NotEmpty();
         RuleFor(x => x.EndTime).NotEmpty();
 

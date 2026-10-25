@@ -36,11 +36,16 @@ public class PracticeSubmissionRepository(HarmoniaDbContext dbContext)
     }
 
     public async Task<PagedList<PracticeSubmission>> SearchAsync(
-        Guid? assignmentId, SearchPracticeSubmissionsRequest filter, CancellationToken cancellationToken)
+        Guid? assignmentId, SearchPracticeSubmissionsRequest filter, IReadOnlyCollection<Guid>? choirIds,
+        CancellationToken cancellationToken)
     {
         var query = DbContext.PracticeSubmissions.AsNoTracking();
 
         if (assignmentId is { } id) query = query.Where(x => x.PracticeAssignmentId == id);
+
+        if (choirIds is not null)
+            query = query.Where(x => x.PracticeAssignment.ChoirId == null
+                || choirIds.Contains(x.PracticeAssignment.ChoirId.Value));
 
         if (!filter.AllAttempts)
         {

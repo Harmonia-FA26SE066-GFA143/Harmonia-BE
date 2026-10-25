@@ -110,6 +110,9 @@ namespace Harmonia.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<Guid?>("DirectorId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
@@ -125,6 +128,8 @@ namespace Harmonia.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("DirectorId");
 
                     b.HasIndex("Name")
                         .IsUnique();
@@ -1777,6 +1782,16 @@ namespace Harmonia.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Harmonia.Domain.Entities.Choir", b =>
+                {
+                    b.HasOne("Harmonia.Domain.Entities.User", "Director")
+                        .WithMany()
+                        .HasForeignKey("DirectorId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Director");
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.ChoirMembership", b =>

@@ -9,4 +9,8 @@ public class ChoirDto
     public string? Description { get; set; }
 
     public bool IsActive { get; set; }
+
+    public Guid? DirectorId { get; set; }
+
+    public string? DirectorFullName { get; set; }
 }

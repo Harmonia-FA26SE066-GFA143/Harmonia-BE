@@ -18,12 +18,14 @@ public class LiturgicalEventService(
     IUserRepository userRepository,
     INotificationService notificationService,
     ILookupService lookupService,
+    IChoirScopeService choirScope,
     IMapper mapper) : ILiturgicalEventService
 {
     public async Task<Result<PagedList<LiturgicalEventListItemDto>>> SearchAsync(
         SearchLiturgicalEventsRequest request, bool includeDrafts, CancellationToken cancellationToken)
     {
-        var page = await liturgicalEventRepository.SearchAsync(request, includeDrafts, cancellationToken);
+        var choirIds = await choirScope.GetDirectedChoirIdsAsync(cancellationToken);
+        var page = await liturgicalEventRepository.SearchAsync(request, includeDrafts, choirIds, cancellationToken);
 
         return Result<PagedList<LiturgicalEventListItemDto>>.Success(new PagedList<LiturgicalEventListItemDto>(
             mapper.Map<List<LiturgicalEventListItemDto>>(page.Items), page.PageNumber, page.PageSize, page.TotalCount));

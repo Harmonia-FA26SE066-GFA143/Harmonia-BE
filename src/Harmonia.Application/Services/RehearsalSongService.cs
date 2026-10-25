@@ -17,6 +17,7 @@ public class RehearsalSongService(
     IGenericRepository<Song> songRepository,
     ILiturgicalEventRepository liturgicalEventRepository,
     ISongListRepository songListRepository,
+    IChoirScopeService choirScope,
     IMapper mapper) : IRehearsalSongService
 {
     public async Task<Result<List<RehearsalSongDto>>> GetAsync(Guid rehearsalId, CancellationToken cancellationToken)
@@ -35,7 +36,10 @@ public class RehearsalSongService(
         Guid rehearsalId, UpdateRehearsalSongsRequest request, CancellationToken cancellationToken)
     {
         var rehearsal = await rehearsalRepository.GetWithSongsForUpdateAsync(rehearsalId, cancellationToken);
-        if (rehearsal is null) return Result<List<RehearsalSongDto>>.Failure(ErrorCodes.RehearsalNotFound);
+        if (rehearsal is null || !await choirScope.CanManageChoirAsync(rehearsal.ChoirId, cancellationToken))
+        {
+            return Result<List<RehearsalSongDto>>.Failure(ErrorCodes.RehearsalNotFound);
+        }
 
         var songIds = request.Items.Select(i => i.SongId).ToList();
         var songs = await songRepository.ListAsync(x => songIds.Contains(x.Id), cancellationToken);
@@ -78,7 +82,8 @@ public class RehearsalSongService(
     public async Task<Result<List<RehearsalSongDto>>> GetDefaultForEventAsync(
         Guid eventId, CancellationToken cancellationToken)
     {
-        if (await liturgicalEventRepository.GetByIdAsync(eventId, cancellationToken) is null)
+        if (await liturgicalEventRepository.GetByIdAsync(eventId, cancellationToken) is null
+            || !await choirScope.CanViewEventAsync(eventId, cancellationToken))
         {
             return Result<List<RehearsalSongDto>>.Failure(ErrorCodes.LiturgicalEventNotFound);
         }

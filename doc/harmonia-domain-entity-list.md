@@ -15,6 +15,7 @@ Conceptual/logical level: attribute names, types and constraints. No indexes, no
 | D5 | **Admin configures FE-49/FE-50 categories at runtime.** | 2026-09-20 | 9 lookup entities stay entities, not enums |
 | D6 | **Liturgical program is planned by day, not by week.** The liturgical day (celebration name, rank, season) comes from an external Catholic calendar API; the priest creates the Masses/events of each day himself; each event is published on its own. Admin still configures `LiturgicalSeason` (FE-50) — the API season only pre-fills the event's season. | 2026-09-30 | `LiturgicalWeek` removed, `LiturgicalDay` (API cache) added; publish moves to `LiturgicalEvent`; `DirectorNote.weekId` → `noteDate` |
 | D7 | **Several choirs.** A member can join several choirs and an event can be served by several choirs. The Choir Director manages every choir — no per-choir director. Schema only for now: services do not yet filter by choir. | 2026-10-17 | `Choir`, `ChoirMembership`, `LiturgicalEventChoir` added; `SongList`, `Rehearsal`, `PracticeAssignment` gain `choirId?` |
+| D8 | **One director per choir.** Each choir has one Choir Director, assigned by the Admin; a director may lead several choirs and manages only their own. An event served by several choirs is planned by its lead choir (`LiturgicalEventChoir.isLead`), chosen by the Parish Priest; directors of the other serving choirs only read it. Records with no choir (data from before D8) are open to every director. Supersedes the "manages every choir" part of D7. | 2026-10-25 | `Choir` gains `directorId?`; `LiturgicalEventChoir` gains `isLead` |
 
 ## Attribute conventions
 
@@ -47,7 +48,7 @@ Written once here instead of repeated 47 times:
 `userId` Guid → User · `tokenHash` string(500) unique · `expiresAt` DateTime (issued + 1 hour) · `usedAt` DateTime?
 
 **45. `Choir`** — one choir of the parish (D7) ***auditable***
-`name` string(100) unique · `description` string(500)? · `isActive` bool
+`name` string(100) unique · `description` string(500)? · `isActive` bool · `directorId` Guid? → User (D8)
 
 **46. `ChoirMembership`** — a member belongs to a choir (D7)
 `memberId` Guid → MemberProfile · `choirId` Guid → Choir · `joinedDate` DateOnly · `isActive` bool (false = left the choir) · unique `(memberId, choirId)`
@@ -74,7 +75,7 @@ Written once here instead of repeated 47 times:
 `eventDate` DateOnly · `liturgicalSeasonId` Guid? → LiturgicalSeason (pre-filled from `LiturgicalDay.seasonName`) · `time` TimeOnly · `massTypeId` Guid? → MassType · `ceremonyTypeId` Guid? → CeremonyType · `categoryId` Guid? → EventCategory · `locationId` Guid → WorshipLocation · `title` string(200)? · `specialRequirements` string(1000)? · `status` EventStatus · `publishedAt` DateTime? · unique `(eventDate, time, locationId)` (D3)
 
 **47. `LiturgicalEventChoir`** — a choir serving an event (D7)
-`eventId` Guid → LiturgicalEvent · `choirId` Guid → Choir · unique `(eventId, choirId)`
+`eventId` Guid → LiturgicalEvent · `choirId` Guid → Choir · `isLead` bool (D8, at most one per event) · unique `(eventId, choirId)`
 
 **10. `LiturgicalSeason`** — Advent, Lent, Ordinary Time… (FE-50)
 `name` string(100) · `startDate` DateOnly · `endDate` DateOnly · `colorHex` string(7)? · `isActive` bool

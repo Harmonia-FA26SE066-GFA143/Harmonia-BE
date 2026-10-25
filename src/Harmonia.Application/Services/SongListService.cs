@@ -21,6 +21,7 @@ public class SongListService(
     IGenericRepository<LiturgicalSlot> slotRepository,
     IUserRepository userRepository,
     INotificationService notificationService,
+    IChoirScopeService choirScope,
     IMapper mapper) : ISongListService
 {
     public async Task<Result<SongListDto>> GetApprovedForEventAsync(Guid eventId, CancellationToken cancellationToken)
@@ -42,7 +43,9 @@ public class SongListService(
     public async Task<Result<SongListDto>> GetLatestForEventAsync(
         Guid eventId, bool includeDraft, CancellationToken cancellationToken)
     {
-        var songList = await songListRepository.GetLatestWithDetailsAsync(eventId, includeDraft, cancellationToken);
+        var songList = await choirScope.CanViewEventAsync(eventId, cancellationToken)
+            ? await songListRepository.GetLatestWithDetailsAsync(eventId, includeDraft, cancellationToken)
+            : null;
 
         return songList is null
             ? Result<SongListDto>.Failure(ErrorCodes.SongListNotFound)
@@ -52,6 +55,10 @@ public class SongListService(
     public async Task<Result<SongListDto>> GetByIdAsync(Guid id, bool includeDraft, CancellationToken cancellationToken)
     {
         var songList = await songListRepository.GetByIdWithDetailsAsync(id, cancellationToken);
+        if (songList is not null && !await choirScope.CanViewEventAsync(songList.EventId, cancellationToken))
+        {
+            songList = null;
+        }
 
         return songList is null || (!includeDraft && songList.Status == SongListStatus.Draft)
             ? Result<SongListDto>.Failure(ErrorCodes.SongListNotFound)
@@ -72,6 +79,12 @@ public class SongListService(
         if (liturgicalEvent is null)
         {
             return Result<SongListDto>.Failure(ErrorCodes.LiturgicalEventNotFound);
+        }
+
+        if (await choirScope.CheckCanLeadEventAsync(
+                request.EventId, ErrorCodes.LiturgicalEventNotFound, cancellationToken) is { } scopeError)
+        {
+            return Result<SongListDto>.Failure(scopeError);
         }
 
         if (liturgicalEvent.Status == EventStatus.Cancelled)
@@ -110,6 +123,7 @@ public class SongListService(
         {
             Id = Guid.NewGuid(),
             EventId = request.EventId,
+            ChoirId = await choirScope.GetLeadChoirIdAsync(request.EventId, cancellationToken),
             Version = (latest?.Version ?? 0) + 1,
             Status = SongListStatus.Draft,
             ProposedBy = proposedBy,
@@ -139,6 +153,12 @@ public class SongListService(
         if (songList is null)
         {
             return Result<SongListDto>.Failure(ErrorCodes.SongListNotFound);
+        }
+
+        if (await choirScope.CheckCanLeadEventAsync(
+                songList.EventId, ErrorCodes.SongListNotFound, cancellationToken) is { } scopeError)
+        {
+            return Result<SongListDto>.Failure(scopeError);
         }
 
         var latest = await songListRepository.GetLatestVersionAsync(songList.EventId, cancellationToken);
@@ -184,6 +204,12 @@ public class SongListService(
         if (songList is null)
         {
             return Result<SongListDto>.Failure(ErrorCodes.SongListNotFound);
+        }
+
+        if (await choirScope.CheckCanLeadEventAsync(
+                songList.EventId, ErrorCodes.SongListNotFound, cancellationToken) is { } scopeError)
+        {
+            return Result<SongListDto>.Failure(scopeError);
         }
 
         var latest = await songListRepository.GetLatestVersionAsync(songList.EventId, cancellationToken);
