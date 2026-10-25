@@ -587,10 +587,10 @@ Gồm mọi trường của `LiturgicalEventDto`, thêm `liturgicalSeasonName`, 
 | GET | `/api/reports/service-history` | `ParishPriest`, `Admin` | `eventId`, `liturgicalSeasonId`, `fromDate`, `toDate`, `pageNumber`, `pageSize` | 200 `PagedList<ServiceHistoryDto>` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`) |
 | GET | `/api/reports/song-usage` | `ParishPriest`, `Admin` | như trên | 200 `PagedList<SongUsageDto>` | như trên |
 | GET | `/api/reports/user-activity` | `Admin` | `fromDate`, `toDate`, `pageNumber`, `pageSize` | 200 `PagedList<UserActivityDto>` | như trên |
-| GET | `/api/reports/rehearsal-attendance` | `Admin`, `ChoirDirector` | như `service-history` + `choirId` (chỉ giữ ca viên đang thuộc ca đoàn) | 200 `PagedList<RehearsalAttendanceReportDto>` | như trên |
-| GET | `/api/reports/participation` | `Admin`, `ChoirDirector` | như `rehearsal-attendance` | 200 `PagedList<ParticipationReportDto>` | như trên |
-| GET | `/api/reports/assignment-completion` | `Admin`, `ChoirDirector` | như `rehearsal-attendance` | 200 `PagedList<PracticeAssignmentCompletionDto>` | như trên |
-| GET | `/api/reports/export` | `Admin`, `ChoirDirector` | `type`, `format`, `eventId`, `liturgicalSeasonId`, `fromDate`, `toDate`, `choirId` | 200 file tải về | 400 `VALIDATION_FAILED` (`REPORT_TYPE_NOT_SUPPORTED`, `REPORT_DATE_RANGE_INVALID`) · 400 `REPORT_TYPE_NOT_SUPPORTED` khi `ChoirDirector` chọn `type` ngoài `RehearsalAttendance`, `Participation`, `AssignmentCompletion` · 404 `REPORT_NO_DATA` · 502 `EXTERNAL_STORAGE_FAILED` |
+| GET | `/api/reports/rehearsal-attendance` | `Admin`, `ChoirDirector` | như `service-history` + `choirId` (chỉ giữ ca viên đang thuộc ca đoàn) | 200 `PagedList<RehearsalAttendanceReportDto>` | như trên · 404 `CHOIR_NOT_FOUND` (ca trưởng lọc `choirId` không phải ca đoàn của mình) |
+| GET | `/api/reports/participation` | `Admin`, `ChoirDirector` | như `rehearsal-attendance` | 200 `PagedList<ParticipationReportDto>` | như `rehearsal-attendance` |
+| GET | `/api/reports/assignment-completion` | `Admin`, `ChoirDirector` | như `rehearsal-attendance` | 200 `PagedList<PracticeAssignmentCompletionDto>` | như `rehearsal-attendance` |
+| GET | `/api/reports/export` | `Admin`, `ChoirDirector` | `type`, `format`, `eventId`, `liturgicalSeasonId`, `fromDate`, `toDate`, `choirId` | 200 file tải về | 400 `VALIDATION_FAILED` (`REPORT_TYPE_NOT_SUPPORTED`, `REPORT_DATE_RANGE_INVALID`) · 400 `REPORT_TYPE_NOT_SUPPORTED` khi `ChoirDirector` chọn `type` ngoài `RehearsalAttendance`, `Participation`, `AssignmentCompletion` · 404 `REPORT_NO_DATA`, `CHOIR_NOT_FOUND` · 502 `EXTERNAL_STORAGE_FAILED` |
 | GET | `/api/reports/exports` | `Admin` | `pageNumber`, `pageSize` | 200 `PagedList<ReportExportDto>` | — |
 
 - `eventId` thu hẹp báo cáo về một sự kiện; `user-activity` bỏ qua tham số này.
@@ -1189,9 +1189,9 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 | GET | `/api/song-lists/event/{eventId}/latest` · `ChoirDirector`, `ParishPriest` | — | 200 `SongListDto` | 404 `SONG_LIST_NOT_FOUND` |
 | GET | `/api/song-lists/{id}` · `ChoirDirector`, `ParishPriest` | — | 200 `SongListDto` | 404 `SONG_LIST_NOT_FOUND` |
 | GET | `/api/song-lists/pending` · `ParishPriest` | — | 200 `SongListDto[]` | — |
-| POST | `/api/song-lists` · `ChoirDirector` | `CreateSongListRequest` | 200 `SongListDto` | 400 `VALIDATION_FAILED` (`SONG_LIST_EMPTY`, `SONG_LIST_SLOT_DUPLICATE`) · 404 `LITURGICAL_EVENT_NOT_FOUND`, `SONG_NOT_FOUND`, `SLOT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_NOT_PUBLISHED`, `SONG_LIST_EVENT_HAS_APPROVED_VERSION`, `SONG_LIST_CANNOT_BE_REVISED`, `SONG_INACTIVE`, `LOOKUP_INACTIVE` |
-| PUT | `/api/song-lists/{id}/items` · `ChoirDirector` | `UpdateSongListItemsRequest` | 200 `SongListDto` | 400 `VALIDATION_FAILED` (`SONG_LIST_EMPTY`, `SONG_LIST_SLOT_DUPLICATE`) · 404 `SONG_LIST_NOT_FOUND`, `SONG_NOT_FOUND`, `SLOT_NOT_FOUND` · 409 `SONG_LIST_NOT_LATEST_VERSION`, `SONG_LIST_NOT_EDITABLE`, `SONG_INACTIVE`, `LOOKUP_INACTIVE` |
-| POST | `/api/song-lists/{id}/submit` · `ChoirDirector` | — | 200 `SongListDto` | 400 `SONG_LIST_EMPTY` · 404 `SONG_LIST_NOT_FOUND` · 409 `SONG_LIST_NOT_LATEST_VERSION`, `SONG_LIST_ALREADY_SUBMITTED`, `SONG_LIST_NOT_EDITABLE` |
+| POST | `/api/song-lists` · `ChoirDirector` | `CreateSongListRequest` | 200 `SongListDto` | 400 `VALIDATION_FAILED` (`SONG_LIST_EMPTY`, `SONG_LIST_SLOT_DUPLICATE`) · 403 `CHOIR_NOT_LEAD` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `SONG_NOT_FOUND`, `SLOT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_NOT_PUBLISHED`, `SONG_LIST_EVENT_HAS_APPROVED_VERSION`, `SONG_LIST_CANNOT_BE_REVISED`, `SONG_INACTIVE`, `LOOKUP_INACTIVE` |
+| PUT | `/api/song-lists/{id}/items` · `ChoirDirector` | `UpdateSongListItemsRequest` | 200 `SongListDto` | 400 `VALIDATION_FAILED` (`SONG_LIST_EMPTY`, `SONG_LIST_SLOT_DUPLICATE`) · 403 `CHOIR_NOT_LEAD` · 404 `SONG_LIST_NOT_FOUND`, `SONG_NOT_FOUND`, `SLOT_NOT_FOUND` · 409 `SONG_LIST_NOT_LATEST_VERSION`, `SONG_LIST_NOT_EDITABLE`, `SONG_INACTIVE`, `LOOKUP_INACTIVE` |
+| POST | `/api/song-lists/{id}/submit` · `ChoirDirector` | — | 200 `SongListDto` | 400 `SONG_LIST_EMPTY` · 403 `CHOIR_NOT_LEAD` · 404 `SONG_LIST_NOT_FOUND` · 409 `SONG_LIST_NOT_LATEST_VERSION`, `SONG_LIST_ALREADY_SUBMITTED`, `SONG_LIST_NOT_EDITABLE` |
 | POST | `/api/song-lists/{id}/review` · `ParishPriest` | `ReviewSongListRequest` | 200 `SongListDto` | 400 `VALIDATION_FAILED` (`REVIEW_NOTES_REQUIRED`) · 404 `SONG_LIST_NOT_FOUND` · 409 `SONG_LIST_NOT_SUBMITTED` |
 
 **Vòng đời:** `Draft` → (`submit`) `Submitted` → (`review`) `Approved` | `Rejected` | `NeedsRevision`.
@@ -1235,7 +1235,7 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
 | GET | `/api/song-list-items/{id}/personnel-requirements` | — | 200 `SongPersonnelRequirementDto[]` | 404 `SONG_LIST_ITEM_NOT_FOUND` |
-| PUT | `/api/song-list-items/{id}/personnel-requirements` | `UpdateSongPersonnelRequirementsRequest` | 200 `SongPersonnelRequirementDto[]` | 400 `VALIDATION_FAILED` · 404 `SONG_LIST_ITEM_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE`, `SONG_LIST_NOT_LATEST_VERSION`, `ROSTER_ALREADY_FINALIZED` |
+| PUT | `/api/song-list-items/{id}/personnel-requirements` | `UpdateSongPersonnelRequirementsRequest` | 200 `SongPersonnelRequirementDto[]` | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `SONG_LIST_ITEM_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE`, `SONG_LIST_NOT_LATEST_VERSION`, `ROSTER_ALREADY_FINALIZED` |
 
 - `PUT` **thay cả bộ**: skill nào không gửi lên thì bị gỡ. Gửi `[]` để gỡ hết.
 - `requiredCount` từ 1 đến 50 (`errors.<field>` chứa `PERSONNEL_REQUIRED_COUNT_INVALID`); skill trùng trong
@@ -1274,14 +1274,14 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
-| POST | `/api/service-rosters/suggestions` | `{ "eventId": "guid" }` | 200 `RosterSuggestionResponse` | 400 `VALIDATION_FAILED` · 404 `LITURGICAL_EVENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_SONG_LIST_NOT_APPROVED`, `ROSTER_NO_PERSONNEL_REQUIREMENT`, `ROSTER_ALREADY_FINALIZED` |
+| POST | `/api/service-rosters/suggestions` | `{ "eventId": "guid" }` | 200 `RosterSuggestionResponse` | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `LITURGICAL_EVENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_SONG_LIST_NOT_APPROVED`, `ROSTER_NO_PERSONNEL_REQUIREMENT`, `ROSTER_ALREADY_FINALIZED` |
 | GET | `/api/service-rosters?eventId=` | — | 200 `ServiceRosterDto` (assignment `Active` + shortage; `shortages` rỗng nếu sự kiện không còn song list đã duyệt) | 404 `LITURGICAL_EVENT_NOT_FOUND`, `ROSTER_NOT_FOUND` (chưa có roster — gọi `suggestions` hoặc thêm tay) |
 | GET | `/api/service-rosters/shortages?eventId=` | — | 200 `RosterShortageDto[]` | 404 `LITURGICAL_EVENT_NOT_FOUND` · 409 `ROSTER_SONG_LIST_NOT_APPROVED` |
-| POST | `/api/service-rosters/assignments` | `{ "eventId", "songListItemId", "skillId", "memberId" }` | 200 `RosterAssignmentDto` | 400 `VALIDATION_FAILED` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `PERSONNEL_REQUIREMENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ROSTER_SONG_LIST_NOT_APPROVED`, `ROSTER_ASSIGNMENT_DUPLICATE`, `MEMBER_NOT_ACTIVE`, `ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED` |
-| POST | `/api/service-rosters/assignments/{id}/replacement` | `{ "memberId" }` | 200 `RosterAssignmentDto` (dòng mới) | 400 `VALIDATION_FAILED` · 404 `ROSTER_ASSIGNMENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ROSTER_ASSIGNMENT_DUPLICATE`, `MEMBER_NOT_ACTIVE`, `ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED` |
-| DELETE | `/api/service-rosters/assignments/{id}` | — | 204 | 404 `ROSTER_ASSIGNMENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED` |
-| POST | `/api/service-rosters/{id}/finalization` | — | 200 `ServiceRosterDto` | 404 `ROSTER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ROSTER_SONG_LIST_NOT_APPROVED`, `MEMBER_NOT_ACTIVE`, `ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED` |
-| POST | `/api/service-rosters/{id}/notifications` | `{ "memberIds": ["guid"] }` | 204 | 400 `VALIDATION_FAILED` · 404 `ROSTER_NOT_FOUND`, `ROSTER_ASSIGNMENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_NOT_FINALIZED` |
+| POST | `/api/service-rosters/assignments` | `{ "eventId", "songListItemId", "skillId", "memberId" }` | 200 `RosterAssignmentDto` | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `PERSONNEL_REQUIREMENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ROSTER_SONG_LIST_NOT_APPROVED`, `ROSTER_ASSIGNMENT_DUPLICATE`, `MEMBER_NOT_ACTIVE`, `ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED` |
+| POST | `/api/service-rosters/assignments/{id}/replacement` | `{ "memberId" }` | 200 `RosterAssignmentDto` (dòng mới) | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `ROSTER_ASSIGNMENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ROSTER_ASSIGNMENT_DUPLICATE`, `MEMBER_NOT_ACTIVE`, `ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED` |
+| DELETE | `/api/service-rosters/assignments/{id}` | — | 204 | 403 `CHOIR_NOT_LEAD` · 404 `ROSTER_ASSIGNMENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED` |
+| POST | `/api/service-rosters/{id}/finalization` | — | 200 `ServiceRosterDto` | 403 `CHOIR_NOT_LEAD` · 404 `ROSTER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ROSTER_SONG_LIST_NOT_APPROVED`, `MEMBER_NOT_ACTIVE`, `ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED` |
+| POST | `/api/service-rosters/{id}/notifications` | `{ "memberIds": ["guid"] }` | 204 | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `ROSTER_NOT_FOUND`, `ROSTER_ASSIGNMENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_NOT_FINALIZED` |
 
 `RosterAssignmentDto` = một phần tử của `assignments` ở trên. `RosterShortageDto` = một phần tử của `shortages`.
 `{id}` của `finalization` / `notifications` là `rosterId` (có trong `RosterSuggestionResponse` và `ServiceRosterDto.id`).
@@ -1365,6 +1365,7 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 ```json
 {
   "id": "guid",
+  "choirId": "guid | null",
   "eventId": "guid | null",
   "songId": "guid | null",
   "materialId": "guid | null",
@@ -1380,7 +1381,7 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 | Method | Path | Body | Thành công | Lỗi |
 |---|---|---|---|---|
 | GET | `/api/practice-assignments?eventId=&pageNumber=&pageSize=` | — | 200 `PagedList<PracticeAssignmentDto>` | — |
-| POST | `/api/practice-assignments` | `{ "choirId", "title", "instruction?", "scope", "dueDate", "eventId?", "songId?", "materialId?", "skillIds?", "memberIds?" }` | 200 `PracticeAssignmentDto` | 400 `VALIDATION_FAILED` (`PRACTICE_DUE_DATE_IN_PAST`, `PRACTICE_TARGET_REQUIRED`) · 404 `LITURGICAL_EVENT_NOT_FOUND`, `SONG_NOT_FOUND`, `MATERIAL_NOT_FOUND`, `SKILL_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `SONG_INACTIVE`, `SKILL_INACTIVE` |
+| POST | `/api/practice-assignments` | `{ "choirId", "title", "instruction?", "scope", "dueDate", "eventId?", "songId?", "materialId?", "skillIds?", "memberIds?" }` | 200 `PracticeAssignmentDto` | 400 `VALIDATION_FAILED` (`PRACTICE_DUE_DATE_IN_PAST`, `PRACTICE_TARGET_REQUIRED`) · 404 `LITURGICAL_EVENT_NOT_FOUND`, `SONG_NOT_FOUND`, `MATERIAL_NOT_FOUND`, `SKILL_NOT_FOUND`, `MEMBER_NOT_FOUND`, `CHOIR_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `CHOIR_INACTIVE`, `CHOIR_NOT_SERVING_EVENT`, `SONG_INACTIVE`, `SKILL_INACTIVE` |
 
 - `GET`: bài tập ca trưởng đã giao, tất cả hoặc của một sự kiện (`eventId`), hạn nộp muộn nhất trước.
   Tên bài hát / tư liệu lấy theo `songId` / `materialId`; bài nộp của từng bài tập xem ở `GET …/{id}/submissions`.
@@ -1593,7 +1594,7 @@ Lên lịch tập và điểm danh chỉ dành cho `ChoirDirector`. Danh sách b
 
 ```json
 {
-  "id": "guid", "eventId": "guid", "locationId": "guid", "locationName": "Nhà thờ chính",
+  "id": "guid", "choirId": "guid | null", "eventId": "guid", "locationId": "guid", "locationName": "Nhà thờ chính",
   "startTime": "2026-10-09T12:00:00Z", "endTime": "2026-10-09T13:30:00Z", "note": "tập bè",
   "songs": [{ "songId": "guid", "songTitle": "Kinh Hòa Bình", "displayOrder": 1, "note": "tập kỹ điệp khúc" }]
 }
@@ -1601,9 +1602,9 @@ Lên lịch tập và điểm danh chỉ dành cho `ChoirDirector`. Danh sách b
 
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
-| POST | `/api/rehearsals` · `ChoirDirector` | `{ "choirId", "eventId?", "locationId?", "startTime", "endTime", "note?", "songs": [{ "songId", "note" }] }` | 200 `RehearsalDto` | 400 `VALIDATION_FAILED` (`REHEARSAL_TIME_INVALID`, `REHEARSAL_SONG_DUPLICATE`) · 404 `LITURGICAL_EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND`, `SONG_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LOOKUP_INACTIVE`, `REHEARSAL_TIME_CONFLICT`, `SONG_INACTIVE` |
+| POST | `/api/rehearsals` · `ChoirDirector` | `{ "choirId", "eventId?", "locationId?", "startTime", "endTime", "note?", "songs": [{ "songId", "note" }] }` | 200 `RehearsalDto` | 400 `VALIDATION_FAILED` (`REHEARSAL_TIME_INVALID`, `REHEARSAL_SONG_DUPLICATE`) · 404 `LITURGICAL_EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND`, `SONG_NOT_FOUND`, `CHOIR_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `CHOIR_INACTIVE`, `CHOIR_NOT_SERVING_EVENT`, `LOOKUP_INACTIVE`, `REHEARSAL_TIME_CONFLICT`, `SONG_INACTIVE` |
 | GET | `/api/rehearsals?eventId=&fromDate=&toDate=&pageNumber=&pageSize=` · `ChoirDirector` | — | 200 `PagedList<RehearsalDto>` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`) |
-| PUT | `/api/rehearsals/{id}` · `ChoirDirector` | `{ "eventId?", "locationId?", "startTime", "endTime", "note?" }` | 200 `RehearsalDto` | 400 `VALIDATION_FAILED` (`REHEARSAL_TIME_INVALID`) · 404 `REHEARSAL_NOT_FOUND`, `LITURGICAL_EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND` · 409 `REHEARSAL_ALREADY_PASSED`, `LITURGICAL_EVENT_CANCELLED`, `LOOKUP_INACTIVE`, `REHEARSAL_TIME_CONFLICT` |
+| PUT | `/api/rehearsals/{id}` · `ChoirDirector` | `{ "eventId?", "locationId?", "startTime", "endTime", "note?" }` | 200 `RehearsalDto` | 400 `VALIDATION_FAILED` (`REHEARSAL_TIME_INVALID`) · 404 `REHEARSAL_NOT_FOUND`, `LITURGICAL_EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND` · 409 `REHEARSAL_ALREADY_PASSED`, `LITURGICAL_EVENT_CANCELLED`, `LOOKUP_INACTIVE`, `REHEARSAL_TIME_CONFLICT`, `CHOIR_INACTIVE`, `CHOIR_NOT_SERVING_EVENT` (đổi sự kiện) |
 | DELETE | `/api/rehearsals/{id}` · `ChoirDirector` | — | 204 | 404 `REHEARSAL_NOT_FOUND` · 409 `REHEARSAL_HAS_ATTENDANCE` |
 | GET | `/api/rehearsals/default-songs?eventId=` · `ChoirDirector` | — | 200 `RehearsalSongDto[]` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
 
@@ -1690,7 +1691,7 @@ sẽ trả (`LITURGICAL_EVENT_CANCELLED`, `MEMBER_NOT_ACTIVE`, `EVENT_PARTICIPAT
 
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
-| POST | `/api/event-participations` · `ChoirDirector` | `{ "eventId", "memberIds?": ["guid"] }` | 200 `EventParticipationDto[]` | 400 `VALIDATION_FAILED` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_NOT_PUBLISHED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `MEMBER_NOT_ACTIVE`, `EVENT_PARTICIPATION_ALREADY_REQUESTED` |
+| POST | `/api/event-participations` · `ChoirDirector` | `{ "eventId", "memberIds?": ["guid"] }` | 200 `EventParticipationDto[]` | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_NOT_PUBLISHED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `MEMBER_NOT_ACTIVE`, `EVENT_PARTICIPATION_ALREADY_REQUESTED` |
 | GET | `/api/event-participations?eventId=` · `ChoirDirector` | — | 200 `EventParticipationSummaryDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
 | GET | `/api/event-participations/mine` · `ChoirMember` | — | 200 `MyParticipationDto[]` | 404 `MEMBER_NOT_FOUND` |
 | PUT | `/api/event-participations/mine/{eventId}` · `ChoirMember` | `{ "status", "note?" }` | 200 `EventParticipationDto` | 400 `VALIDATION_FAILED` · 404 `MEMBER_NOT_FOUND` · 409 `MEMBER_NOT_ACTIVE`, `EVENT_PARTICIPATION_NOT_INVITED`, `LITURGICAL_EVENT_CANCELLED`, `EVENT_PARTICIPATION_ALREADY_RESPONDED`, `EVENT_PARTICIPATION_CLOSED` |
