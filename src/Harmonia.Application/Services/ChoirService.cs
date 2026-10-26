@@ -45,7 +45,7 @@ public class ChoirService(
     public async Task<Result<List<ChoirDto>>> GetAllAsync(CancellationToken cancellationToken)
     {
         var userId = currentUser.UserId;
-        var choirs = currentUser.RoleName == RoleNames.Admin
+        var choirs = currentUser.RoleName is RoleNames.Admin or RoleNames.ParishPriest
             ? await choirRepository.ListAsync(_ => true, cancellationToken)
             : await choirRepository.ListAsync(x => x.DirectorId == userId, cancellationToken);
 

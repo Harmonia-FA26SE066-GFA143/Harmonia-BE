@@ -97,10 +97,12 @@ public class UpcomingScheduleService(
     }
 
     public async Task<Result<List<RehearsalSummaryDto>>> GetUpcomingRehearsalsAsync(
-        Guid userId, CancellationToken cancellationToken)
+        Guid userId, GetScheduleRehearsalsRequest request, CancellationToken cancellationToken)
     {
-        var rehearsals = await rehearsalRepository.GetUpcomingAsync(
-            DateTime.UtcNow, await GetVisibleChoirIdsAsync(userId, cancellationToken), cancellationToken);
+        var choirIds = await GetVisibleChoirIdsAsync(userId, cancellationToken);
+        var rehearsals = request is { FromDate: { } fromDate, ToDate: { } toDate }
+            ? await rehearsalRepository.GetStartingBetweenAsync(fromDate, toDate, choirIds, cancellationToken)
+            : await rehearsalRepository.GetUpcomingAsync(DateTime.UtcNow, choirIds, cancellationToken);
 
         return Result<List<RehearsalSummaryDto>>.Success(mapper.Map<List<RehearsalSummaryDto>>(rehearsals));
     }

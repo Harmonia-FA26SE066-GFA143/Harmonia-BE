@@ -1,4 +1,5 @@
 using AutoMapper;
+using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IRepositories;
 using Harmonia.Application.Mappings;
 using Harmonia.Application.Services;
@@ -95,7 +96,7 @@ public class UpcomingScheduleServiceTests
         _rehearsals.GetUpcomingAsync(Arg.Do<DateTime>(fromTimes.Add), null, _ct).Returns([withLocation, withoutLocation]);
         var before = DateTime.UtcNow;
 
-        var result = await _sut.GetUpcomingRehearsalsAsync(Guid.NewGuid(), _ct);
+        var result = await _sut.GetUpcomingRehearsalsAsync(Guid.NewGuid(), new GetScheduleRehearsalsRequest(), _ct);
 
         Assert.InRange(Assert.Single(fromTimes), before, DateTime.UtcNow);
         Assert.True(result.IsSuccess);
@@ -105,6 +106,22 @@ public class UpcomingScheduleServiceTests
         Assert.Equal([gloria.Id, kyrie.Id], dto.Songs.Select(s => s.SongId));
         Assert.Null(result.Value[1].LocationName);
         Assert.Empty(result.Value[1].Songs);
+    }
+
+    [Fact]
+    public async Task GetUpcomingRehearsals_WithDateRange_AsksThatRangeInsteadOfUpcoming_Async()
+    {
+        var start = new DateTime(2026, 9, 1, 12, 0, 0, DateTimeKind.Utc);
+        var past = new Rehearsal { Id = Guid.NewGuid(), StartTime = start, EndTime = start.AddHours(1) };
+        var from = new DateOnly(2026, 9, 1);
+        var to = new DateOnly(2026, 9, 30);
+        _rehearsals.GetStartingBetweenAsync(from, to, null, _ct).Returns([past]);
+
+        var result = await _sut.GetUpcomingRehearsalsAsync(
+            Guid.NewGuid(), new GetScheduleRehearsalsRequest { FromDate = from, ToDate = to }, _ct);
+
+        Assert.Equal([past.Id], result.Value!.Select(r => r.Id));
+        await _rehearsals.DidNotReceive().GetUpcomingAsync(Arg.Any<DateTime>(), Arg.Any<IReadOnlyCollection<Guid>?>(), _ct);
     }
 
     // ---- Own sections for members ----

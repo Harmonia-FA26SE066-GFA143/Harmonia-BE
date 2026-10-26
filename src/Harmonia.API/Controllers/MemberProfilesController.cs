@@ -37,7 +37,7 @@ public class MemberProfilesController(IMemberProfileService memberProfileService
         ToActionResult(await memberProfileService.GetMyHistoryAsync(User.GetUserId(), request, cancellationToken));
 
     [HttpGet]
-    [Authorize(Roles = RoleNames.ChoirDirector)]
+    [Authorize(Roles = $"{RoleNames.ChoirDirector},{RoleNames.Admin}")]
     [ProducesResponseType<PagedList<MemberProfileSummaryDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> SearchAsync(
         [FromQuery] SearchMemberProfilesRequest request, CancellationToken cancellationToken) =>

@@ -8,10 +8,11 @@ namespace Harmonia.API.Controllers;
 
 /// <summary>
 /// Choirs of the parish and their members (D7). The Admin creates choirs and assigns their director;
-/// each Choir Director sees and manages the members of their own choirs.
+/// each Choir Director sees and manages the members of their own choirs. The Parish Priest reads the list to assign
+/// choirs to events.
 /// </summary>
 [Route("api/choirs")]
-[Authorize(Roles = $"{RoleNames.Admin},{RoleNames.ChoirDirector}")]
+[Authorize(Roles = $"{RoleNames.Admin},{RoleNames.ChoirDirector},{RoleNames.ParishPriest}")]
 public class ChoirsController(IChoirService choirService) : ApiControllerBase
 {
     [HttpPost]
@@ -34,17 +35,20 @@ public class ChoirsController(IChoirService choirService) : ApiControllerBase
         ToActionResult(await choirService.UpdateAsync(id, request, cancellationToken));
 
     [HttpGet("{id:guid}/members")]
+    [Authorize(Roles = $"{RoleNames.Admin},{RoleNames.ChoirDirector}")]
     [ProducesResponseType<List<ChoirMemberDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMembersAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await choirService.GetMembersAsync(id, cancellationToken));
 
     [HttpPost("{id:guid}/members")]
+    [Authorize(Roles = $"{RoleNames.Admin},{RoleNames.ChoirDirector}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> AddMembersAsync(
         Guid id, [FromBody] AddChoirMembersRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await choirService.AddMembersAsync(id, request, cancellationToken));
 
     [HttpDelete("{id:guid}/members/{memberId:guid}")]
+    [Authorize(Roles = $"{RoleNames.Admin},{RoleNames.ChoirDirector}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> RemoveMemberAsync(Guid id, Guid memberId, CancellationToken cancellationToken) =>
         ToActionResult(await choirService.RemoveMemberAsync(id, memberId, cancellationToken));

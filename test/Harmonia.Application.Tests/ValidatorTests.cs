@@ -635,6 +635,23 @@ public class ValidatorTests
     }
 
     [Fact]
+    public void GetScheduleRehearsals_NoneOrBothDates_AcceptsUpToMaxRange_RejectsTheRest()
+    {
+        var validator = new GetScheduleRehearsalsRequestValidator();
+        var from = new DateOnly(2026, 10, 1);
+        GetScheduleRehearsalsRequest Range(DateOnly? f, DateOnly? t) => new() { FromDate = f, ToDate = t };
+
+        Assert.Empty(ErrorCodesOf(validator, Range(null, null)));
+        Assert.Empty(ErrorCodesOf(validator, Range(from, from.AddDays(GetScheduleRehearsalsRequestValidator.MaxRangeDays - 1))));
+        Assert.Equal([ErrorCodes.ReportDateRangeInvalid], ErrorCodesOf(validator, Range(from, null)));
+        Assert.Equal([ErrorCodes.ReportDateRangeInvalid], ErrorCodesOf(validator, Range(null, from)));
+        Assert.Equal([ErrorCodes.ReportDateRangeInvalid], ErrorCodesOf(validator, Range(from, from.AddDays(-1))));
+        Assert.Equal(
+            [ErrorCodes.ReportDateRangeTooLarge],
+            ErrorCodesOf(validator, Range(from, from.AddDays(GetScheduleRehearsalsRequestValidator.MaxRangeDays))));
+    }
+
+    [Fact]
     public void ExportReport_KnownTypeAndFormat_HasNoErrors()
     {
         var request = new ExportReportRequest { Type = ReportType.SongUsage, Format = ReportFormat.Pdf };

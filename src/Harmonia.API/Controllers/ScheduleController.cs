@@ -25,8 +25,9 @@ public class ScheduleController(IUpcomingScheduleService upcomingScheduleService
 
     [HttpGet("rehearsals")]
     [ProducesResponseType<List<RehearsalSummaryDto>>(StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetUpcomingRehearsalsAsync(CancellationToken cancellationToken) =>
-        ToActionResult(await upcomingScheduleService.GetUpcomingRehearsalsAsync(User.GetUserId(), cancellationToken));
+    public async Task<IActionResult> GetUpcomingRehearsalsAsync(
+        [FromQuery] GetScheduleRehearsalsRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await upcomingScheduleService.GetUpcomingRehearsalsAsync(User.GetUserId(), request, cancellationToken));
 
     [HttpGet("rehearsals/{id:guid}")]
     [ProducesResponseType<MemberRehearsalDetailDto>(StatusCodes.Status200OK)]

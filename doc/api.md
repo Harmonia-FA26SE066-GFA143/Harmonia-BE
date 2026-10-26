@@ -265,7 +265,7 @@ hiển thị email thay tên. `phone` có thể `null`.
 
 ---
 
-## 4. Member profiles — `api/member-profiles` · của tôi: `ChoirMember` · quản lý: `ChoirDirector`
+## 4. Member profiles — `api/member-profiles` · của tôi: `ChoirMember` · quản lý: `ChoirDirector` · tìm kiếm: `ChoirDirector`, `Admin`
 
 ### `MemberProfileDto`
 
@@ -307,7 +307,7 @@ Chưa có kỹ năng nào → `[]`.
 |---|---|---|---|---|---|
 | GET | `/api/member-profiles/me` | `ChoirMember` | — | 200 `MemberProfileDetailDto` | 404 `MEMBER_NOT_FOUND` |
 | PUT | `/api/member-profiles/me` | `ChoirMember` | `{ "fullName", "phone", "dateOfBirth" }` | 200 `MemberProfileDto` | 400 `VALIDATION_FAILED` · 404 `MEMBER_NOT_FOUND` |
-| GET | `/api/member-profiles` | `ChoirDirector` | query `keyword`, `status`, `skillId`, `pageNumber`, `pageSize` | 200 `PagedList<MemberProfileSummaryDto>` | — |
+| GET | `/api/member-profiles` | `ChoirDirector`, `Admin` | query `keyword`, `status`, `skillId`, `pageNumber`, `pageSize` | 200 `PagedList<MemberProfileSummaryDto>` | — |
 | GET | `/api/member-profiles/{id}` | `ChoirDirector` | — | 200 `MemberProfileDto` | 404 `MEMBER_NOT_FOUND` |
 | PUT | `/api/member-profiles/{id}` | `ChoirDirector` | `{ "phone", "dateOfBirth", "joinedDate", "status" }` | 200 `MemberProfileDto` | 400 `VALIDATION_FAILED`, `MEMBER_JOINED_DATE_IN_FUTURE` · 404 `MEMBER_NOT_FOUND` |
 | GET | `/api/member-profiles/me/history` | `ChoirMember` | query `liturgicalSeasonId`, `fromDate`, `toDate`, `pageNumber`, `pageSize` | 200 `PagedList<ParticipationHistoryDto>` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`) · 404 `MEMBER_NOT_FOUND` |
@@ -463,7 +463,7 @@ Chưa có kỹ năng nào → `[]`.
 | PATCH | `/api/liturgical-events/{id}/cancel` | — | 200 `LiturgicalEventDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED` |
 | GET | `/api/schedule/events` · mọi role | — | 200 `LiturgicalEventSummaryDto[]` | — |
 | GET | `/api/schedule/events/{id}` · mọi role | — | 200 `MemberEventDetailDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
-| GET | `/api/schedule/rehearsals` · mọi role | — | 200 `RehearsalSummaryDto[]` | — |
+| GET | `/api/schedule/rehearsals` · mọi role | query `fromDate?`, `toDate?` | 200 `RehearsalSummaryDto[]` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`, `REPORT_DATE_RANGE_TOO_LARGE`) |
 | GET | `/api/schedule/rehearsals/{id}` · mọi role | — | 200 `MemberRehearsalDetailDto` | 404 `REHEARSAL_NOT_FOUND` |
 | GET | `/api/schedule/assignments` · `ChoirMember` | — | 200 `MyAssignedEventDto[]` | 404 `MEMBER_NOT_FOUND` |
 | GET | `/api/liturgical-events/{id}/preparation-progress` · `ChoirDirector` | — | 200 `EventPreparationProgressDto[]` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
@@ -532,7 +532,10 @@ Gồm mọi trường của `LiturgicalEventDto`, thêm `liturgicalSeasonName`, 
 **Lịch sắp tới (UC-04 / FE-05)**
 
 - `events`: sự kiện `Published` từ hôm nay trở đi, sắp theo ngày rồi giờ.
-- `rehearsals`: buổi tập **chưa kết thúc** tại thời điểm gọi (cả buổi đang diễn ra), sắp theo giờ bắt đầu. Chỉ buổi tập
+- `rehearsals`: không gửi ngày → buổi tập **chưa kết thúc** tại thời điểm gọi (cả buổi đang diễn ra). Gửi `fromDate` +
+  `toDate` (ngày giáo xứ, tính cả hai đầu, tối đa 93 ngày) → buổi tập **bắt đầu** trong khoảng đó, cả quá khứ lẫn tương lai;
+  gửi một trong hai hoặc `fromDate > toDate` → `REPORT_DATE_RANGE_INVALID`, quá 93 ngày → `REPORT_DATE_RANGE_TOO_LARGE`.
+  Sắp theo giờ bắt đầu; cùng luật lọc ca đoàn (D8) ở cả hai cách. Chỉ buổi tập
   thường (không gắn sự kiện) hoặc gắn sự kiện `Published`. `locationName`, `note` có thể `null`.
   `songs`: `RehearsalSongDto[]` (xem mục 7e) theo thứ tự hiển thị, `[]` khi ca trưởng chưa chọn bài.
 - `events/{id}` — `MemberEventDetailDto` = `{ id, eventDate, time, title, locationName, liturgicalSeasonName,
@@ -825,7 +828,7 @@ dữ liệu trong khoảng lọc vẫn hiện với các số bằng 0.
 
 ---
 
-## 4f. Choirs — `api/choirs` · tạo / sửa: `Admin` · xem, quản lý ca viên: `Admin`, `ChoirDirector` · ca đoàn phục vụ sự kiện `api/liturgical-events/{id}/choirs`: gán `ParishPriest`, xem `ParishPriest`, `ChoirDirector` (D7, D8)
+## 4f. Choirs — `api/choirs` · tạo / sửa: `Admin` · xem, quản lý ca viên: `Admin`, `ChoirDirector` · xem danh sách: `ParishPriest` · ca đoàn phục vụ sự kiện `api/liturgical-events/{id}/choirs`: gán `ParishPriest`, xem `ParishPriest`, `ChoirDirector` (D7, D8)
 
 Một giáo xứ có nhiều ca đoàn; ca viên gia nhập được nhiều ca đoàn, một sự kiện có nhiều ca đoàn phục vụ.
 Mỗi ca đoàn có **một** ca trưởng do Admin gán (`directorId`); một ca trưởng có thể phụ trách nhiều ca đoàn.
@@ -846,7 +849,7 @@ Admin thấy và quản lý mọi ca đoàn.
 | Method | Route | Role | Body / Query | Thành công | Lỗi |
 |---|---|---|---|---|---|
 | POST | `/api/choirs` | `Admin` | `{ "name", "description?", "directorId?" }` | 200 `ChoirDto` | 400 `VALIDATION_FAILED`, `CHOIR_DIRECTOR_INVALID` · 409 `CHOIR_NAME_ALREADY_EXISTS` |
-| GET | `/api/choirs` | `Admin`, `ChoirDirector` | — | 200 `ChoirDto[]` (sắp theo tên, gồm cả ca đoàn đã tắt; ca trưởng chỉ nhận ca đoàn của mình) | — |
+| GET | `/api/choirs` | `Admin`, `ChoirDirector`, `ParishPriest` | — | 200 `ChoirDto[]` (sắp theo tên, gồm cả ca đoàn đã tắt; ca trưởng chỉ nhận ca đoàn của mình, Admin và cha xứ nhận mọi ca đoàn) | — |
 | PUT | `/api/choirs/{id}` | `Admin` | `{ "name", "description?", "isActive", "directorId?" }` | 200 `ChoirDto` | 400 `VALIDATION_FAILED`, `CHOIR_DIRECTOR_INVALID` · 404 `CHOIR_NOT_FOUND` · 409 `CHOIR_NAME_ALREADY_EXISTS` |
 | GET | `/api/choirs/{id}/members` | `Admin`, `ChoirDirector` | — | 200 `ChoirMemberDto[]` (ca viên đang ở trong ca đoàn, sắp theo tên) | 404 `CHOIR_NOT_FOUND` |
 | POST | `/api/choirs/{id}/members` | `Admin`, `ChoirDirector` | `{ "memberIds": ["guid"] }` | 204 | 400 `VALIDATION_FAILED` (`CHOIR_MEMBER_INVALID`), `CHOIR_MEMBER_INVALID` · 404 `CHOIR_NOT_FOUND` · 409 `CHOIR_INACTIVE` |

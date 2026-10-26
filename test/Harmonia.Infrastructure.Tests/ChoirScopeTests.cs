@@ -196,6 +196,30 @@ public sealed class ChoirScopeTests : IDisposable
     }
 
     [Fact]
+    public async Task RehearsalStartingBetween_PastRange_KeepsOwnChoirAndParishDayBounds_Async()
+    {
+        var day = new DateOnly(2020, 3, 10);
+        Rehearsal New(Guid? choirId, DateTime start) => new()
+        {
+            Id = Guid.NewGuid(), ChoirId = choirId, StartTime = start, EndTime = start.AddHours(1),
+        };
+        var firstMinute = New(_mine.Id, VietnamTime.StartOfDayUtc(day));
+        var lastMinute = New(null, VietnamTime.StartOfDayUtc(day.AddDays(1)).AddMinutes(-1));
+        var theirs = New(_theirs.Id, VietnamTime.StartOfDayUtc(day).AddHours(2));
+        var nextDay = New(_mine.Id, VietnamTime.StartOfDayUtc(day.AddDays(1)));
+        await using (var seed = _db.NewContext())
+        {
+            seed.Rehearsals.AddRange(firstMinute, lastMinute, theirs, nextDay);
+            await seed.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var found = await new RehearsalRepository(context).GetStartingBetweenAsync(day, day, [_mine.Id], _ct);
+
+        Assert.Equal([firstMinute.Id, lastMinute.Id], found.Select(x => x.Id));
+    }
+
+    [Fact]
     public async Task PracticeAssignmentsForMember_ChoirAssignmentReachesOnlyItsMembers_Async()
     {
         PracticeAssignment New(Guid? choirId) => new()

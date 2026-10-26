@@ -19,6 +19,13 @@ public interface IRehearsalRepository : IGenericRepository<Rehearsal>
         DateTime fromTime, IReadOnlyCollection<Guid>? choirIds, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Same visibility as <see cref="GetUpcomingAsync"/>, but rehearsals starting between the parish dates
+    /// <paramref name="fromDate"/> and <paramref name="toDate"/> (inclusive), past ones included, earliest first.
+    /// </summary>
+    Task<List<Rehearsal>> GetStartingBetweenAsync(
+        DateOnly fromDate, DateOnly toDate, IReadOnlyCollection<Guid>? choirIds, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Read-only rehearsal that is standalone or belongs to a Published event, and belongs to one of
     /// <paramref name="choirIds"/> or to no choir when that is set; null otherwise. Location and Songs.Song
     /// are loaded; Attendances holds only the member's row.

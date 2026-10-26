@@ -237,6 +237,17 @@ public class ChoirServiceTests
     }
 
     [Fact]
+    public async Task GetAll_AsParishPriest_ReturnsEveryChoir_Async()
+    {
+        NewChoir("Theirs", directorId: NewDirector("Other").Id);
+        _currentUser.RoleName.Returns(RoleNames.ParishPriest);
+
+        var result = await _sut.GetAllAsync(_ct);
+
+        Assert.Equal(["Cecilia Choir", "Theirs"], result.Value!.Select(x => x.Name));
+    }
+
+    [Fact]
     public async Task GetMembers_ChoirOfAnotherDirector_ReturnsNotFound_Async()
     {
         _choir.DirectorId = NewDirector("Other").Id;

@@ -28,6 +28,25 @@ public class RehearsalRepository(HarmoniaDbContext dbContext)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
 
+    public Task<List<Rehearsal>> GetStartingBetweenAsync(
+        DateOnly fromDate, DateOnly toDate, IReadOnlyCollection<Guid>? choirIds, CancellationToken cancellationToken)
+    {
+        // Dates are parish dates; StartTime is stored in UTC.
+        var from = VietnamTime.StartOfDayUtc(fromDate);
+        var before = VietnamTime.StartOfDayUtc(toDate.AddDays(1));
+
+        return DbContext.Rehearsals
+            .AsNoTracking()
+            .Include(x => x.Location)
+            .Include(x => x.Songs).ThenInclude(s => s.Song)
+            .Where(x => x.StartTime >= from && x.StartTime < before)
+            .Where(x => choirIds == null || x.ChoirId == null || choirIds.Contains(x.ChoirId.Value))
+            .Where(x => x.LiturgicalEvent == null || x.LiturgicalEvent.Status == EventStatus.Published)
+            .OrderBy(x => x.StartTime)
+            .AsSplitQuery()
+            .ToListAsync(cancellationToken);
+    }
+
     public Task<Rehearsal?> GetVisibleForMemberAsync(
         Guid id, Guid memberId, IReadOnlyCollection<Guid>? choirIds, CancellationToken cancellationToken) =>
         DbContext.Rehearsals
