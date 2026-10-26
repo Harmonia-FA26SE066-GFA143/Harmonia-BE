@@ -16,7 +16,7 @@ public class SearchActivityTrendRequestValidator : AbstractValidator<SearchActiv
         RuleFor(x => x.ToDate)
             .NotNull()
             .Must((request, toDate) => request.FromDate is not { } from
-                || (from <= toDate && toDate!.Value.DayNumber - from.DayNumber < MaxDays))
+                || (from <= toDate && toDate.Value.DayNumber - from.DayNumber < MaxDays))
             .WithErrorCode(ErrorCodes.ReportDateRangeInvalid);
     }
 }

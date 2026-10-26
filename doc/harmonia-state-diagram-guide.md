@@ -22,7 +22,9 @@ Chỉ vẽ cho entity có trường trạng thái **và** có luật chuyển tr
 | `MaterialLearningProgress` | `LearningStatus` | Nhỏ | Ca viên tự đổi, không có guard |
 | `MemberProfile` | `MemberStatus` | Không | Ca trưởng đặt tự do qua `UpdateAsync`, không có luật chuyển |
 | `RehearsalAttendance` | `AttendanceStatus` | Không | Là giá trị điểm danh, không phải vòng đời |
-| `EventParticipation` | `ParticipationStatus` | Chưa | Enum có rồi nhưng chưa service nào đổi trạng thái — vẽ khi làm xong chức năng |
+| `EventParticipation` | `ParticipationStatus` | Có | Invited → Confirmed / Declined / Unsure, trả lời một lần, có guard (`EventParticipationService`) |
+| `Song` | `IsActive` (bool) | Nhỏ | Active → Inactive khi xoá, chặn nếu bài đã được dùng |
+| `MusicMaterial` | `IsActive` (bool) | Nhỏ | Active → Inactive khi xoá; thay file giữ nguyên Active |
 
 ## 2. Quy trình vẽ một sơ đồ
 
@@ -102,22 +104,31 @@ Không dùng hình thoi, hình chữ nhật góc vuông, hay swimlane — đó l
 ```mermaid
 stateDiagram-v2
     [*] --> Draft : create
+    [*] --> Draft : generate từ giờ lễ cố định
     Draft --> Draft : update
-    Draft --> Published : publish / báo ChoirDirector + ChoirMember
+    Draft --> Published : publish [chưa qua, có loại lễ, có mùa, danh mục còn hoạt động, chưa trùng giờ] / báo ca đoàn phục vụ
     Published --> Published : update
     Draft --> Cancelled : cancel [ngày lễ chưa qua]
-    Published --> Cancelled : cancel [ngày lễ chưa qua] / báo ChoirDirector + ChoirMember
+    Published --> Cancelled : cancel [ngày lễ chưa qua] / báo ca đoàn phục vụ
     Cancelled --> [*]
 
     note right of Draft : Chỉ ParishPriest thấy
-    note right of Published : Mọi role thấy. Mới được tạo SongList, ServiceRoster
+    note right of Published
+        Mọi role thấy. Mới được tạo SongList, ServiceRoster.
+        "Báo ca đoàn phục vụ" = ca viên và ca trưởng các ca đoàn gắn với sự kiện;
+        chưa gắn ca đoàn thì báo cả giáo xứ.
+    end note
 ```
 
 | Từ chối | Mã lỗi |
 |---|---|
 | publish khi đã Published | `LITURGICAL_EVENT_ALREADY_PUBLISHED` |
 | update / publish / cancel khi đã Cancelled | `LITURGICAL_EVENT_CANCELLED` |
-| cancel khi ngày lễ đã qua | `LITURGICAL_EVENT_ALREADY_PASSED` |
+| publish / cancel khi ngày lễ đã qua | `LITURGICAL_EVENT_ALREADY_PASSED` |
+| publish khi thiếu cả loại lễ lẫn nghi thức | `LITURGICAL_EVENT_TYPE_REQUIRED` |
+| publish khi chưa chọn mùa phụng vụ | `LITURGICAL_EVENT_SEASON_REQUIRED` |
+| publish khi danh mục đã tắt / ngày ngoài mùa (được sớm một ngày cho lễ vọng) | `LOOKUP_INACTIVE` / `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` |
+| publish khi trùng ngày + giờ + địa điểm | `LITURGICAL_EVENT_SLOT_TAKEN` |
 
 ### 5.2 `SongList` — `SongListService`
 
@@ -225,10 +236,48 @@ stateDiagram-v2
 | review / đổi kết quả lần nộp cũ | `PRACTICE_SUBMISSION_SUPERSEDED` |
 | addFeedback khi chưa được chấm | `PRACTICE_SUBMISSION_NOT_REVIEWED` |
 
-### 5.6 Các vòng đời nhỏ
+### 5.6 `EventParticipation` — `EventParticipationService`
 
 ```mermaid
 stateDiagram-v2
+    [*] --> Invited : request [sự kiện Published, chưa huỷ, chưa qua; ca viên đang hoạt động, chưa được mời] / báo ca viên
+    Invited --> Confirmed : respond [ca viên đang hoạt động, sự kiện chưa bắt đầu]
+    Invited --> Declined : respond [như trên]
+    Invited --> Unsure : respond [như trên]
+    Confirmed --> [*]
+    Declined --> [*]
+    Unsure --> [*]
+
+    note right of Invited
+        Ca trưởng ca đoàn phụ trách mời (D8); chỉ mời được ca viên của các ca đoàn phục vụ.
+        Mỗi ca viên một lần mời, không gửi lại. Trả lời là cuối cùng, không đổi được.
+    end note
+```
+
+| Từ chối | Mã lỗi |
+|---|---|
+| mời ca viên đã được mời cho sự kiện này | `EVENT_PARTICIPATION_ALREADY_REQUESTED` |
+| mời khi sự kiện chưa Published / đã huỷ / đã qua | `LITURGICAL_EVENT_NOT_PUBLISHED` / `LITURGICAL_EVENT_CANCELLED` / `LITURGICAL_EVENT_ALREADY_PASSED` |
+| ca trưởng ca đoàn không phụ trách mời | `CHOIR_NOT_LEAD` (403) |
+| trả lời khi đã trả lời | `EVENT_PARTICIPATION_ALREADY_RESPONDED` |
+| trả lời khi sự kiện đã bắt đầu | `EVENT_PARTICIPATION_CLOSED` |
+| trả lời khi ca viên không còn hoạt động / chưa được mời | `MEMBER_NOT_ACTIVE` / `EVENT_PARTICIPATION_NOT_INVITED` |
+
+### 5.7 Các vòng đời nhỏ
+
+```mermaid
+stateDiagram-v2
+    state "Song (IsActive)" as SG {
+        [*] --> Active : ca trưởng tạo
+        Active --> Inactive : xoá [chưa nằm trong SongList, RehearsalSong, PracticeAssignment nào]
+        Inactive --> [*]
+    }
+    state "MusicMaterial (IsActive)" as MM {
+        [*] --> Active : upload
+        Active --> Active : thay file [đúng loại, ≤ 20 MB] / giữ tiến độ học, trừ khi resetProgress
+        Active --> Inactive : xoá
+        Inactive --> [*]
+    }
     state "User (IsActive)" as U {
         [*] --> Active : Admin tạo
         Active --> Inactive : deactivate [không phải chính mình, không phải Admin cuối] / thu hồi mọi RefreshToken
@@ -242,6 +291,11 @@ stateDiagram-v2
         Learned --> NeedsPractice : ca viên đánh dấu
     }
 ```
+
+| Từ chối | Mã lỗi |
+|---|---|
+| xoá bài hát đã được dùng | `SONG_IN_USE` |
+| thay file sai đuôi / quá dung lượng / tài liệu đã xoá | `MATERIAL_FILE_TYPE_NOT_ALLOWED` / `MATERIAL_FILE_TOO_LARGE` / `MATERIAL_NOT_FOUND` |
 
 ## 6. Quan hệ giữa các sơ đồ
 
@@ -263,6 +317,8 @@ flowchart LR
   thì nhận cả `Unsure` — phản hồi là cuối cùng, ca trưởng xếp họ vào chỗ ít quan trọng
   (chốt 2026-10-16). Gợi ý tự động (UC-25) vẫn chỉ lấy `Confirmed`.
 - `LiturgicalEvent` sang `Cancelled` thì khoá toàn bộ nhánh bên phải.
+- Sự kiện nhiều ca đoàn: chỉ ca trưởng của ca đoàn phụ trách được đổi trạng thái `SongList`, `ServiceRoster` và gửi
+  lời mời `EventParticipation`; ca đoàn phục vụ khác chỉ xem (`403 CHOIR_NOT_LEAD`) (D8).
 
 ## 7. Checklist trước khi nộp sơ đồ
 
@@ -273,3 +329,17 @@ flowchart LR
 - [ ] State kết thúc không có mũi tên đi ra.
 - [ ] Không dùng tên cấm: `ChoirLeader`, `Event`, `Season`, `Assignment`, `Attendance`, `Feedback` trần.
 - [ ] Code đổi luật chuyển trạng thái thì sửa sơ đồ trong cùng PR.
+
+## Lịch sử sửa
+
+**2026-10-26** — đối chiếu `main@718696c` (D8 và đợt backlog Web), so với bản trước:
+
+- **Thêm** mục 5.6 `EventParticipation` (sơ đồ + bảng 6 lỗi); bảng mục 1 đổi `EventParticipation` từ "Chưa" sang "Có".
+- **Thêm** vào vòng đời nhỏ (nay là 5.7): `Song (IsActive)` chặn xoá bài đã dùng, `MusicMaterial (IsActive)` có tự
+  chuyển "thay file"; kèm bảng lỗi. Bảng mục 1 thêm hai dòng `Song`, `MusicMaterial`.
+- **Sửa** 5.1 `LiturgicalEvent`: thêm `[*] --> Draft : generate`; guard đầy đủ của publish; nhãn thông báo
+  "báo ChoirDirector + ChoirMember" → "báo ca đoàn phục vụ" (chưa gắn ca đoàn thì cả giáo xứ); bảng lỗi thêm 4 dòng
+  (`TYPE_REQUIRED`, `SEASON_REQUIRED`, `LOOKUP_INACTIVE` / ngoài mùa, `SLOT_TAKEN`), dòng `ALREADY_PASSED` áp cả publish.
+- **Sửa** mục 6: thêm ghi chú quyền ca đoàn phụ trách (D8).
+- **Sửa** số mục: "5.6 Các vòng đời nhỏ" → 5.7.
+- **Xoá** dòng "`EventParticipation` … Chưa — vẽ khi làm xong chức năng" ở bảng mục 1 (thay bằng dòng "Có").

@@ -22,14 +22,16 @@ VS Code hoặc dán vào <https://mermaid.live> để xem hình.
 
 ## 2. Chọn khái niệm nào đưa vào
 
-Từ 48 entity, lọc theo ba luật:
+Từ 50 entity, lọc theo ba luật:
 
 1. **Bỏ entity kỹ thuật** — người dùng nghiệp vụ không gọi tên chúng:
    `RefreshToken`, `PasswordResetToken`, `AuditLog`, `SystemSetting`, `ReportExport`,
-   `NotificationRecipient`, `LiturgicalDay` (chỉ là cache của API lịch).
+   `NotificationRecipient`, `LiturgicalDay` (chỉ là cache của API lịch), `LiturgicalNameTranslation`
+   (bản dịch tên lễ của cache đó).
 2. **Gộp entity trung gian thành quan hệ n–n** khi nó không mang dữ liệu nghiệp vụ riêng:
    `SongClassification`, `SongVocalRequirement`, `SongInstrumentRequirement`,
-   `PracticeAssignmentTarget`, `RehearsalSong`, `LiturgicalEventChoir` (thành `LiturgicalEvent` n–n `Choir`).
+   `PracticeAssignmentTarget`, `RehearsalSong`, `PracticeAssignmentMaterial` (thành `PracticeAssignment` n–n
+   `MusicMaterial`), `LiturgicalEventChoir` (thành `LiturgicalEvent` n–n `Choir`, kèm ghi chú "một ca đoàn phụ trách").
 3. **Giữ entity trung gian** khi người dùng thao tác trực tiếp trên nó hoặc nó có trạng thái:
    `MemberSkill` (được duyệt), `EventParticipation` (được xác nhận), `RosterAssignment`
    (được thay), `SongListItem`, `SongPersonnelRequirement`, `RehearsalAttendance`,
@@ -51,9 +53,11 @@ Kết quả cho Harmonia:
 35 khái niệm là quá nhiều cho một trang. Vẽ **một sơ đồ tổng** khoảng 15 ô (mục 4.1) và
 **sơ đồ chi tiết theo nhóm** (mục 4.2) cho những nhóm cần giải thích.
 
-Có ô `Choir` (D7): giáo xứ có nhiều ca đoàn, ca viên gia nhập nhiều ca đoàn qua
-`ChoirMembership`, một sự kiện có nhiều ca đoàn phục vụ. Một `ChoirDirector` quản lý mọi ca
-đoàn — không vẽ quan hệ "ca trưởng của" giữa `User` và `Choir`. `MassSchedule` chỉ là khuôn
+Có ô `Choir` (D7, D8): giáo xứ có nhiều ca đoàn, ca viên gia nhập nhiều ca đoàn qua
+`ChoirMembership`, một sự kiện có nhiều ca đoàn phục vụ. Mỗi ca đoàn có **một** ca trưởng do Admin gán, một ca
+trưởng phụ trách được nhiều ca đoàn — vẽ `User "0..1" -- "*" Choir : phụ trách`. Sự kiện nhiều ca đoàn có
+**một ca đoàn phụ trách** (cha xứ chọn) lập danh sách bài, mời và phân công; các ca đoàn khác chỉ xem.
+`MassSchedule` chỉ là khuôn
 mẫu giờ lễ để sinh sự kiện nháp, không nối tới `LiturgicalEvent`. Không có ô `Instrumentalist` — nhạc công
 là `MemberProfile` có `MemberSkill` thuộc `SkillCategory` nhạc cụ.
 
@@ -104,8 +108,8 @@ sai nghiệp vụ thì bội số sai.
    có một đường nối.
 7. Vẽ đường nối theo bảng ở bước 2, đánh dấu dòng đã vẽ.
 8. Ghi bội số hai đầu, rồi ghi tên quan hệ.
-9. Thêm ghi chú cho những điểm người đọc hay hỏi: nhiều ca đoàn nhưng một ca trưởng chung (D7),
-   không có role nhạc công, `SongList` mỗi phiên bản một dòng.
+9. Thêm ghi chú cho những điểm người đọc hay hỏi: mỗi ca đoàn một ca trưởng, sự kiện nhiều ca đoàn có một
+   **ca đoàn phụ trách** (D8), không có role nhạc công, `SongList` mỗi phiên bản một dòng.
 
 ### Bố cục
 
@@ -147,8 +151,9 @@ classDiagram
     User "1" -- "0..1" MemberProfile : có hồ sơ
     MemberProfile "1" -- "*" MemberSkill : khai báo
     Skill "1" -- "*" MemberSkill : được khai
+    User "0..1" -- "*" Choir : phụ trách
     MemberProfile "*" -- "*" Choir : gia nhập
-    LiturgicalEvent "*" -- "*" Choir : được phục vụ bởi
+    LiturgicalEvent "*" -- "*" Choir : được phục vụ bởi (một ca đoàn phụ trách)
     WorshipLocation "1" -- "*" LiturgicalEvent : diễn ra tại
     LiturgicalEvent "1" -- "*" SongList : có các phiên bản
     SongList "1" -- "*" SongListItem : gồm
@@ -163,6 +168,7 @@ classDiagram
     Skill "1" -- "*" RosterAssignment : đảm nhận
     LiturgicalEvent "0..1" -- "*" Rehearsal : chuẩn bị bằng
     LiturgicalEvent "0..1" -- "*" PracticeAssignment : giao cho
+    PracticeAssignment "*" -- "*" MusicMaterial : kèm tư liệu
     PracticeAssignment "1" -- "*" PracticeSubmission : nhận
     MemberProfile "1" -- "*" PracticeSubmission : nộp
 ```
@@ -235,3 +241,16 @@ từ mục "Relationships for the ERD" của `doc/harmonia-domain-entity-list.md
 - [ ] Bốn hub nằm giữa, danh mục nằm ngoài rìa, không đường nào cắt nhau.
 - [ ] Sơ đồ tổng không quá 20 ô; phần còn lại nằm ở sơ đồ chi tiết.
 - [ ] Đổi entity hoặc quan hệ trong `harmonia-domain-entity-list.md` thì sửa sơ đồ trong cùng PR.
+
+## Lịch sử sửa
+
+**2026-10-26** — đối chiếu `main@718696c` (D8 và đợt backlog Web), so với bản trước:
+
+- **Sửa** đoạn giới thiệu ô `Choir` ở mục 2: bỏ "một `ChoirDirector` quản lý mọi ca đoàn — không vẽ quan hệ ca trưởng";
+  thay bằng mỗi ca đoàn một ca trưởng, một ca trưởng nhiều ca đoàn, sự kiện nhiều ca đoàn có ca đoàn phụ trách (D8).
+- **Sửa** bước 9 mục 3: ghi chú "một ca trưởng chung (D7)" → "mỗi ca đoàn một ca trưởng, có ca đoàn phụ trách (D8)".
+- **Sửa** mục 2: "48 entity" → 50; luật 1 thêm `LiturgicalNameTranslation`; luật 2 thêm `PracticeAssignmentMaterial`
+  và ghi chú "một ca đoàn phụ trách" cho `LiturgicalEventChoir`.
+- **Thêm** vào sơ đồ tổng 4.1: `User "0..1" -- "*" Choir : phụ trách` và
+  `PracticeAssignment "*" -- "*" MusicMaterial : kèm tư liệu`; nhãn `LiturgicalEvent -- Choir` thêm "(một ca đoàn phụ trách)".
+- **Xoá** không có. Số khái niệm giữ lại vẫn 35 (hai entity mới đều bị lọc theo luật 1 và 2).

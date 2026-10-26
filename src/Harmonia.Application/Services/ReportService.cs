@@ -185,8 +185,9 @@ public class ReportService(
         if (scopeError is not null) return Result<List<ActivityTrendDto>>.Failure(scopeError);
 
         var members = new List<MemberProfile>();
-        for (filter.PageNumber = 1; ; filter.PageNumber++)
+        for (var pageNumber = 1; ; pageNumber++)
         {
+            filter.PageNumber = pageNumber;
             var page = await memberProfileRepository.GetActiveWithActivityAsync(filter, directorUserId, cancellationToken);
             members.AddRange(page.Items);
             if (page.Items.Count == 0 || members.Count >= page.TotalCount) break;

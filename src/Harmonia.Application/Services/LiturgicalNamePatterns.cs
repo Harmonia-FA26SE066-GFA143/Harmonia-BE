@@ -36,19 +36,22 @@ public static partial class LiturgicalNamePatterns
 
     private const string DayName = "(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)";
 
+    // Names come from an external calendar API, so a match must not run unbounded (Sonar S6444).
+    private static Regex Rx(string pattern) => new(pattern, RegexOptions.None, TimeSpan.FromSeconds(1));
+
     private static readonly (Regex Pattern, Func<GroupCollection, string> Translate)[] Rules =
     [
-        (new Regex($@"^{DayName} of the (\d+)(?:st|nd|rd|th) Week of (Advent|Lent|Easter|Ordinary Time)$"),
+        (Rx($@"^{DayName} of the (\d+)(?:st|nd|rd|th) Week of (Advent|Lent|Easter|Ordinary Time)$"),
             g => $"{Days[g[1].Value]} tuần {Roman(int.Parse(g[2].Value))} {Seasons[g[3].Value]}"),
-        (new Regex(@"^(\d+)(?:st|nd|rd|th) Sunday of Ordinary Time$"),
+        (Rx(@"^(\d+)(?:st|nd|rd|th) Sunday of Ordinary Time$"),
             g => $"Chúa nhật {Roman(int.Parse(g[1].Value))} Thường niên"),
-        (new Regex("^(First|Second|Third|Fourth|Fifth|Sixth|Seventh) Sunday of (Advent|Lent|Easter)$"),
+        (Rx("^(First|Second|Third|Fourth|Fifth|Sixth|Seventh) Sunday of (Advent|Lent|Easter)$"),
             g => $"Chúa nhật {Roman(Ordinals[g[1].Value])} {Seasons[g[2].Value]}"),
-        (new Regex($"^{DayName} - Christmas Weekday$"), g => $"{Days[g[1].Value]} Mùa Giáng Sinh"),
-        (new Regex($"^{DayName} after Ash Wednesday$"), g => $"{Days[g[1].Value]} sau Lễ Tro"),
-        (new Regex($"^{DayName} of Holy Week$"), g => $"{Days[g[1].Value]} Tuần Thánh"),
-        (new Regex($"^{DayName} of the Octave of Easter$"), g => $"{Days[g[1].Value]} trong Tuần Bát Nhật Phục Sinh"),
-        (new Regex(@"^(\d+)(?:st|nd|rd|th) Day of the Octave of Christmas$"),
+        (Rx($"^{DayName} - Christmas Weekday$"), g => $"{Days[g[1].Value]} Mùa Giáng Sinh"),
+        (Rx($"^{DayName} after Ash Wednesday$"), g => $"{Days[g[1].Value]} sau Lễ Tro"),
+        (Rx($"^{DayName} of Holy Week$"), g => $"{Days[g[1].Value]} Tuần Thánh"),
+        (Rx($"^{DayName} of the Octave of Easter$"), g => $"{Days[g[1].Value]} trong Tuần Bát Nhật Phục Sinh"),
+        (Rx(@"^(\d+)(?:st|nd|rd|th) Day of the Octave of Christmas$"),
             g => $"Ngày thứ {g[1].Value} trong Tuần Bát Nhật Giáng Sinh"),
     ];
 

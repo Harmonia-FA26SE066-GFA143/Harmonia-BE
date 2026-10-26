@@ -24,16 +24,18 @@ public static class SystemSettingKeys
 
     public const string RehearsalAttendanceOpensMinutesBefore = "Rehearsal.AttendanceOpensMinutesBefore";
 
+    private const string GeneralGroup = "Thông tin chung";
+
     // In the order the settings page shows them; the index is SystemSettingDto.Order.
     public static readonly IReadOnlyList<SystemSettingDefinition> All =
     [
-        new(ParishName, SettingDataType.String, string.Empty, "Tên giáo xứ", "Thông tin chung",
+        new(ParishName, SettingDataType.String, string.Empty, "Tên giáo xứ", GeneralGroup,
             "Tên giáo xứ, hiển thị trên ứng dụng.", IsPublic: true, IsAnonymous: true),
-        new(ChoirName, SettingDataType.String, string.Empty, "Tên ca đoàn", "Thông tin chung",
+        new(ChoirName, SettingDataType.String, string.Empty, "Tên ca đoàn", GeneralGroup,
             "Tên ca đoàn, hiển thị trên ứng dụng.", IsPublic: true, IsAnonymous: true),
-        new(ContactEmail, SettingDataType.String, string.Empty, "Email liên hệ", "Thông tin chung",
+        new(ContactEmail, SettingDataType.String, string.Empty, "Email liên hệ", GeneralGroup,
             "Email liên hệ hiển thị ở trang chủ và trang đăng nhập.", IsPublic: true, IsAnonymous: true),
-        new(SystemAnnouncement, SettingDataType.String, string.Empty, "Thông báo hệ thống", "Thông tin chung",
+        new(SystemAnnouncement, SettingDataType.String, string.Empty, "Thông báo hệ thống", GeneralGroup,
             "Thông báo hiển thị cho mọi người dùng; để trống thì không hiển thị.", IsPublic: true),
         new(RosterRecentServiceDays, SettingDataType.Int, "60", "Số ngày tính là phục vụ gần đây", "Phân công",
             "Số ngày gần nhất được tính là đã phục vụ gần đây khi đề xuất phân công.", MinValue: 1, MaxValue: 365),

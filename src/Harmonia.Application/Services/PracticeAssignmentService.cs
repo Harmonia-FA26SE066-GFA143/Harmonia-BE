@@ -298,18 +298,21 @@ public class PracticeAssignmentService(
             if (!song.IsActive) return ErrorCodes.SongInactive;
         }
 
-        var materialIds = MaterialIdsOf(request);
-        if (materialIds.Count > 0)
-        {
-            var materials = await musicMaterialRepository.ListAsync(x => materialIds.Contains(x.Id), cancellationToken);
-            if (materials.Count != materialIds.Count
-                || materials.Any(m => !m.IsActive || (request.SongId.HasValue && m.SongId != request.SongId)))
-            {
-                return ErrorCodes.MaterialNotFound;
-            }
-        }
+        return await CheckMaterialsAsync(request, cancellationToken);
+    }
 
-        return null;
+    /// <summary>MATERIAL_NOT_FOUND when a listed material is missing, inactive or belongs to another song; else null.</summary>
+    private async Task<string?> CheckMaterialsAsync(
+        CreatePracticeAssignmentRequest request, CancellationToken cancellationToken)
+    {
+        var materialIds = MaterialIdsOf(request);
+        if (materialIds.Count == 0) return null;
+
+        var materials = await musicMaterialRepository.ListAsync(x => materialIds.Contains(x.Id), cancellationToken);
+        return materials.Count != materialIds.Count
+            || materials.Any(m => !m.IsActive || (request.SongId.HasValue && m.SongId != request.SongId))
+            ? ErrorCodes.MaterialNotFound
+            : null;
     }
 
     /// <summary>MaterialIds when sent, else the older single MaterialId; duplicates dropped, order kept.</summary>
