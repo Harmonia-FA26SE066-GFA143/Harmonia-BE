@@ -1607,6 +1607,43 @@ public sealed class RepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task GetMembersServingNear_ReturnsMembersActiveOnAnotherLiveEventInTheWindow_Async()
+    {
+        var seed = await SeedRosterAsync();
+        var date = VietnamTime.Today.AddDays(-10);
+        Guid recentEventId;
+        await using (var lookup = _db.NewContext())
+            recentEventId = (await lookup.ServiceRosters.SingleAsync(x => x.Assignments.Count == 2, _ct)).EventId;
+
+        async Task<List<Guid>> NearAsync(Guid excludeEventId, DateOnly day, TimeOnly from)
+        {
+            await using var context = _db.NewContext();
+            return await new ServiceRosterRepository(context).GetMembersServingNearAsync(
+                [seed.ConfirmedId, seed.DeclinedId], excludeEventId, day, from, new TimeOnly(1, 0), _ct);
+        }
+
+        // "confirmed" serves the 10-day-old event, starting 00:00, on two lines: listed once.
+        Assert.Equal([seed.ConfirmedId], await NearAsync(seed.EventId, date, TimeOnly.MinValue));
+        Assert.Empty(await NearAsync(recentEventId, date, TimeOnly.MinValue));
+        Assert.Empty(await NearAsync(seed.EventId, date, new TimeOnly(0, 1)));
+        Assert.Empty(await NearAsync(seed.EventId, date.AddDays(1), TimeOnly.MinValue));
+
+        await using (var change = _db.NewContext())
+            await change.LiturgicalEvents.Where(x => x.Id == recentEventId)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, EventStatus.Cancelled), _ct);
+        Assert.Empty(await NearAsync(seed.EventId, date, TimeOnly.MinValue));
+
+        await using (var change = _db.NewContext())
+        {
+            await change.LiturgicalEvents.Where(x => x.Id == recentEventId)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, EventStatus.Published), _ct);
+            await change.RosterAssignments.Where(x => x.Roster.EventId == recentEventId)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, RosterAssignmentStatus.Replaced), _ct);
+        }
+        Assert.Empty(await NearAsync(seed.EventId, date, TimeOnly.MinValue));
+    }
+
+    [Fact]
     public async Task GetEventWithRoster_LoadsRosterAssignmentsTracked_Async()
     {
         var seed = await SeedRosterAsync();

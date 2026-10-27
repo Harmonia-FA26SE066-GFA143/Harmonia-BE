@@ -69,9 +69,20 @@ public class RosterServiceTests
         _repository.CountRecentServicesAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), _ct)
             .Returns(new Dictionary<Guid, int> { [_chi] = 3, [_binh] = 1 });
         _repository.GetAssignmentsAsync(Arg.Any<Guid>(), _ct).Returns([]);
+        _repository.GetMembersServingNearAsync(default!, default, default, default, default, default)
+            .ReturnsForAnyArgs(new List<Guid>());
 
         AiFails();
     }
+
+    /// <summary>The member holds a line on another event of the same date starting at <paramref name="start"/>.</summary>
+    private void ServesAnotherEventAt(Guid memberId, TimeOnly start) =>
+        _repository.GetMembersServingNearAsync(
+                Arg.Any<IReadOnlyCollection<Guid>>(), _event.Id, _event.EventDate, Arg.Any<TimeOnly>(), Arg.Any<TimeOnly>(), _ct)
+            .Returns(call => call.ArgAt<IReadOnlyCollection<Guid>>(0).Contains(memberId)
+                && call.ArgAt<TimeOnly>(3) <= start && start <= call.ArgAt<TimeOnly>(4)
+                    ? new List<Guid> { memberId }
+                    : new List<Guid>());
 
     private void AiFails() =>
         _generator.GenerateAsync(Arg.Do<List<RosterSlotInput>>(x => _sentToAi = x), _ct)
@@ -200,6 +211,19 @@ public class RosterServiceTests
         Assert.Equal("Nhap le", shortage.SongTitle);
         Assert.Equal(3, shortage.RequiredCount);
         Assert.Equal(1, shortage.AssignedCount);
+    }
+
+    [Fact]
+    public async Task Suggest_MemberServingAnotherEventNearby_IsNotPicked_Async()
+    {
+        var roster = ExistingRoster();
+        ServesAnotherEventAt(_binh, _event.Time);
+
+        var result = await SuggestAsync();
+
+        Assert.True(result.IsSuccess);
+        Assert.DoesNotContain(_binh, roster.Assignments.Select(x => x.MemberId));
+        Assert.Equal([_chi, _an], roster.Assignments.Where(x => x.SkillId == _soprano.Id).Select(x => x.MemberId));
     }
 
     [Fact]
@@ -489,6 +513,25 @@ public class RosterServiceTests
         Assert.Equal(ErrorCodes.RosterAssignmentDuplicate, (await AddAsync(_an)).Code);
     }
 
+    [Theory]
+    [InlineData(7, 120, false)] // exactly the window apart: two Masses back to back are fine
+    [InlineData(7, 121, true)]
+    [InlineData(9, 0, true)] // 0 still refuses the same start
+    [InlineData(8, 0, false)]
+    public async Task AddAssignment_MemberServingAnotherEventNearby_ReturnsTimeConflict_Async(
+        int otherStartHour, int overlapMinutes, bool conflict)
+    {
+        _event.Time = new TimeOnly(9, 0);
+        _settings.GetIntAsync(SystemSettingKeys.RosterEventOverlapMinutes, _ct).Returns(overlapMinutes);
+        RosterWith(RosterStatus.Suggested);
+        ServesAnotherEventAt(_an, new TimeOnly(otherStartHour, 0));
+        MemberIs(_an);
+
+        var result = await AddAsync(_an);
+
+        Assert.Equal(conflict ? ErrorCodes.RosterMemberTimeConflict : null, result.Code);
+    }
+
     [Fact]
     public async Task AddAssignment_FinalizedRoster_ReturnsRosterAlreadyFinalized_Async()
     {
@@ -523,6 +566,21 @@ public class RosterServiceTests
         Assert.Equal(RosterAssignmentStatus.Replaced, old.Status);
         Assert.Equal(replacement.Id, old.ReplacedByAssignmentId);
         Assert.Equal(replacement.Id, result.Value!.Id);
+    }
+
+    [Fact]
+    public async Task ReplaceAssignment_MemberServingAnotherEventNearby_ReturnsTimeConflictAndKeepsOldLine_Async()
+    {
+        var old = SopranoLine(_binh);
+        RosterWith(RosterStatus.Suggested, old);
+        ServesAnotherEventAt(_an, _event.Time);
+        MemberIs(_an);
+
+        var result = await _sut.ReplaceAssignmentAsync(old.Id, new ReplaceRosterAssignmentRequest { MemberId = _an }, _ct);
+
+        Assert.Equal(ErrorCodes.RosterMemberTimeConflict, result.Code);
+        Assert.Equal(RosterAssignmentStatus.Active, old.Status);
+        await _repository.DidNotReceiveWithAnyArgs().SaveChangesAsync(_ct);
     }
 
     [Fact]

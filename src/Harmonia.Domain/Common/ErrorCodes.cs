@@ -244,6 +244,9 @@ public static class ErrorCodes
 
     public const string RosterAssignmentDuplicate = "ROSTER_ASSIGNMENT_DUPLICATE";
 
+    // The member already serves another event starting within Roster.EventOverlapMinutes of this one.
+    public const string RosterMemberTimeConflict = "ROSTER_MEMBER_TIME_CONFLICT";
+
     public const string PersonnelRequirementNotFound = "PERSONNEL_REQUIREMENT_NOT_FOUND";
 
     // Removing a requirement someone is still assigned to; remove or move the assignment first.

@@ -44,6 +44,21 @@ public class ServiceRosterRepository(HarmoniaDbContext dbContext)
             .Select(g => new { MemberId = g.Key, Count = g.Select(x => x.RosterId).Distinct().Count() })
             .ToDictionaryAsync(x => x.MemberId, x => x.Count, cancellationToken);
 
+    public Task<List<Guid>> GetMembersServingNearAsync(
+        IReadOnlyCollection<Guid> memberIds, Guid excludeEventId, DateOnly date, TimeOnly from, TimeOnly to,
+        CancellationToken cancellationToken) =>
+        DbContext.RosterAssignments
+            .Where(x => memberIds.Contains(x.MemberId)
+                && x.Status == RosterAssignmentStatus.Active
+                && x.Roster.EventId != excludeEventId
+                && x.Roster.LiturgicalEvent.Status != EventStatus.Cancelled
+                && x.Roster.LiturgicalEvent.EventDate == date
+                && x.Roster.LiturgicalEvent.Time >= from
+                && x.Roster.LiturgicalEvent.Time <= to)
+            .Select(x => x.MemberId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
     public Task<List<RosterAssignment>> GetAssignmentsAsync(Guid rosterId, CancellationToken cancellationToken) =>
         DbContext.RosterAssignments
             .AsNoTracking()

@@ -232,6 +232,7 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 | `ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED` | 409 | Ca viên chưa được duyệt kỹ năng này |
 | `ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED` | 409 | Ca viên chưa xác nhận tham gia (chưa phản hồi hoặc đã từ chối) |
 | `ROSTER_ASSIGNMENT_DUPLICATE` | 409 | Ca viên đã được phân công vị trí này |
+| `ROSTER_MEMBER_TIME_CONFLICT` | 409 | Ca viên đã được phân công ở một lễ khác gần giờ này |
 | `PERSONNEL_REQUIREMENT_NOT_FOUND` | 404 | Không tìm thấy yêu cầu nhân sự |
 | `PERSONNEL_REQUIREMENT_IN_USE` | 409 | Yêu cầu nhân sự này đang có người được phân công, hãy gỡ phân công trước |
 | `PERSONNEL_REQUIRED_COUNT_INVALID` | 400 | Số lượng người phải lớn hơn 0 |
@@ -404,3 +405,5 @@ xem — trả 404, để không lộ sự tồn tại của bản ghi.
   vừa được gán cùng kỹ năng đó ở một bài (hoặc ngược lại).
 - 2026-10-26: thêm `PERSONNEL_REQUIREMENT_IN_USE` — `PUT` yêu cầu nhân sự (của bài hoặc cả buổi lễ) bỏ một kỹ năng
   đang có dòng phân công `Active`. `ROSTER_ALREADY_FINALIZED` còn trả khi sửa dòng / yêu cầu cả buổi lễ đã chốt sớm.
+- 2026-10-27: thêm `ROSTER_MEMBER_TIME_CONFLICT` — thêm / thay người vào phân công khi ca viên đang có dòng `Active` ở một
+  lễ khác (chưa huỷ, mọi ca đoàn) cùng ngày, bắt đầu cách nhau ít hơn `Roster.EventOverlapMinutes` phút.

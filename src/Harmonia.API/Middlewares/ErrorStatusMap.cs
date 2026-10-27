@@ -135,6 +135,7 @@ public static class ErrorStatusMap
         [ErrorCodes.RosterAssignmentMemberSkillNotApproved] = StatusCodes.Status409Conflict,
         [ErrorCodes.RosterAssignmentMemberNotConfirmed] = StatusCodes.Status409Conflict,
         [ErrorCodes.RosterAssignmentDuplicate] = StatusCodes.Status409Conflict,
+        [ErrorCodes.RosterMemberTimeConflict] = StatusCodes.Status409Conflict,
         [ErrorCodes.PersonnelRequirementNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.PersonnelRequirementInUse] = StatusCodes.Status409Conflict,
         [ErrorCodes.PersonnelRequiredCountInvalid] = StatusCodes.Status400BadRequest,

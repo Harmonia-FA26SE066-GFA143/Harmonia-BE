@@ -825,6 +825,7 @@ dữ liệu trong khoảng lọc vẫn hiện với các số bằng 0.
 | `System.Announcement` | String | rỗng | có | Thông báo chung cho mọi người dùng; rỗng thì không hiện |
 | `Roster.RecentServiceDays` | Int 1–365 | 60 | không | Số ngày tính "phục vụ gần đây" khi gợi ý phân công |
 | `Roster.AiSuggestionEnabled` | Bool | true | không | Tắt thì gợi ý phân công không gọi AI, chỉ xếp theo luật (`isAiGenerated` = `false`) |
+| `Roster.EventOverlapMinutes` | Int 0–720 | 120 | không | Không phân công một ca viên vào hai lễ cùng ngày bắt đầu cách nhau ít hơn N phút (`ROSTER_MEMBER_TIME_CONFLICT`; gợi ý bỏ qua người đó). 0 = chỉ chặn hai lễ cùng giờ |
 | `Practice.AllowLateSubmission` | Bool | false | không | Bật thì nộp bản thu sau hạn không còn bị `PRACTICE_SUBMISSION_PAST_DUE`; bài vẫn tính là quá hạn |
 | `Rehearsal.AttendanceOpensMinutesBefore` | Int 0–120 | 0 | không | Cho điểm danh sớm N phút trước giờ bắt đầu; sớm hơn nữa vẫn `REHEARSAL_NOT_STARTED` |
 
@@ -1371,8 +1372,8 @@ Ca trưởng vẫn sửa được bằng `PUT /api/song-list-items/{id}/personne
 | POST | `/api/service-rosters/suggestions` | `{ "eventId": "guid" }` | 200 `RosterSuggestionResponse` | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `LITURGICAL_EVENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_SONG_LIST_NOT_APPROVED`, `ROSTER_NO_PERSONNEL_REQUIREMENT`, `ROSTER_ALREADY_FINALIZED` |
 | GET | `/api/service-rosters?eventId=` | — | 200 `ServiceRosterDto` (assignment `Active` + shortage; `shortages` rỗng nếu sự kiện không còn song list đã duyệt) | 404 `LITURGICAL_EVENT_NOT_FOUND`, `ROSTER_NOT_FOUND` (chưa có roster — gọi `suggestions` hoặc thêm tay) |
 | GET | `/api/service-rosters/shortages?eventId=` | — | 200 `RosterShortageDto[]` | 404 `LITURGICAL_EVENT_NOT_FOUND` · 409 `ROSTER_SONG_LIST_NOT_APPROVED` |
-| POST | `/api/service-rosters/assignments` | `{ "eventId", "songListItemId?", "skillId", "memberId", "note?" }` | 200 `RosterAssignmentDto` | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `PERSONNEL_REQUIREMENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ROSTER_SONG_LIST_NOT_APPROVED`, `ROSTER_ASSIGNMENT_DUPLICATE`, `MEMBER_NOT_ACTIVE`, `ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED` |
-| POST | `/api/service-rosters/assignments/{id}/replacement` | `{ "memberId", "note?" }` | 200 `RosterAssignmentDto` (dòng mới) | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `ROSTER_ASSIGNMENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ROSTER_ASSIGNMENT_DUPLICATE`, `MEMBER_NOT_ACTIVE`, `ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED` |
+| POST | `/api/service-rosters/assignments` | `{ "eventId", "songListItemId?", "skillId", "memberId", "note?" }` | 200 `RosterAssignmentDto` | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `PERSONNEL_REQUIREMENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ROSTER_SONG_LIST_NOT_APPROVED`, `ROSTER_ASSIGNMENT_DUPLICATE`, `MEMBER_NOT_ACTIVE`, `ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED`, `ROSTER_MEMBER_TIME_CONFLICT` |
+| POST | `/api/service-rosters/assignments/{id}/replacement` | `{ "memberId", "note?" }` | 200 `RosterAssignmentDto` (dòng mới) | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `ROSTER_ASSIGNMENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ROSTER_ASSIGNMENT_DUPLICATE`, `MEMBER_NOT_ACTIVE`, `ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED`, `ROSTER_MEMBER_TIME_CONFLICT` |
 | PUT | `/api/service-rosters/assignments/{id}/note` | `{ "note" }` | 200 `RosterAssignmentDto` | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `ROSTER_ASSIGNMENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED` |
 | DELETE | `/api/service-rosters/assignments/{id}` | — | 204 | 403 `CHOIR_NOT_LEAD` · 404 `ROSTER_ASSIGNMENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED` |
 | POST | `/api/service-rosters/{id}/finalization` | — | 200 `ServiceRosterDto` | 403 `CHOIR_NOT_LEAD` · 404 `ROSTER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ROSTER_SONG_LIST_NOT_APPROVED`, `MEMBER_NOT_ACTIVE`, `ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED` |
@@ -1462,6 +1463,9 @@ Role `ParishPriest`, `ChoirDirector`. 200 `PagedList<SongSuggestionResponse>` ·
 
 - Ứng viên cho mỗi cặp (bài, skill): ca viên **đang hoạt động**, đã được **duyệt** skill đó và đã
   **xác nhận tham gia** (`Confirmed`) sự kiện. Không ai ngoài danh sách này được gợi ý.
+- Ca viên đang có dòng `Active` ở lễ khác (chưa huỷ) cùng ngày, bắt đầu cách nhau ít hơn `Roster.EventOverlapMinutes`
+  phút, bị bỏ khỏi ứng viên; thêm / thay tay người đó trả 409 `ROSTER_MEMBER_TIME_CONFLICT`. Chỉ so lễ cùng ngày; khi chốt
+  không kiểm lại.
 - AI (Gemini) chọn trong ứng viên, ưu tiên level cao và người ít phục vụ trong 60 ngày gần nhất. Server
   kiểm lại mọi lựa chọn của AI, rồi tự bù chỗ còn trống theo cùng tiêu chí. AI lỗi hoặc quá 20 giây thì
   phần bù lo toàn bộ và `isAiGenerated = false`. Endpoint không trả lỗi vì AI.

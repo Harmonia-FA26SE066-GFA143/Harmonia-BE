@@ -11,6 +11,17 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
   huống trước đây chưa có. FE bỏ qua trường lạ, hiển thị câu chung cho mã lạ.
 - Mỗi PR đổi hợp đồng thêm một dòng vào mục ngày tương ứng ở đây, cùng PR cập nhật `api.md` / `error-codes.md`.
 
+## 2026-10-27
+
+### Phân công phục vụ: chặn trùng giờ (Web tbd-backlog B40)
+
+- Mã lỗi mới 409 `ROSTER_MEMBER_TIME_CONFLICT` cho `POST api/service-rosters/assignments` và
+  `POST …/assignments/{id}/replacement`: ca viên đã có dòng `Active` ở một lễ khác chưa huỷ (mọi ca đoàn) cùng ngày, bắt
+  đầu cách nhau ít hơn `Roster.EventOverlapMinutes` phút.
+- `POST api/service-rosters/suggestions` bỏ qua những ca viên đó; chỗ thiếu hiện trong `shortages` như thường.
+- Setting mới `Roster.EventOverlapMinutes` (Int 0–720, mặc định 120, nhóm "Phân công"), tự thêm khi khởi động. Không cần
+  migration.
+
 ## 2026-10-26
 
 Phân loại bài hát chi tiết hơn (theo dieuca.net) và phân công 3 tầng: đồng ca không phân công, vai **cả buổi lễ**

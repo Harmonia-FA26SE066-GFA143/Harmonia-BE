@@ -335,7 +335,7 @@ public class RosterService(
         }
 
         var memberError = await MemberNotAssignableCodeAsync(
-            roster, liturgicalEvent.Id, request.SongListItemId, request.SkillId, request.MemberId, cancellationToken);
+            roster, liturgicalEvent, request.SongListItemId, request.SkillId, request.MemberId, cancellationToken);
         if (memberError is not null) return Result<RosterAssignmentDto>.Failure(memberError);
 
         if (roster is null)
@@ -365,7 +365,7 @@ public class RosterService(
         if (RosterNotEditableCode(roster) is { } rosterError) return Result<RosterAssignmentDto>.Failure(rosterError);
 
         var memberError = await MemberNotAssignableCodeAsync(
-            roster, roster.EventId, old.SongListItemId, old.SkillId, request.MemberId, cancellationToken);
+            roster, roster.LiturgicalEvent, old.SongListItemId, old.SkillId, request.MemberId, cancellationToken);
         if (memberError is not null) return Result<RosterAssignmentDto>.Failure(memberError);
 
         var replacement = NewManualAssignment(roster.Id, old.SongListItemId, old.SkillId, request.MemberId);
@@ -432,11 +432,14 @@ public class RosterService(
     /// <summary>
     /// Error code when the member cannot take the song / skill: already holds it on the roster (also when one line is
     /// whole-service and the other a song line of the same skill), missing, not Active,
-    /// skill not approved or participation neither Confirmed nor Unsure. Null when they can.
+    /// skill not approved, participation neither Confirmed nor Unsure, or serving another event near the same time.
+    /// Null when they can.
     /// </summary>
     private async Task<string?> MemberNotAssignableCodeAsync(
-        ServiceRoster? roster, Guid eventId, Guid? songListItemId, Guid skillId, Guid memberId, CancellationToken cancellationToken)
+        ServiceRoster? roster, LiturgicalEvent liturgicalEvent, Guid? songListItemId, Guid skillId, Guid memberId,
+        CancellationToken cancellationToken)
     {
+        var eventId = liturgicalEvent.Id;
         // Same song and skill, or the same skill across the whole service and a song: the organist already plays every song.
         if (roster?.Assignments.Any(a => a.Status == RosterAssignmentStatus.Active && a.SkillId == skillId && a.MemberId == memberId
                 && (a.SongListItemId == songListItemId || a.SongListItemId is null || songListItemId is null)) == true)
@@ -452,7 +455,28 @@ public class RosterService(
         if (member.Status != MemberStatus.Active) return ErrorCodes.MemberNotActive;
         if (member.MemberSkills.Count == 0) return ErrorCodes.RosterAssignmentMemberSkillNotApproved;
         if (member.EventParticipations.Count == 0) return ErrorCodes.RosterAssignmentMemberNotConfirmed;
-        return null;
+
+        var (from, to) = await OverlapWindowAsync(liturgicalEvent, cancellationToken);
+        var busy = await rosterRepository.GetMembersServingNearAsync(
+            [memberId], eventId, liturgicalEvent.EventDate, from, to, cancellationToken);
+        return busy.Count > 0 ? ErrorCodes.RosterMemberTimeConflict : null;
+    }
+
+    /// <summary>
+    /// Start times, both ends included, at which another event clashes with this one. Events have a start time only, so
+    /// two events clash when they start less than Roster.EventOverlapMinutes apart; 0 means the same start only.
+    /// </summary>
+    private async Task<(TimeOnly From, TimeOnly To)> OverlapWindowAsync(
+        LiturgicalEvent liturgicalEvent, CancellationToken cancellationToken)
+    {
+        var minutes = await systemSettingService.GetIntAsync(SystemSettingKeys.RosterEventOverlapMinutes, cancellationToken);
+        // "Less than N minutes apart" with inclusive bounds: one tick short of N.
+        var margin = minutes == 0 ? TimeSpan.Zero : TimeSpan.FromMinutes(minutes) - TimeSpan.FromTicks(1);
+        var start = liturgicalEvent.Time.ToTimeSpan();
+
+        // shortcut: only events of the same date are compared, so 23:30 and 00:30 the next day never clash; compare full date-times if night events appear.
+        return (start <= margin ? TimeOnly.MinValue : TimeOnly.FromTimeSpan(start - margin),
+            start + margin >= TimeSpan.FromDays(1) ? TimeOnly.MaxValue : TimeOnly.FromTimeSpan(start + margin));
     }
 
     private static RosterAssignment NewManualAssignment(Guid rosterId, Guid? songListItemId, Guid skillId, Guid memberId) => new()
@@ -483,6 +507,16 @@ public class RosterService(
         var candidateSkills = await rosterRepository.GetCandidateSkillsAsync(liturgicalEvent.Id, skillIds, cancellationToken);
         if (await choirScope.GetEventMemberIdsAsync(liturgicalEvent.Id, cancellationToken) is { } eventMemberIds)
             candidateSkills = candidateSkills.Where(x => eventMemberIds.Contains(x.MemberId)).ToList();
+
+        // Members already serving another event near the same time are not suggested.
+        if (candidateSkills.Count > 0)
+        {
+            var (from, to) = await OverlapWindowAsync(liturgicalEvent, cancellationToken);
+            var busy = await rosterRepository.GetMembersServingNearAsync(
+                candidateSkills.Select(x => x.MemberId).Distinct().ToList(), liturgicalEvent.Id, liturgicalEvent.EventDate,
+                from, to, cancellationToken);
+            candidateSkills = candidateSkills.Where(x => !busy.Contains(x.MemberId)).ToList();
+        }
 
         var memberIds = candidateSkills.Select(x => x.MemberId).Distinct().ToList();
         var recentServiceDays = await systemSettingService.GetIntAsync(

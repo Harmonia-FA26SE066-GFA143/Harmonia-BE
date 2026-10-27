@@ -30,6 +30,14 @@ public interface IServiceRosterRepository : IGenericRepository<ServiceRoster>
     Task<Dictionary<Guid, int>> CountRecentServicesAsync(
         IReadOnlyCollection<Guid> memberIds, DateOnly from, DateOnly to, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Members among <paramref name="memberIds"/> holding an Active line on the roster of another non-cancelled event
+    /// dated <paramref name="date"/> whose start time lies between <paramref name="from"/> and <paramref name="to"/>, both included.
+    /// </summary>
+    Task<List<Guid>> GetMembersServingNearAsync(
+        IReadOnlyCollection<Guid> memberIds, Guid excludeEventId, DateOnly date, TimeOnly from, TimeOnly to,
+        CancellationToken cancellationToken);
+
     /// <summary>Read-only Active assignments of the roster, with Member.User, Skill and SongListItem.Song loaded.</summary>
     Task<List<RosterAssignment>> GetAssignmentsAsync(Guid rosterId, CancellationToken cancellationToken);
 

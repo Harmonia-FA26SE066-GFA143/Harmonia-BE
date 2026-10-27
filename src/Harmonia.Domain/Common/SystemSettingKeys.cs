@@ -20,6 +20,8 @@ public static class SystemSettingKeys
 
     public const string RosterAiSuggestionEnabled = "Roster.AiSuggestionEnabled";
 
+    public const string RosterEventOverlapMinutes = "Roster.EventOverlapMinutes";
+
     public const string PracticeAllowLateSubmission = "Practice.AllowLateSubmission";
 
     public const string RehearsalAttendanceOpensMinutesBefore = "Rehearsal.AttendanceOpensMinutesBefore";
@@ -41,6 +43,9 @@ public static class SystemSettingKeys
             "Số ngày gần nhất được tính là đã phục vụ gần đây khi đề xuất phân công.", MinValue: 1, MaxValue: 365),
         new(RosterAiSuggestionEnabled, SettingDataType.Bool, "true", "Đề xuất phân công bằng AI", "Phân công",
             "Có dùng AI để đề xuất phân công không; tắt thì chỉ dùng quy tắc có sẵn."),
+        new(RosterEventOverlapMinutes, SettingDataType.Int, "120", "Khoảng cách tối thiểu giữa hai lễ (phút)", "Phân công",
+            "Không phân công một ca viên vào hai lễ cùng ngày bắt đầu cách nhau ít hơn số phút này; 0 thì chỉ chặn hai lễ cùng giờ.",
+            MinValue: 0, MaxValue: 720),
         new(PracticeAllowLateSubmission, SettingDataType.Bool, "false", "Cho nộp bản thu trễ hạn", "Luyện tập",
             "Cho phép ca viên nộp bản thu sau hạn của bài tập."),
         new(RehearsalAttendanceOpensMinutesBefore, SettingDataType.Int, "0", "Mở điểm danh trước giờ tập (phút)",
