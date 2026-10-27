@@ -7,7 +7,7 @@ public class LiturgicalEvent : BaseAuditableEntity
 {
     public DateOnly EventDate { get; set; }
 
-    // Pre-filled from LiturgicalDay.SeasonName; the priest may change it.
+    // Pre-filled with the active season covering EventDate when none is picked; the priest may change it.
     public Guid? LiturgicalSeasonId { get; set; }
 
     public TimeOnly Time { get; set; }
@@ -43,6 +43,8 @@ public class LiturgicalEvent : BaseAuditableEntity
     public ICollection<SongList> SongLists { get; set; } = [];
 
     public ICollection<EventParticipation> EventParticipations { get; set; } = [];
+
+    public ICollection<EventPersonnelRequirement> PersonnelRequirements { get; set; } = [];
 
     public ServiceRoster? ServiceRoster { get; set; }
 

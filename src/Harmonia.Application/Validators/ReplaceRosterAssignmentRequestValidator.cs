@@ -8,5 +8,6 @@ public class ReplaceRosterAssignmentRequestValidator : AbstractValidator<Replace
     public ReplaceRosterAssignmentRequestValidator()
     {
         RuleFor(x => x.MemberId).NotEmpty();
+        RuleFor(x => x.Note).MaximumLength(200);
     }
 }

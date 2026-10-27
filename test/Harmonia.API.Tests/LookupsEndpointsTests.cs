@@ -31,7 +31,8 @@ public class LookupsEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<H
 
         var rows = (await member.GetFromJsonAsync<List<MassTypeDto>>("api/lookups/mass-types", TestJson.Options, _ct))!;
 
-        Assert.Equal(["Daily Mass", "Sunday Mass"], rows.Select(x => x.Name));
+        // DataSeeder already filled the catalog at startup, so only this test's rows are compared.
+        Assert.Equal(["Daily Mass", "Sunday Mass"], rows.Select(x => x.Name).Where(x => x.EndsWith(" Mass")));
     }
 
     [Fact]
@@ -46,7 +47,9 @@ public class LookupsEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<H
         var rows = (await priest.GetFromJsonAsync<List<LiturgicalSlotDto>>(
             "api/lookups/liturgical-slots", TestJson.Options, _ct))!;
 
-        Assert.Equal(["Entrance", "Offertory", "Communion"], rows.Select(x => x.Name));
+        // DataSeeder already filled the catalog at startup, so only this test's rows are compared.
+        Assert.Equal(["Entrance", "Offertory", "Communion"],
+            rows.Select(x => x.Name).Where(x => x is "Entrance" or "Offertory" or "Communion"));
     }
 
     [Fact]

@@ -21,6 +21,7 @@ public class LookupService(
     IGenericRepository<Skill> skills,
     IGenericRepository<SongVocalRequirement> songVocalRequirements,
     IGenericRepository<SongInstrumentRequirement> songInstrumentRequirements,
+    IGenericRepository<LiturgicalSlotRequirement> slotRequirements,
     IMapper mapper) : ILookupService
 {
     public async Task<Result<List<MassTypeDto>>> GetMassTypesAsync(bool includeInactive, CancellationToken cancellationToken)
@@ -166,15 +167,112 @@ public class LookupService(
             cancellationToken);
     }
 
-    public Task<Result<SongThemeDto>> SaveSongThemeAsync(Guid? id, SaveCatalogItemRequest request, CancellationToken cancellationToken)
+    public async Task<Result<SongThemeDto>> SaveSongThemeAsync(Guid? id, SaveSongThemeRequest request, CancellationToken cancellationToken)
     {
+        if (request.ParentId is { } parentId)
+        {
+            // The whole table is a few dozen rows, so walking up the tree in memory is cheaper than a recursive query.
+            var parents = (await songThemes.ListAsync(_ => true, cancellationToken)).ToDictionary(x => x.Id);
+            var current = id is { } themeId ? parents.GetValueOrDefault(themeId) : null;
+
+            // An active theme never sits under a switched-off one; an inactive one may stay where it is.
+            if (!parents.TryGetValue(parentId, out var parent) || (!parent.IsActive && (request.IsActive || current?.ParentId != parentId)))
+                return Result<SongThemeDto>.Failure(ErrorCodes.SongThemeParentInvalid);
+
+            for (Guid? ancestor = parentId; ancestor is { } ancestorId; ancestor = parents.GetValueOrDefault(ancestorId)?.ParentId)
+            {
+                if (ancestorId == id) return Result<SongThemeDto>.Failure(ErrorCodes.SongThemeParentInvalid);
+            }
+        }
+
+        // Switching a theme off while children are on would leave a live branch under a dead one: children go first.
+        if (id is { } existingId && !request.IsActive
+            && (await songThemes.ListAsync(x => x.ParentId == existingId && x.IsActive, cancellationToken)).Count > 0)
+            return Result<SongThemeDto>.Failure(ErrorCodes.SongThemeHasActiveChildren);
+
         var name = request.Name.Trim();
-        return SaveAsync<SongTheme, SongThemeDto>(
+        return await SaveAsync<SongTheme, SongThemeDto>(
             songThemes, id, ErrorCodes.LookupNotFound,
             x => x.Name == name && x.Id != id, ErrorCodes.LookupNameDuplicate,
-            x => { x.Name = name; x.Description = request.Description; x.IsActive = request.IsActive; },
+            x => { x.Name = name; x.Description = request.Description; x.IsActive = request.IsActive; x.ParentId = request.ParentId; },
             cancellationToken);
     }
+
+    public async Task<Result<List<LiturgicalSlotRequirementDto>>> GetLiturgicalSlotRequirementsAsync(
+        Guid slotId, CancellationToken cancellationToken)
+    {
+        if (await liturgicalSlots.GetByIdAsync(slotId, cancellationToken) is null)
+            return Result<List<LiturgicalSlotRequirementDto>>.Failure(ErrorCodes.LookupNotFound);
+
+        var rows = await slotRequirements.ListAsync(x => x.SlotId == slotId, cancellationToken);
+        var skillIds = rows.Select(x => x.SkillId).ToList();
+        var skillById = (await skills.ListAsync(x => skillIds.Contains(x.Id), cancellationToken)).ToDictionary(x => x.Id);
+        return Result<List<LiturgicalSlotRequirementDto>>.Success(ToSlotRequirementDtos(rows, skillById));
+    }
+
+    public async Task<Result<List<LiturgicalSlotRequirementDto>>> UpdateLiturgicalSlotRequirementsAsync(
+        Guid slotId, UpdateLiturgicalSlotRequirementsRequest request, CancellationToken cancellationToken)
+    {
+        if (await liturgicalSlots.GetByIdAsync(slotId, cancellationToken) is null)
+            return Result<List<LiturgicalSlotRequirementDto>>.Failure(ErrorCodes.LookupNotFound);
+
+        var rows = await slotRequirements.ListAsync(x => x.SlotId == slotId, cancellationToken);
+        var skillIds = request.Requirements.Select(x => x.SkillId).Concat(rows.Select(x => x.SkillId)).Distinct().ToList();
+        var skillById = (await skills.ListAsync(x => skillIds.Contains(x.Id), cancellationToken)).ToDictionary(x => x.Id);
+
+        foreach (var requirement in request.Requirements)
+        {
+            if (!skillById.TryGetValue(requirement.SkillId, out var skill))
+                return Result<List<LiturgicalSlotRequirementDto>>.Failure(ErrorCodes.SkillNotFound);
+            if (!skill.IsActive && rows.All(x => x.SkillId != skill.Id))
+                return Result<List<LiturgicalSlotRequirementDto>>.Failure(ErrorCodes.SkillInactive);
+        }
+
+        var result = new List<LiturgicalSlotRequirement>();
+        foreach (var row in rows)
+        {
+            var requested = request.Requirements.FirstOrDefault(x => x.SkillId == row.SkillId);
+            if (requested is null)
+            {
+                slotRequirements.Remove(row);
+                continue;
+            }
+
+            // ListAsync rows are untracked; the kept one is re-read tracked to change its count.
+            var tracked = (await slotRequirements.GetByIdAsync(row.Id, cancellationToken))!;
+            tracked.RequiredCount = requested.RequiredCount;
+            result.Add(tracked);
+        }
+
+        foreach (var requirement in request.Requirements.Where(r => rows.All(x => x.SkillId != r.SkillId)))
+        {
+            var added = new LiturgicalSlotRequirement
+            {
+                Id = Guid.NewGuid(), SlotId = slotId, SkillId = requirement.SkillId, RequiredCount = requirement.RequiredCount,
+            };
+            await slotRequirements.AddAsync(added, cancellationToken);
+            result.Add(added);
+        }
+
+        await slotRequirements.SaveChangesAsync(cancellationToken);
+        return Result<List<LiturgicalSlotRequirementDto>>.Success(ToSlotRequirementDtos(result, skillById));
+    }
+
+    private static List<LiturgicalSlotRequirementDto> ToSlotRequirementDtos(
+        IEnumerable<LiturgicalSlotRequirement> rows, Dictionary<Guid, Skill> skillById) =>
+        rows.Select(x => new LiturgicalSlotRequirementDto
+            {
+                SkillId = x.SkillId,
+                SkillName = skillById[x.SkillId].Name,
+                SkillCategoryId = skillById[x.SkillId].CategoryId,
+                RequiredCount = x.RequiredCount,
+            })
+            .OrderBy(x => x.SkillName)
+            .ToList();
+
+    public async Task<Guid?> FindLiturgicalSeasonIdAsync(DateOnly date, CancellationToken cancellationToken) =>
+        (await liturgicalSeasons.ListAsync(x => x.IsActive && x.StartDate <= date && date <= x.EndDate, cancellationToken))
+            .FirstOrDefault()?.Id;
 
     public Task<Result<LiturgicalSlotDto>> SaveLiturgicalSlotAsync(Guid? id, SaveLiturgicalSlotRequest request, CancellationToken cancellationToken)
     {

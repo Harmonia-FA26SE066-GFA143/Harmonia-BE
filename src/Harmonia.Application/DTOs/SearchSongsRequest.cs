@@ -18,12 +18,15 @@ public class SearchSongsRequest : PagingRequest
 
     public Guid? CeremonyTypeId { get; set; }
 
+    /// <summary>Also matches songs classified under any descendant of this theme.</summary>
     public Guid? SongThemeId { get; set; }
+
+    public Guid? LiturgicalSlotId { get; set; }
 
     /// <summary>Matches a vocal or an instrument requirement.</summary>
     public Guid? SkillId { get; set; }
 
-    /// <summary>False keeps only songs with no season, Mass type, ceremony type or theme yet; true the others.</summary>
+    /// <summary>False keeps only songs with no season, Mass type, ceremony type, theme or Mass part yet; true the others.</summary>
     public bool? IsClassified { get; set; }
 
     /// <summary>Keeps only songs with no active material of this type, e.g. SampleAudio.</summary>

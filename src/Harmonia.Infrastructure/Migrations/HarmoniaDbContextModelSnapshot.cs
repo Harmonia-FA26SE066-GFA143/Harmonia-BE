@@ -263,6 +263,31 @@ namespace Harmonia.Infrastructure.Migrations
                     b.ToTable("EventParticipations");
                 });
 
+            modelBuilder.Entity("Harmonia.Domain.Entities.EventPersonnelRequirement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("RequiredCount")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("SkillId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SkillId");
+
+                    b.HasIndex("EventId", "SkillId")
+                        .IsUnique();
+
+                    b.ToTable("EventPersonnelRequirements");
+                });
+
             modelBuilder.Entity("Harmonia.Domain.Entities.LiturgicalDay", b =>
                 {
                     b.Property<Guid>("Id")
@@ -484,6 +509,31 @@ namespace Harmonia.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("LiturgicalSlots");
+                });
+
+            modelBuilder.Entity("Harmonia.Domain.Entities.LiturgicalSlotRequirement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("RequiredCount")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("SkillId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("SlotId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SkillId");
+
+                    b.HasIndex("SlotId", "SkillId")
+                        .IsUnique();
+
+                    b.ToTable("LiturgicalSlotRequirements");
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.MassSchedule", b =>
@@ -1217,6 +1267,10 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Property<Guid>("MemberId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("Note")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<DateTime?>("NotifiedAt")
                         .HasColumnType("datetime2");
 
@@ -1251,36 +1305,6 @@ namespace Harmonia.Infrastructure.Migrations
                     b.HasIndex("SongListItemId");
 
                     b.ToTable("RosterAssignments");
-                });
-
-            modelBuilder.Entity("Harmonia.Domain.Entities.RosterShortage", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("AvailableCount")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("DetectedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("RequiredCount")
-                        .HasColumnType("int");
-
-                    b.Property<Guid>("RosterId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("SkillId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("RosterId");
-
-                    b.HasIndex("SkillId");
-
-                    b.ToTable("RosterShortages");
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.ServiceRoster", b =>
@@ -1318,6 +1342,9 @@ namespace Harmonia.Infrastructure.Migrations
 
                     b.Property<Guid?>("UpdatedBy")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("WholeServiceFinalizedAt")
+                        .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
@@ -1505,6 +1532,11 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Property<bool>("IsMandatory")
                         .HasColumnType("bit");
 
+                    b.Property<int>("RequiredCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<Guid>("SkillId")
                         .HasColumnType("uniqueidentifier");
 
@@ -1684,10 +1716,15 @@ namespace Harmonia.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Name")
                         .IsUnique();
+
+                    b.HasIndex("ParentId");
 
                     b.ToTable("SongThemes");
                 });
@@ -1700,6 +1737,11 @@ namespace Harmonia.Infrastructure.Migrations
 
                     b.Property<bool>("IsMandatory")
                         .HasColumnType("bit");
+
+                    b.Property<int>("RequiredCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
 
                     b.Property<Guid>("SkillId")
                         .HasColumnType("uniqueidentifier");
@@ -1925,6 +1967,25 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Navigation("Member");
                 });
 
+            modelBuilder.Entity("Harmonia.Domain.Entities.EventPersonnelRequirement", b =>
+                {
+                    b.HasOne("Harmonia.Domain.Entities.LiturgicalEvent", "LiturgicalEvent")
+                        .WithMany("PersonnelRequirements")
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Harmonia.Domain.Entities.Skill", "Skill")
+                        .WithMany()
+                        .HasForeignKey("SkillId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("LiturgicalEvent");
+
+                    b.Navigation("Skill");
+                });
+
             modelBuilder.Entity("Harmonia.Domain.Entities.LiturgicalEvent", b =>
                 {
                     b.HasOne("Harmonia.Domain.Entities.EventCategory", "Category")
@@ -1981,6 +2042,25 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Navigation("Choir");
 
                     b.Navigation("LiturgicalEvent");
+                });
+
+            modelBuilder.Entity("Harmonia.Domain.Entities.LiturgicalSlotRequirement", b =>
+                {
+                    b.HasOne("Harmonia.Domain.Entities.Skill", "Skill")
+                        .WithMany()
+                        .HasForeignKey("SkillId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Harmonia.Domain.Entities.LiturgicalSlot", "Slot")
+                        .WithMany("Requirements")
+                        .HasForeignKey("SlotId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Skill");
+
+                    b.Navigation("Slot");
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.MassSchedule", b =>
@@ -2349,25 +2429,6 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Navigation("SongListItem");
                 });
 
-            modelBuilder.Entity("Harmonia.Domain.Entities.RosterShortage", b =>
-                {
-                    b.HasOne("Harmonia.Domain.Entities.ServiceRoster", "Roster")
-                        .WithMany("Shortages")
-                        .HasForeignKey("RosterId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Harmonia.Domain.Entities.Skill", "Skill")
-                        .WithMany("RosterShortages")
-                        .HasForeignKey("SkillId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Roster");
-
-                    b.Navigation("Skill");
-                });
-
             modelBuilder.Entity("Harmonia.Domain.Entities.ServiceRoster", b =>
                 {
                     b.HasOne("Harmonia.Domain.Entities.LiturgicalEvent", "LiturgicalEvent")
@@ -2532,6 +2593,16 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Navigation("SongListItem");
                 });
 
+            modelBuilder.Entity("Harmonia.Domain.Entities.SongTheme", b =>
+                {
+                    b.HasOne("Harmonia.Domain.Entities.SongTheme", "Parent")
+                        .WithMany("Children")
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Parent");
+                });
+
             modelBuilder.Entity("Harmonia.Domain.Entities.SongVocalRequirement", b =>
                 {
                     b.HasOne("Harmonia.Domain.Entities.Skill", "Skill")
@@ -2593,6 +2664,8 @@ namespace Harmonia.Infrastructure.Migrations
 
                     b.Navigation("EventParticipations");
 
+                    b.Navigation("PersonnelRequirements");
+
                     b.Navigation("PracticeAssignments");
 
                     b.Navigation("Rehearsals");
@@ -2609,6 +2682,8 @@ namespace Harmonia.Infrastructure.Migrations
 
             modelBuilder.Entity("Harmonia.Domain.Entities.LiturgicalSlot", b =>
                 {
+                    b.Navigation("Requirements");
+
                     b.Navigation("SongListItems");
                 });
 
@@ -2675,8 +2750,6 @@ namespace Harmonia.Infrastructure.Migrations
             modelBuilder.Entity("Harmonia.Domain.Entities.ServiceRoster", b =>
                 {
                     b.Navigation("Assignments");
-
-                    b.Navigation("Shortages");
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.Skill", b =>
@@ -2684,8 +2757,6 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Navigation("MemberSkills");
 
                     b.Navigation("RosterAssignments");
-
-                    b.Navigation("RosterShortages");
 
                     b.Navigation("SongInstrumentRequirements");
 
@@ -2724,6 +2795,11 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Navigation("PersonnelRequirements");
 
                     b.Navigation("RosterAssignments");
+                });
+
+            modelBuilder.Entity("Harmonia.Domain.Entities.SongTheme", b =>
+                {
+                    b.Navigation("Children");
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.User", b =>

@@ -507,6 +507,8 @@ Chưa có kỹ năng nào → `[]`.
   có gì để tạo. Không gửi thông báo.
 - Danh sách (`GET`) trả sự kiện **mọi trạng thái** (kể cả `Draft`, `Cancelled`), sắp theo ngày rồi giờ; các bộ lọc
   `fromDate`, `toDate` (bao gồm hai đầu, `yyyy-MM-dd`) và `status` kết hợp AND, đều tuỳ chọn.
+- **Tự điền mùa (`POST`)**: không gửi `liturgicalSeasonId` thì lấy mùa đang hoạt động có `startDate`–`endDate` chứa
+  `eventDate` (cùng luật với sinh sự kiện từ giờ lễ cố định); không có mùa nào thì để `null`. `PUT` không tự điền.
 - **Kiểm danh mục (cả `POST` lẫn `PUT`)**: `liturgicalSeasonId`, `massTypeId`, `ceremonyTypeId`, `categoryId`, `locationId`
   phải trỏ tới mục có thật → nếu không 404 `LOOKUP_NOT_FOUND`; mục đã tắt (`isActive: false`) → 409 `LOOKUP_INACTIVE`.
   Lỗi không cho biết trường nào sai. Khi `PUT`, Id giữ nguyên so với sự kiện hiện tại vẫn được chấp nhận dù mục đã tắt.
@@ -585,7 +587,7 @@ Gồm mọi trường của `LiturgicalEventDto`, thêm `liturgicalSeasonName`, 
 - `songListStatus`: trạng thái phiên bản danh sách bài hát **mới nhất**; `null` nếu chưa đề xuất.
 - `participation*`: đếm `EventParticipation` theo trạng thái; `participationInvited` = đã mời nhưng chưa trả lời.
 - `rosterStatus`: `Draft` | `Suggested` | `Finalized`, `null` nếu chưa có phân công; `rosterActiveAssignments` không tính dòng đã bị thay.
-- `rosterShortages`: giống `GET /api/service-rosters/shortages?eventId=`; `null` khi chưa có danh sách bài hát được duyệt (chưa biết cần bao nhiêu người), `[]` khi đủ người.
+- `rosterShortages`: giống `GET /api/service-rosters/shortages?eventId=`; `null` khi chưa có danh sách bài hát được duyệt và sự kiện cũng không có yêu cầu cả buổi lễ, `[]` khi đủ người.
 - `attendanceExpected` = `rehearsalsHeld` × số ca viên đang hoạt động; `attendancePresent` = tổng lượt `Present` + `Late`.
 - `practice*`: cộng dồn các cột `assignments*` của `preparation-progress` trên mọi ca viên đang hoạt động.
 
@@ -1050,13 +1052,13 @@ Thư viện bài hát và phân loại bài hát (UC-21 / FE-27, FE-29).
 ```
 
 - `materialCounts`: số tài liệu đang hoạt động theo từng `MaterialType`, đủ mọi loại (0 khi chưa có).
-- `isClassified`: bài đã có ít nhất một mùa phụng vụ, loại lễ, nghi thức hoặc chủ đề.
+- `isClassified`: bài đã có ít nhất một mùa phụng vụ, loại lễ, nghi thức, chủ đề hoặc vị trí trong lễ.
 - `timesUsed` / `lastUsedDate`: đếm như báo cáo `song-usage` — sự kiện `Published` đã qua có danh sách `Approved`
   chứa bài; `lastUsedDate` là `null` khi `timesUsed` = 0.
 
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
-| GET | `/api/songs?keyword=&liturgicalSeasonId=&massTypeId=&ceremonyTypeId=&songThemeId=&skillId=&isClassified=&missingMaterialType=&pageNumber=1&pageSize=20` | — | 200 `PagedList<SongDto>` | — |
+| GET | `/api/songs?keyword=&liturgicalSeasonId=&massTypeId=&ceremonyTypeId=&songThemeId=&liturgicalSlotId=&skillId=&isClassified=&missingMaterialType=&pageNumber=1&pageSize=20` | — | 200 `PagedList<SongDto>` | — |
 | GET | `/api/songs/{id}` | — | 200 `SongDto` | 404 `SONG_NOT_FOUND` |
 | POST | `/api/songs` | `{ "title", "composer", "lyricist", "musicalKey", "tempo", "notes" }` | 200 `SongDto` | 400 `VALIDATION_FAILED` · 409 `SONG_TITLE_DUPLICATE` |
 | PUT | `/api/songs/{id}` | như POST | 200 `SongDto` | 400 `VALIDATION_FAILED` · 404 `SONG_NOT_FOUND` · 409 `SONG_TITLE_DUPLICATE` |
@@ -1064,6 +1066,10 @@ Thư viện bài hát và phân loại bài hát (UC-21 / FE-27, FE-29).
 | GET | `/api/songs/{id}/classification` | — | 200 `SongClassificationDto` | 404 `SONG_NOT_FOUND` |
 | PUT | `/api/songs/{id}/classification` | `UpdateSongClassificationRequest` | 200 `SongClassificationDto` | 400 `VALIDATION_FAILED`, `SONG_CLASSIFICATION_DUPLICATE`, `SONG_SKILL_REQUIREMENT_DUPLICATE`, `SONG_CLASSIFICATION_TARGET_INVALID`, `SONG_SKILL_REQUIREMENT_CATEGORY_INVALID` · 404 `SONG_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE` |
 
+- `songThemeId` lấy cả bài gắn chủ đề con cháu (lọc "Đức Maria" ra cả bài gắn "Mân Côi"). `liturgicalSlotId`
+  lọc theo vị trí trong lễ (id từ `GET /api/lookups/liturgical-slots`).
+- `UpdateSongClassificationRequest` có thêm `liturgicalSlotIds` (Nhập lễ, Đáp ca, Dâng lễ, Hiệp lễ, Kết lễ...);
+  `SongClassificationDto` có thêm `liturgicalSlots`. Luật trùng / không hợp lệ như các nhóm khác.
 - `keyword` tìm trong `title`, `composer`, `lyricist`, **không phân biệt hoa thường và dấu tiếng Việt**
   ("con buoc" ra "Con Bước", "duc" ra "Đức"); kết quả sắp theo `title`. Tìm ca viên theo tên
   (`/api/member-profiles`) và tìm tài liệu (`/api/music-materials/mine`) cũng không phân biệt dấu.
@@ -1087,8 +1093,8 @@ Thư viện bài hát và phân loại bài hát (UC-21 / FE-27, FE-29).
   "massTypes": [],
   "ceremonyTypes": [],
   "songThemes": [{ "id": "guid", "name": "Đức Mẹ" }],
-  "vocalRequirements": [{ "skillId": "guid", "skillName": "Soprano", "isMandatory": true }],
-  "instrumentRequirements": [{ "skillId": "guid", "skillName": "Organ", "isMandatory": false }]
+  "vocalRequirements": [{ "skillId": "guid", "skillName": "Soprano", "isMandatory": true, "requiredCount": 1 }],
+  "instrumentRequirements": [{ "skillId": "guid", "skillName": "Organ", "isMandatory": false, "requiredCount": 1 }]
 }
 ```
 
@@ -1098,8 +1104,8 @@ Thư viện bài hát và phân loại bài hát (UC-21 / FE-27, FE-29).
   "massTypeIds": [],
   "ceremonyTypeIds": [],
   "songThemeIds": ["guid"],
-  "vocalRequirements": [{ "skillId": "guid", "isMandatory": true }],
-  "instrumentRequirements": [{ "skillId": "guid", "isMandatory": false }]
+  "vocalRequirements": [{ "skillId": "guid", "isMandatory": true, "requiredCount": 1 }],
+  "instrumentRequirements": [{ "skillId": "guid", "isMandatory": false, "requiredCount": 1 }]
 }
 ```
 
@@ -1111,6 +1117,11 @@ Thư viện bài hát và phân loại bài hát (UC-21 / FE-27, FE-29).
   Mục bài đã có từ trước vẫn giữ được dù sau đó bị vô hiệu hoá, và `GET` vẫn hiển thị.
 - `instrumentRequirements` chỉ nhận skill thuộc nhóm Instrument; `vocalRequirements` nhận skill thuộc
   mọi nhóm còn lại (Vocal, Solo, Psalm, Conducting support). Sai nhóm → 400 `SONG_SKILL_REQUIREMENT_CATEGORY_INVALID`.
+- `requiredCount` (1–50, mặc định 1): số người bài cần với kỹ năng đó — song ca 2, Thương Khó 3 solo. Ngoài khoảng →
+  400 `PERSONNEL_REQUIRED_COUNT_INVALID`.
+- **Điền sẵn khi lập danh sách bài**: mục `isMandatory = true` thuộc nhóm **khác Vocal** (Solo, Psalm, Instrument,
+  Conducting support) được chép sang yêu cầu nhân sự của bài khi bài được đưa vào danh sách. Bè Vocal (S/A/T/B) không bao
+  giờ được chép — bài đồng ca không sinh phân công.
 
 ---
 
@@ -1311,7 +1322,14 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
 | GET | `/api/song-list-items/{id}/personnel-requirements` | — | 200 `SongPersonnelRequirementDto[]` | 404 `SONG_LIST_ITEM_NOT_FOUND` |
-| PUT | `/api/song-list-items/{id}/personnel-requirements` | `UpdateSongPersonnelRequirementsRequest` | 200 `SongPersonnelRequirementDto[]` | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `SONG_LIST_ITEM_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE`, `SONG_LIST_NOT_LATEST_VERSION`, `ROSTER_ALREADY_FINALIZED` |
+| PUT | `/api/song-list-items/{id}/personnel-requirements` | `UpdateSongPersonnelRequirementsRequest` | 200 `SongPersonnelRequirementDto[]` | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `SONG_LIST_ITEM_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE`, `SONG_LIST_NOT_LATEST_VERSION`, `ROSTER_ALREADY_FINALIZED`, `PERSONNEL_REQUIREMENT_IN_USE` |
+
+**Điền sẵn yêu cầu nhân sự** khi tạo danh sách (`POST /api/song-lists`) hoặc sửa bài (`PUT .../items`):
+1. Cùng bài hát ở cùng vị trí trong phiên bản trước / bản nháp trước khi sửa → giữ nguyên yêu cầu ca trưởng đã để lại
+   (kể cả không có gì). Trước đây sửa danh sách làm mất hết yêu cầu đã khai.
+2. Bài mới: lấy yêu cầu `isMandatory` khác bè Vocal ở thư viện + yêu cầu mặc định của vị trí, trùng kỹ năng thì lấy số lớn hơn;
+   bỏ kỹ năng sự kiện đã khai cả buổi lễ.
+Ca trưởng vẫn sửa được bằng `PUT /api/song-list-items/{id}/personnel-requirements`.
 
 - `PUT` **thay cả bộ**: skill nào không gửi lên thì bị gỡ. Gửi `[]` để gỡ hết.
 - `requiredCount` từ 1 đến 50 (`errors.<field>` chứa `PERSONNEL_REQUIRED_COUNT_INVALID`); skill trùng trong
@@ -1339,7 +1357,7 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
   "assignments": [{
     "id": "guid", "memberId": "guid", "memberName": "Nguyễn Văn An",
     "skillId": "guid", "skillName": "Soprano",
-    "songListItemId": "guid", "songTitle": "Hãy Nâng Tâm Hồn", "source": "Suggested"
+    "songListItemId": "guid", "songTitle": "Hãy Nâng Tâm Hồn", "note": null, "source": "Suggested"
   }],
   "shortages": [{
     "songListItemId": "guid", "songTitle": "Hãy Nâng Tâm Hồn",
@@ -1353,13 +1371,76 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 | POST | `/api/service-rosters/suggestions` | `{ "eventId": "guid" }` | 200 `RosterSuggestionResponse` | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `LITURGICAL_EVENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_SONG_LIST_NOT_APPROVED`, `ROSTER_NO_PERSONNEL_REQUIREMENT`, `ROSTER_ALREADY_FINALIZED` |
 | GET | `/api/service-rosters?eventId=` | — | 200 `ServiceRosterDto` (assignment `Active` + shortage; `shortages` rỗng nếu sự kiện không còn song list đã duyệt) | 404 `LITURGICAL_EVENT_NOT_FOUND`, `ROSTER_NOT_FOUND` (chưa có roster — gọi `suggestions` hoặc thêm tay) |
 | GET | `/api/service-rosters/shortages?eventId=` | — | 200 `RosterShortageDto[]` | 404 `LITURGICAL_EVENT_NOT_FOUND` · 409 `ROSTER_SONG_LIST_NOT_APPROVED` |
-| POST | `/api/service-rosters/assignments` | `{ "eventId", "songListItemId", "skillId", "memberId" }` | 200 `RosterAssignmentDto` | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `PERSONNEL_REQUIREMENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ROSTER_SONG_LIST_NOT_APPROVED`, `ROSTER_ASSIGNMENT_DUPLICATE`, `MEMBER_NOT_ACTIVE`, `ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED` |
-| POST | `/api/service-rosters/assignments/{id}/replacement` | `{ "memberId" }` | 200 `RosterAssignmentDto` (dòng mới) | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `ROSTER_ASSIGNMENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ROSTER_ASSIGNMENT_DUPLICATE`, `MEMBER_NOT_ACTIVE`, `ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED` |
+| POST | `/api/service-rosters/assignments` | `{ "eventId", "songListItemId?", "skillId", "memberId", "note?" }` | 200 `RosterAssignmentDto` | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `PERSONNEL_REQUIREMENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ROSTER_SONG_LIST_NOT_APPROVED`, `ROSTER_ASSIGNMENT_DUPLICATE`, `MEMBER_NOT_ACTIVE`, `ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED` |
+| POST | `/api/service-rosters/assignments/{id}/replacement` | `{ "memberId", "note?" }` | 200 `RosterAssignmentDto` (dòng mới) | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `ROSTER_ASSIGNMENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ROSTER_ASSIGNMENT_DUPLICATE`, `MEMBER_NOT_ACTIVE`, `ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED` |
+| PUT | `/api/service-rosters/assignments/{id}/note` | `{ "note" }` | 200 `RosterAssignmentDto` | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `ROSTER_ASSIGNMENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED` |
 | DELETE | `/api/service-rosters/assignments/{id}` | — | 204 | 403 `CHOIR_NOT_LEAD` · 404 `ROSTER_ASSIGNMENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED` |
 | POST | `/api/service-rosters/{id}/finalization` | — | 200 `ServiceRosterDto` | 403 `CHOIR_NOT_LEAD` · 404 `ROSTER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ROSTER_SONG_LIST_NOT_APPROVED`, `MEMBER_NOT_ACTIVE`, `ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED` |
 | POST | `/api/service-rosters/{id}/notifications` | `{ "memberIds": ["guid"] }` | 204 | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `ROSTER_NOT_FOUND`, `ROSTER_ASSIGNMENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_NOT_FINALIZED` |
 
+`ServiceRosterDto` có thêm `wholeServiceFinalizedAt` (null khi chưa chốt sớm vai cả buổi lễ).
 `RosterAssignmentDto` = một phần tử của `assignments` ở trên. `RosterShortageDto` = một phần tử của `shortages`.
+`songListItemId` / `songTitle` là `null` ở dòng phân công và dòng thiếu người **cả buổi lễ** (organ, bắt nhịp...).
+`note` là ghi chú vai ("Thuật giả", "câu 2"), tối đa 200 ký tự; `replacement` không gửi `note` thì giữ ghi chú của dòng cũ,
+`PUT .../note` gửi rỗng để xoá. `MyAssignmentDto` của ca viên cũng có `note`.
+
+### Ba tầng nhân sự
+
+| Tầng | Ví dụ | Khai ở đâu | Phân công |
+|---|---|---|---|
+| Đồng ca | hát bè S/A/T/B | không khai | không — chỉ xác nhận tham gia |
+| Cả buổi lễ | organ, guitar, bắt nhịp | `PUT /api/liturgical-events/{id}/personnel-requirements` | một người giữ cả lễ, `songListItemId = null` |
+| Theo bài | xướng đáp ca, Alleluia, solo, song ca, vai Thương Khó | `PUT /api/song-list-items/{id}/personnel-requirements` (được điền sẵn) | theo từng bài |
+
+- Người cả buổi lễ chơi **mọi bài**, nên bài chỉ cần **phần vượt quá**: bài cần Guitar ×2, cả lễ có Guitar ×1 → bài còn
+  Guitar ×1 (gợi ý, thiếu người tính trên phần này, `requiredCount` của dòng thiếu = phần còn lại). Bài cần ≤ số của cả lễ
+  → coi là đủ, không gợi ý riêng. Người đang giữ kỹ năng đó cho cả lễ không được chọn lại cho phần thêm của bài — gợi ý tự bỏ qua, thêm / thay tay
+  trả 409 `ROSTER_ASSIGNMENT_DUPLICATE` (cả chiều ngược lại: người có dòng ở bài không được làm dòng cả lễ cùng kỹ năng).
+- Yêu cầu cả buổi lễ **không cần** danh sách bài đã duyệt: `suggestions`, `shortages`, thêm tay dòng cả buổi lễ chạy được
+  ngay. Chỉ báo `ROSTER_SONG_LIST_NOT_APPROVED` khi chưa có danh sách duyệt **và** sự kiện không có yêu cầu cả buổi lễ
+  (thêm tay dòng theo bài vẫn cần danh sách duyệt). `finalization` vẫn cần danh sách đã duyệt.
+
+### Yêu cầu nhân sự cả buổi lễ — `api/liturgical-events/{id}/personnel-requirements`
+
+| Method | Role | Body | Thành công | Lỗi |
+|---|---|---|---|---|
+| GET | `ParishPriest`, `ChoirDirector` | — | 200 `EventPersonnelRequirementDto[]` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
+| PUT | `ChoirDirector` (ca đoàn phụ trách) | `{ "requirements": [{ "skillId", "requiredCount" }] }` | 200 `EventPersonnelRequirementDto[]` | 400 `VALIDATION_FAILED` (`PERSONNEL_REQUIREMENT_DUPLICATE`, `PERSONNEL_REQUIRED_COUNT_INVALID`) · 403 `CHOIR_NOT_LEAD` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE`, `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `PERSONNEL_REQUIREMENT_IN_USE` |
+
+`EventPersonnelRequirementDto` = `{ "skillId", "skillName", "skillCategoryId", "requiredCount" }`, sắp theo tên kỹ năng.
+`PUT` thay cả bộ; `requiredCount` 1–50. Bỏ một kỹ năng đang có người được gán → 409 `PERSONNEL_REQUIREMENT_IN_USE`
+(gỡ dòng phân công trước). Đã chốt sớm vai cả buổi lễ hoặc chốt toàn bộ → 409 `ROSTER_ALREADY_FINALIZED`.
+
+### Chốt sớm vai cả buổi lễ — `POST /api/service-rosters/{id}/whole-service-finalization`
+
+| Thành công | Lỗi |
+|---|---|
+| 200 `ServiceRosterDto` (`wholeServiceFinalizedAt` có giá trị, `status` giữ nguyên) | 403 `CHOIR_NOT_LEAD` · 404 `ROSTER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ROSTER_NO_PERSONNEL_REQUIREMENT`, `MEMBER_NOT_ACTIVE`, `ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED` |
+
+- Dùng khi cần hẹn organist / người bắt nhịp sớm, trước khi danh sách bài được duyệt. Chỉ kiểm các dòng cả buổi lễ
+  (như `finalization`); dòng theo bài không bị đụng.
+- Sau khi chốt sớm: dòng cả buổi lễ không thêm / xoá / sửa ghi chú được, yêu cầu cả buổi lễ không sửa được
+  (409 `ROSTER_ALREADY_FINALIZED`); `suggestions` giữ nguyên các dòng đó. **Vẫn thay người được**
+  (`.../replacement`) khi organist báo bận: dòng mới chưa `notifiedAt`, gửi `notifications` cho người mới.
+- `notifications` gửi được ngay, nhưng **chỉ** các dòng cả buổi lễ; chốt toàn bộ xong thì gửi được mọi dòng.
+  Trước cả hai bước chốt vẫn là 409 `ROSTER_NOT_FINALIZED`.
+
+### Gợi ý bài cho sự kiện — `GET /api/liturgical-events/{id}/song-suggestions?slotId=&pageNumber=1&pageSize=20`
+
+Role `ParishPriest`, `ChoirDirector`. 200 `PagedList<SongSuggestionResponse>` · 400 `VALIDATION_FAILED` · 404 `LITURGICAL_EVENT_NOT_FOUND`.
+
+```json
+{ "songId": "guid", "title": "Bánh Trường Sinh", "composer": "Kim Long", "score": 5,
+  "matchesSlot": true, "matchesEventType": false, "matchesSeason": true, "timesUsed": 2, "lastUsedDate": "2026-08-02" }
+```
+
+- Điểm: khớp vị trí `slotId` +3, khớp loại lễ hoặc nghi thức của sự kiện +2, khớp mùa của sự kiện +2. Chỉ trả bài có điểm > 0.
+- **Loại bỏ** bài chỉ được phân loại vào **mùa khác** (bài Giáng Sinh trong Mùa Chay), và khi có `slotId`, bài chỉ được
+  phân loại vào **vị trí khác**. Bài chưa phân loại mùa / vị trí coi như dùng được mọi mùa / vị trí.
+- Sắp: điểm giảm dần → bài **để trống ít tiêu chí hơn** (cụ thể hơn) lên trước — để trống mùa / loại lễ / vị trí nghĩa là
+  hợp mọi thứ, nên kém hơn một lần khớp thật → bài lâu chưa hát lên trước (chưa hát bao giờ đứng đầu) → tên bài. `timesUsed` / `lastUsedDate`
+  đếm như thư viện bài hát.
+- Chỉ là gợi ý: lập danh sách vẫn chọn được bài bất kỳ.
 `{id}` của `finalization` / `notifications` là `rosterId` (có trong `RosterSuggestionResponse` và `ServiceRosterDto.id`).
 
 ### `ServiceRosterDto` (đọc roster hiện tại / kết quả chốt)
@@ -1384,7 +1465,10 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 - AI (Gemini) chọn trong ứng viên, ưu tiên level cao và người ít phục vụ trong 60 ngày gần nhất. Server
   kiểm lại mọi lựa chọn của AI, rồi tự bù chỗ còn trống theo cùng tiêu chí. AI lỗi hoặc quá 20 giây thì
   phần bù lo toàn bộ và `isAiGenerated = false`. Endpoint không trả lỗi vì AI.
-- Một ca viên có thể phục vụ nhiều bài, và nhiều skill trong cùng một bài.
+- AI được biết ô nào là cả buổi lễ (`isWholeService`) và được dặn rải đều, tránh giao thêm bài cho người đã giữ vai cả lễ.
+- Một ca viên có thể phục vụ nhiều bài, và nhiều skill trong cùng một bài. Phần bù theo luật **rải đều**: ưu tiên người
+  đang giữ ít dòng nhất trong lần gợi ý này, cùng số dòng thì theo level / số lần phục vụ gần đây. Yêu cầu cả buổi lễ
+  được xếp trước, nên organist ít khi bị giao thêm solo.
 - Gọi lại được nhiều lần cho tới khi chốt: dòng `source = Suggested` cũ bị thay; dòng `Manual` (ca trưởng sửa
   tay) **được giữ** và tính là đã có người, nên chỉ gợi ý thêm cho phần còn thiếu.
 - `assignments` là **toàn bộ** phân công hiện tại của sự kiện (gợi ý mới + dòng tay), sắp theo thứ tự bài,
@@ -1831,7 +1915,7 @@ danh sách (dữ liệu cũ vẫn trỏ tới nó). Không phân trang — trả
 | `GET /api/lookups/mass-types` | `{ "id", "name", "description", "isActive" }` | tên |
 | `GET /api/lookups/ceremony-types` | `{ "id", "name", "description", "isActive" }` | tên |
 | `GET /api/lookups/event-categories` | `{ "id", "name", "description", "isActive" }` | tên |
-| `GET /api/lookups/song-themes` | `{ "id", "name", "description", "isActive" }` | tên |
+| `GET /api/lookups/song-themes` | `{ "id", "name", "description", "isActive", "parentId" }` | tên |
 | `GET /api/lookups/skill-categories` | `{ "id", "name", "description", "isActive" }` | tên |
 | `GET /api/lookups/liturgical-seasons` | `{ "id", "name", "startDate", "endDate", "colorHex", "isActive" }` | `startDate` |
 | `GET /api/lookups/liturgical-slots` | `{ "id", "name", "defaultOrder", "isActive" }` | `defaultOrder` (thứ tự trong lễ) |
@@ -1850,7 +1934,7 @@ danh sách (dữ liệu cũ vẫn trỏ tới nó). Không phân trang — trả
 |---|---|---|---|---|
 | POST · PUT `{id}` | `/api/lookups/mass-types` · `ceremony-types` · `event-categories` · `skill-categories` | `{ "name", "description?", "isActive" }` | 200 phần tử như bảng trên | 400 `VALIDATION_FAILED` · 404 `LOOKUP_NOT_FOUND` (PUT) · 409 `LOOKUP_NAME_DUPLICATE`, `LOOKUP_IN_USE` (chỉ `skill-categories`) |
 | POST · PUT `{id}` | `/api/lookups/skills` | `{ "categoryId", "name", "description?", "isActive" }` | 200 `SkillDto` | 400 `VALIDATION_FAILED` · 404 `SKILL_CATEGORY_NOT_FOUND`, `SKILL_NOT_FOUND` (PUT) · 409 `SKILL_NAME_DUPLICATE`, `LOOKUP_INACTIVE`, `SKILL_IN_USE` |
-| POST · PUT `{id}` | `/api/lookups/song-themes` | `{ "name", "description?", "isActive" }` | 200 `SongThemeDto` | 400 `VALIDATION_FAILED` · 404 `LOOKUP_NOT_FOUND` (PUT) · 409 `LOOKUP_NAME_DUPLICATE` |
+| POST · PUT `{id}` | `/api/lookups/song-themes` | `{ "name", "description?", "isActive", "parentId?" }` | 200 `SongThemeDto` | 400 `VALIDATION_FAILED`, `SONG_THEME_PARENT_INVALID` · 404 `LOOKUP_NOT_FOUND` (PUT) · 409 `LOOKUP_NAME_DUPLICATE` |
 | POST · PUT `{id}` | `/api/lookups/liturgical-slots` · `Admin`, `ChoirDirector` | `{ "name", "defaultOrder", "isActive" }` | 200 `LiturgicalSlotDto` | như trên |
 | POST · PUT `{id}` | `/api/lookups/worship-locations` | `{ "name", "address?", "isActive" }` | 200 `WorshipLocationDto` | như trên |
 | POST · PUT `{id}` | `/api/lookups/liturgical-seasons` | `{ "name", "startDate", "endDate", "colorHex?", "isActive" }` | 200 `LiturgicalSeasonDto` | 400 `VALIDATION_FAILED` (`LITURGICAL_SEASON_DATE_INVALID`) · 404 `LOOKUP_NOT_FOUND` (PUT) · 409 `LITURGICAL_SEASON_DATE_OVERLAP` |
@@ -1862,6 +1946,15 @@ danh sách (dữ liệu cũ vẫn trỏ tới nó). Không phân trang — trả
   Mục mới dùng chung cho mọi danh sách sau này. Ca trưởng không đọc được mục đã tắt (`includeInactive` chỉ cho Admin).
 - `song-themes`, `liturgical-slots`, `worship-locations`: response giờ có thêm `isActive`. Tên chủ đề tối đa 50 ký tự;
   tên vị trí phụng vụ và nơi cử hành tối đa 100; `address` tối đa 300; `defaultOrder` ≥ 0.
+- `GET /api/lookups/liturgical-slots/{id}/requirements` (mọi role) · `PUT` (chỉ Admin, body
+  `{ "requirements": [{ "skillId", "requiredCount" }] }`): người vị trí đó luôn cần dù đặt bài nào, ví dụ Đáp ca → 1 người
+  xướng. Trả `{ "skillId", "skillName", "skillCategoryId", "requiredCount" }[]`. Lỗi: 400 `VALIDATION_FAILED` · 404
+  `LOOKUP_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE`. Chỉ áp cho bài đưa vào vị trí **sau** khi sửa.
+- `song-themes` là **cây nhiều cấp** (vd Đức Maria › Mân Côi): `parentId` `null` là gốc. API trả danh sách phẳng, FE tự
+  dựng cây theo `parentId`. `SONG_THEME_PARENT_INVALID` khi cha không tồn tại, đã tắt (trừ khi giữ nguyên cha cũ),
+  hoặc chính là chủ đề đó / một chủ đề con cháu của nó. Không giới hạn số cấp.
+- Chủ đề đang hoạt động không nằm dưới chủ đề đã tắt: tắt chủ đề còn con đang hoạt động → 409 `SONG_THEME_HAS_ACTIVE_CHILDREN` (tắt con
+  trước); bật hoặc tạo chủ đề dưới cha đã tắt → 400 `SONG_THEME_PARENT_INVALID`.
 - Tắt một mục không gỡ nó khỏi dữ liệu đang dùng: sự kiện, danh sách bài hát cũ vẫn giữ tham chiếu; mục đã tắt
   chỉ không chọn được cho bản ghi mới.
 - `name`: bắt buộc, tối đa 50 ký tự (mùa phụng vụ: 100); `description` tối đa 300; trùng tên (không phân biệt

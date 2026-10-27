@@ -51,6 +51,19 @@ public class ServiceRostersController(IRosterService rosterService) : ApiControl
     public async Task<IActionResult> RemoveAssignmentAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await rosterService.RemoveAssignmentAsync(id, cancellationToken));
 
+    /// <summary>Sets or clears the role note of an assignment, e.g. "Narrator" in the Passion.</summary>
+    [HttpPut("assignments/{id:guid}/note")]
+    [ProducesResponseType<RosterAssignmentDto>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdateNoteAsync(
+        Guid id, [FromBody] UpdateRosterAssignmentNoteRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await rosterService.UpdateNoteAsync(id, request, cancellationToken));
+
+    /// <summary>Locks only the whole-service lines (organist, conductor) so they can be notified before the song list is ready.</summary>
+    [HttpPost("{id:guid}/whole-service-finalization")]
+    [ProducesResponseType<ServiceRosterDto>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> FinalizeWholeServiceAsync(Guid id, CancellationToken cancellationToken) =>
+        ToActionResult(await rosterService.FinalizeWholeServiceAsync(id, cancellationToken));
+
     /// <summary>Locks the roster after the song list is approved; shortages do not block (UC-26 / FE-39).</summary>
     [HttpPost("{id:guid}/finalization")]
     [ProducesResponseType<ServiceRosterDto>(StatusCodes.Status200OK)]

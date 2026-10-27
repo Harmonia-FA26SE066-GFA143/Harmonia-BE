@@ -11,6 +11,9 @@ public class UpdateSongClassificationRequest
 
     public List<Guid> SongThemeIds { get; set; } = [];
 
+    /// <summary>Parts of the Mass the song fits: entrance, psalm, offertory, communion, recessional...</summary>
+    public List<Guid> LiturgicalSlotIds { get; set; } = [];
+
     public List<UpdateSongSkillRequirementRequest> VocalRequirements { get; set; } = [];
 
     public List<UpdateSongSkillRequirementRequest> InstrumentRequirements { get; set; } = [];

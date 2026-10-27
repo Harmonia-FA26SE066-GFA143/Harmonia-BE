@@ -21,6 +21,8 @@ public static class DependencyInjection
         services.AddScoped<IMusicMaterialService, MusicMaterialService>();
         services.AddScoped<ILookupService, LookupService>();
         services.AddScoped<ISongPersonnelRequirementService, SongPersonnelRequirementService>();
+        services.AddScoped<IEventPersonnelRequirementService, EventPersonnelRequirementService>();
+        services.AddScoped<ISongSuggestionService, SongSuggestionService>();
         services.AddScoped<IRosterService, RosterService>();
         services.AddScoped<ILiturgicalDayService, LiturgicalDayService>();
         services.AddScoped<ILiturgicalNameTranslationService, LiturgicalNameTranslationService>();

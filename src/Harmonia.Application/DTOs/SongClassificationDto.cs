@@ -13,6 +13,8 @@ public class SongClassificationDto
 
     public List<SongClassificationSummaryDto> SongThemes { get; set; } = [];
 
+    public List<SongClassificationSummaryDto> LiturgicalSlots { get; set; } = [];
+
     public List<SongVocalRequirementDto> VocalRequirements { get; set; } = [];
 
     public List<SongInstrumentRequirementDto> InstrumentRequirements { get; set; } = [];

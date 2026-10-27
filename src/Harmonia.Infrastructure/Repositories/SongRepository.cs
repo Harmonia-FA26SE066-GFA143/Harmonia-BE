@@ -30,7 +30,14 @@ public class SongRepository(HarmoniaDbContext dbContext)
         query = WhereClassifiedAs(query, ClassificationTarget.LiturgicalSeason, filter.LiturgicalSeasonId);
         query = WhereClassifiedAs(query, ClassificationTarget.MassType, filter.MassTypeId);
         query = WhereClassifiedAs(query, ClassificationTarget.CeremonyType, filter.CeremonyTypeId);
-        query = WhereClassifiedAs(query, ClassificationTarget.SongTheme, filter.SongThemeId);
+        query = WhereClassifiedAs(query, ClassificationTarget.LiturgicalSlot, filter.LiturgicalSlotId);
+
+        if (filter.SongThemeId is { } themeId)
+        {
+            var themeIds = await GetThemeWithDescendantsAsync(themeId, cancellationToken);
+            query = query.Where(x => x.Classifications.Any(
+                c => c.TargetType == ClassificationTarget.SongTheme && themeIds.Contains(c.TargetId)));
+        }
 
         if (filter.SkillId is { } skillId)
         {
@@ -58,6 +65,40 @@ public class SongRepository(HarmoniaDbContext dbContext)
             .ToListAsync(cancellationToken);
 
         return new PagedList<Song>(items, filter.PageNumber, filter.PageSize, totalCount);
+    }
+
+    public async Task<List<(Song Song, bool MatchesSeason, bool MatchesEventType, bool MatchesSlot, bool HasSeason, bool HasEventType, bool HasSlot)>> GetSuggestionMatchesAsync(
+        Guid? liturgicalSeasonId, Guid? massTypeId, Guid? ceremonyTypeId, Guid? slotId, CancellationToken cancellationToken)
+    {
+        const ClassificationTarget season = ClassificationTarget.LiturgicalSeason, slot = ClassificationTarget.LiturgicalSlot;
+
+        var rows = await DbContext.Songs
+            .AsNoTracking()
+            .Where(s => s.IsActive)
+            .Where(s => liturgicalSeasonId == null
+                || !s.Classifications.Any(c => c.TargetType == season)
+                || s.Classifications.Any(c => c.TargetType == season && c.TargetId == liturgicalSeasonId))
+            .Where(s => slotId == null
+                || !s.Classifications.Any(c => c.TargetType == slot)
+                || s.Classifications.Any(c => c.TargetType == slot && c.TargetId == slotId))
+            .Select(s => new
+            {
+                Song = s,
+                MatchesSeason = s.Classifications.Any(c => c.TargetType == season && c.TargetId == liturgicalSeasonId),
+                MatchesEventType = s.Classifications.Any(c =>
+                    (c.TargetType == ClassificationTarget.MassType && c.TargetId == massTypeId)
+                    || (c.TargetType == ClassificationTarget.CeremonyType && c.TargetId == ceremonyTypeId)),
+                MatchesSlot = s.Classifications.Any(c => c.TargetType == slot && c.TargetId == slotId),
+                HasSeason = s.Classifications.Any(c => c.TargetType == season),
+                HasEventType = s.Classifications.Any(c =>
+                    c.TargetType == ClassificationTarget.MassType || c.TargetType == ClassificationTarget.CeremonyType),
+                HasSlot = s.Classifications.Any(c => c.TargetType == slot),
+            })
+            .Where(x => x.MatchesSeason || x.MatchesEventType || x.MatchesSlot)
+            .ToListAsync(cancellationToken);
+
+        // Expression trees cannot build tuples, so rows are shaped in memory.
+        return rows.Select(x => (x.Song, x.MatchesSeason, x.MatchesEventType, x.MatchesSlot, x.HasSeason, x.HasEventType, x.HasSlot)).ToList();
     }
 
     public Task<bool> ExistsByTitleAsync(
@@ -113,7 +154,7 @@ public class SongRepository(HarmoniaDbContext dbContext)
     public async Task<Dictionary<Guid, (string Name, bool IsActive)>> GetClassificationTargetsAsync(
         ClassificationTarget targetType, IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken)
     {
-        // The four lookups share the shape Id / Name / IsActive but no base type, hence one branch each.
+        // The five lookups share the shape Id / Name / IsActive but no base type, hence one branch each.
         var rows = targetType switch
         {
             ClassificationTarget.LiturgicalSeason => await DbContext.LiturgicalSeasons.AsNoTracking()
@@ -123,6 +164,8 @@ public class SongRepository(HarmoniaDbContext dbContext)
             ClassificationTarget.CeremonyType => await DbContext.CeremonyTypes.AsNoTracking()
                 .Where(x => ids.Contains(x.Id)).Select(x => new { x.Id, x.Name, x.IsActive }).ToListAsync(cancellationToken),
             ClassificationTarget.SongTheme => await DbContext.SongThemes.AsNoTracking()
+                .Where(x => ids.Contains(x.Id)).Select(x => new { x.Id, x.Name, x.IsActive }).ToListAsync(cancellationToken),
+            ClassificationTarget.LiturgicalSlot => await DbContext.LiturgicalSlots.AsNoTracking()
                 .Where(x => ids.Contains(x.Id)).Select(x => new { x.Id, x.Name, x.IsActive }).ToListAsync(cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(targetType), targetType, "Unknown classification target."),
         };
@@ -188,6 +231,21 @@ public class SongRepository(HarmoniaDbContext dbContext)
         return new PagedList<(Song, int, DateOnly?)>(
             rows.Select(x => (x.Song, x.TimesUsed, x.LastUsedDate)).ToList(),
             filter.PageNumber, filter.PageSize, totalCount);
+    }
+
+    /// <summary>The theme and every theme below it, so filtering by "Mary" also finds songs tagged "Rosary".</summary>
+    private async Task<List<Guid>> GetThemeWithDescendantsAsync(Guid themeId, CancellationToken cancellationToken)
+    {
+        // A few dozen rows: loading the tree beats a recursive CTE.
+        var childrenByParent = (await DbContext.SongThemes.AsNoTracking()
+                .Where(x => x.ParentId != null).Select(x => new { x.Id, x.ParentId }).ToListAsync(cancellationToken))
+            .ToLookup(x => x.ParentId!.Value, x => x.Id);
+
+        var result = new List<Guid> { themeId };
+        for (var i = 0; i < result.Count; i++)
+            result.AddRange(childrenByParent[result[i]]);
+
+        return result;
     }
 
     private static IQueryable<Song> WhereClassifiedAs(IQueryable<Song> query, ClassificationTarget targetType, Guid? targetId) =>

@@ -92,6 +92,8 @@ public static class ErrorStatusMap
         [ErrorCodes.SongTitleDuplicate] = StatusCodes.Status409Conflict,
         [ErrorCodes.SongInUse] = StatusCodes.Status409Conflict,
         [ErrorCodes.SongClassificationTargetInvalid] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.SongThemeParentInvalid] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.SongThemeHasActiveChildren] = StatusCodes.Status409Conflict,
         [ErrorCodes.SongSkillRequirementCategoryInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.MaterialNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.MaterialFileRequired] = StatusCodes.Status400BadRequest,
@@ -134,6 +136,7 @@ public static class ErrorStatusMap
         [ErrorCodes.RosterAssignmentMemberNotConfirmed] = StatusCodes.Status409Conflict,
         [ErrorCodes.RosterAssignmentDuplicate] = StatusCodes.Status409Conflict,
         [ErrorCodes.PersonnelRequirementNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.PersonnelRequirementInUse] = StatusCodes.Status409Conflict,
         [ErrorCodes.PersonnelRequiredCountInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.PersonnelRequirementDuplicate] = StatusCodes.Status409Conflict,
 

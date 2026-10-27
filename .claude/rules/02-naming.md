@@ -38,9 +38,11 @@ Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 | quyết định duyệt | `SongListReview` |
 | xác nhận tham gia | `EventParticipation` — KHÔNG dùng `ParticipationConfirmation` |
 | yêu cầu nhân sự cho bài | `SongPersonnelRequirement` |
+| yêu cầu nhân sự cả buổi lễ (organ, bắt nhịp) | `EventPersonnelRequirement` |
+| người một vị trí trong lễ luôn cần (Đáp ca → người xướng) | `LiturgicalSlotRequirement` |
 | phân công phục vụ | `ServiceRoster` — KHÔNG dùng `Assignment` |
 | dòng phân công | `RosterAssignment` |
-| cảnh báo thiếu người | `RosterShortage` |
+| cảnh báo thiếu người | `RosterShortageDto` — tính lúc chạy, KHÔNG có bảng (bỏ entity `RosterShortage` 2026-10-26) |
 | buổi tập | `Rehearsal` |
 | điểm danh | `RehearsalAttendance` — KHÔNG dùng `Attendance` trần |
 | bài hát của buổi tập | `RehearsalSong` — KHÔNG phải `SongList` (không phiên bản, không duyệt) |

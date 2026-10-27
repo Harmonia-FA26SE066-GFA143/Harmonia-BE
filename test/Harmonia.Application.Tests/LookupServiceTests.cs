@@ -23,6 +23,7 @@ public class LookupServiceTests
     private readonly IGenericRepository<WorshipLocation> _locations = Substitute.For<IGenericRepository<WorshipLocation>>();
     private readonly IGenericRepository<SongVocalRequirement> _vocalRequirements = Substitute.For<IGenericRepository<SongVocalRequirement>>();
     private readonly IGenericRepository<SongInstrumentRequirement> _instrumentRequirements = Substitute.For<IGenericRepository<SongInstrumentRequirement>>();
+    private readonly IGenericRepository<LiturgicalSlotRequirement> _slotRequirements = Substitute.For<IGenericRepository<LiturgicalSlotRequirement>>();
     private readonly LookupService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
 
@@ -51,6 +52,7 @@ public class LookupServiceTests
             _skills,
             _vocalRequirements,
             _instrumentRequirements,
+            _slotRequirements,
             mapper);
 
         Rows(_vocalRequirements);
@@ -263,7 +265,7 @@ public class LookupServiceTests
         Rows(_slots);
         Rows(_locations);
 
-        var theme = await _sut.SaveSongThemeAsync(null, new SaveCatalogItemRequest { Name = " Marian ", Description = "For Mary" }, _ct);
+        var theme = await _sut.SaveSongThemeAsync(null, new SaveSongThemeRequest { Name = " Marian ", Description = "For Mary" }, _ct);
         var slot = await _sut.SaveLiturgicalSlotAsync(null, new SaveLiturgicalSlotRequest { Name = " Entrance ", DefaultOrder = 1 }, _ct);
         var location = await _sut.SaveWorshipLocationAsync(
             null, new SaveWorshipLocationRequest { Name = " Chapel ", Address = "12 Main St", IsActive = false }, _ct);
@@ -281,7 +283,7 @@ public class LookupServiceTests
         Rows(_slots, new LiturgicalSlot { Id = Guid.NewGuid(), Name = "Entrance" });
         Rows(_locations, new WorshipLocation { Id = Guid.NewGuid(), Name = "Chapel" });
 
-        var theme = await _sut.SaveSongThemeAsync(null, new SaveCatalogItemRequest { Name = "Marian" }, _ct);
+        var theme = await _sut.SaveSongThemeAsync(null, new SaveSongThemeRequest { Name = "Marian" }, _ct);
         var slot = await _sut.SaveLiturgicalSlotAsync(null, new SaveLiturgicalSlotRequest { Name = "Entrance" }, _ct);
         var location = await _sut.SaveWorshipLocationAsync(null, new SaveWorshipLocationRequest { Name = "Chapel" }, _ct);
         var missing = await _sut.SaveWorshipLocationAsync(Guid.NewGuid(), new SaveWorshipLocationRequest { Name = "Other" }, _ct);
@@ -289,6 +291,54 @@ public class LookupServiceTests
         Assert.Equal(
             [ErrorCodes.LookupNameDuplicate, ErrorCodes.LookupNameDuplicate, ErrorCodes.LookupNameDuplicate, ErrorCodes.LookupNotFound],
             new[] { theme.Code, slot.Code, location.Code, missing.Code });
+    }
+
+    [Fact]
+    public async Task SaveSongTheme_Parent_StoredWhenValid_RejectedWhenMissingOrDescendant_Async()
+    {
+        var mary = new SongTheme { Id = Guid.NewGuid(), Name = "Mary" };
+        var rosary = new SongTheme { Id = Guid.NewGuid(), Name = "Rosary", ParentId = mary.Id };
+        Rows(_songThemes, mary, rosary);
+
+        var child = await _sut.SaveSongThemeAsync(null, new SaveSongThemeRequest { Name = "Assumption", ParentId = mary.Id }, _ct);
+        var missing = await _sut.SaveSongThemeAsync(null, new SaveSongThemeRequest { Name = "Other", ParentId = Guid.NewGuid() }, _ct);
+        var self = await _sut.SaveSongThemeAsync(mary.Id, new SaveSongThemeRequest { Name = "Mary", ParentId = mary.Id }, _ct);
+        var cycle = await _sut.SaveSongThemeAsync(mary.Id, new SaveSongThemeRequest { Name = "Mary", ParentId = rosary.Id }, _ct);
+
+        Assert.Equal(mary.Id, child.Value!.ParentId);
+        Assert.Equal(
+            [ErrorCodes.SongThemeParentInvalid, ErrorCodes.SongThemeParentInvalid, ErrorCodes.SongThemeParentInvalid],
+            new[] { missing.Code, self.Code, cycle.Code });
+        Assert.Null(mary.ParentId);
+    }
+
+    [Fact]
+    public async Task UpdateLiturgicalSlotRequirements_ReplacesTheSet_AndRejectsUnknownSkill_Async()
+    {
+        var slot = new LiturgicalSlot { Id = Guid.NewGuid(), Name = "Psalm" };
+        _slots.GetByIdAsync(slot.Id, _ct).Returns(slot);
+        var psalmist = new Skill { Id = Guid.NewGuid(), Name = "Psalmist", IsActive = true };
+        var solo = new Skill { Id = Guid.NewGuid(), Name = "Solo", IsActive = true };
+        var organ = new Skill { Id = Guid.NewGuid(), Name = "Organ", IsActive = true };
+        Rows(_skills, psalmist, solo, organ);
+        var kept = new LiturgicalSlotRequirement { Id = Guid.NewGuid(), SlotId = slot.Id, SkillId = psalmist.Id, RequiredCount = 1 };
+        var dropped = new LiturgicalSlotRequirement { Id = Guid.NewGuid(), SlotId = slot.Id, SkillId = organ.Id, RequiredCount = 1 };
+        Rows(_slotRequirements, kept, dropped);
+        _slotRequirements.GetByIdAsync(kept.Id, _ct).Returns(kept);
+
+        var unknown = await _sut.UpdateLiturgicalSlotRequirementsAsync(slot.Id, new UpdateLiturgicalSlotRequirementsRequest
+        {
+            Requirements = [new() { SkillId = Guid.NewGuid(), RequiredCount = 1 }],
+        }, _ct);
+        var result = await _sut.UpdateLiturgicalSlotRequirementsAsync(slot.Id, new UpdateLiturgicalSlotRequirementsRequest
+        {
+            Requirements = [new() { SkillId = psalmist.Id, RequiredCount = 2 }, new() { SkillId = solo.Id, RequiredCount = 1 }],
+        }, _ct);
+
+        Assert.Equal(ErrorCodes.SkillNotFound, unknown.Code);
+        Assert.Equal([("Psalmist", 2), ("Solo", 1)], result.Value!.Select(x => (x.SkillName, x.RequiredCount)));
+        _slotRequirements.Received(1).Remove(dropped);
+        await _slotRequirements.Received(1).AddAsync(Arg.Is<LiturgicalSlotRequirement>(x => x.SkillId == solo.Id && x.SlotId == slot.Id), _ct);
     }
 
     // ---- Catalog rows an event points at ----
@@ -421,5 +471,20 @@ public class LookupServiceTests
         }, _ct);
 
         Assert.Contains(result.Errors, e => e.ErrorCode == ErrorCodes.LiturgicalSeasonDateInvalid);
+    }
+
+    [Fact]
+    public async Task SaveSongTheme_NoActiveChildUnderASwitchedOffParent_Async()
+    {
+        var mary = new SongTheme { Id = Guid.NewGuid(), Name = "Mary", IsActive = true };
+        var rosary = new SongTheme { Id = Guid.NewGuid(), Name = "Rosary", ParentId = mary.Id, IsActive = true };
+        var closed = new SongTheme { Id = Guid.NewGuid(), Name = "Closed", IsActive = false };
+        Rows(_songThemes, mary, rosary, closed);
+
+        var switchOffParent = await _sut.SaveSongThemeAsync(mary.Id, new SaveSongThemeRequest { Name = "Mary", IsActive = false }, _ct);
+        var activeUnderClosed = await _sut.SaveSongThemeAsync(null, new SaveSongThemeRequest { Name = "New", ParentId = closed.Id }, _ct);
+
+        Assert.Equal(ErrorCodes.SongThemeHasActiveChildren, switchOffParent.Code);
+        Assert.Equal(ErrorCodes.SongThemeParentInvalid, activeUnderClosed.Code);
     }
 }

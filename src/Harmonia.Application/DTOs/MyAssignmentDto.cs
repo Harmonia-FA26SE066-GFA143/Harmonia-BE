@@ -12,4 +12,6 @@ public class MyAssignmentDto
     public Guid? SongListItemId { get; set; }
 
     public string? SongTitle { get; set; }
+
+    public string? Note { get; set; }
 }

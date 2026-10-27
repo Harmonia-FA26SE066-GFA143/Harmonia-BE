@@ -60,6 +60,10 @@ public class SongListServiceTests
         _users.GetActiveUserIdsByRolesAsync(
                 Arg.Is<IReadOnlyCollection<string>>(r => r.SequenceEqual(new[] { RoleNames.ParishPriest })), _ct)
             .Returns([_priestId]);
+        _songLists.GetItemsWithRequirementsAsync(Arg.Any<Guid>(), _ct).Returns([]);
+        _songLists.GetSongDefaultRequirementsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), _ct).Returns([]);
+        _songLists.GetSlotDefaultRequirementsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), _ct).Returns([]);
+        _songLists.GetWholeServiceRequirementsAsync(_eventId, _ct).Returns(new Dictionary<Guid, int>());
     }
 
     private CreateSongListRequest NewCreateRequest() => new() { EventId = _eventId, Items = [NewItem()] };
@@ -478,5 +482,50 @@ public class SongListServiceTests
             Guid.NewGuid(), new ReviewSongListRequest { Decision = ReviewDecision.Approve }, _priestId, _ct);
 
         Assert.Equal(ErrorCodes.SongListNotFound, result.Code);
+    }
+
+    // ---- Pre-filled personnel requirements ----
+
+    private readonly Guid _solo = Guid.NewGuid(), _psalmist = Guid.NewGuid(), _organ = Guid.NewGuid();
+
+    [Fact]
+    public async Task Create_NewSong_GetsLibraryAndSlotDefaults_LargerCountWins_SkipsWholeServiceSkills_Async()
+    {
+        SongList? added = null;
+        _songLists.AddAsync(Arg.Do<SongList>(s => added = s), _ct).Returns(Task.CompletedTask);
+        _songLists.GetByIdWithDetailsAsync(Arg.Any<Guid>(), _ct).Returns(_ => added);
+        _songLists.GetSongDefaultRequirementsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), _ct).Returns([(_songId, _solo, 1), (_songId, _organ, 1)]);
+        _songLists.GetSlotDefaultRequirementsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), _ct).Returns([(_slotId, _psalmist, 1), (_slotId, _solo, 2)]);
+        _songLists.GetWholeServiceRequirementsAsync(_eventId, _ct).Returns(new Dictionary<Guid, int> { [_organ] = 1, [_solo] = 1 });
+
+        await _sut.CreateAsync(NewCreateRequest(), _directorId, _ct);
+
+        var item = Assert.Single(added!.Items);
+        Assert.Equal(
+            [(_psalmist, 1), (_solo, 2)],
+            item.PersonnelRequirements.Select(x => (x.SkillId, x.RequiredCount)).OrderBy(x => x.Item2).ToList());
+        Assert.All(item.PersonnelRequirements, x => Assert.Equal(item.Id, x.SongListItemId));
+    }
+
+    [Fact]
+    public async Task UpdateItems_SameSongInSameSlot_KeepsWhatTheDirectorLeft_EvenNothing_Async()
+    {
+        var songList = Existing(SongListStatus.Draft);
+        var earlier = new SongListItem { SongId = _songId, SlotId = _slotId };
+        earlier.PersonnelRequirements.Add(new SongPersonnelRequirement { SkillId = _solo, RequiredCount = 3 });
+        var removedAll = new SongListItem { SongId = Guid.NewGuid(), SlotId = _slotId };
+        _songLists.GetItemsWithRequirementsAsync(songList.Id, _ct).Returns([earlier, removedAll]);
+        _songLists.GetItemsAsync(songList.Id, _ct).Returns([]);
+        _songRows.Add(new Song { Id = removedAll.SongId, IsActive = true });
+        _songLists.GetSlotDefaultRequirementsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), _ct).Returns([(_slotId, _psalmist, 1)]);
+
+        await _sut.UpdateItemsAsync(songList.Id, new UpdateSongListItemsRequest
+        {
+            Items = [NewItem(), new() { SongId = removedAll.SongId, SlotId = _slotId, DisplayOrder = 2 }],
+        }, _ct);
+
+        Assert.Equal([(_solo, 3)], _addedItems.Single(x => x.SongId == _songId).PersonnelRequirements.Select(x => (x.SkillId, x.RequiredCount)));
+        Assert.Empty(_addedItems.Single(x => x.SongId == removedAll.SongId).PersonnelRequirements);
+        await _songLists.DidNotReceive().GetSlotDefaultRequirementsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), _ct);
     }
 }

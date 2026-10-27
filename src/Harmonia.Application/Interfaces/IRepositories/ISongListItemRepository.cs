@@ -6,7 +6,8 @@ public interface ISongListItemRepository : IGenericRepository<SongListItem>
 {
     /// <summary>
     /// Tracked, with <see cref="SongListItem.PersonnelRequirements"/> (each with its Skill),
-    /// <see cref="SongListItem.SongList"/>, its LiturgicalEvent and that event's ServiceRoster loaded.
+    /// <see cref="SongListItem.SongList"/>, its LiturgicalEvent and that event's ServiceRoster loaded,
+    /// plus the item's Active <see cref="SongListItem.RosterAssignments"/>.
     /// </summary>
     Task<SongListItem?> GetWithPersonnelRequirementsAsync(Guid id, CancellationToken cancellationToken);
 

@@ -30,7 +30,7 @@ public class AuditableEntityInterceptor(ICurrentUserService currentUser) : SaveC
         typeof(RehearsalAttendance),
         typeof(Skill), typeof(SkillCategory),
         typeof(MassType), typeof(CeremonyType), typeof(EventCategory), typeof(LiturgicalSeason),
-        typeof(SongTheme), typeof(LiturgicalSlot), typeof(WorshipLocation)
+        typeof(SongTheme), typeof(LiturgicalSlot), typeof(LiturgicalSlotRequirement), typeof(WorshipLocation)
     ];
 
     // Taking attendance adds a row per member at every rehearsal; only a later correction is worth an entry.

@@ -139,6 +139,9 @@ public class SongListService(
             }).ToList(),
         };
 
+        var earlierItems = latest is null ? [] : await songListRepository.GetItemsWithRequirementsAsync(latest.Id, cancellationToken);
+        await FillPersonnelRequirementsAsync(request.EventId, songList.Items, earlierItems, cancellationToken);
+
         await songListRepository.AddAsync(songList, cancellationToken);
         await songListRepository.SaveChangesAsync(cancellationToken);
 
@@ -178,6 +181,8 @@ public class SongListService(
             return Result<SongListDto>.Failure(itemsError);
         }
 
+        // Items are recreated, so their requirements are read first and carried over to the same song in the same slot.
+        var earlierItems = await songListRepository.GetItemsWithRequirementsAsync(id, cancellationToken);
         var existingItems = await songListRepository.GetItemsAsync(id, cancellationToken);
         await songListRepository.RemoveItemsAsync(existingItems, cancellationToken);
 
@@ -189,7 +194,8 @@ public class SongListService(
             SlotId = i.SlotId,
             DisplayOrder = i.DisplayOrder,
             Note = i.Note,
-        });
+        }).ToList();
+        await FillPersonnelRequirementsAsync(songList.EventId, newItems, earlierItems, cancellationToken);
 
         await songListRepository.AddItemsAsync(newItems, cancellationToken);
         await songListRepository.SaveChangesAsync(cancellationToken);
@@ -312,6 +318,47 @@ public class SongListService(
         var result = await songListRepository.GetByIdWithDetailsAsync(id, cancellationToken);
         return Result<SongListDto>.Success(mapper.Map<SongListDto>(result));
     }
+
+    /// <summary>
+    /// Pre-fills who each new item needs, so a choral song needs nobody and a psalm gets its psalmist without typing.
+    /// The same song in the same slot of the earlier version (or of this draft before the edit) keeps the requirements
+    /// the director left there, even none. Otherwise: the song's mandatory library requirements outside the Vocal parts,
+    /// plus the slot's defaults, the larger count winning; a skill the event staffs for the whole service is added only
+    /// when the song needs more people than the service has.
+    /// </summary>
+    private async Task FillPersonnelRequirementsAsync(
+        Guid eventId, ICollection<SongListItem> items, List<SongListItem> earlierItems, CancellationToken cancellationToken)
+    {
+        var earlier = earlierItems.GroupBy(x => (x.SongId, x.SlotId)).ToDictionary(g => g.Key, g => g.First().PersonnelRequirements);
+        var fresh = items.Where(x => !earlier.ContainsKey((x.SongId, x.SlotId))).ToList();
+
+        foreach (var item in items.Where(x => earlier.ContainsKey((x.SongId, x.SlotId))))
+        {
+            foreach (var requirement in earlier[(item.SongId, item.SlotId)])
+                item.PersonnelRequirements.Add(NewRequirement(item.Id, requirement.SkillId, requirement.RequiredCount));
+        }
+
+        if (fresh.Count == 0) return;
+
+        var bySong = (await songListRepository.GetSongDefaultRequirementsAsync(
+            fresh.Select(x => x.SongId).Distinct().ToList(), cancellationToken)).ToLookup(x => x.SongId, x => (x.SkillId, x.RequiredCount));
+        var bySlot = (await songListRepository.GetSlotDefaultRequirementsAsync(
+            fresh.Select(x => x.SlotId).Distinct().ToList(), cancellationToken)).ToLookup(x => x.SlotId, x => (x.SkillId, x.RequiredCount));
+        var wholeService = await songListRepository.GetWholeServiceRequirementsAsync(eventId, cancellationToken);
+
+        foreach (var item in fresh)
+        {
+            foreach (var skill in bySong[item.SongId].Concat(bySlot[item.SlotId]).GroupBy(x => x.SkillId))
+            {
+                var count = skill.Max(x => x.RequiredCount);
+                if (count > wholeService.GetValueOrDefault(skill.Key))
+                    item.PersonnelRequirements.Add(NewRequirement(item.Id, skill.Key, count));
+            }
+        }
+    }
+
+    private static SongPersonnelRequirement NewRequirement(Guid itemId, Guid skillId, int requiredCount) =>
+        new() { Id = Guid.NewGuid(), SongListItemId = itemId, SkillId = skillId, RequiredCount = requiredCount };
 
     private async Task<string?> ValidateItemReferencesAsync(
         List<UpdateSongListItemRequest> items, CancellationToken cancellationToken)

@@ -23,6 +23,4 @@ public class Skill : BaseEntity
     public ICollection<SongPersonnelRequirement> SongPersonnelRequirements { get; set; } = [];
 
     public ICollection<RosterAssignment> RosterAssignments { get; set; } = [];
-
-    public ICollection<RosterShortage> RosterShortages { get; set; } = [];
 }

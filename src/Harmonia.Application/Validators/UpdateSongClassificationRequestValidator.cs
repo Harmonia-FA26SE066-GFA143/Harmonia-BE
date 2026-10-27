@@ -13,11 +13,13 @@ public class UpdateSongClassificationRequestValidator : AbstractValidator<Update
         RuleFor(x => x.MassTypeIds).Cascade(CascadeMode.Stop).NotNull().Must(BeDistinct).WithErrorCode(ErrorCodes.SongClassificationDuplicate);
         RuleFor(x => x.CeremonyTypeIds).Cascade(CascadeMode.Stop).NotNull().Must(BeDistinct).WithErrorCode(ErrorCodes.SongClassificationDuplicate);
         RuleFor(x => x.SongThemeIds).Cascade(CascadeMode.Stop).NotNull().Must(BeDistinct).WithErrorCode(ErrorCodes.SongClassificationDuplicate);
+        RuleFor(x => x.LiturgicalSlotIds).Cascade(CascadeMode.Stop).NotNull().Must(BeDistinct).WithErrorCode(ErrorCodes.SongClassificationDuplicate);
 
         RuleForEach(x => x.LiturgicalSeasonIds).NotEmpty();
         RuleForEach(x => x.MassTypeIds).NotEmpty();
         RuleForEach(x => x.CeremonyTypeIds).NotEmpty();
         RuleForEach(x => x.SongThemeIds).NotEmpty();
+        RuleForEach(x => x.LiturgicalSlotIds).NotEmpty();
 
         RuleFor(x => x.VocalRequirements).Cascade(CascadeMode.Stop).NotNull()
             .Must(x => BeDistinct(x.Select(r => r.SkillId))).WithErrorCode(ErrorCodes.SongSkillRequirementDuplicate);

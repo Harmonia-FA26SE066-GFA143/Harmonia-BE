@@ -15,6 +15,15 @@ public interface ISongRepository : IGenericRepository<Song>
     Task<PagedList<Song>> SearchAsync(string? keyword, SearchSongsRequest filter, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Read-only active songs matching at least one of the event's season, Mass type, ceremony type or the slot, with
+    /// which ones they match. A song classified only under other seasons, or only under other slots, is left out: it
+    /// was put there on purpose (a Christmas carol in Lent, an entrance hymn at communion). A null id matches nothing.
+    /// The Has* flags say whether the song is classified on that dimension at all (any season, any Mass or ceremony type, any slot).
+    /// </summary>
+    Task<List<(Song Song, bool MatchesSeason, bool MatchesEventType, bool MatchesSlot, bool HasSeason, bool HasEventType, bool HasSlot)>> GetSuggestionMatchesAsync(
+        Guid? liturgicalSeasonId, Guid? massTypeId, Guid? ceremonyTypeId, Guid? slotId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// True if another active song has the same title and composer (a null composer matches only null).
     /// Deleted songs are ignored, so a deleted title can be created again.
     /// </summary>

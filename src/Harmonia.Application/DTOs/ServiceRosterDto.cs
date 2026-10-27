@@ -16,6 +16,9 @@ public class ServiceRosterDto
 
     public Guid? FinalizedBy { get; set; }
 
+    /// <summary>When the whole-service lines were locked ahead of the rest; null while they are still open.</summary>
+    public DateTime? WholeServiceFinalizedAt { get; set; }
+
     /// <summary>Active assignments only; replaced lines are history and are left out.</summary>
     public List<RosterAssignmentDto> Assignments { get; set; } = [];
 

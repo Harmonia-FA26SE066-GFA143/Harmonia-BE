@@ -1,4 +1,5 @@
 using Harmonia.Application.Interfaces.IRepositories;
+using Harmonia.Domain.Common;
 using Harmonia.Domain.Entities;
 using Harmonia.Domain.Enums;
 using Harmonia.Infrastructure.Data;
@@ -67,4 +68,41 @@ public class SongListRepository(HarmoniaDbContext dbContext)
 
     public async Task AddReviewAsync(SongListReview review, CancellationToken cancellationToken) =>
         await DbContext.SongListReviews.AddAsync(review, cancellationToken);
+
+    public Task<List<SongListItem>> GetItemsWithRequirementsAsync(Guid songListId, CancellationToken cancellationToken) =>
+        DbContext.SongListItems
+            .AsNoTracking()
+            .Include(x => x.PersonnelRequirements)
+            .Where(x => x.SongListId == songListId)
+            .ToListAsync(cancellationToken);
+
+    public async Task<List<(Guid SongId, Guid SkillId, int RequiredCount)>> GetSongDefaultRequirementsAsync(
+        IReadOnlyCollection<Guid> songIds, CancellationToken cancellationToken)
+    {
+        var vocal = await DbContext.SongVocalRequirements
+            .Where(x => songIds.Contains(x.SongId) && x.IsMandatory && x.Skill.IsActive && x.Skill.CategoryId != SkillCategoryIds.Vocal)
+            .Select(x => new { x.SongId, x.SkillId, x.RequiredCount })
+            .ToListAsync(cancellationToken);
+        var instrument = await DbContext.SongInstrumentRequirements
+            .Where(x => songIds.Contains(x.SongId) && x.IsMandatory && x.Skill.IsActive)
+            .Select(x => new { x.SongId, x.SkillId, x.RequiredCount })
+            .ToListAsync(cancellationToken);
+
+        // Expression trees cannot build tuples, so rows are shaped in memory.
+        return vocal.Concat(instrument).Select(x => (x.SongId, x.SkillId, x.RequiredCount)).ToList();
+    }
+
+    public async Task<List<(Guid SlotId, Guid SkillId, int RequiredCount)>> GetSlotDefaultRequirementsAsync(
+        IReadOnlyCollection<Guid> slotIds, CancellationToken cancellationToken) =>
+        (await DbContext.LiturgicalSlotRequirements
+            .Where(x => slotIds.Contains(x.SlotId) && x.Skill.IsActive)
+            .Select(x => new { x.SlotId, x.SkillId, x.RequiredCount })
+            .ToListAsync(cancellationToken))
+        .Select(x => (x.SlotId, x.SkillId, x.RequiredCount))
+        .ToList();
+
+    public Task<Dictionary<Guid, int>> GetWholeServiceRequirementsAsync(Guid eventId, CancellationToken cancellationToken) =>
+        DbContext.EventPersonnelRequirements
+            .Where(x => x.EventId == eventId)
+            .ToDictionaryAsync(x => x.SkillId, x => x.RequiredCount, cancellationToken);
 }

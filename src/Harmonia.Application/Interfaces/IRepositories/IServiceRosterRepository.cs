@@ -4,7 +4,10 @@ namespace Harmonia.Application.Interfaces.IRepositories;
 
 public interface IServiceRosterRepository : IGenericRepository<ServiceRoster>
 {
-    /// <summary>Tracked event with its ServiceRoster and the roster's assignments loaded (roster may be null).</summary>
+    /// <summary>
+    /// Tracked event with its ServiceRoster and the roster's assignments loaded (roster may be null), plus its
+    /// whole-service personnel requirements with their Skill.
+    /// </summary>
     Task<LiturgicalEvent?> GetEventWithRosterAsync(Guid eventId, CancellationToken cancellationToken);
 
     /// <summary>
@@ -40,7 +43,10 @@ public interface IServiceRosterRepository : IGenericRepository<ServiceRoster>
     /// <summary>Tracked roster owning the assignment, with its LiturgicalEvent and all its assignments loaded.</summary>
     Task<ServiceRoster?> GetRosterByAssignmentAsync(Guid assignmentId, CancellationToken cancellationToken);
 
-    /// <summary>Tracked roster with its LiturgicalEvent loaded (assignments not loaded).</summary>
+    /// <summary>
+    /// Tracked roster with its LiturgicalEvent and the event's whole-service personnel requirements (with Skill)
+    /// loaded; assignments not loaded.
+    /// </summary>
     Task<ServiceRoster?> GetRosterWithEventAsync(Guid rosterId, CancellationToken cancellationToken);
 
     /// <summary>

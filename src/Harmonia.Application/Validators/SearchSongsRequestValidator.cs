@@ -12,6 +12,7 @@ public class SearchSongsRequestValidator : AbstractValidator<SearchSongsRequest>
         RuleFor(x => x.MassTypeId).NotEqual(Guid.Empty);
         RuleFor(x => x.CeremonyTypeId).NotEqual(Guid.Empty);
         RuleFor(x => x.SongThemeId).NotEqual(Guid.Empty);
+        RuleFor(x => x.LiturgicalSlotId).NotEqual(Guid.Empty);
         RuleFor(x => x.SkillId).NotEqual(Guid.Empty);
     }
 }

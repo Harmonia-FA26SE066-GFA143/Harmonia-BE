@@ -89,6 +89,7 @@ public class SongService(ISongRepository songRepository, IMapper mapper) : ISong
             (ClassificationTarget.MassType, request.MassTypeIds),
             (ClassificationTarget.CeremonyType, request.CeremonyTypeIds),
             (ClassificationTarget.SongTheme, request.SongThemeIds),
+            (ClassificationTarget.LiturgicalSlot, request.LiturgicalSlotIds),
         ];
 
         // Validate everything before touching the tracked song, so a failure leaves it untouched.
@@ -119,10 +120,12 @@ public class SongService(ISongRepository songRepository, IMapper mapper) : ISong
                 song.Classifications.Add(new SongClassification { SongId = song.Id, TargetType = type, TargetId = targetId });
         }
 
-        SyncRequirements(song.VocalRequirements, request.VocalRequirements, x => x.SkillId, (x, isMandatory) => x.IsMandatory = isMandatory,
-            r => new SongVocalRequirement { SongId = song.Id, SkillId = r.SkillId, Skill = skills[r.SkillId], IsMandatory = r.IsMandatory });
-        SyncRequirements(song.InstrumentRequirements, request.InstrumentRequirements, x => x.SkillId, (x, isMandatory) => x.IsMandatory = isMandatory,
-            r => new SongInstrumentRequirement { SongId = song.Id, SkillId = r.SkillId, Skill = skills[r.SkillId], IsMandatory = r.IsMandatory });
+        SyncRequirements(song.VocalRequirements, request.VocalRequirements, x => x.SkillId,
+            (x, r) => { x.IsMandatory = r.IsMandatory; x.RequiredCount = r.RequiredCount; },
+            r => new SongVocalRequirement { SongId = song.Id, SkillId = r.SkillId, Skill = skills[r.SkillId], IsMandatory = r.IsMandatory, RequiredCount = r.RequiredCount });
+        SyncRequirements(song.InstrumentRequirements, request.InstrumentRequirements, x => x.SkillId,
+            (x, r) => { x.IsMandatory = r.IsMandatory; x.RequiredCount = r.RequiredCount; },
+            r => new SongInstrumentRequirement { SongId = song.Id, SkillId = r.SkillId, Skill = skills[r.SkillId], IsMandatory = r.IsMandatory, RequiredCount = r.RequiredCount });
 
         await songRepository.SaveChangesAsync(cancellationToken);
         return Result<SongClassificationDto>.Success(await ToClassificationDtoAsync(song, cancellationToken));
@@ -148,10 +151,10 @@ public class SongService(ISongRepository songRepository, IMapper mapper) : ISong
         return null;
     }
 
-    /// <summary>Removes requirements no longer requested, updates IsMandatory on kept ones and adds new ones.</summary>
+    /// <summary>Removes requirements no longer requested, updates IsMandatory and RequiredCount on kept ones and adds new ones.</summary>
     private static void SyncRequirements<T>(
         ICollection<T> current, List<UpdateSongSkillRequirementRequest> requested,
-        Func<T, Guid> getSkillId, Action<T, bool> setMandatory, Func<UpdateSongSkillRequirementRequest, T> create)
+        Func<T, Guid> getSkillId, Action<T, UpdateSongSkillRequirementRequest> update, Func<UpdateSongSkillRequirementRequest, T> create)
     {
         foreach (var removed in current.Where(x => requested.All(r => r.SkillId != getSkillId(x))).ToList())
             current.Remove(removed);
@@ -160,7 +163,7 @@ public class SongService(ISongRepository songRepository, IMapper mapper) : ISong
         {
             var existing = current.FirstOrDefault(x => getSkillId(x) == requirement.SkillId);
             if (existing is null) current.Add(create(requirement));
-            else setMandatory(existing, requirement.IsMandatory);
+            else update(existing, requirement);
         }
     }
 
@@ -183,6 +186,7 @@ public class SongService(ISongRepository songRepository, IMapper mapper) : ISong
             MassTypes = await ItemsAsync(ClassificationTarget.MassType, cancellationToken),
             CeremonyTypes = await ItemsAsync(ClassificationTarget.CeremonyType, cancellationToken),
             SongThemes = await ItemsAsync(ClassificationTarget.SongTheme, cancellationToken),
+            LiturgicalSlots = await ItemsAsync(ClassificationTarget.LiturgicalSlot, cancellationToken),
             VocalRequirements = mapper.Map<List<SongVocalRequirementDto>>(song.VocalRequirements),
             InstrumentRequirements = mapper.Map<List<SongInstrumentRequirementDto>>(song.InstrumentRequirements),
         };

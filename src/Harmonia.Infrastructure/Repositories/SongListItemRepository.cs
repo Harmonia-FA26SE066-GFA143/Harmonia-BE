@@ -1,5 +1,6 @@
 using Harmonia.Application.Interfaces.IRepositories;
 using Harmonia.Domain.Entities;
+using Harmonia.Domain.Enums;
 using Harmonia.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,6 +13,8 @@ public class SongListItemRepository(HarmoniaDbContext dbContext)
         DbContext.SongListItems
             .Include(x => x.PersonnelRequirements).ThenInclude(x => x.Skill)
             .Include(x => x.SongList.LiturgicalEvent.ServiceRoster)
+            .Include(x => x.RosterAssignments.Where(a => a.Status == RosterAssignmentStatus.Active))
+            .AsSplitQuery()
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
     public async Task<bool> IsLatestVersionAsync(Guid eventId, int version, CancellationToken cancellationToken) =>

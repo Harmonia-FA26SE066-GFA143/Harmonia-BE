@@ -43,8 +43,11 @@ public class LiturgicalEventService(
     public async Task<Result<LiturgicalEventDto>> CreateAsync(
         CreateLiturgicalEventRequest request, CancellationToken cancellationToken)
     {
+        // Same rule as events generated from Mass schedules: no season picked → the season covering the date.
+        var seasonId = request.LiturgicalSeasonId ?? await lookupService.FindLiturgicalSeasonIdAsync(request.EventDate, cancellationToken);
+
         var catalogs = await lookupService.CheckEventCatalogsAsync(
-            request.EventDate, request.LiturgicalSeasonId, request.MassTypeId, request.CeremonyTypeId,
+            request.EventDate, seasonId, request.MassTypeId, request.CeremonyTypeId,
             request.CategoryId, request.LocationId, null, cancellationToken);
         if (!catalogs.IsSuccess)
         {
@@ -62,7 +65,7 @@ public class LiturgicalEventService(
             Id = Guid.NewGuid(),
             EventDate = request.EventDate,
             Time = request.Time,
-            LiturgicalSeasonId = request.LiturgicalSeasonId,
+            LiturgicalSeasonId = seasonId,
             MassTypeId = request.MassTypeId,
             CeremonyTypeId = request.CeremonyTypeId,
             CategoryId = request.CategoryId,

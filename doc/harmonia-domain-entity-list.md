@@ -98,9 +98,9 @@ Written once here instead of repeated 47 times:
 `title` string(200) · `composer` string(150)? · `lyricist` string(150)? · `musicalKey` string(10)? · `tempo` string(50)? · `notes` string(1000)? · `isActive` bool
 
 **16. `SongTheme`** — theme taxonomy (FE-29/50)
-`name` string(100) unique · `description` string(300)? · `isActive` bool
+`name` string(100) unique · `description` string(300)? · `isActive` bool · `parentId` Guid? → SongTheme (tree of any depth, restrict delete)
 
-**17. `SongClassification`** — song ↔ season / Mass type / ceremony type / theme (FE-29)
+**17. `SongClassification`** — song ↔ season / Mass type / ceremony type / theme / Mass part (FE-29)
 `songId` Guid → Song · `targetType` ClassificationTarget · `targetId` Guid · unique `(songId, targetType, targetId)`
 
 **18. `SongVocalRequirement`** · **19. `SongInstrumentRequirement`** — skills the song needs (FE-29)
@@ -148,10 +148,7 @@ Written once here instead of repeated 47 times:
 **29. `RosterAssignment`** — one assignment line (FE-38/40)
 `rosterId` Guid → ServiceRoster · `memberId` Guid → MemberProfile · `skillId` Guid → Skill · `songListItemId` Guid? → SongListItem · `source` AssignmentSource · `notifiedAt` DateTime? · `status` RosterAssignmentStatus · `replacedByAssignmentId` Guid? → RosterAssignment (self; set when Replaced)
 
-**30. ⚪ `RosterShortage`** — shortage warning (FE-37)
-`rosterId` Guid → ServiceRoster · `skillId` Guid → Skill · `requiredCount` int · `availableCount` int · `detectedAt` DateTime
-
-⚪ Compute at runtime instead of storing, unless warning history matters.
+**30. ~~`RosterShortage`~~** — removed 2026-10-26: shortages are computed at runtime (`RosterShortageDto`), never stored.
 
 ## G. Rehearsal & practice
 
@@ -221,7 +218,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 | `SkillLevel` | Beginner, Intermediate, Advanced |
 | `ApprovalStatus` | Pending, Approved, Rejected |
 | `EventStatus` | Draft, Published, Cancelled |
-| `ClassificationTarget` | LiturgicalSeason, MassType, CeremonyType, SongTheme |
+| `ClassificationTarget` | LiturgicalSeason, MassType, CeremonyType, SongTheme, LiturgicalSlot |
 | `MaterialType` | SheetMusic, Lyrics, SampleAudio, RehearsalMaterial |
 | `LearningStatus` | NotStarted, NeedsPractice, Learned |
 | `SongListStatus` | Draft, Submitted, Approved, Rejected, NeedsRevision |
@@ -270,7 +267,8 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 - `MassSchedule` n — 1 `MassType` / `WorshipLocation` *(template only, no FK to the events it generates)*
 
 **Music library**
-- `Song` 1 — n `SongClassification` → `LiturgicalSeason` | `MassType` | `CeremonyType` | `SongTheme`
+- `Song` 1 — n `SongClassification` → `LiturgicalSeason` | `MassType` | `CeremonyType` | `SongTheme` | `LiturgicalSlot`
+- `SongTheme` 1 — n `SongTheme` (parent → children)
 - `Song` 1 — n `SongVocalRequirement` n — 1 `Skill`
 - `Song` 1 — n `SongInstrumentRequirement` n — 1 `Skill`
 - `Song` 1 — n `MusicMaterial` 1 — n `MaterialLearningProgress` n — 1 `MemberProfile`
@@ -285,7 +283,6 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 - `SongListItem` 1 — n `SongPersonnelRequirement` n — 1 `Skill`
 - `LiturgicalEvent` 1 — 1 `ServiceRoster` 1 — n `RosterAssignment`
 - `RosterAssignment` n — 1 `MemberProfile`, n — 1 `Skill`, n — 0..1 `SongListItem`
-- `ServiceRoster` 1 — n `RosterShortage` n — 1 `Skill`
 
 **Rehearsal & practice**
 - `LiturgicalEvent` 1 — n `Rehearsal` n — 1 `WorshipLocation`
@@ -330,3 +327,15 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 - 2026-10-17: `LiturgicalDay` is filled from the Liturgical Calendar API instead of an uploaded GCatholic.org `.ics` file. The priest syncs one civil year and that year's cached days are overwritten; names are English, Epiphany / Ascension / Corpus Christi are moved to Sunday as in Vietnam. No column change, no migration.
 - 2026-10-20: `MassSchedule` added (47 → 48) — the parish's fixed weekly Mass times; `POST api/liturgical-events/generation` creates Draft events from them. Publishing an event now requires a season and active catalogs. Needs a migration.
 - 2026-10-25: `PracticeAssignmentMaterial` added (48 → 49) — several materials per practice assignment; `PracticeAssignment.materialId` stays as the first one for older clients, and DataSeeder copies it into the new table. `LiturgicalNameTranslation` added (49 → 50) with enum `LiturgicalNameKind` — Vietnamese calendar names kept by the Admin, seeded once from the Web's table. Enum `ReportPeriod` for the activity trend report (22 → 24). Needs a migration.
+
+**Bổ sung 2026-10-26 — phân công 3 tầng**
+
+**`EventPersonnelRequirement`** — người sự kiện cần cho cả buổi lễ (organ, guitar, bắt nhịp)
+`eventId` Guid → LiturgicalEvent (cascade) · `skillId` Guid → Skill (restrict) · `requiredCount` int · unique `(eventId, skillId)`
+
+**`LiturgicalSlotRequirement`** — người một vị trí trong lễ luôn cần (Đáp ca → 1 người xướng), điền sẵn vào danh sách bài
+`slotId` Guid → LiturgicalSlot (cascade) · `skillId` Guid → Skill (restrict) · `requiredCount` int · unique `(slotId, skillId)`
+
+Sửa: `SongVocalRequirement`, `SongInstrumentRequirement` thêm `requiredCount` int (mặc định 1) · `RosterAssignment` thêm
+`note` string(200)?; `songListItemId` null = dòng cả buổi lễ.
+`ServiceRoster` thêm `wholeServiceFinalizedAt` DateTime? (chốt sớm vai cả buổi lễ). Bỏ bảng `RosterShortage`.

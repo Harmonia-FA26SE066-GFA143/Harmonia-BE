@@ -1,11 +1,14 @@
 namespace Harmonia.Application.DTOs;
 
-/// <summary>A song / skill pair that could not be fully staffed. Computed on the fly, not read from RosterShortage.</summary>
+/// <summary>
+/// A requirement that could not be fully staffed. Computed on the fly, never stored.
+/// SongListItemId and SongTitle are null for a whole-service requirement (organist, conductor...).
+/// </summary>
 public class RosterShortageDto
 {
-    public Guid SongListItemId { get; set; }
+    public Guid? SongListItemId { get; set; }
 
-    public string SongTitle { get; set; } = string.Empty;
+    public string? SongTitle { get; set; }
 
     public Guid SkillId { get; set; }
 

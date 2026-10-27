@@ -11,4 +11,6 @@ public class LiturgicalSlot : BaseEntity
     public bool IsActive { get; set; } = true;
 
     public ICollection<SongListItem> SongListItems { get; set; } = [];
+
+    public ICollection<LiturgicalSlotRequirement> Requirements { get; set; } = [];
 }

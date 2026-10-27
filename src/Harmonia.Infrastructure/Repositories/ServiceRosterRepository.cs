@@ -11,7 +11,9 @@ public class ServiceRosterRepository(HarmoniaDbContext dbContext)
 {
     public Task<LiturgicalEvent?> GetEventWithRosterAsync(Guid eventId, CancellationToken cancellationToken) =>
         DbContext.LiturgicalEvents
+            .AsSplitQuery()
             .Include(x => x.ServiceRoster!.Assignments)
+            .Include(x => x.PersonnelRequirements).ThenInclude(x => x.Skill)
             .FirstOrDefaultAsync(x => x.Id == eventId, cancellationToken);
 
     public Task<SongList?> GetApprovedSongListAsync(Guid eventId, CancellationToken cancellationToken) =>
@@ -71,7 +73,7 @@ public class ServiceRosterRepository(HarmoniaDbContext dbContext)
 
     public Task<ServiceRoster?> GetRosterWithEventAsync(Guid rosterId, CancellationToken cancellationToken) =>
         DbContext.ServiceRosters
-            .Include(x => x.LiturgicalEvent)
+            .Include(x => x.LiturgicalEvent.PersonnelRequirements).ThenInclude(x => x.Skill)
             .FirstOrDefaultAsync(x => x.Id == rosterId, cancellationToken);
 
     public Task<List<RosterAssignment>> GetAssignmentsWithEligibilityAsync(

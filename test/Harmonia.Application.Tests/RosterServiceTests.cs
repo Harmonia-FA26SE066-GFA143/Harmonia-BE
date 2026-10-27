@@ -769,4 +769,255 @@ public class RosterServiceTests
 
         Assert.Equal(ErrorCodes.LiturgicalEventAlreadyPassed, (await NotifyAsync(roster, _an)).Code);
     }
+
+    // ---- Whole-service requirements (organist, conductor...) ----
+
+    private void EventNeedsGuitar() =>
+        _event.PersonnelRequirements.Add(new EventPersonnelRequirement { SkillId = _guitar.Id, Skill = _guitar, RequiredCount = 1 });
+
+    [Fact]
+    public async Task Suggest_WholeServiceRequirementWithoutApprovedSongList_StaffsItWithoutASong_Async()
+    {
+        var roster = ExistingRoster();
+        EventNeedsGuitar();
+        _repository.GetApprovedSongListAsync(_event.Id, _ct).Returns((SongList?)null);
+
+        var result = await SuggestAsync();
+
+        Assert.True(result.IsSuccess);
+        var line = Assert.Single(roster.Assignments);
+        Assert.Equal((_an, _guitar.Id, (Guid?)null), (line.MemberId, line.SkillId, line.SongListItemId));
+    }
+
+    [Fact]
+    public async Task Suggest_SongRequirementOfAWholeServiceSkill_IsCoveredByTheWholeServiceLine_Async()
+    {
+        var roster = ExistingRoster();
+        EventNeedsGuitar();
+
+        var result = await SuggestAsync();
+
+        // The entrance song also asks for a guitar, but the whole-service guitarist plays it.
+        Assert.Null(Assert.Single(roster.Assignments, x => x.SkillId == _guitar.Id).SongListItemId);
+        Assert.DoesNotContain(result.Value!.Shortages, x => x.SkillId == _guitar.Id);
+    }
+
+    [Fact]
+    public async Task Suggest_ByRules_SpreadsSongLinesAcrossMembers_Async()
+    {
+        var roster = ExistingRoster();
+        _entrance.PersonnelRequirements.Remove(_entrance.PersonnelRequirements.Single(x => x.SkillId == _guitar.Id));
+        var offertory = new SongListItem { Id = Guid.NewGuid(), DisplayOrder = 1, Song = new Song { Title = "Dang le" } };
+        offertory.PersonnelRequirements.Add(new SongPersonnelRequirement { SkillId = _soprano.Id, Skill = _soprano, RequiredCount = 1 });
+        _songList.Items.Add(offertory);
+
+        await SuggestAsync();
+
+        // Binh and Chi already sing the entrance, so the offertory goes to An despite a lower level.
+        Assert.Equal(_an, Assert.Single(roster.Assignments, x => x.SongListItemId == offertory.Id).MemberId);
+    }
+
+    [Fact]
+    public async Task GetShortages_NoApprovedSongListButWholeServiceRequirement_ReturnsItsShortage_Async()
+    {
+        EventNeedsGuitar();
+        _repository.GetApprovedSongListAsync(_event.Id, _ct).Returns((SongList?)null);
+
+        var result = await _sut.GetShortagesAsync(_event.Id, _ct);
+
+        var shortage = Assert.Single(result.Value!);
+        Assert.Equal((_guitar.Id, (Guid?)null, 0), (shortage.SkillId, shortage.SongListItemId, shortage.AssignedCount));
+    }
+
+    [Fact]
+    public async Task AddAssignment_WholeServiceLine_NeedsEventRequirementAndKeepsNote_Async()
+    {
+        var roster = RosterWith(RosterStatus.Suggested);
+        MemberIs(_an);
+        var request = new CreateRosterAssignmentRequest { EventId = _event.Id, SkillId = _guitar.Id, MemberId = _an, Note = "  intro  " };
+
+        var missing = await _sut.AddAssignmentAsync(request, _ct);
+        EventNeedsGuitar();
+        var added = await _sut.AddAssignmentAsync(request, _ct);
+
+        Assert.Equal(ErrorCodes.PersonnelRequirementNotFound, missing.Code);
+        Assert.True(added.IsSuccess);
+        var line = Assert.Single(roster.Assignments);
+        Assert.Equal(((Guid?)null, "intro"), (line.SongListItemId, line.Note));
+    }
+
+    [Fact]
+    public async Task UpdateNote_And_Replace_KeepOrClearTheRoleNote_Async()
+    {
+        var line = SopranoLine(_an);
+        var roster = RosterWith(RosterStatus.Suggested, line);
+        MemberIs(_binh);
+
+        await _sut.UpdateNoteAsync(line.Id, new UpdateRosterAssignmentNoteRequest { Note = "Narrator" }, _ct);
+        await _sut.ReplaceAssignmentAsync(line.Id, new ReplaceRosterAssignmentRequest { MemberId = _binh }, _ct);
+        var replacement = roster.Assignments.Single(x => x.Status == RosterAssignmentStatus.Active);
+        var keptNote = replacement.Note;
+        _repository.GetRosterByAssignmentAsync(replacement.Id, _ct).Returns(roster);
+        await _sut.UpdateNoteAsync(replacement.Id, new UpdateRosterAssignmentNoteRequest { Note = " " }, _ct);
+
+        Assert.Equal(("Narrator", "Narrator"), (line.Note, keptNote));
+        Assert.Null(replacement.Note);
+    }
+
+    // ---- Whole-service lines finalized ahead of the song list ----
+
+    private RosterAssignment GuitarWholeServiceLine(Guid memberId)
+    {
+        var line = SopranoLineFor(memberId);
+        line.SkillId = _guitar.Id;
+        line.Skill = _guitar;
+        line.SongListItemId = null;
+        line.Member.MemberSkills.Add(new MemberSkill { MemberId = memberId, SkillId = _guitar.Id });
+        return line;
+    }
+
+    [Fact]
+    public async Task FinalizeWholeService_ChecksOnlyWholeServiceLines_ThenLocksThem_Async()
+    {
+        EventNeedsGuitar();
+        var guitarist = GuitarWholeServiceLine(_an);
+        var roster = FinalizableRoster(RosterStatus.Suggested, guitarist, SopranoLineFor(_binh, confirmed: false));
+        roster.Assignments.Add(guitarist);
+        _repository.GetRosterByAssignmentAsync(guitarist.Id, _ct).Returns(roster);
+
+        var result = await _sut.FinalizeWholeServiceAsync(roster.Id, _ct);
+        var again = await _sut.FinalizeWholeServiceAsync(roster.Id, _ct);
+        var remove = await _sut.RemoveAssignmentAsync(guitarist.Id, _ct);
+
+        // Binh's song line is no longer valid, but only the whole-service lines are checked at this step.
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(roster.WholeServiceFinalizedAt);
+        Assert.Equal(RosterStatus.Suggested, roster.Status);
+        Assert.Equal([ErrorCodes.RosterAlreadyFinalized, ErrorCodes.RosterAlreadyFinalized], new[] { again.Code, remove.Code });
+    }
+
+    [Fact]
+    public async Task FinalizeWholeService_NoWholeServiceRequirement_ReturnsNoPersonnelRequirement_Async()
+    {
+        var roster = FinalizableRoster(RosterStatus.Suggested);
+
+        Assert.Equal(ErrorCodes.RosterNoPersonnelRequirement, (await _sut.FinalizeWholeServiceAsync(roster.Id, _ct)).Code);
+    }
+
+    [Fact]
+    public async Task Suggest_AfterWholeServiceFinalized_KeepsTheLockedLineAndPicksNoOther_Async()
+    {
+        EventNeedsGuitar();
+        var roster = ExistingRoster();
+        roster.WholeServiceFinalizedAt = DateTime.UtcNow;
+        var locked = new RosterAssignment { Id = Guid.NewGuid(), MemberId = _chi, SkillId = _guitar.Id, Source = AssignmentSource.Suggested };
+        roster.Assignments.Add(locked);
+
+        await SuggestAsync();
+
+        Assert.Same(locked, Assert.Single(roster.Assignments, x => x.SkillId == _guitar.Id));
+    }
+
+    [Fact]
+    public async Task SendNotifications_OnlyWholeServiceFinalized_NotifiesOnlyWholeServiceLines_Async()
+    {
+        var guitarist = NotifiableLine(_an);
+        guitarist.SongListItemId = null;
+        guitarist.SongListItem = null;
+        guitarist.SkillId = _guitar.Id;
+        guitarist.Skill = _guitar;
+        var soprano = NotifiableLine(_binh);
+        var roster = NotifiableRoster(RosterStatus.Suggested, guitarist, soprano);
+        var beforeLock = await NotifyAsync(roster);
+        roster.WholeServiceFinalizedAt = DateTime.UtcNow;
+
+        var result = await NotifyAsync(roster);
+
+        Assert.Equal(ErrorCodes.RosterNotFinalized, beforeLock.Code);
+        Assert.True(result.IsSuccess);
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(x => x.RecipientUserIds.Single() == guitarist.Member.UserId && x.Content.Contains("Guitar (cả buổi lễ)")),
+            _ct);
+        Assert.Null(soprano.NotifiedAt);
+    }
+
+    // ---- Song needing more of a whole-service skill ----
+
+    [Fact]
+    public async Task Suggest_SongNeedsMoreThanWholeService_StaffsOnlyTheRestWithAnotherMember_Async()
+    {
+        var roster = ExistingRoster();
+        EventNeedsGuitar();
+        _entrance.PersonnelRequirements.Single(x => x.SkillId == _guitar.Id).RequiredCount = 2;
+        _repository.GetCandidateSkillsAsync(_event.Id, Arg.Any<IReadOnlyCollection<Guid>>(), _ct).Returns(
+        [
+            new MemberSkill { MemberId = _an, SkillId = _guitar.Id, Level = SkillLevel.Advanced },
+            new MemberSkill { MemberId = _binh, SkillId = _guitar.Id, Level = SkillLevel.Beginner },
+        ]);
+
+        var result = await SuggestAsync();
+
+        // An plays guitar for the whole service; the song's second guitar must be someone else.
+        Assert.Equal(_an, Assert.Single(roster.Assignments, x => x.SkillId == _guitar.Id && x.SongListItemId == null).MemberId);
+        Assert.Equal(_binh, Assert.Single(roster.Assignments, x => x.SkillId == _guitar.Id && x.SongListItemId == _entrance.Id).MemberId);
+        Assert.DoesNotContain(result.Value!.Shortages, x => x.SkillId == _guitar.Id);
+    }
+
+    [Fact]
+    public async Task Suggest_SongNeedsMoreThanWholeService_NobodyElse_ReportsTheRestShort_Async()
+    {
+        ExistingRoster();
+        EventNeedsGuitar();
+        _entrance.PersonnelRequirements.Single(x => x.SkillId == _guitar.Id).RequiredCount = 2;
+
+        var result = await SuggestAsync();
+
+        // Only An plays guitar and already holds the whole service, so the song is one short, not two.
+        var shortage = Assert.Single(result.Value!.Shortages, x => x.SkillId == _guitar.Id);
+        Assert.Equal((_entrance.Id, 1, 0), (shortage.SongListItemId!.Value, shortage.RequiredCount, shortage.AssignedCount));
+    }
+
+    [Fact]
+    public async Task ReplaceAssignment_WholeServiceLineAfterEarlyFinalization_IsAllowed_Async()
+    {
+        EventNeedsGuitar();
+        var guitarist = GuitarWholeServiceLine(_an);
+        var roster = FinalizableRoster(RosterStatus.Suggested, guitarist);
+        roster.Assignments.Add(guitarist);
+        _repository.GetRosterByAssignmentAsync(guitarist.Id, _ct).Returns(roster);
+        _repository.GetAssignmentsAsync(roster.Id, _ct)
+            .Returns(_ => roster.Assignments.Where(x => x.Status == RosterAssignmentStatus.Active).ToList());
+        await _sut.FinalizeWholeServiceAsync(roster.Id, _ct);
+        MemberIs(_binh);
+
+        var result = await _sut.ReplaceAssignmentAsync(guitarist.Id, new ReplaceRosterAssignmentRequest { MemberId = _binh }, _ct);
+
+        Assert.True(result.IsSuccess);
+        var replacement = roster.Assignments.Single(x => x.Status == RosterAssignmentStatus.Active);
+        Assert.Equal((_binh, (Guid?)null, (DateTime?)null), (replacement.MemberId, replacement.SongListItemId, replacement.NotifiedAt));
+    }
+
+    [Fact]
+    public async Task AddAssignment_SameSkillWholeServiceAndSong_ReturnsDuplicateBothWays_Async()
+    {
+        EventNeedsGuitar();
+        var wholeService = new RosterAssignment { MemberId = _an, SkillId = _guitar.Id, Source = AssignmentSource.Manual };
+        var songLine = new RosterAssignment { MemberId = _binh, SkillId = _guitar.Id, SongListItemId = _entrance.Id, Source = AssignmentSource.Manual };
+        RosterWith(RosterStatus.Suggested, wholeService, songLine);
+        MemberIs(_an);
+        MemberIs(_binh);
+
+        var anOnSong = await _sut.AddAssignmentAsync(new CreateRosterAssignmentRequest
+        {
+            EventId = _event.Id, SongListItemId = _entrance.Id, SkillId = _guitar.Id, MemberId = _an,
+        }, _ct);
+        var binhOnWholeService = await _sut.AddAssignmentAsync(new CreateRosterAssignmentRequest
+        {
+            EventId = _event.Id, SkillId = _guitar.Id, MemberId = _binh,
+        }, _ct);
+
+        Assert.Equal(
+            [ErrorCodes.RosterAssignmentDuplicate, ErrorCodes.RosterAssignmentDuplicate],
+            new[] { anOnSong.Code, binhOnWholeService.Code });
+    }
 }

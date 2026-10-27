@@ -18,5 +18,7 @@ public class RosterAssignmentDto
 
     public string? SongTitle { get; set; }
 
+    public string? Note { get; set; }
+
     public AssignmentSource Source { get; set; }
 }

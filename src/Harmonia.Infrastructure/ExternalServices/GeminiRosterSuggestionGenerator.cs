@@ -19,12 +19,15 @@ public class GeminiRosterSuggestionGenerator(
     private const string Instructions =
         """
         You assign choir members to service slots for one liturgical event.
-        Each slot is one song and one skill, with neededCount and its eligible candidates.
+        Each slot is one skill with neededCount and its eligible candidates. A slot with isWholeService = true
+        is played or led for the whole event (organist, conductor); the others are one song each (psalmist, soloist).
+        Choral parts are never slots: everyone sings them.
         Rules:
         - Pick at most neededCount members per slot, only from that slot's candidates, no repeats in a slot.
         - Prefer a higher level (Advanced > Intermediate > Beginner > null).
         - Among similar levels prefer a lower recentServiceCount, to spread the load fairly.
-        - The same member may fill slots of several songs, and several skills of one song.
+        - Spread song slots across members: avoid giving one member several song slots while another candidate has none.
+        - A member chosen for a whole-service slot is busy all event; give them a song slot only when nobody else can take it.
         Return one entry per slot with the chosen memberCodes.
         Slots:
         """;

@@ -176,6 +176,8 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `SONG_IN_USE` | 409 | Bài hát đã được dùng trong danh sách bài hát, buổi tập hoặc bài luyện tập, không thể xoá |
 | `SONG_CLASSIFICATION_DUPLICATE` | 400 | Bài hát đã được phân loại theo mục này |
 | `SONG_CLASSIFICATION_TARGET_INVALID` | 400 | Đối tượng phân loại không hợp lệ |
+| `SONG_THEME_PARENT_INVALID` | 400 | Chủ đề cha không hợp lệ |
+| `SONG_THEME_HAS_ACTIVE_CHILDREN` | 409 | Chủ đề còn chủ đề con đang hoạt động, hãy tắt chủ đề con trước |
 | `SONG_SKILL_REQUIREMENT_DUPLICATE` | 400 | Kỹ năng này đã được khai báo cho bài hát |
 | `SONG_SKILL_REQUIREMENT_CATEGORY_INVALID` | 400 | Kỹ năng không thuộc đúng nhóm bè / nhạc cụ |
 | `MATERIAL_NOT_FOUND` | 404 | Không tìm thấy tài liệu |
@@ -231,6 +233,7 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 | `ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED` | 409 | Ca viên chưa xác nhận tham gia (chưa phản hồi hoặc đã từ chối) |
 | `ROSTER_ASSIGNMENT_DUPLICATE` | 409 | Ca viên đã được phân công vị trí này |
 | `PERSONNEL_REQUIREMENT_NOT_FOUND` | 404 | Không tìm thấy yêu cầu nhân sự |
+| `PERSONNEL_REQUIREMENT_IN_USE` | 409 | Yêu cầu nhân sự này đang có người được phân công, hãy gỡ phân công trước |
 | `PERSONNEL_REQUIRED_COUNT_INVALID` | 400 | Số lượng người phải lớn hơn 0 |
 | `PERSONNEL_REQUIREMENT_DUPLICATE` | 409 | Kỹ năng này đã được khai báo cho bài hát |
 
@@ -394,3 +397,10 @@ xem — trả 404, để không lộ sự tồn tại của bản ghi.
 - 2026-10-25: thêm `CHOIR_NOT_SERVING_EVENT`, `CHOIR_LEAD_INVALID`, `CHOIR_NOT_LEAD` (D8). Ca trưởng chỉ quản lý ca đoàn
   của mình; bản ghi ngoài phạm vi trả mã `_NOT_FOUND` sẵn có của từng tài nguyên. Ca trưởng ca đoàn phục vụ nhưng
   không phụ trách mà sửa danh sách bài / phân công / lời mời nhận 403 `CHOIR_NOT_LEAD`.
+- 2026-10-26: thêm `SONG_THEME_PARENT_INVALID` — `POST`/`PUT /api/lookups/song-themes` chọn chủ đề cha không tồn tại,
+  đã tắt, hoặc là chính nó / chủ đề con cháu của nó (chủ đề bài hát thành cây nhiều cấp).
+- 2026-10-26: thêm `SONG_THEME_HAS_ACTIVE_CHILDREN` — tắt chủ đề còn con đang hoạt động (mã riêng, không dùng chung
+  `LOOKUP_IN_USE` của nhóm kỹ năng). `ROSTER_ASSIGNMENT_DUPLICATE` còn trả khi một người vừa giữ kỹ năng cho cả buổi lễ
+  vừa được gán cùng kỹ năng đó ở một bài (hoặc ngược lại).
+- 2026-10-26: thêm `PERSONNEL_REQUIREMENT_IN_USE` — `PUT` yêu cầu nhân sự (của bài hoặc cả buổi lễ) bỏ một kỹ năng
+  đang có dòng phân công `Active`. `ROSTER_ALREADY_FINALIZED` còn trả khi sửa dòng / yêu cầu cả buổi lễ đã chốt sớm.

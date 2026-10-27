@@ -52,7 +52,11 @@ public class SongPersonnelRequirementService(
             if (!skill.IsActive && !current.Contains(skillId)) return Result<List<SongPersonnelRequirementDto>>.Failure(ErrorCodes.SkillInactive);
         }
 
-        foreach (var removed in item.PersonnelRequirements.Where(x => !skillIds.Contains(x.SkillId)).ToList())
+        var removedRequirements = item.PersonnelRequirements.Where(x => !skillIds.Contains(x.SkillId)).ToList();
+        if (removedRequirements.Any(r => item.RosterAssignments.Any(a => a.SkillId == r.SkillId)))
+            return Result<List<SongPersonnelRequirementDto>>.Failure(ErrorCodes.PersonnelRequirementInUse);
+
+        foreach (var removed in removedRequirements)
             item.PersonnelRequirements.Remove(removed);
 
         foreach (var requirement in request.Requirements)

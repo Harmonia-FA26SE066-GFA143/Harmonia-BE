@@ -5,5 +5,6 @@ public enum ClassificationTarget
     LiturgicalSeason,
     MassType,
     CeremonyType,
-    SongTheme
+    SongTheme,
+    LiturgicalSlot
 }

@@ -16,7 +16,9 @@ public class LiturgicalEventsController(
     ILiturgicalEventService liturgicalEventService,
     IEventPreparationService eventPreparationService,
     IChoirService choirService,
-    IMassScheduleService massScheduleService) : ApiControllerBase
+    IMassScheduleService massScheduleService,
+    IEventPersonnelRequirementService eventPersonnelRequirementService,
+    ISongSuggestionService songSuggestionService) : ApiControllerBase
 {
     /// <summary>Draft events are listed for the priest only (B23).</summary>
     [HttpGet]
@@ -93,4 +95,27 @@ public class LiturgicalEventsController(
     public async Task<IActionResult> UpdateChoirsAsync(
         Guid id, [FromBody] UpdateEventChoirsRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await choirService.UpdateEventChoirsAsync(id, request, cancellationToken));
+
+    /// <summary>Library songs that fit the event (season, Mass or ceremony type) and optionally one slot, best first.</summary>
+    [HttpGet("{id:guid}/song-suggestions")]
+    [Authorize(Roles = $"{RoleNames.ParishPriest},{RoleNames.ChoirDirector}")]
+    [ProducesResponseType<PagedList<SongSuggestionResponse>>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetSongSuggestionsAsync(
+        Guid id, [FromQuery] SearchSongSuggestionsRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await songSuggestionService.GetForEventAsync(id, request, cancellationToken));
+
+    /// <summary>People the event needs for the whole service (organist, guitarist, conductor), not per song.</summary>
+    [HttpGet("{id:guid}/personnel-requirements")]
+    [Authorize(Roles = $"{RoleNames.ParishPriest},{RoleNames.ChoirDirector}")]
+    [ProducesResponseType<List<EventPersonnelRequirementDto>>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPersonnelRequirementsAsync(Guid id, CancellationToken cancellationToken) =>
+        ToActionResult(await eventPersonnelRequirementService.GetAsync(id, cancellationToken));
+
+    /// <summary>Replaces the whole-service requirements; only the lead choir's director.</summary>
+    [HttpPut("{id:guid}/personnel-requirements")]
+    [Authorize(Roles = RoleNames.ChoirDirector)]
+    [ProducesResponseType<List<EventPersonnelRequirementDto>>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdatePersonnelRequirementsAsync(
+        Guid id, [FromBody] UpdateEventPersonnelRequirementsRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await eventPersonnelRequirementService.UpdateAsync(id, request, cancellationToken));
 }

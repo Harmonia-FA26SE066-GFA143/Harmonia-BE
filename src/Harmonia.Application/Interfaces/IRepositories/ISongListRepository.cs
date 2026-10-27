@@ -27,4 +27,21 @@ public interface ISongListRepository : IGenericRepository<SongList>
     Task AddItemsAsync(IEnumerable<SongListItem> items, CancellationToken cancellationToken);
 
     Task AddReviewAsync(SongListReview review, CancellationToken cancellationToken);
+
+    /// <summary>Read-only items of the list with their PersonnelRequirements loaded.</summary>
+    Task<List<SongListItem>> GetItemsWithRequirementsAsync(Guid songListId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Mandatory library requirements (vocal and instrument tables) of the given songs, for active skills outside the
+    /// Vocal category: choir parts are sung by everyone and never staffed per song.
+    /// </summary>
+    Task<List<(Guid SongId, Guid SkillId, int RequiredCount)>> GetSongDefaultRequirementsAsync(
+        IReadOnlyCollection<Guid> songIds, CancellationToken cancellationToken);
+
+    /// <summary>Requirements of the given liturgical slots, for active skills.</summary>
+    Task<List<(Guid SlotId, Guid SkillId, int RequiredCount)>> GetSlotDefaultRequirementsAsync(
+        IReadOnlyCollection<Guid> slotIds, CancellationToken cancellationToken);
+
+    /// <summary>Skill → count the event already needs for the whole service (EventPersonnelRequirement).</summary>
+    Task<Dictionary<Guid, int>> GetWholeServiceRequirementsAsync(Guid eventId, CancellationToken cancellationToken);
 }

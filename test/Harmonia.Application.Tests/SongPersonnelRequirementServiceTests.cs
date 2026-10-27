@@ -69,6 +69,19 @@ public class SongPersonnelRequirementServiceTests
     }
 
     [Fact]
+    public async Task Update_RemovingARequirementSomeoneHolds_ReturnsInUse_Async()
+    {
+        var item = StubItem();
+        item.PersonnelRequirements.Add(new SongPersonnelRequirement { SkillId = _guitar.Id, Skill = _guitar, RequiredCount = 1 });
+        item.RosterAssignments.Add(new RosterAssignment { SkillId = _guitar.Id, Status = RosterAssignmentStatus.Active });
+
+        var result = await _sut.UpdateAsync(item.Id, Request((_soprano.Id, 1)), _ct);
+
+        Assert.Equal(ErrorCodes.PersonnelRequirementInUse, result.Code);
+        Assert.Equal(_guitar.Id, Assert.Single(item.PersonnelRequirements).SkillId);
+    }
+
+    [Fact]
     public async Task Update_EmptyList_RemovesEverything_Async()
     {
         var item = StubItem();

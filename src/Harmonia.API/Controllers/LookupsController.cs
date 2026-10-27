@@ -77,13 +77,13 @@ public class LookupsController(ILookupService lookupService) : ApiControllerBase
     [HttpPost("song-themes")]
     [Authorize(Roles = RoleNames.Admin)]
     [ProducesResponseType<SongThemeDto>(StatusCodes.Status200OK)]
-    public async Task<IActionResult> CreateSongThemeAsync([FromBody] SaveCatalogItemRequest request, CancellationToken cancellationToken) =>
+    public async Task<IActionResult> CreateSongThemeAsync([FromBody] SaveSongThemeRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await lookupService.SaveSongThemeAsync(null, request, cancellationToken));
 
     [HttpPut("song-themes/{id:guid}")]
     [Authorize(Roles = RoleNames.Admin)]
     [ProducesResponseType<SongThemeDto>(StatusCodes.Status200OK)]
-    public async Task<IActionResult> UpdateSongThemeAsync(Guid id, [FromBody] SaveCatalogItemRequest request, CancellationToken cancellationToken) =>
+    public async Task<IActionResult> UpdateSongThemeAsync(Guid id, [FromBody] SaveSongThemeRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await lookupService.SaveSongThemeAsync(id, request, cancellationToken));
 
     [HttpGet("skill-categories")]
@@ -136,6 +136,19 @@ public class LookupsController(ILookupService lookupService) : ApiControllerBase
     [ProducesResponseType<LiturgicalSlotDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateLiturgicalSlotAsync(Guid id, [FromBody] SaveLiturgicalSlotRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await lookupService.SaveLiturgicalSlotAsync(id, request, cancellationToken));
+
+    /// <summary>People the slot needs whatever song fills it (e.g. a psalmist for the psalm), pre-filled into song lists.</summary>
+    [HttpGet("liturgical-slots/{id:guid}/requirements")]
+    [ProducesResponseType<List<LiturgicalSlotRequirementDto>>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetLiturgicalSlotRequirementsAsync(Guid id, CancellationToken cancellationToken) =>
+        ToActionResult(await lookupService.GetLiturgicalSlotRequirementsAsync(id, cancellationToken));
+
+    [HttpPut("liturgical-slots/{id:guid}/requirements")]
+    [Authorize(Roles = RoleNames.Admin)]
+    [ProducesResponseType<List<LiturgicalSlotRequirementDto>>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdateLiturgicalSlotRequirementsAsync(
+        Guid id, [FromBody] UpdateLiturgicalSlotRequirementsRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await lookupService.UpdateLiturgicalSlotRequirementsAsync(id, request, cancellationToken));
 
     [HttpGet("worship-locations")]
     [ProducesResponseType<List<WorshipLocationDto>>(StatusCodes.Status200OK)]

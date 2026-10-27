@@ -79,11 +79,13 @@ public class HarmoniaDbContext(DbContextOptions<HarmoniaDbContext> options) : Db
 
     public DbSet<SongPersonnelRequirement> SongPersonnelRequirements => Set<SongPersonnelRequirement>();
 
+    public DbSet<EventPersonnelRequirement> EventPersonnelRequirements => Set<EventPersonnelRequirement>();
+
+    public DbSet<LiturgicalSlotRequirement> LiturgicalSlotRequirements => Set<LiturgicalSlotRequirement>();
+
     public DbSet<ServiceRoster> ServiceRosters => Set<ServiceRoster>();
 
     public DbSet<RosterAssignment> RosterAssignments => Set<RosterAssignment>();
-
-    public DbSet<RosterShortage> RosterShortages => Set<RosterShortage>();
 
     public DbSet<Rehearsal> Rehearsals => Set<Rehearsal>();
 

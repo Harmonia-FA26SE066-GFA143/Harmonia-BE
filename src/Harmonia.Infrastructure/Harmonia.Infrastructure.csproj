@@ -23,6 +23,8 @@
   <ItemGroup>
     <!-- First Vietnamese names of the liturgical calendar; DataSeeder loads it into an empty table. -->
     <EmbeddedResource Include="Data\LiturgicalNameTranslations.json" LogicalName="LiturgicalNameTranslations.json" />
+    <!-- First Mass types, ceremony types, Mass parts and song theme tree; DataSeeder loads each into an empty table. -->
+    <EmbeddedResource Include="Data\SongCatalogs.json" LogicalName="SongCatalogs.json" />
   </ItemGroup>
 
   <PropertyGroup>

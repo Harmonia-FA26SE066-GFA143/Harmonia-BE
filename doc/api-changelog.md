@@ -11,6 +11,55 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
   huống trước đây chưa có. FE bỏ qua trường lạ, hiển thị câu chung cho mã lạ.
 - Mỗi PR đổi hợp đồng thêm một dòng vào mục ngày tương ứng ở đây, cùng PR cập nhật `api.md` / `error-codes.md`.
 
+## 2026-10-26
+
+Phân loại bài hát chi tiết hơn (theo dieuca.net) và phân công 3 tầng: đồng ca không phân công, vai **cả buổi lễ**
+(organ, bắt nhịp), vai **theo bài** (xướng đáp ca, solo). Cần migration trước khi deploy.
+
+### [Phá vỡ] Phân công phục vụ
+
+- `RosterShortageDto.songListItemId` và `songTitle` **có thể `null`**: dòng thiếu người cho cả buổi lễ. Web đang hiển thị
+  `"{songTitle}: thiếu …"` phải đổi cho dòng này (ví dụ "Cả buổi lễ: thiếu 1 Organ").
+- `RosterShortageDto.requiredCount` của dòng **theo bài** giờ là **phần thêm** ngoài người cả buổi lễ: bài cần Guitar ×2, cả
+  lễ có Guitar ×1 → dòng thiếu của bài có `requiredCount = 1`. Hiển thị "cần **thêm** 1 guitar". Bài cần ≤ số của cả lễ không
+  còn sinh dòng thiếu nào.
+- `RosterAssignmentDto.songListItemId = null` = dòng cả buổi lễ. `MyAssignmentDto` cũng vậy.
+- `GET api/liturgical-events/{id}/preparation-status`: `rosterShortages` **khác `null`** khi sự kiện có yêu cầu cả buổi lễ,
+  kể cả khi chưa có danh sách bài được duyệt.
+- `POST api/service-rosters/suggestions`, `GET …/shortages`: không còn trả `ROSTER_SONG_LIST_NOT_APPROVED` khi sự kiện có yêu
+  cầu cả buổi lễ — chạy trên phần cả buổi lễ.
+- `ROSTER_ASSIGNMENT_DUPLICATE` thêm trường hợp: một người giữ kỹ năng cho cả buổi lễ không được gán thêm cùng kỹ năng ở một
+  bài, và ngược lại (thêm và thay người).
+- `PUT api/song-list-items/{id}/personnel-requirements`: bỏ một kỹ năng đang có người được gán → 409
+  `PERSONNEL_REQUIREMENT_IN_USE` (trước đây gỡ được, để lại dòng phân công mồ côi).
+
+### [Phá vỡ] Chủ đề bài hát
+
+- `POST` / `PUT api/lookups/song-themes` nhận thêm `parentId?`; `GET` trả thêm `parentId`. Chủ đề thành cây nhiều cấp.
+- Tắt chủ đề còn con đang hoạt động → 409 `SONG_THEME_HAS_ACTIVE_CHILDREN` (mã mới). Bật / tạo chủ đề dưới cha đã tắt → 400
+  `SONG_THEME_PARENT_INVALID` (mã mới).
+- `GET api/songs?songThemeId=` giờ trả cả bài của các chủ đề con cháu.
+
+### Không phá vỡ
+
+- Endpoint mới:
+  - `GET` / `PUT api/liturgical-events/{id}/personnel-requirements` — vai cả buổi lễ.
+  - `POST api/service-rosters/{id}/whole-service-finalization` — chốt sớm vai cả buổi lễ; sau đó dòng cả buổi lễ chỉ còn
+    **thay người** được, `notifications` gửi được ngay cho các dòng đó. `ServiceRosterDto` thêm `wholeServiceFinalizedAt`.
+  - `PUT api/service-rosters/assignments/{id}/note` — ghi chú vai. `RosterAssignmentDto`, `MyAssignmentDto` thêm `note`;
+    thêm / thay người nhận `note?`.
+  - `GET api/liturgical-events/{id}/song-suggestions?slotId=` — gợi ý bài cho sự kiện.
+  - `GET` / `PUT api/lookups/liturgical-slots/{id}/requirements` — người vị trí luôn cần (Admin ghi).
+- `POST api/service-rosters/assignments`: `songListItemId` thành tuỳ chọn (bỏ trống = dòng cả buổi lễ).
+- Phân loại bài: `liturgicalSlotIds` / `liturgicalSlots` (vị trí trong lễ); `vocalRequirements` / `instrumentRequirements` thêm
+  `requiredCount` (mặc định 1). `GET api/songs` thêm lọc `liturgicalSlotId`.
+- `POST api/liturgical-events`: bỏ trống `liturgicalSeasonId` → server điền mùa đang hoạt động **chứa ngày lễ**. Lễ Vọng tối
+  24/12 vì vậy được điền Mùa Vọng; cha xứ tự chọn Giáng Sinh nếu muốn (chủ ý, không tự đoán theo giờ).
+- Yêu cầu nhân sự của bài được **điền sẵn** khi tạo / sửa danh sách: giữ yêu cầu của cùng bài cùng vị trí ở bản trước; bài mới
+  lấy từ thư viện (bỏ bè S/A/T/B) + mặc định của vị trí. Sửa danh sách không còn làm mất yêu cầu đã khai.
+- Dữ liệu mẫu (loại lễ, nghi thức, vị trí trong lễ, cây chủ đề, mặc định Đáp ca / Tung hô Tin Mừng) chỉ nạp vào **bảng đang
+  trống**. Trên Azure các bảng đã có dữ liệu thì Admin tự cấu hình; mặc định Đáp ca chỉ nạp khi đã có kỹ năng nhóm Đáp ca.
+
 ## 2026-10-25
 
 ### [Phá vỡ] Nhiều ca đoàn — phạm vi ca trưởng (D8)

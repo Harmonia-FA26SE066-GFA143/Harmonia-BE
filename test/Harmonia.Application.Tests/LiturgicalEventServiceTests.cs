@@ -87,6 +87,23 @@ public class LiturgicalEventServiceTests
     }
 
     [Fact]
+    public async Task Create_NoSeasonPicked_UsesSeasonCoveringTheDate_Async()
+    {
+        var advent = Guid.NewGuid();
+        var request = new CreateLiturgicalEventRequest
+        {
+            EventDate = _event.EventDate, Time = _event.Time, LocationId = Guid.NewGuid(), MassTypeId = Guid.NewGuid(),
+        };
+        _lookups.FindLiturgicalSeasonIdAsync(request.EventDate, _ct).Returns(advent);
+
+        var result = await _sut.CreateAsync(request, _ct);
+
+        Assert.Equal(advent, result.Value!.LiturgicalSeasonId);
+        await _lookups.Received(1).CheckEventCatalogsAsync(
+            request.EventDate, advent, request.MassTypeId, null, null, request.LocationId, null, _ct);
+    }
+
+    [Fact]
     public async Task Update_CatalogCheckFails_ReturnsItsCode_AndIsGivenTheCurrentEvent_Async()
     {
         var request = UpdateRequest();

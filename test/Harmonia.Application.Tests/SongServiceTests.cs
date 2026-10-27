@@ -253,6 +253,21 @@ public class SongServiceTests
     }
 
     [Fact]
+    public async Task UpdateClassification_LiturgicalSlot_StoredAndReturned_Async()
+    {
+        var song = StubClassifiedSong();
+        var communion = StubLookup("Communion");
+
+        var result = await _sut.UpdateClassificationAsync(
+            song.Id, new UpdateSongClassificationRequest { LiturgicalSlotIds = [communion] }, _ct);
+
+        Assert.True(result.IsSuccess);
+        var classification = Assert.Single(song.Classifications);
+        Assert.Equal((ClassificationTarget.LiturgicalSlot, communion), (classification.TargetType, classification.TargetId));
+        Assert.Equal("Communion", Assert.Single(result.Value!.LiturgicalSlots).Name);
+    }
+
+    [Fact]
     public async Task UpdateClassification_KeepsTargetDeactivatedSince_Async()
     {
         var song = StubClassifiedSong();

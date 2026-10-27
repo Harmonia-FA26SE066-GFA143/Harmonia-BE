@@ -9,8 +9,9 @@ public class CreateRosterAssignmentRequestValidator : AbstractValidator<CreateRo
     public CreateRosterAssignmentRequestValidator()
     {
         RuleFor(x => x.EventId).NotEmpty();
-        RuleFor(x => x.SongListItemId).NotEmpty();
+        RuleFor(x => x.SongListItemId).NotEqual(Guid.Empty);
         RuleFor(x => x.SkillId).NotEmpty();
         RuleFor(x => x.MemberId).NotEmpty();
+        RuleFor(x => x.Note).MaximumLength(200);
     }
 }

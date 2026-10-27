@@ -162,6 +162,12 @@ public static class ErrorCodes
 
     public const string SongClassificationTargetInvalid = "SONG_CLASSIFICATION_TARGET_INVALID";
 
+    // Parent theme missing, switched off, the theme itself or one of its descendants.
+    public const string SongThemeParentInvalid = "SONG_THEME_PARENT_INVALID";
+
+    // Switching off a theme whose children are still active; the children go first.
+    public const string SongThemeHasActiveChildren = "SONG_THEME_HAS_ACTIVE_CHILDREN";
+
     // Field-level, same as above.
     public const string SongSkillRequirementDuplicate = "SONG_SKILL_REQUIREMENT_DUPLICATE";
 
@@ -239,6 +245,9 @@ public static class ErrorCodes
     public const string RosterAssignmentDuplicate = "ROSTER_ASSIGNMENT_DUPLICATE";
 
     public const string PersonnelRequirementNotFound = "PERSONNEL_REQUIREMENT_NOT_FOUND";
+
+    // Removing a requirement someone is still assigned to; remove or move the assignment first.
+    public const string PersonnelRequirementInUse = "PERSONNEL_REQUIREMENT_IN_USE";
 
     public const string PersonnelRequiredCountInvalid = "PERSONNEL_REQUIRED_COUNT_INVALID";
 

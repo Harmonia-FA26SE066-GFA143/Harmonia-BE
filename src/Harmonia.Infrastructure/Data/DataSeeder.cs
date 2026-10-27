@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Domain.Common;
 using Harmonia.Domain.Entities;
@@ -31,6 +32,78 @@ public class DataSeeder(
         await SeedSystemSettingsAsync(cancellationToken);
         await SeedMissingAssignmentMaterialsAsync(cancellationToken);
         await SeedLiturgicalNameTranslationsAsync(cancellationToken);
+        await SeedSongCatalogsAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Fills the Mass type, ceremony type, Mass part and song theme catalogs from SongCatalogs.json (classification
+    /// modelled on dieuca.net). Each table only while it is empty, for the same reason as the translations.
+    /// Liturgical seasons are not seeded: their dates change every year.
+    /// </summary>
+    private async Task SeedSongCatalogsAsync(CancellationToken cancellationToken)
+    {
+        await using var stream = typeof(DataSeeder).Assembly.GetManifestResourceStream("SongCatalogs.json")
+            ?? throw new InvalidOperationException("Embedded resource SongCatalogs.json is missing.");
+        var root = await JsonNode.ParseAsync(stream, cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Embedded resource SongCatalogs.json is empty.");
+
+        static IEnumerable<string> Names(JsonNode? node) => node!.AsArray().Select(x => x!.GetValue<string>());
+
+        if (!await dbContext.MassTypes.AnyAsync(cancellationToken))
+            dbContext.MassTypes.AddRange(Names(root["MassTypes"]).Select(x => new MassType { Id = Guid.NewGuid(), Name = x }));
+
+        if (!await dbContext.CeremonyTypes.AnyAsync(cancellationToken))
+            dbContext.CeremonyTypes.AddRange(Names(root["CeremonyTypes"]).Select(x => new CeremonyType { Id = Guid.NewGuid(), Name = x }));
+
+        if (!await dbContext.LiturgicalSlots.AnyAsync(cancellationToken))
+            dbContext.LiturgicalSlots.AddRange(Names(root["LiturgicalSlots"])
+                .Select((x, i) => new LiturgicalSlot { Id = Guid.NewGuid(), Name = x, DefaultOrder = i + 1 }));
+
+        if (!await dbContext.SongThemes.AnyAsync(cancellationToken))
+            AddThemes(root["SongThemes"]!.AsObject(), null);
+
+        var count = await dbContext.SaveChangesAsync(cancellationToken);
+        if (count > 0) logger.LogInformation("Seeded {Count} song catalog rows.", count);
+
+        await SeedSlotRequirementsAsync(root["LiturgicalSlotRequirements"]!.AsObject(), cancellationToken);
+
+        // Each property is a theme; its value holds the child themes, nested to any depth.
+        void AddThemes(JsonObject themes, Guid? parentId)
+        {
+            foreach (var (name, children) in themes)
+            {
+                var theme = new SongTheme { Id = Guid.NewGuid(), Name = name, ParentId = parentId };
+                dbContext.SongThemes.Add(theme);
+                AddThemes(children!.AsObject(), theme.Id);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gives the named slots one person of the named skill category (key of SkillCategoryIds), e.g. a psalmist for the
+    /// psalm, while the table is empty. Skills are the Admin's, so a slot is skipped until its category has an active
+    /// skill, and the seed is retried on the next start.
+    /// </summary>
+    private async Task SeedSlotRequirementsAsync(JsonObject categoryBySlot, CancellationToken cancellationToken)
+    {
+        if (await dbContext.LiturgicalSlotRequirements.AnyAsync(cancellationToken)) return;
+
+        foreach (var (slotName, categoryKey) in categoryBySlot)
+        {
+            var categoryId = (Guid)typeof(SkillCategoryIds).GetField(categoryKey!.GetValue<string>())!.GetValue(null)!;
+            var slotId = await dbContext.LiturgicalSlots.Where(x => x.Name == slotName).Select(x => (Guid?)x.Id).FirstOrDefaultAsync(cancellationToken);
+            var skillId = await dbContext.Skills.Where(x => x.CategoryId == categoryId && x.IsActive)
+                .OrderBy(x => x.Name).Select(x => (Guid?)x.Id).FirstOrDefaultAsync(cancellationToken);
+            if (slotId is null || skillId is null) continue;
+
+            dbContext.LiturgicalSlotRequirements.Add(new LiturgicalSlotRequirement
+            {
+                Id = Guid.NewGuid(), SlotId = slotId.Value, SkillId = skillId.Value, RequiredCount = 1,
+            });
+        }
+
+        var count = await dbContext.SaveChangesAsync(cancellationToken);
+        if (count > 0) logger.LogInformation("Seeded {Count} liturgical slot requirements.", count);
     }
 
     /// <summary>

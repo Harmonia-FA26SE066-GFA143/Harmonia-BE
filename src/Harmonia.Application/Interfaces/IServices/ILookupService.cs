@@ -50,7 +50,24 @@ public interface ILookupService
     Task<Result<LiturgicalSeasonDto>> SaveLiturgicalSeasonAsync(
         Guid? id, SaveLiturgicalSeasonRequest request, CancellationToken cancellationToken);
 
-    Task<Result<SongThemeDto>> SaveSongThemeAsync(Guid? id, SaveCatalogItemRequest request, CancellationToken cancellationToken);
+    /// <summary>
+    /// The parent must exist, not be the theme itself or one of its descendants, and be active unless the theme is
+    /// inactive and stays under it. A theme with active children cannot be switched off (SONG_THEME_HAS_ACTIVE_CHILDREN).
+    /// </summary>
+    Task<Result<SongThemeDto>> SaveSongThemeAsync(Guid? id, SaveSongThemeRequest request, CancellationToken cancellationToken);
+
+    /// <summary>People the slot needs whatever song fills it, ordered by skill name; LOOKUP_NOT_FOUND for an unknown slot.</summary>
+    Task<Result<List<LiturgicalSlotRequirementDto>>> GetLiturgicalSlotRequirementsAsync(Guid slotId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Replaces the slot's whole requirement set. Only newly added skills must be active. Song lists already made keep
+    /// their own requirements; only songs put in the slot afterwards get the new ones.
+    /// </summary>
+    Task<Result<List<LiturgicalSlotRequirementDto>>> UpdateLiturgicalSlotRequirementsAsync(
+        Guid slotId, UpdateLiturgicalSlotRequirementsRequest request, CancellationToken cancellationToken);
+
+    /// <summary>The active season whose dates contain <paramref name="date"/>, or null; used to pre-fill a new event.</summary>
+    Task<Guid?> FindLiturgicalSeasonIdAsync(DateOnly date, CancellationToken cancellationToken);
 
     Task<Result<LiturgicalSlotDto>> SaveLiturgicalSlotAsync(Guid? id, SaveLiturgicalSlotRequest request, CancellationToken cancellationToken);
 

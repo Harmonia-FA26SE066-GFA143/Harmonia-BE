@@ -7,16 +7,18 @@ namespace Harmonia.Application.Interfaces.IServices;
 public interface IRosterService
 {
     /// <summary>
-    /// Suggests who serves each song / skill of the event's approved song list, from members with the
-    /// approved skill who confirmed participation. Replaces the previous suggested assignments, keeps the
-    /// manual ones and counts them as filled. Uses AI when available and rules otherwise; slots that still
+    /// Suggests who serves the event's whole-service requirements (organist, conductor...) and each song / skill of its
+    /// approved song list, from members with the approved skill who confirmed participation. Whole-service ones work
+    /// before the song list is approved. Replaces the previous suggested assignments, keeps the manual ones and counts
+    /// them as filled. Uses AI when available and rules otherwise, spreading lines across members; slots that still
     /// lack people come back as shortages.
     /// </summary>
     Task<Result<RosterSuggestionResponse>> SuggestAsync(SuggestServiceRosterRequest request, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Song / skill requirements of the event's approved song list that the current roster does not fully
-    /// staff (UC-25a / FE-37). Every existing assignment counts as filled; with no roster yet, every
+    /// Whole-service requirements and song / skill requirements of the event's approved song list that the current
+    /// roster does not fully staff (UC-25a / FE-37). A song requirement of a skill the event needs for the whole
+    /// service is covered by that line and never listed. Every existing assignment counts as filled; with no roster yet, every
     /// requirement is a shortage.
     /// </summary>
     Task<Result<List<RosterShortageDto>>> GetShortagesAsync(Guid eventId, CancellationToken cancellationToken);
@@ -43,6 +45,18 @@ public interface IRosterService
 
     /// <summary>Deletes an Active assignment from a roster that is not finalized (UC-25b / FE-38).</summary>
     Task<Result> RemoveAssignmentAsync(Guid assignmentId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Locks the whole-service lines (organist, conductor) before the song list is ready, so they can be notified early.
+    /// Every such line must still be eligible, as in finalization. Afterwards those lines and the event's whole-service
+    /// requirements can no longer change (except replacing a member who drops out), and suggestions leave them alone;
+    /// song lines stay open.
+    /// </summary>
+    Task<Result<ServiceRosterDto>> FinalizeWholeServiceAsync(Guid rosterId, CancellationToken cancellationToken);
+
+    /// <summary>Sets the role note of an Active assignment ("Narrator", "verse 2"); blank clears it. Not once finalized.</summary>
+    Task<Result<RosterAssignmentDto>> UpdateNoteAsync(
+        Guid assignmentId, UpdateRosterAssignmentNoteRequest request, CancellationToken cancellationToken);
 
     /// <summary>
     /// Locks the roster once the event's song list is approved (UC-26 / FE-39). Every Active assignment must still

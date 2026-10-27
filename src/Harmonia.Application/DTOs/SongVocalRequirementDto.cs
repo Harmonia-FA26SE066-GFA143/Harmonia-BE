@@ -7,4 +7,6 @@ public class SongVocalRequirementDto
     public string SkillName { get; set; } = string.Empty;
 
     public bool IsMandatory { get; set; }
+
+    public int RequiredCount { get; set; }
 }

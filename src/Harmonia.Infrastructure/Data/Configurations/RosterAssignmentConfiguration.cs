@@ -8,6 +8,8 @@ public class RosterAssignmentConfiguration : IEntityTypeConfiguration<RosterAssi
 {
     public void Configure(EntityTypeBuilder<RosterAssignment> builder)
     {
+        builder.Property(x => x.Note).HasMaxLength(200);
+
         builder.HasOne(x => x.Roster)
             .WithMany(x => x.Assignments)
             .HasForeignKey(x => x.RosterId)
