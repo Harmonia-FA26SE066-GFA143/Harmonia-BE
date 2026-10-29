@@ -79,7 +79,7 @@ Sai theo D8 (đoạn mục 2 và bước 9 mục 3 vẫn viết "một ca trư�
       xoá file cũ; lưu lỗi thì xoá file mới).
 - [x] UC-28 (F9): tạo bài tập — kiểm danh sách tư liệu bằng một `ListAsync`, tạo các dòng `PracticeAssignmentMaterial`.
 - [x] UC-34 (F12): thêm `activity-trend` (đọc mọi trang ca viên → bài tập → chia kỳ).
-- [ ] Hỏi: quản lý bản dịch tên lễ gộp vào UC-32 hay thêm UC mới — cần chốt trước khi vẽ sequence.
+- [x] Quản lý bản dịch tên lễ gộp vào UC-32 (chốt 2026-10-27).
 
 ## 4. Activity — `doc/harmonia-activity-diagram-guide.md`
 

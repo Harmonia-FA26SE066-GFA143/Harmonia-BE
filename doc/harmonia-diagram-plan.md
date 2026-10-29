@@ -70,7 +70,7 @@ Hộp tên `IChoirScopeService` ← `LiturgicalEventService`, `UpcomingScheduleS
 | UC-12 | Manage Daily Liturgical Program | Vẽ — đồng bộ ngày từ API ngoài, tạo sự kiện, công bố (S-05). Người nhận thông báo: `IUserRepository.GetActiveUserIdsOfEventChoirsAsync`; `alt` sự kiện chưa gắn ca đoàn → `GetActiveUserIdsByRolesAsync` (cả giáo xứ). Ngày lễ được sớm hơn mùa một ngày (lễ vọng) |
 | UC-12E | Generate Draft Events from Mass Schedules | Trong UC-12 |
 | UC-36 | Manage Mass Schedules | Tham chiếu UC-37 |
-| (chưa có mã) | Manage Liturgical Name Translations (Admin) | Tham chiếu UC-37 — **chờ chốt**: gộp vào UC-32 hay thêm UC mới |
+| UC-32 | Manage Liturgical Name Translations (Admin) — gộp vào UC-32 (chốt 2026-10-27) | Tham chiếu UC-37 |
 | UC-04 | View Upcoming Events & Rehearsal Schedule | Tùy chọn |
 
 ## 3.5 F5 — Thư viện Thánh nhạc

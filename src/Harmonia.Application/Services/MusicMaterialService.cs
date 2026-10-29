@@ -25,7 +25,7 @@ public class MusicMaterialService(
 
     private static readonly string[] DocumentExtensions = [".pdf", ".png", ".jpg"];
 
-    private static readonly string[] AudioExtensions = [".mp3", ".m4a", ".wav"];
+    private static readonly string[] AudioExtensions = [".mp3", ".m4a", ".wav", ".mid", ".midi"];
 
     public async Task<Result<MusicMaterialDto>> UploadAsync(
         UploadMusicMaterialRequest request, FileContent? file, CancellationToken cancellationToken)

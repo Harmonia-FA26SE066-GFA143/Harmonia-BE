@@ -1192,7 +1192,7 @@ Tư liệu của bài hát: bản nhạc, lời, audio mẫu, tài liệu tập 
   | `materialType` | Đuôi file |
   |---|---|
   | `SheetMusic`, `Lyrics` | `.pdf`, `.png`, `.jpg` |
-  | `SampleAudio` | `.mp3`, `.m4a`, `.wav` |
+  | `SampleAudio` | `.mp3`, `.m4a`, `.wav`, `.mid`, `.midi` (MIDI trình duyệt không phát trực tiếp — FE cho tải về) |
   | `RehearsalMaterial` | cả hai nhóm trên |
 
   Server chỉ xét đuôi file và dung lượng thật, bỏ qua `Content-Type` client gửi.

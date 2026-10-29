@@ -102,7 +102,7 @@ Hệ thống Harmonia gồm **14 feature**, bao phủ toàn bộ 54 function (FE
 
 | Function | Actor | Mã |
 | --- | --- | --- |
-| Định nghĩa nhân sự cần cho mỗi bài (số người mỗi bè, số người mỗi nhạc cụ) | CD | UC-24 / FE-35 |
+| Định nghĩa nhân sự cần cho mỗi bài (số người mỗi bè, số người mỗi nhạc cụ) và cho cả buổi lễ (organ, bắt nhịp) | CD | UC-24 / FE-35 |
 | Yêu cầu hệ thống gợi ý danh sách phân công | CD | UC-25 / FE-36 |
 | Xem cảnh báo thiếu bè / nhạc cụ / vai trò | CD | UC-25a / FE-37 |
 | Điều chỉnh phân công thủ công | CD | UC-25b / FE-38 |
@@ -154,9 +154,9 @@ Hệ thống Harmonia gồm **14 feature**, bao phủ toàn bộ 54 function (FE
 
 | Function | Actor | Mã |
 | --- | --- | --- |
-| Quản lý ca đoàn: tạo, sửa, tắt ca đoàn | CD | UC-37 |
-| Xem thành viên, gán / rút ca viên khỏi ca đoàn (một ca viên thuộc được nhiều ca đoàn) | CD | UC-38 |
-| Gán ca đoàn phục vụ sự kiện (một sự kiện có nhiều ca đoàn) | CD | UC-39 |
+| Quản lý ca đoàn: tạo, sửa, tắt ca đoàn, gán ca trưởng | AD | UC-37 |
+| Xem thành viên, gán / rút ca viên khỏi ca đoàn (một ca viên thuộc được nhiều ca đoàn; ca trưởng chỉ ca đoàn của mình) | CD, AD | UC-38 |
+| Gán ca đoàn phục vụ sự kiện và chọn ca đoàn phụ trách (một sự kiện có nhiều ca đoàn) | PP | UC-39 |
 
 ## F14. Cấu hình Hệ thống
 
@@ -164,6 +164,7 @@ Hệ thống Harmonia gồm **14 feature**, bao phủ toàn bộ 54 function (FE
 | --- | --- | --- |
 | Cấu hình danh mục kỹ năng | AD | UC-32 / FE-49 |
 | Cấu hình mùa phụng vụ, loại lễ, nghi thức, loại sự kiện | AD | UC-32 / FE-50 |
+| Quản lý bản dịch tiếng Việt tên lễ, bậc lễ, mùa từ API lịch | AD | UC-32 |
 | Quản lý cài đặt chung của hệ thống | AD | UC-33 / FE-51 |
 
 ## Ghi chú

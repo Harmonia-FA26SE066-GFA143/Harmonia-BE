@@ -71,6 +71,8 @@ public class MusicMaterialServiceTests
 
     [Theory]
     [InlineData(MaterialType.SampleAudio, "sample.mp3", "music-materials/sample-audio")]
+    [InlineData(MaterialType.SampleAudio, "sample.mid", "music-materials/sample-audio")]
+    [InlineData(MaterialType.RehearsalMaterial, "tap.MIDI", "music-materials/rehearsal-material")]
     [InlineData(MaterialType.Lyrics, "loi.JPG", "music-materials/lyrics")]
     [InlineData(MaterialType.RehearsalMaterial, "bass.wav", "music-materials/rehearsal-material")]
     [InlineData(MaterialType.RehearsalMaterial, "tap.pdf", "music-materials/rehearsal-material")]
@@ -84,6 +86,7 @@ public class MusicMaterialServiceTests
 
     [Theory]
     [InlineData(MaterialType.SheetMusic, "ban-nhac.mp3")]
+    [InlineData(MaterialType.SheetMusic, "ban-nhac.mid")]
     [InlineData(MaterialType.SampleAudio, "sample.pdf")]
     [InlineData(MaterialType.RehearsalMaterial, "virus.exe")]
     [InlineData(MaterialType.SheetMusic, "no-extension")]

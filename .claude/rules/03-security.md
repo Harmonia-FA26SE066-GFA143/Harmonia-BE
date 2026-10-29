@@ -118,7 +118,8 @@
 
 - Whitelist phần mở rộng, chặn theo whitelist, không blacklist:
   - `MusicMaterial` theo `MaterialType` (chốt 2026-10-02): `SheetMusic`, `Lyrics` nhận
-    `.pdf`, `.png`, `.jpg`; `SampleAudio` nhận `.mp3`, `.m4a`, `.wav`;
+    `.pdf`, `.png`, `.jpg`; `SampleAudio` nhận `.mp3`, `.m4a`, `.wav`, `.mid`, `.midi`
+    (MIDI thêm 2026-10-29, lưu Cloudinary dạng raw);
     `RehearsalMaterial` nhận cả hai nhóm. Tối đa 20 MB một file.
   - `PracticeSubmission` nhận `.mp3`, `.m4a`, `.wav`.
 - Không tin `Content-Type` client gửi — kiểm phần mở rộng lẫn dung lượng ở server.
