@@ -186,6 +186,20 @@ public static class ErrorCodes
 
     public const string MaterialLearningStatusInvalid = "MATERIAL_LEARNING_STATUS_INVALID";
 
+    // Not a MIDI material, or a MIDI uploaded before piano rendering existed: replace the file to render it.
+    public const string MaterialPianoUnavailable = "MATERIAL_PIANO_UNAVAILABLE";
+
+    public const string MidiInvalidFile = "MIDI_INVALID_FILE";
+
+    // Format 2 or SMPTE time division.
+    public const string MidiFormatUnsupported = "MIDI_FORMAT_UNSUPPORTED";
+
+    // Nothing left once percussion is dropped.
+    public const string MidiNoPlayableNotes = "MIDI_NO_PLAYABLE_NOTES";
+
+    // Longer than the timeline limit or more notes than the renderer accepts.
+    public const string MidiLimitExceeded = "MIDI_LIMIT_EXCEEDED";
+
     // 7. Song list & review.
     public const string SongListNotFound = "SONG_LIST_NOT_FOUND";
 

@@ -24,6 +24,14 @@ public class MusicMaterialProfile : Profile
             .ForMember(dest => dest.LearningUpdatedAt, opt => opt.MapFrom(src =>
                 src.LearningProgresses.Select(p => (DateTime?)p.UpdatedAt).FirstOrDefault()));
 
+        // Signed URLs are built by MusicMaterialService; only called once PianoDurationSeconds is set.
+        CreateMap<MusicMaterial, PianoPlaybackDto>()
+            .ForMember(dest => dest.DurationSeconds, opt => opt.MapFrom(src => src.PianoDurationSeconds!.Value))
+            .ForMember(dest => dest.AudioUrl, opt => opt.Ignore())
+            .ForMember(dest => dest.NotesUrl, opt => opt.Ignore())
+            .ForMember(dest => dest.Status, opt => opt.Ignore())
+            .ForMember(dest => dest.SchemaVersion, opt => opt.Ignore());
+
         CreateMap<UploadMusicMaterialRequest, MusicMaterial>();
         CreateMap<UpdateMusicMaterialRequest, MusicMaterial>();
     }

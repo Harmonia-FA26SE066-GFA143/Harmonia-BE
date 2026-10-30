@@ -24,6 +24,14 @@ public class MusicMaterial : BaseAuditableEntity
 
     public long? FileSizeBytes { get; set; }
 
+    /// <summary>Piano rendering of a MIDI file, for the mobile piano roll. Null for every non-MIDI material.</summary>
+    public string? PianoAudioPublicId { get; set; }
+
+    /// <summary>notes.json (schema v1) built on the same timeline as <see cref="PianoAudioPublicId"/>.</summary>
+    public string? PianoNotesPublicId { get; set; }
+
+    public double? PianoDurationSeconds { get; set; }
+
     public Guid? TargetSkillId { get; set; }
 
     public bool IsActive { get; set; } = true;

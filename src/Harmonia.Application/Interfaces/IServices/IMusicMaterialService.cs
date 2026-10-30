@@ -52,6 +52,13 @@ public interface IMusicMaterialService
     Task<Result<MusicMaterialDto>> ReplaceFileAsync(
         Guid id, ReplaceMusicMaterialFileRequest request, FileContent? file, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Fresh signed URLs of the piano rendering of a MIDI material, for the mobile piano roll.
+    /// Rendering happens on upload or file replacement, so nothing is rendered here.
+    /// MATERIAL_NOT_FOUND, MATERIAL_PIANO_UNAVAILABLE.
+    /// </summary>
+    Task<Result<PianoPlaybackDto>> GetPianoPlaybackAsync(Guid id, CancellationToken cancellationToken);
+
     /// <summary>Soft delete: sets IsActive to false and keeps the stored file, which learning progress still points at.</summary>
     Task<Result> DeleteAsync(Guid id, CancellationToken cancellationToken);
 }

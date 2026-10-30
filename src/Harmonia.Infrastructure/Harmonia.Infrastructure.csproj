@@ -14,6 +14,8 @@
     <PackageReference Include="ClosedXML" Version="0.105.1" />
     <PackageReference Include="CloudinaryDotNet" Version="1.29.3" />
     <PackageReference Include="Google.Apis.Auth" Version="1.77.0" />
+    <PackageReference Include="Melanchall.DryWetMidi.Nativeless" Version="8.0.3" />
+    <PackageReference Include="MeltySynth" Version="2.4.1" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.6" />
     <PackageReference Include="Microsoft.Extensions.Identity.Core" Version="9.0.9" />
     <PackageReference Include="QuestPDF" Version="2026.9.1" />

@@ -66,6 +66,15 @@ public class MusicMaterialsController(IMusicMaterialService musicMaterialService
         ToActionResult(await musicMaterialService.UpdateLearningProgressAsync(
             User.GetUserId(), id, request, cancellationToken));
 
+    /// <summary>
+    /// Fresh signed URLs of the piano rendering (WAV + notes.json) of a MIDI material, for the mobile piano roll.
+    /// Call again once the URLs expire; nothing is rendered again.
+    /// </summary>
+    [HttpGet("{id:guid}/piano")]
+    [ProducesResponseType<PianoPlaybackDto>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPianoPlaybackAsync(Guid id, CancellationToken cancellationToken) =>
+        ToActionResult(await musicMaterialService.GetPianoPlaybackAsync(id, cancellationToken));
+
     [HttpPut("{id:guid}")]
     [Authorize(Roles = RoleNames.ChoirDirector)]
     [ProducesResponseType<MusicMaterialDto>(StatusCodes.Status200OK)]

@@ -22,6 +22,7 @@ public class MusicMaterialServiceTests
     private readonly IMemberProfileRepository _members = Substitute.For<IMemberProfileRepository>();
     private readonly IMaterialLearningProgressRepository _progresses = Substitute.For<IMaterialLearningProgressRepository>();
     private readonly IFileStorageService _storage = Substitute.For<IFileStorageService>();
+    private readonly IMidiRenderer _midi = Substitute.For<IMidiRenderer>();
     private readonly MusicMaterialService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly Guid _directorUserId = Guid.NewGuid();
@@ -36,7 +37,7 @@ public class MusicMaterialServiceTests
                 cfg.AddProfile<MemberProfileProfile>();
             }, NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new MusicMaterialService(_materials, _songs, _skills, _members, _progresses, _storage, mapper);
+        _sut = new MusicMaterialService(_materials, _songs, _skills, _members, _progresses, _storage, _midi, mapper);
 
         _songs.GetByIdAsync(_song.Id, _ct).Returns(_song);
         _storage.UploadAsync(default!, default!, default!, default, default)
@@ -44,6 +45,7 @@ public class MusicMaterialServiceTests
                 $"harmonia/{call.ArgAt<string>(2)}/stored{Path.GetExtension(call.ArgAt<string>(1))}", "unused")));
         _storage.DeleteAsync(default!, default, default).ReturnsForAnyArgs(Result.Success());
         _storage.GetSignedUrl(Arg.Any<string>()).Returns(call => $"signed:{call.Arg<string>()}");
+        _midi.Render(default!).ReturnsForAnyArgs(Result<PianoRender>.Success(new PianoRender([1], [2], 12.5)));
     }
 
     private UploadMusicMaterialRequest NewRequest(MaterialType type = MaterialType.SheetMusic) =>
@@ -637,6 +639,95 @@ public class MusicMaterialServiceTests
     public async Task Delete_Missing_ReturnsMaterialNotFound_Async()
     {
         var result = await _sut.DeleteAsync(Guid.NewGuid(), _ct);
+
+        Assert.Equal(ErrorCodes.MaterialNotFound, result.Code);
+    }
+
+    [Fact]
+    public async Task Upload_Midi_StoresPianoFilesBesideTheMidi_Async()
+    {
+        var result = await _sut.UploadAsync(NewRequest(MaterialType.SampleAudio), NewFile("dem-thanh.mid"), _ct);
+
+        Assert.True(result.IsSuccess);
+        await _storage.Received(1).UploadAsync(Arg.Any<Stream>(), "piano.wav", "music-materials/piano", true, _ct);
+        await _storage.Received(1).UploadAsync(Arg.Any<Stream>(), "notes.json", "music-materials/piano", true, _ct);
+        await _materials.Received(1).AddAsync(
+            Arg.Is<MusicMaterial>(m => m.FilePublicId == "harmonia/music-materials/sample-audio/stored.mid"
+                && m.PianoAudioPublicId == "harmonia/music-materials/piano/stored.wav"
+                && m.PianoNotesPublicId == "harmonia/music-materials/piano/stored.json"
+                && m.PianoDurationSeconds == 12.5), _ct);
+    }
+
+    [Fact]
+    public async Task Upload_MidiRejectedByRenderer_ReturnsItsCodeAndStoresNothing_Async()
+    {
+        _midi.Render(default!).ReturnsForAnyArgs(Result<PianoRender>.Failure(ErrorCodes.MidiInvalidFile));
+
+        var result = await _sut.UploadAsync(NewRequest(MaterialType.SampleAudio), NewFile("hong.mid"), _ct);
+
+        Assert.Equal(ErrorCodes.MidiInvalidFile, result.Code);
+        await _storage.DidNotReceiveWithAnyArgs().UploadAsync(default!, default!, default!, default, default);
+        await _materials.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task Upload_Mp3_DoesNotRender_Async()
+    {
+        await _sut.UploadAsync(NewRequest(MaterialType.SampleAudio), NewFile("sample.mp3"), _ct);
+
+        _midi.DidNotReceiveWithAnyArgs().Render(default!);
+    }
+
+    [Fact]
+    public async Task ReplaceFile_MidiWithMp3_ClearsPianoAndDeletesOldPianoFiles_Async()
+    {
+        var material = StubAudioMaterial();
+        material.PianoAudioPublicId = "harmonia/old.wav";
+        material.PianoNotesPublicId = "harmonia/old.json";
+        material.PianoDurationSeconds = 30;
+
+        var result = await _sut.ReplaceFileAsync(material.Id, new ReplaceMusicMaterialFileRequest(), NewFile("new.mp3"), _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(material.PianoAudioPublicId);
+        Assert.Null(material.PianoNotesPublicId);
+        Assert.Null(material.PianoDurationSeconds);
+        await _storage.Received(1).DeleteAsync("harmonia/old.wav", true, CancellationToken.None);
+        await _storage.Received(1).DeleteAsync("harmonia/old.json", true, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task GetPianoPlayback_RenderedMidi_ReturnsFreshSignedUrls_Async()
+    {
+        var material = StubAudioMaterial();
+        material.PianoAudioPublicId = "harmonia/p.wav";
+        material.PianoNotesPublicId = "harmonia/p.json";
+        material.PianoDurationSeconds = 180.5;
+
+        var result = await _sut.GetPianoPlaybackAsync(material.Id, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Ready", result.Value!.Status);
+        Assert.Equal(1, result.Value.SchemaVersion);
+        Assert.Equal(180.5, result.Value.DurationSeconds);
+        Assert.Equal("signed:harmonia/p.wav", result.Value.AudioUrl);
+        Assert.Equal("signed:harmonia/p.json", result.Value.NotesUrl);
+    }
+
+    [Fact]
+    public async Task GetPianoPlayback_MaterialWithoutPiano_ReturnsPianoUnavailable_Async()
+    {
+        var material = StubAudioMaterial();
+
+        var result = await _sut.GetPianoPlaybackAsync(material.Id, _ct);
+
+        Assert.Equal(ErrorCodes.MaterialPianoUnavailable, result.Code);
+    }
+
+    [Fact]
+    public async Task GetPianoPlayback_Missing_ReturnsMaterialNotFound_Async()
+    {
+        var result = await _sut.GetPianoPlaybackAsync(Guid.NewGuid(), _ct);
 
         Assert.Equal(ErrorCodes.MaterialNotFound, result.Code);
     }

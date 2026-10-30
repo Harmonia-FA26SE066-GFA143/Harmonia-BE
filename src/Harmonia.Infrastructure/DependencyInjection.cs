@@ -85,6 +85,9 @@ public static class DependencyInjection
                 "Missing or invalid Gemini__* configuration. See src/Harmonia.API/.env.example.")
             .ValidateOnStart();
 
+        // Optional section: the default SoundFont path works when it is absent.
+        services.AddOptions<MidiRendererOptions>().Bind(configuration.GetSection(MidiRendererOptions.SectionName));
+
         services.AddHttpContextAccessor();
 
         // Plain CRUD: inject IGenericRepository<T> directly, no per-entity repository needed.
@@ -127,6 +130,8 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddSingleton<IFileStorageService, CloudinaryFileStorageService>();
         services.AddSingleton<IReportFileWriter, ReportFileWriter>();
+        // Singleton so the SoundFont is loaded once.
+        services.AddSingleton<IMidiRenderer, MidiRenderer>();
         services.AddSingleton<IEmailSender, BrevoEmailSender>();
         services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
         services.AddScoped<DataSeeder>();

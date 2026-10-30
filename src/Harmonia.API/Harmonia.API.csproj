@@ -18,6 +18,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Piano SoundFont read by MidiRenderer (MidiRenderer__SoundFontPath); copied only if present. -->
+    <None Include="SoundFonts\**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Harmonia.Application\Harmonia.Application.csproj" />
     <ProjectReference Include="..\Harmonia.Infrastructure\Harmonia.Infrastructure.csproj" />
   </ItemGroup>
