@@ -24,7 +24,9 @@ public class SongRepository(HarmoniaDbContext dbContext)
             const string collation = HarmoniaDbContext.SearchCollation;
             query = query.Where(x => EF.Functions.Collate(x.Title, collation).Contains(keyword)
                 || (x.Composer != null && EF.Functions.Collate(x.Composer, collation).Contains(keyword))
-                || (x.Lyricist != null && EF.Functions.Collate(x.Lyricist, collation).Contains(keyword)));
+                || (x.Lyricist != null && EF.Functions.Collate(x.Lyricist, collation).Contains(keyword))
+                || x.MusicMaterials.Any(m => m.IsActive && m.LyricsText != null
+                    && EF.Functions.Collate(m.LyricsText, collation).Contains(keyword)));
         }
 
         query = WhereClassifiedAs(query, ClassificationTarget.LiturgicalSeason, filter.LiturgicalSeasonId);

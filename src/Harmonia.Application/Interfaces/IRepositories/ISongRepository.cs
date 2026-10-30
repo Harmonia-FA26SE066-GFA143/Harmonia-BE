@@ -9,7 +9,7 @@ public interface ISongRepository : IGenericRepository<Song>
 {
     /// <summary>
     /// One page of active songs ordered by title. <paramref name="keyword"/> matches title,
-    /// composer or lyricist; null returns every active song. The classification ids of
+    /// composer, lyricist or the text of an active lyrics material; null returns every active song. The classification ids of
     /// <paramref name="filter"/> narrow the result further when set.
     /// </summary>
     Task<PagedList<Song>> SearchAsync(string? keyword, SearchSongsRequest filter, CancellationToken cancellationToken);

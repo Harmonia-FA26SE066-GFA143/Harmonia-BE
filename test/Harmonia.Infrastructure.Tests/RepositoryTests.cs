@@ -875,6 +875,34 @@ public sealed class RepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task SongSearch_Keyword_MatchesActiveLyricsText_Async()
+    {
+        var withLyrics = new Song { Id = Guid.NewGuid(), Title = "Xin vang" };
+        var deletedLyrics = new Song { Id = Guid.NewGuid(), Title = "Me oi" };
+        await using (var seed = _db.NewContext())
+        {
+            seed.Songs.AddRange(withLyrics, deletedLyrics);
+            seed.MusicMaterials.AddRange(
+                new MusicMaterial
+                {
+                    Id = Guid.NewGuid(), SongId = withLyrics.Id, MaterialType = MaterialType.Lyrics, Title = "Lyrics",
+                    LyricsText = "Xin vang nghe loi Chua phan",
+                },
+                new MusicMaterial
+                {
+                    Id = Guid.NewGuid(), SongId = deletedLyrics.Id, MaterialType = MaterialType.Lyrics, Title = "Lyrics",
+                    LyricsText = "loi Chua phan day", IsActive = false,
+                });
+            await seed.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var page = await new SongRepository(context).SearchAsync("loi Chua", new SearchSongsRequest(), _ct);
+
+        Assert.Equal(withLyrics.Id, Assert.Single(page.Items).Id);
+    }
+
+    [Fact]
     public async Task SongStats_CountActiveMaterialsByType_AndClassification_Async()
     {
         var seed = await SeedMaterialsAsync(_ct);
