@@ -75,6 +75,13 @@ public class MusicMaterialsController(IMusicMaterialService musicMaterialService
     public async Task<IActionResult> GetPlaybackAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await musicMaterialService.GetPlaybackAsync(id, cancellationToken));
 
+    /// <summary>Draft lyrics read by AI from a sheet music file; nothing is saved. Save the edited text as a Lyrics material.</summary>
+    [HttpPost("{id:guid}/extract-lyrics")]
+    [Authorize(Roles = RoleNames.ChoirDirector)]
+    [ProducesResponseType<ExtractedLyricsResponse>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ExtractLyricsAsync(Guid id, CancellationToken cancellationToken) =>
+        ToActionResult(await musicMaterialService.ExtractLyricsAsync(id, cancellationToken));
+
     [HttpPut("{id:guid}")]
     [Authorize(Roles = RoleNames.ChoirDirector)]
     [ProducesResponseType<MusicMaterialDto>(StatusCodes.Status200OK)]

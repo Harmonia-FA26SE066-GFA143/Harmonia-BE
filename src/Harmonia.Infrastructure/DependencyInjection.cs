@@ -108,6 +108,12 @@ public static class DependencyInjection
             // Short on purpose: RosterService falls back to rules, so a slow model only delays the answer.
             client.Timeout = TimeSpan.FromSeconds(20);
         });
+        services.AddHttpClient<ILyricsExtractor, GeminiLyricsExtractor>(client =>
+        {
+            client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
+            // Per request: a 20 MB download or upload, or the model reading a multi-page PDF.
+            client.Timeout = TimeSpan.FromSeconds(60);
+        });
         services.AddHttpClient<ILiturgicalCalendarClient, LiturgicalCalendarApiClient>(client =>
         {
             client.BaseAddress = new Uri("https://litcal.johnromanodorazio.com/");

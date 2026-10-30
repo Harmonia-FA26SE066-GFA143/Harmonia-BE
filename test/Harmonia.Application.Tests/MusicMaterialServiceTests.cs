@@ -23,6 +23,7 @@ public class MusicMaterialServiceTests
     private readonly IMaterialLearningProgressRepository _progresses = Substitute.For<IMaterialLearningProgressRepository>();
     private readonly IFileStorageService _storage = Substitute.For<IFileStorageService>();
     private readonly IMidiRenderer _midi = Substitute.For<IMidiRenderer>();
+    private readonly ILyricsExtractor _lyrics = Substitute.For<ILyricsExtractor>();
     private readonly MusicMaterialService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly Guid _directorUserId = Guid.NewGuid();
@@ -37,7 +38,7 @@ public class MusicMaterialServiceTests
                 cfg.AddProfile<MemberProfileProfile>();
             }, NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new MusicMaterialService(_materials, _songs, _skills, _members, _progresses, _storage, _midi, mapper);
+        _sut = new MusicMaterialService(_materials, _songs, _skills, _members, _progresses, _storage, _midi, _lyrics, mapper);
 
         _songs.GetByIdAsync(_song.Id, _ct).Returns(_song);
         _storage.UploadAsync(default!, default!, default!, default, default)
@@ -772,5 +773,58 @@ public class MusicMaterialServiceTests
 
         Assert.True(result.IsSuccess);
         await _materials.Received(1).AddAsync(Arg.Is<MusicMaterial>(m => m.PlaybackInstrument == null), _ct);
+    }
+
+    private MusicMaterial StubSheetMusic()
+    {
+        var material = new MusicMaterial
+        {
+            Id = Guid.NewGuid(), SongId = _song.Id, Title = "Ban nhac", MaterialType = MaterialType.SheetMusic,
+            FilePublicId = "harmonia/sheet.pdf", FileName = "sheet.pdf", FileSizeBytes = 10, IsActive = true,
+        };
+        _materials.GetByIdAsync(material.Id, _ct).Returns(material);
+        return material;
+    }
+
+    [Fact]
+    public async Task ExtractLyrics_SheetMusic_ReturnsDraftFromSignedUrl_WithoutSaving_Async()
+    {
+        var material = StubSheetMusic();
+        _lyrics.ExtractAsync("signed:harmonia/sheet.pdf", "harmonia/sheet.pdf", _ct).Returns(Result<string>.Success("Xin vang loi Chua"));
+
+        var result = await _sut.ExtractLyricsAsync(material.Id, _ct);
+
+        Assert.Equal("Xin vang loi Chua", result.Value!.LyricsText);
+        await _materials.DidNotReceiveWithAnyArgs().SaveChangesAsync(default);
+    }
+
+    [Fact]
+    public async Task ExtractLyrics_Missing_ReturnsMaterialNotFound_Async()
+    {
+        var result = await _sut.ExtractLyricsAsync(Guid.NewGuid(), _ct);
+
+        Assert.Equal(ErrorCodes.MaterialNotFound, result.Code);
+    }
+
+    [Fact]
+    public async Task ExtractLyrics_NotSheetMusic_ReturnsNotSheetMusic_AndSkipsAi_Async()
+    {
+        var material = StubAudioMaterial();
+
+        var result = await _sut.ExtractLyricsAsync(material.Id, _ct);
+
+        Assert.Equal(ErrorCodes.MaterialNotSheetMusic, result.Code);
+        await _lyrics.DidNotReceiveWithAnyArgs().ExtractAsync(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task ExtractLyrics_AiFails_PassesTheCodeThrough_Async()
+    {
+        var material = StubSheetMusic();
+        _lyrics.ExtractAsync(default!, default!, default).ReturnsForAnyArgs(Result<string>.Failure(ErrorCodes.ExternalAiFailed));
+
+        var result = await _sut.ExtractLyricsAsync(material.Id, _ct);
+
+        Assert.Equal(ErrorCodes.ExternalAiFailed, result.Code);
     }
 }

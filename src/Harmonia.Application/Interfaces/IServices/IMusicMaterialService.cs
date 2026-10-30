@@ -59,6 +59,13 @@ public interface IMusicMaterialService
     /// </summary>
     Task<Result<PlaybackDto>> GetPlaybackAsync(Guid id, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Draft lyrics read by AI from an active SheetMusic material. Nothing is saved: the director edits the draft
+    /// and saves it as a Lyrics material through <see cref="UploadAsync"/>.
+    /// MATERIAL_NOT_FOUND, MATERIAL_NOT_SHEET_MUSIC, EXTERNAL_AI_FAILED.
+    /// </summary>
+    Task<Result<ExtractedLyricsResponse>> ExtractLyricsAsync(Guid id, CancellationToken cancellationToken);
+
     /// <summary>Soft delete: sets IsActive to false and keeps the stored file, which learning progress still points at.</summary>
     Task<Result> DeleteAsync(Guid id, CancellationToken cancellationToken);
 }

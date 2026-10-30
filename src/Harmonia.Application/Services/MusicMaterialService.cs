@@ -17,6 +17,7 @@ public class MusicMaterialService(
     IMaterialLearningProgressRepository learningProgressRepository,
     IFileStorageService fileStorageService,
     IMidiRenderer midiRenderer,
+    ILyricsExtractor lyricsExtractor,
     IMapper mapper) : IMusicMaterialService
 {
     private const string PlaybackFolder = "music-materials/playback";
@@ -249,6 +250,20 @@ public class MusicMaterialService(
         dto.AudioUrl = fileStorageService.GetSignedUrl(material.PlaybackAudioPublicId);
         dto.NotesUrl = fileStorageService.GetSignedUrl(material.PlaybackNotesPublicId);
         return Result<PlaybackDto>.Success(dto);
+    }
+
+    public async Task<Result<ExtractedLyricsResponse>> ExtractLyricsAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var material = await musicMaterialRepository.GetByIdAsync(id, cancellationToken);
+        if (material is not { IsActive: true }) return Result<ExtractedLyricsResponse>.Failure(ErrorCodes.MaterialNotFound);
+        if (material.MaterialType != MaterialType.SheetMusic || material.FilePublicId is null)
+            return Result<ExtractedLyricsResponse>.Failure(ErrorCodes.MaterialNotSheetMusic);
+
+        var lyrics = await lyricsExtractor.ExtractAsync(
+            fileStorageService.GetSignedUrl(material.FilePublicId), material.FilePublicId, cancellationToken);
+        return lyrics.IsSuccess
+            ? Result<ExtractedLyricsResponse>.Success(new ExtractedLyricsResponse(lyrics.Value!))
+            : Result<ExtractedLyricsResponse>.Failure(lyrics.Code!);
     }
 
     /// <summary>

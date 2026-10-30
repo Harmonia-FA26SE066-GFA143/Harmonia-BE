@@ -102,6 +102,7 @@ public static class ErrorStatusMap
         [ErrorCodes.MaterialLyricsSourceInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.MaterialLearningStatusInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.MaterialPlaybackUnavailable] = StatusCodes.Status409Conflict,
+        [ErrorCodes.MaterialNotSheetMusic] = StatusCodes.Status400BadRequest,
         // 422 as agreed with mobile (Harmonia_MIDI_Backend_Spec §7): the file arrived but its content cannot be played.
         [ErrorCodes.MidiInvalidFile] = StatusCodes.Status422UnprocessableEntity,
         [ErrorCodes.MidiFormatUnsupported] = StatusCodes.Status422UnprocessableEntity,

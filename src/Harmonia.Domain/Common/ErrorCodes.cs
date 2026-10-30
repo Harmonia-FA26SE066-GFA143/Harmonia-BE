@@ -189,6 +189,9 @@ public static class ErrorCodes
     // Not a MIDI material, or a MIDI uploaded before MIDI rendering existed: replace the file to render it.
     public const string MaterialPlaybackUnavailable = "MATERIAL_PLAYBACK_UNAVAILABLE";
 
+    // Lyrics extraction reads sheet music only.
+    public const string MaterialNotSheetMusic = "MATERIAL_NOT_SHEET_MUSIC";
+
     public const string MidiInvalidFile = "MIDI_INVALID_FILE";
 
     // Format 2 or SMPTE time division.

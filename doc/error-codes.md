@@ -187,6 +187,7 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `MATERIAL_LYRICS_SOURCE_INVALID` | 400 | Lời bài hát cần đúng một trong hai: tệp Word hoặc nội dung gõ trực tiếp |
 | `MATERIAL_LEARNING_STATUS_INVALID` | 400 | Trạng thái học tập không hợp lệ |
 | `MATERIAL_PLAYBACK_UNAVAILABLE` | 409 | Tài liệu chưa có bản phát nhạc. Hãy tải lại tệp MIDI |
+| `MATERIAL_NOT_SHEET_MUSIC` | 400 | Chỉ trích được lời từ bản nhạc |
 | `MIDI_INVALID_FILE` | 422 | Tệp MIDI không hợp lệ |
 | `MIDI_FORMAT_UNSUPPORTED` | 422 | Định dạng MIDI chưa được hỗ trợ |
 | `MIDI_NO_PLAYABLE_NOTES` | 422 | Tệp MIDI không có nốt nào để phát |
@@ -309,7 +310,7 @@ lọc theo cặp `(NotificationId, UserId)` nên "không tồn tại" và "của
 |---|---|---|
 | `EXTERNAL_EMAIL_FAILED` | 502 | Không gửi được email, vui lòng thử lại |
 | `EXTERNAL_STORAGE_FAILED` | 502 | Không tải được tệp lên, vui lòng thử lại |
-| `EXTERNAL_AI_FAILED` | 502 | Không tạo được gợi ý phân công, vui lòng thử lại |
+| `EXTERNAL_AI_FAILED` | 502 | Dịch vụ AI không phản hồi, vui lòng thử lại |
 | `EXTERNAL_CALENDAR_FAILED` | 502 | Không lấy được lịch phụng vụ, vui lòng thử lại |
 
 ## 15. Ca đoàn
