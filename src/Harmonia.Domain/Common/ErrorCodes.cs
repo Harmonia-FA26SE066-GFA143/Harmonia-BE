@@ -186,8 +186,8 @@ public static class ErrorCodes
 
     public const string MaterialLearningStatusInvalid = "MATERIAL_LEARNING_STATUS_INVALID";
 
-    // Not a MIDI material, or a MIDI uploaded before piano rendering existed: replace the file to render it.
-    public const string MaterialPianoUnavailable = "MATERIAL_PIANO_UNAVAILABLE";
+    // Not a MIDI material, or a MIDI uploaded before MIDI rendering existed: replace the file to render it.
+    public const string MaterialPlaybackUnavailable = "MATERIAL_PLAYBACK_UNAVAILABLE";
 
     public const string MidiInvalidFile = "MIDI_INVALID_FILE";
 

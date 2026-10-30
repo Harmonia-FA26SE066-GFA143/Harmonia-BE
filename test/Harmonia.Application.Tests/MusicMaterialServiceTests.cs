@@ -45,7 +45,7 @@ public class MusicMaterialServiceTests
                 $"harmonia/{call.ArgAt<string>(2)}/stored{Path.GetExtension(call.ArgAt<string>(1))}", "unused")));
         _storage.DeleteAsync(default!, default, default).ReturnsForAnyArgs(Result.Success());
         _storage.GetSignedUrl(Arg.Any<string>()).Returns(call => $"signed:{call.Arg<string>()}");
-        _midi.Render(default!).ReturnsForAnyArgs(Result<PianoRender>.Success(new PianoRender([1], [2], 12.5)));
+        _midi.Render(default!, default).ReturnsForAnyArgs(Result<PlaybackRender>.Success(new PlaybackRender([1], [2], 12.5)));
     }
 
     private UploadMusicMaterialRequest NewRequest(MaterialType type = MaterialType.SheetMusic) =>
@@ -644,24 +644,25 @@ public class MusicMaterialServiceTests
     }
 
     [Fact]
-    public async Task Upload_Midi_StoresPianoFilesBesideTheMidi_Async()
+    public async Task Upload_Midi_StoresPlaybackFilesBesideTheMidi_Async()
     {
         var result = await _sut.UploadAsync(NewRequest(MaterialType.SampleAudio), NewFile("dem-thanh.mid"), _ct);
 
         Assert.True(result.IsSuccess);
-        await _storage.Received(1).UploadAsync(Arg.Any<Stream>(), "piano.wav", "music-materials/piano", true, _ct);
-        await _storage.Received(1).UploadAsync(Arg.Any<Stream>(), "notes.json", "music-materials/piano", true, _ct);
+        await _storage.Received(1).UploadAsync(Arg.Any<Stream>(), "audio.wav", "music-materials/playback", true, _ct);
+        await _storage.Received(1).UploadAsync(Arg.Any<Stream>(), "notes.json", "music-materials/playback", true, _ct);
         await _materials.Received(1).AddAsync(
             Arg.Is<MusicMaterial>(m => m.FilePublicId == "harmonia/music-materials/sample-audio/stored.mid"
-                && m.PianoAudioPublicId == "harmonia/music-materials/piano/stored.wav"
-                && m.PianoNotesPublicId == "harmonia/music-materials/piano/stored.json"
-                && m.PianoDurationSeconds == 12.5), _ct);
+                && m.PlaybackAudioPublicId == "harmonia/music-materials/playback/stored.wav"
+                && m.PlaybackNotesPublicId == "harmonia/music-materials/playback/stored.json"
+                && m.PlaybackDurationSeconds == 12.5
+                && m.PlaybackInstrument == PlaybackInstrument.Piano), _ct);
     }
 
     [Fact]
     public async Task Upload_MidiRejectedByRenderer_ReturnsItsCodeAndStoresNothing_Async()
     {
-        _midi.Render(default!).ReturnsForAnyArgs(Result<PianoRender>.Failure(ErrorCodes.MidiInvalidFile));
+        _midi.Render(default!, default).ReturnsForAnyArgs(Result<PlaybackRender>.Failure(ErrorCodes.MidiInvalidFile));
 
         var result = await _sut.UploadAsync(NewRequest(MaterialType.SampleAudio), NewFile("hong.mid"), _ct);
 
@@ -675,60 +676,101 @@ public class MusicMaterialServiceTests
     {
         await _sut.UploadAsync(NewRequest(MaterialType.SampleAudio), NewFile("sample.mp3"), _ct);
 
-        _midi.DidNotReceiveWithAnyArgs().Render(default!);
+        _midi.DidNotReceiveWithAnyArgs().Render(default!, default);
     }
 
     [Fact]
-    public async Task ReplaceFile_MidiWithMp3_ClearsPianoAndDeletesOldPianoFiles_Async()
+    public async Task ReplaceFile_MidiWithMp3_ClearsPlaybackAndDeletesOldPlaybackFiles_Async()
     {
         var material = StubAudioMaterial();
-        material.PianoAudioPublicId = "harmonia/old.wav";
-        material.PianoNotesPublicId = "harmonia/old.json";
-        material.PianoDurationSeconds = 30;
+        material.PlaybackAudioPublicId = "harmonia/old.wav";
+        material.PlaybackNotesPublicId = "harmonia/old.json";
+        material.PlaybackDurationSeconds = 30;
+        material.PlaybackInstrument = PlaybackInstrument.Organ;
 
         var result = await _sut.ReplaceFileAsync(material.Id, new ReplaceMusicMaterialFileRequest(), NewFile("new.mp3"), _ct);
 
         Assert.True(result.IsSuccess);
-        Assert.Null(material.PianoAudioPublicId);
-        Assert.Null(material.PianoNotesPublicId);
-        Assert.Null(material.PianoDurationSeconds);
+        Assert.Null(material.PlaybackAudioPublicId);
+        Assert.Null(material.PlaybackNotesPublicId);
+        Assert.Null(material.PlaybackDurationSeconds);
+        Assert.Null(material.PlaybackInstrument);
         await _storage.Received(1).DeleteAsync("harmonia/old.wav", true, CancellationToken.None);
         await _storage.Received(1).DeleteAsync("harmonia/old.json", true, CancellationToken.None);
     }
 
     [Fact]
-    public async Task GetPianoPlayback_RenderedMidi_ReturnsFreshSignedUrls_Async()
+    public async Task GetPlayback_RenderedMidi_ReturnsFreshSignedUrls_Async()
     {
         var material = StubAudioMaterial();
-        material.PianoAudioPublicId = "harmonia/p.wav";
-        material.PianoNotesPublicId = "harmonia/p.json";
-        material.PianoDurationSeconds = 180.5;
+        material.PlaybackAudioPublicId = "harmonia/p.wav";
+        material.PlaybackNotesPublicId = "harmonia/p.json";
+        material.PlaybackDurationSeconds = 180.5;
+        material.PlaybackInstrument = PlaybackInstrument.Guitar;
 
-        var result = await _sut.GetPianoPlaybackAsync(material.Id, _ct);
+        var result = await _sut.GetPlaybackAsync(material.Id, _ct);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Ready", result.Value!.Status);
         Assert.Equal(1, result.Value.SchemaVersion);
         Assert.Equal(180.5, result.Value.DurationSeconds);
+        Assert.Equal(PlaybackInstrument.Guitar, result.Value.Instrument);
         Assert.Equal("signed:harmonia/p.wav", result.Value.AudioUrl);
         Assert.Equal("signed:harmonia/p.json", result.Value.NotesUrl);
     }
 
     [Fact]
-    public async Task GetPianoPlayback_MaterialWithoutPiano_ReturnsPianoUnavailable_Async()
+    public async Task GetPlayback_MaterialWithoutPlayback_ReturnsPlaybackUnavailable_Async()
     {
         var material = StubAudioMaterial();
 
-        var result = await _sut.GetPianoPlaybackAsync(material.Id, _ct);
+        var result = await _sut.GetPlaybackAsync(material.Id, _ct);
 
-        Assert.Equal(ErrorCodes.MaterialPianoUnavailable, result.Code);
+        Assert.Equal(ErrorCodes.MaterialPlaybackUnavailable, result.Code);
     }
 
     [Fact]
-    public async Task GetPianoPlayback_Missing_ReturnsMaterialNotFound_Async()
+    public async Task GetPlayback_Missing_ReturnsMaterialNotFound_Async()
     {
-        var result = await _sut.GetPianoPlaybackAsync(Guid.NewGuid(), _ct);
+        var result = await _sut.GetPlaybackAsync(Guid.NewGuid(), _ct);
 
         Assert.Equal(ErrorCodes.MaterialNotFound, result.Code);
+    }
+
+    [Fact]
+    public async Task Upload_MidiWithInstrument_RendersAndStoresThatInstrument_Async()
+    {
+        var request = NewRequest(MaterialType.SampleAudio);
+        request.Instrument = PlaybackInstrument.Organ;
+
+        await _sut.UploadAsync(request, NewFile("dem-thanh.mid"), _ct);
+
+        _midi.Received(1).Render(Arg.Any<Stream>(), PlaybackInstrument.Organ);
+        await _materials.Received(1).AddAsync(
+            Arg.Is<MusicMaterial>(m => m.PlaybackInstrument == PlaybackInstrument.Organ), _ct);
+    }
+
+    [Fact]
+    public async Task ReplaceFile_MidiWithInstrument_RendersWithThatInstrument_Async()
+    {
+        var material = StubAudioMaterial();
+
+        await _sut.ReplaceFileAsync(
+            material.Id, new ReplaceMusicMaterialFileRequest { Instrument = PlaybackInstrument.StringEnsemble }, NewFile("new.mid"), _ct);
+
+        _midi.Received(1).Render(Arg.Any<Stream>(), PlaybackInstrument.StringEnsemble);
+        Assert.Equal(PlaybackInstrument.StringEnsemble, material.PlaybackInstrument);
+    }
+
+    [Fact]
+    public async Task Upload_Mp3WithInstrument_IgnoresTheInstrument_Async()
+    {
+        var request = NewRequest(MaterialType.SampleAudio);
+        request.Instrument = PlaybackInstrument.Organ;
+
+        var result = await _sut.UploadAsync(request, NewFile("sample.mp3"), _ct);
+
+        Assert.True(result.IsSuccess);
+        await _materials.Received(1).AddAsync(Arg.Is<MusicMaterial>(m => m.PlaybackInstrument == null), _ct);
     }
 }

@@ -11,8 +11,8 @@ public class MusicMaterialConfiguration : IEntityTypeConfiguration<MusicMaterial
         builder.Property(x => x.Title).IsRequired().HasMaxLength(200);
         builder.Property(x => x.FilePublicId).HasMaxLength(255);
         builder.Property(x => x.FileName).HasMaxLength(200);
-        builder.Property(x => x.PianoAudioPublicId).HasMaxLength(255);
-        builder.Property(x => x.PianoNotesPublicId).HasMaxLength(255);
+        builder.Property(x => x.PlaybackAudioPublicId).HasMaxLength(255);
+        builder.Property(x => x.PlaybackNotesPublicId).HasMaxLength(255);
 
         builder.HasOne(x => x.Song)
             .WithMany(x => x.MusicMaterials)

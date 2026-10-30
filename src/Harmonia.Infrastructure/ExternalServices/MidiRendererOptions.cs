@@ -6,8 +6,8 @@ public class MidiRendererOptions
     public const string SectionName = "MidiRenderer";
 
     /// <summary>
-    /// Piano SoundFont (.sf2) with a licence that allows use in the product. Relative paths start at the app's
+    /// General MIDI SoundFont (.sf2) with a licence that allows use in the product. Relative paths start at the app's
     /// output folder, where src/Harmonia.API/SoundFonts/ is copied on build and publish.
     /// </summary>
-    public string SoundFontPath { get; set; } = "SoundFonts/piano.sf2";
+    public string SoundFontPath { get; set; } = "SoundFonts/GeneralUser-GS.sf2";
 }

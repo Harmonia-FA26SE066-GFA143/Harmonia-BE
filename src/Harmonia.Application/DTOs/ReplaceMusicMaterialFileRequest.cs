@@ -1,3 +1,5 @@
+using Harmonia.Domain.Enums;
+
 namespace Harmonia.Application.DTOs;
 
 /// <summary>
@@ -7,4 +9,7 @@ namespace Harmonia.Application.DTOs;
 public class ReplaceMusicMaterialFileRequest
 {
     public bool ResetProgress { get; set; }
+
+    /// <summary>MIDI files only: the instrument they are rendered with. Ignored for any other file.</summary>
+    public PlaybackInstrument Instrument { get; set; }
 }

@@ -754,6 +754,20 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Property<int>("MaterialType")
                         .HasColumnType("int");
 
+                    b.Property<string>("PlaybackAudioPublicId")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<double?>("PlaybackDurationSeconds")
+                        .HasColumnType("float");
+
+                    b.Property<int?>("PlaybackInstrument")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PlaybackNotesPublicId")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
                     b.Property<Guid>("SongId")
                         .HasColumnType("uniqueidentifier");
 

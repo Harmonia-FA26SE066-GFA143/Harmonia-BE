@@ -18,6 +18,7 @@ public class UploadMusicMaterialRequestValidator : AbstractValidator<UploadMusic
         RuleFor(x => x.SongId).NotEmpty();
         RuleFor(x => x.Title).NotEmpty().MaximumLength(200);
         RuleFor(x => x.MaterialType).IsInEnum();
+        RuleFor(x => x.Instrument).IsInEnum();
         RuleFor(x => x.LyricsText).MaximumLength(MaxLyricsTextLength);
         RuleFor(x => x.LyricsText).Empty().When(x => x.MaterialType != MaterialType.Lyrics)
             .WithErrorCode(ErrorCodes.MaterialLyricsSourceInvalid);

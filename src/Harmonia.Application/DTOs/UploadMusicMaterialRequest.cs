@@ -15,4 +15,7 @@ public class UploadMusicMaterialRequest
 
     /// <summary>Lyrics only: the text itself, sent instead of a .docx file.</summary>
     public string? LyricsText { get; set; }
+
+    /// <summary>MIDI files only: the instrument they are rendered with. Ignored for any other file.</summary>
+    public PlaybackInstrument Instrument { get; set; }
 }

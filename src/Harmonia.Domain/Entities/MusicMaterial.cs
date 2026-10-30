@@ -24,13 +24,15 @@ public class MusicMaterial : BaseAuditableEntity
 
     public long? FileSizeBytes { get; set; }
 
-    /// <summary>Piano rendering of a MIDI file, for the mobile piano roll. Null for every non-MIDI material.</summary>
-    public string? PianoAudioPublicId { get; set; }
+    /// <summary>Audio rendering of a MIDI file, for the mobile piano roll. Null for every non-MIDI material.</summary>
+    public string? PlaybackAudioPublicId { get; set; }
 
-    /// <summary>notes.json (schema v1) built on the same timeline as <see cref="PianoAudioPublicId"/>.</summary>
-    public string? PianoNotesPublicId { get; set; }
+    /// <summary>notes.json (schema v1) built on the same timeline as <see cref="PlaybackAudioPublicId"/>.</summary>
+    public string? PlaybackNotesPublicId { get; set; }
 
-    public double? PianoDurationSeconds { get; set; }
+    public double? PlaybackDurationSeconds { get; set; }
+
+    public PlaybackInstrument? PlaybackInstrument { get; set; }
 
     public Guid? TargetSkillId { get; set; }
 

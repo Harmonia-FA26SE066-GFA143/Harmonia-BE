@@ -19,7 +19,7 @@ public class MusicMaterialService(
     IMidiRenderer midiRenderer,
     IMapper mapper) : IMusicMaterialService
 {
-    private const string PianoFolder = "music-materials/piano";
+    private const string PlaybackFolder = "music-materials/playback";
 
     private static readonly string[] MidiExtensions = [".mid", ".midi"];
 
@@ -53,14 +53,14 @@ public class MusicMaterialService(
         if (CheckFile(request.MaterialType, file) is { } fileError)
             return Result<MusicMaterialDto>.Failure(fileError);
 
-        var piano = await StorePianoAsync(file!, cancellationToken);
-        if (!piano.IsSuccess) return Result<MusicMaterialDto>.Failure(piano.Code!);
+        var playback = await StorePlaybackAsync(file!, request.Instrument, cancellationToken);
+        if (!playback.IsSuccess) return Result<MusicMaterialDto>.Failure(playback.Code!);
 
         var upload = await fileStorageService.UploadAsync(
             file!.Content, file.FileName, FolderFor(request.MaterialType), isPrivate: true, cancellationToken);
         if (!upload.IsSuccess)
         {
-            await DeletePianoAsync(piano.Value?.AudioPublicId, piano.Value?.NotesPublicId);
+            await DeletePlaybackAsync(playback.Value?.AudioPublicId, playback.Value?.NotesPublicId);
             return Result<MusicMaterialDto>.Failure(upload.Code!);
         }
 
@@ -72,7 +72,7 @@ public class MusicMaterialService(
         // Keep the tail so the extension survives truncation.
         material.FileName = fileName.Length > MaxFileNameLength ? fileName[^MaxFileNameLength..] : fileName;
         material.FileSizeBytes = file.Length;
-        SetPiano(material, piano.Value);
+        SetPlayback(material, playback.Value);
 
         try
         {
@@ -85,7 +85,7 @@ public class MusicMaterialService(
             // Best effort: a failed cleanup is logged by the storage service and must not hide the save error.
             // ponytail: an orphan survives if cleanup fails too; add a storage sweep job if that ever matters.
             await fileStorageService.DeleteAsync(publicId, isPrivate: true, CancellationToken.None);
-            await DeletePianoAsync(material.PianoAudioPublicId, material.PianoNotesPublicId);
+            await DeletePlaybackAsync(material.PlaybackAudioPublicId, material.PlaybackNotesPublicId);
             throw;
         }
 
@@ -180,26 +180,26 @@ public class MusicMaterialService(
         if (CheckFile(material.MaterialType, file) is { } fileError)
             return Result<MusicMaterialDto>.Failure(fileError);
 
-        var piano = await StorePianoAsync(file!, cancellationToken);
-        if (!piano.IsSuccess) return Result<MusicMaterialDto>.Failure(piano.Code!);
+        var playback = await StorePlaybackAsync(file!, request.Instrument, cancellationToken);
+        if (!playback.IsSuccess) return Result<MusicMaterialDto>.Failure(playback.Code!);
 
         var upload = await fileStorageService.UploadAsync(
             file!.Content, file.FileName, FolderFor(material.MaterialType), isPrivate: true, cancellationToken);
         if (!upload.IsSuccess)
         {
-            await DeletePianoAsync(piano.Value?.AudioPublicId, piano.Value?.NotesPublicId);
+            await DeletePlaybackAsync(playback.Value?.AudioPublicId, playback.Value?.NotesPublicId);
             return Result<MusicMaterialDto>.Failure(upload.Code!);
         }
 
         var oldPublicId = material.FilePublicId;
-        var (oldAudioId, oldNotesId) = (material.PianoAudioPublicId, material.PianoNotesPublicId);
+        var (oldAudioId, oldNotesId) = (material.PlaybackAudioPublicId, material.PlaybackNotesPublicId);
         var newPublicId = upload.Value!.PublicId;
         var fileName = Path.GetFileName(file.FileName);
         material.FilePublicId = newPublicId;
         material.FileName = fileName.Length > MaxFileNameLength ? fileName[^MaxFileNameLength..] : fileName;
         material.FileSizeBytes = file.Length;
-        // A non-MIDI replacement clears the piano files, so the old rendering is never served for the new file.
-        SetPiano(material, piano.Value);
+        // A non-MIDI replacement clears the playback files, so the old rendering is never served for the new file.
+        SetPlayback(material, playback.Value);
 
         if (request.ResetProgress)
         {
@@ -215,13 +215,13 @@ public class MusicMaterialService(
         {
             // The row still points at the old file, so the new one is the orphan; same cleanup as UploadAsync.
             await fileStorageService.DeleteAsync(newPublicId, isPrivate: true, CancellationToken.None);
-            await DeletePianoAsync(piano.Value?.AudioPublicId, piano.Value?.NotesPublicId);
+            await DeletePlaybackAsync(playback.Value?.AudioPublicId, playback.Value?.NotesPublicId);
             throw;
         }
 
         // Best effort: nothing points at the old file any more, and a failed delete is logged by the storage service.
         await fileStorageService.DeleteAsync(oldPublicId, isPrivate: true, CancellationToken.None);
-        await DeletePianoAsync(oldAudioId, oldNotesId);
+        await DeletePlaybackAsync(oldAudioId, oldNotesId);
 
         if (material.TargetSkillId is { } skillId)
             material.TargetSkill = await skillRepository.GetByIdAsync(skillId, cancellationToken);
@@ -238,64 +238,67 @@ public class MusicMaterialService(
         return Result.Success();
     }
 
-    public async Task<Result<PianoPlaybackDto>> GetPianoPlaybackAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<Result<PlaybackDto>> GetPlaybackAsync(Guid id, CancellationToken cancellationToken)
     {
         var material = await musicMaterialRepository.GetByIdAsync(id, cancellationToken);
-        if (material is not { IsActive: true }) return Result<PianoPlaybackDto>.Failure(ErrorCodes.MaterialNotFound);
-        if (material.PianoAudioPublicId is null || material.PianoNotesPublicId is null || material.PianoDurationSeconds is null)
-            return Result<PianoPlaybackDto>.Failure(ErrorCodes.MaterialPianoUnavailable);
+        if (material is not { IsActive: true }) return Result<PlaybackDto>.Failure(ErrorCodes.MaterialNotFound);
+        if (material.PlaybackAudioPublicId is null || material.PlaybackNotesPublicId is null || material.PlaybackDurationSeconds is null)
+            return Result<PlaybackDto>.Failure(ErrorCodes.MaterialPlaybackUnavailable);
 
-        var dto = mapper.Map<PianoPlaybackDto>(material);
-        dto.AudioUrl = fileStorageService.GetSignedUrl(material.PianoAudioPublicId);
-        dto.NotesUrl = fileStorageService.GetSignedUrl(material.PianoNotesPublicId);
-        return Result<PianoPlaybackDto>.Success(dto);
+        var dto = mapper.Map<PlaybackDto>(material);
+        dto.AudioUrl = fileStorageService.GetSignedUrl(material.PlaybackAudioPublicId);
+        dto.NotesUrl = fileStorageService.GetSignedUrl(material.PlaybackNotesPublicId);
+        return Result<PlaybackDto>.Success(dto);
     }
 
     /// <summary>
-    /// Renders a MIDI upload and stores its piano files before the MIDI itself, so a file the renderer rejects
-    /// never reaches storage. Any other file returns success with no piano files.
+    /// Renders a MIDI upload and stores its playback files before the MIDI itself, so a file the renderer rejects
+    /// never reaches storage. Any other file returns success with no playback files.
     /// </summary>
-    private async Task<Result<PianoFiles?>> StorePianoAsync(FileContent file, CancellationToken cancellationToken)
+    private async Task<Result<PlaybackFiles?>> StorePlaybackAsync(
+        FileContent file, PlaybackInstrument instrument, CancellationToken cancellationToken)
     {
         if (!MidiExtensions.Contains(Path.GetExtension(file.FileName).ToLowerInvariant()))
-            return Result<PianoFiles?>.Success(null);
+            return Result<PlaybackFiles?>.Success(null);
 
-        var render = midiRenderer.Render(file.Content);
+        var render = midiRenderer.Render(file.Content, instrument);
         // The MIDI itself is uploaded next from the same stream; IFormFile streams are seekable.
         file.Content.Position = 0;
-        if (!render.IsSuccess) return Result<PianoFiles?>.Failure(render.Code!);
+        if (!render.IsSuccess) return Result<PlaybackFiles?>.Failure(render.Code!);
 
         using var audioContent = new MemoryStream(render.Value!.AudioWav);
-        var audio = await fileStorageService.UploadAsync(audioContent, "piano.wav", PianoFolder, isPrivate: true, cancellationToken);
-        if (!audio.IsSuccess) return Result<PianoFiles?>.Failure(audio.Code!);
+        var audio = await fileStorageService.UploadAsync(audioContent, "audio.wav", PlaybackFolder, isPrivate: true, cancellationToken);
+        if (!audio.IsSuccess) return Result<PlaybackFiles?>.Failure(audio.Code!);
 
         using var notesContent = new MemoryStream(render.Value.NotesJson);
-        var notes = await fileStorageService.UploadAsync(notesContent, "notes.json", PianoFolder, isPrivate: true, cancellationToken);
+        var notes = await fileStorageService.UploadAsync(notesContent, "notes.json", PlaybackFolder, isPrivate: true, cancellationToken);
         if (!notes.IsSuccess)
         {
-            await DeletePianoAsync(audio.Value!.PublicId, null);
-            return Result<PianoFiles?>.Failure(notes.Code!);
+            await DeletePlaybackAsync(audio.Value!.PublicId, null);
+            return Result<PlaybackFiles?>.Failure(notes.Code!);
         }
 
-        return Result<PianoFiles?>.Success(
-            new PianoFiles(audio.Value!.PublicId, notes.Value!.PublicId, render.Value.DurationSeconds));
+        return Result<PlaybackFiles?>.Success(
+            new PlaybackFiles(audio.Value!.PublicId, notes.Value!.PublicId, render.Value.DurationSeconds, instrument));
     }
 
-    private static void SetPiano(MusicMaterial material, PianoFiles? piano)
+    private static void SetPlayback(MusicMaterial material, PlaybackFiles? playback)
     {
-        material.PianoAudioPublicId = piano?.AudioPublicId;
-        material.PianoNotesPublicId = piano?.NotesPublicId;
-        material.PianoDurationSeconds = piano?.DurationSeconds;
+        material.PlaybackAudioPublicId = playback?.AudioPublicId;
+        material.PlaybackNotesPublicId = playback?.NotesPublicId;
+        material.PlaybackDurationSeconds = playback?.DurationSeconds;
+        material.PlaybackInstrument = playback?.Instrument;
     }
 
     // Best effort, like the other cleanups here: a failed delete is logged by the storage service.
-    private async Task DeletePianoAsync(string? audioPublicId, string? notesPublicId)
+    private async Task DeletePlaybackAsync(string? audioPublicId, string? notesPublicId)
     {
         if (audioPublicId is not null) await fileStorageService.DeleteAsync(audioPublicId, isPrivate: true, CancellationToken.None);
         if (notesPublicId is not null) await fileStorageService.DeleteAsync(notesPublicId, isPrivate: true, CancellationToken.None);
     }
 
-    private sealed record PianoFiles(string AudioPublicId, string NotesPublicId, double DurationSeconds);
+    private sealed record PlaybackFiles(
+        string AudioPublicId, string NotesPublicId, double DurationSeconds, PlaybackInstrument Instrument);
 
     private TDto ToDto<TDto>(MusicMaterial material) where TDto : MusicMaterialDto
     {

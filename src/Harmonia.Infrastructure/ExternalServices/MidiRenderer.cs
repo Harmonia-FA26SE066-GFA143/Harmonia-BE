@@ -2,6 +2,7 @@ using System.Text.Json;
 using Harmonia.Application.Common.Models;
 using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Domain.Common;
+using Harmonia.Domain.Enums;
 using Melanchall.DryWetMidi.Common;
 using Melanchall.DryWetMidi.Core;
 using Melanchall.DryWetMidi.Interaction;
@@ -14,7 +15,7 @@ namespace Harmonia.Infrastructure.ExternalServices;
 /// <summary>
 /// Reads a Standard MIDI File with DryWetMidi and plays the very same timed events into MeltySynth, so the notes
 /// in notes.json and the WAV share one timeline. Percussion (channel 10) is left out of both; every other channel
-/// sounds as the piano of the SoundFont, whatever program the file asks for.
+/// plays the chosen instrument from the General MIDI SoundFont, whatever program the file asks for.
 /// </summary>
 public class MidiRenderer(IOptions<MidiRendererOptions> options) : IMidiRenderer
 {
@@ -39,7 +40,7 @@ public class MidiRenderer(IOptions<MidiRendererOptions> options) : IMidiRenderer
         () => new SoundFont(Path.Combine(AppContext.BaseDirectory, options.Value.SoundFontPath)),
         LazyThreadSafetyMode.PublicationOnly);
 
-    public Result<PianoRender> Render(Stream midi)
+    public Result<PlaybackRender> Render(Stream midi, PlaybackInstrument instrument)
     {
         MidiFile file;
         try
@@ -48,11 +49,11 @@ public class MidiRenderer(IOptions<MidiRendererOptions> options) : IMidiRenderer
         }
         catch (MidiException)
         {
-            return Result<PianoRender>.Failure(ErrorCodes.MidiInvalidFile);
+            return Result<PlaybackRender>.Failure(ErrorCodes.MidiInvalidFile);
         }
 
         if (file.OriginalFormat == MidiFileFormat.MultiSequence || file.TimeDivision is not TicksPerQuarterNoteTimeDivision)
-            return Result<PianoRender>.Failure(ErrorCodes.MidiFormatUnsupported);
+            return Result<PlaybackRender>.Failure(ErrorCodes.MidiFormatUnsupported);
 
         var tempoMap = file.GetTempoMap();
         double Seconds(long ticks) => TimeConverter.ConvertTo<MetricTimeSpan>(ticks, tempoMap).TotalMicroseconds / 1_000_000d;
@@ -64,7 +65,7 @@ public class MidiRenderer(IOptions<MidiRendererOptions> options) : IMidiRenderer
             var chunkNotes = chunk.GetNotes().Where(n => n.Channel != PercussionChannel).ToList();
             var noteOns = chunk.Events.OfType<NoteOnEvent>().Count(e => e.Channel != PercussionChannel && e.Velocity > 0);
             // A Note On with no Note Off would hold forever; the spec asks to reject the file instead.
-            if (noteOns != chunkNotes.Count) return Result<PianoRender>.Failure(ErrorCodes.MidiInvalidFile);
+            if (noteOns != chunkNotes.Count) return Result<PlaybackRender>.Failure(ErrorCodes.MidiInvalidFile);
             if (chunkNotes.Count == 0) continue;
 
             var trackId = tracks.Count;
@@ -80,16 +81,16 @@ public class MidiRenderer(IOptions<MidiRendererOptions> options) : IMidiRenderer
             }
         }
 
-        if (notes.Count == 0) return Result<PianoRender>.Failure(ErrorCodes.MidiNoPlayableNotes);
+        if (notes.Count == 0) return Result<PlaybackRender>.Failure(ErrorCodes.MidiNoPlayableNotes);
         var notesEnd = notes.Max(n => n.Start + n.Duration);
-        if (notes.Count > MaxNotes || notesEnd > MaxTimelineSeconds) return Result<PianoRender>.Failure(ErrorCodes.MidiLimitExceeded);
+        if (notes.Count > MaxNotes || notesEnd > MaxTimelineSeconds) return Result<PlaybackRender>.Failure(ErrorCodes.MidiLimitExceeded);
 
         var events = file.GetTimedEvents()
             .Where(e => e.Event is ChannelEvent c && c.Channel != PercussionChannel)
             .Select(e => (Sample: (int)Math.Round(Seconds(e.Time) * SampleRate), Event: (ChannelEvent)e.Event))
             .ToList();
         var durationSeconds = Math.Ceiling((notesEnd + TailSeconds) * SampleRate) / SampleRate;
-        var audio = RenderWav(events, (int)(durationSeconds * SampleRate));
+        var audio = RenderWav(events, (int)(durationSeconds * SampleRate), GeneralMidiProgram(instrument));
 
         notes.Sort((a, b) => (a.Start, a.Track, a.Pitch).CompareTo((b.Start, b.Track, b.Pitch)));
         var json = JsonSerializer.SerializeToUtf8Bytes(new
@@ -111,13 +112,18 @@ public class MidiRenderer(IOptions<MidiRendererOptions> options) : IMidiRenderer
             }),
         }, JsonOptions);
 
-        return Result<PianoRender>.Success(new PianoRender(json, audio, durationSeconds));
+        return Result<PlaybackRender>.Success(new PlaybackRender(json, audio, durationSeconds));
     }
 
     /// <summary>Mono 16-bit PCM WAV: no encoder delay to compensate for, unlike MP3, so seeking stays exact.</summary>
-    private byte[] RenderWav(List<(int Sample, ChannelEvent Event)> events, int totalSamples)
+    private byte[] RenderWav(List<(int Sample, ChannelEvent Event)> events, int totalSamples, int program)
     {
         var synthesizer = new Synthesizer(_soundFont.Value, SampleRate);
+        for (var channel = 0; channel < 16; channel++)
+        {
+            if (channel != PercussionChannel) synthesizer.ProcessMidiMessage(channel, 0xC0, program, 0);
+        }
+
         var left = new float[BlockSamples];
         var right = new float[BlockSamples];
         var wav = new byte[44 + totalSamples * 2];
@@ -150,7 +156,8 @@ public class MidiRenderer(IOptions<MidiRendererOptions> options) : IMidiRenderer
                 // Velocity 0 is a Note Off; MeltySynth handles it the same way.
                 case NoteOnEvent on: synthesizer.ProcessMidiMessage(channel, 0x90, on.NoteNumber, on.Velocity); break;
                 case NoteOffEvent off: synthesizer.ProcessMidiMessage(channel, 0x80, off.NoteNumber, off.Velocity); break;
-                // Sustain pedal, volume, expression and the like; program changes are skipped to keep the piano.
+                // Sustain pedal, volume, expression and the like; the file's program changes are skipped so the chosen
+                // instrument stays, and a bank select alone does not switch presets in MeltySynth.
                 case ControlChangeEvent cc: synthesizer.ProcessMidiMessage(channel, 0xB0, cc.ControlNumber, cc.ControlValue); break;
                 case PitchBendEvent bend: synthesizer.ProcessMidiMessage(channel, 0xE0, bend.PitchValue & 0x7F, bend.PitchValue >> 7); break;
             }
@@ -159,6 +166,16 @@ public class MidiRenderer(IOptions<MidiRendererOptions> options) : IMidiRenderer
         RenderUntil(totalSamples);
         return wav;
     }
+
+    // General MIDI program numbers (0-based): Acoustic Grand Piano, Church Organ, Nylon Guitar, String Ensemble 1.
+    private static int GeneralMidiProgram(PlaybackInstrument instrument) => instrument switch
+    {
+        PlaybackInstrument.Piano => 0,
+        PlaybackInstrument.Organ => 19,
+        PlaybackInstrument.Guitar => 24,
+        PlaybackInstrument.StringEnsemble => 48,
+        _ => throw new ArgumentOutOfRangeException(nameof(instrument), instrument, "Unknown playback instrument."),
+    };
 
     private static void WriteWavHeader(byte[] wav, int totalSamples)
     {

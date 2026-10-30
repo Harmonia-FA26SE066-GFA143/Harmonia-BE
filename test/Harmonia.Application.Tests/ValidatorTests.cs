@@ -818,6 +818,8 @@ public class ValidatorTests
         { new SearchMusicMaterialsRequestValidator(), new SearchMusicMaterialsRequest { LiturgicalSeasonId = Guid.Empty } },
         { new SearchMusicMaterialsRequestValidator(), new SearchMusicMaterialsRequest { SkillId = Guid.Empty } },
         { new SearchMusicMaterialsRequestValidator(), new SearchMusicMaterialsRequest { MaterialType = (MaterialType)99 } },
+        { new UploadMusicMaterialRequestValidator(), new UploadMusicMaterialRequest { SongId = Guid.NewGuid(), Title = "Midi", Instrument = (PlaybackInstrument)99 } },
+        { new ReplaceMusicMaterialFileRequestValidator(), new ReplaceMusicMaterialFileRequest { Instrument = (PlaybackInstrument)99 } },
         { new SearchMusicMaterialsRequestValidator(), new SearchMusicMaterialsRequest { LearningStatus = (LearningStatus)99 } },
         { new SearchMemberProfilesRequestValidator(), new SearchMemberProfilesRequest { Keyword = new string('x', 101) } },
         { new SearchMemberProfilesRequestValidator(), new SearchMemberProfilesRequest { Status = (MemberStatus)99 } },

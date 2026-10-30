@@ -101,7 +101,7 @@ public static class ErrorStatusMap
         [ErrorCodes.MaterialFileTooLarge] = StatusCodes.Status413PayloadTooLarge,
         [ErrorCodes.MaterialLyricsSourceInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.MaterialLearningStatusInvalid] = StatusCodes.Status400BadRequest,
-        [ErrorCodes.MaterialPianoUnavailable] = StatusCodes.Status409Conflict,
+        [ErrorCodes.MaterialPlaybackUnavailable] = StatusCodes.Status409Conflict,
         // 422 as agreed with mobile (Harmonia_MIDI_Backend_Spec §7): the file arrived but its content cannot be played.
         [ErrorCodes.MidiInvalidFile] = StatusCodes.Status422UnprocessableEntity,
         [ErrorCodes.MidiFormatUnsupported] = StatusCodes.Status422UnprocessableEntity,
