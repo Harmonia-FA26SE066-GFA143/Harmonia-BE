@@ -1177,13 +1177,13 @@ Tư liệu của bài hát: bản nhạc, lời, audio mẫu, tài liệu tập 
 
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
-| POST | `/api/music-materials` | `multipart/form-data`: `songId`, `title`, `materialType`, `targetSkillId?`, `file` | 200 `MusicMaterialDto` | 400 `VALIDATION_FAILED`, `MATERIAL_FILE_REQUIRED`, `MATERIAL_FILE_TYPE_NOT_ALLOWED` · 404 `SONG_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE` · 413 `MATERIAL_FILE_TOO_LARGE` · 502 `EXTERNAL_STORAGE_FAILED` |
+| POST | `/api/music-materials` | `multipart/form-data`: `songId`, `title`, `materialType`, `targetSkillId?`, `file` **hoặc** `lyricsText` (chỉ `Lyrics`) | 200 `MusicMaterialDto` | 400 `VALIDATION_FAILED`, `MATERIAL_FILE_REQUIRED`, `MATERIAL_FILE_TYPE_NOT_ALLOWED`, `MATERIAL_LYRICS_SOURCE_INVALID` · 404 `SONG_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE` · 413 `MATERIAL_FILE_TOO_LARGE` · 502 `EXTERNAL_STORAGE_FAILED` |
 | GET | `/api/music-materials?songId=&pageNumber=1&pageSize=20` | — | 200 `PagedList<MusicMaterialDto>` | 400 `VALIDATION_FAILED` (thiếu `songId`) · 404 `SONG_NOT_FOUND` |
 | GET | `/api/music-materials/mine?keyword=&songId=&liturgicalSeasonId=&skillId=&materialType=&learningStatus=&pageNumber=1&pageSize=20` · chỉ `ChoirMember` | — | 200 `PagedList<MusicMaterialDetailDto>` — tài liệu cho mọi người + tài liệu cho kỹ năng **đã duyệt** của ca viên (UC-07); bộ lọc xem bên dưới (UC-07E) | 404 `MEMBER_NOT_FOUND`, `SONG_NOT_FOUND` |
 | PUT | `/api/music-materials/{id}/learning-progress` · chỉ `ChoirMember` | `{ "status": "Learned" }` | 200 `MaterialLearningProgressDto` | 400 `VALIDATION_FAILED` (`errors.status`: `MATERIAL_LEARNING_STATUS_INVALID`) · 404 `MEMBER_NOT_FOUND`, `MATERIAL_NOT_FOUND` |
 | GET | `/api/music-materials/{id}/learning-progress?status=&pageNumber=1&pageSize=20` · chỉ `ChoirDirector` | — | 200 `PagedList<MaterialLearningProgressDetailDto>` | 404 `MATERIAL_NOT_FOUND` |
-| PUT | `/api/music-materials/{id}` | `{ "title", "targetSkillId" }` | 200 `MusicMaterialDto` | 400 `VALIDATION_FAILED` · 404 `MATERIAL_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE` |
-| PUT | `/api/music-materials/{id}/file` | `multipart/form-data`: `file`, `resetProgress?` (mặc định `false`) | 200 `MusicMaterialDto` — giữ nguyên `id`, tiêu đề, loại, kỹ năng đích và bài luyện tập đang gắn; file cũ bị xoá khỏi kho. `resetProgress=true` xoá đánh dấu "đã học / cần luyện thêm" của ca viên với tài liệu này | 400 `MATERIAL_FILE_REQUIRED`, `MATERIAL_FILE_TYPE_NOT_ALLOWED` (theo loại hiện có của tài liệu) · 404 `MATERIAL_NOT_FOUND` · 413 `MATERIAL_FILE_TOO_LARGE` · 502 `EXTERNAL_STORAGE_FAILED` |
+| PUT | `/api/music-materials/{id}` | `{ "title", "targetSkillId", "lyricsText" }` | 200 `MusicMaterialDto` | 400 `VALIDATION_FAILED`, `MATERIAL_LYRICS_SOURCE_INVALID` · 404 `MATERIAL_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE` |
+| PUT | `/api/music-materials/{id}/file` | `multipart/form-data`: `file`, `resetProgress?` (mặc định `false`) | 200 `MusicMaterialDto` — giữ nguyên `id`, tiêu đề, loại, kỹ năng đích và bài luyện tập đang gắn; file cũ bị xoá khỏi kho. `resetProgress=true` xoá đánh dấu "đã học / cần luyện thêm" của ca viên với tài liệu này | 400 `MATERIAL_FILE_REQUIRED`, `MATERIAL_FILE_TYPE_NOT_ALLOWED` (theo loại hiện có của tài liệu), `MATERIAL_LYRICS_SOURCE_INVALID` (lời dạng text, không có file để thay) · 404 `MATERIAL_NOT_FOUND` · 413 `MATERIAL_FILE_TOO_LARGE` · 502 `EXTERNAL_STORAGE_FAILED` |
 | DELETE | `/api/music-materials/{id}` | — | 204 | 404 `MATERIAL_NOT_FOUND` |
 
 - `materialType`: `SheetMusic` | `Lyrics` | `SampleAudio` | `RehearsalMaterial` (gửi tên hoặc số).
@@ -1191,11 +1191,16 @@ Tư liệu của bài hát: bản nhạc, lời, audio mẫu, tài liệu tập 
 
   | `materialType` | Đuôi file |
   |---|---|
-  | `SheetMusic`, `Lyrics` | `.pdf`, `.png`, `.jpg` |
+  | `SheetMusic` | `.pdf`, `.png`, `.jpg` |
+  | `Lyrics` | `.docx` — hoặc không gửi file mà gửi `lyricsText` (≤ 20 000 ký tự) |
   | `SampleAudio` | `.mp3`, `.m4a`, `.wav`, `.mid`, `.midi` (MIDI trình duyệt không phát trực tiếp — FE cho tải về) |
   | `RehearsalMaterial` | cả hai nhóm trên |
 
   Server chỉ xét đuôi file và dung lượng thật, bỏ qua `Content-Type` client gửi.
+- `Lyrics` cần **đúng một** trong `file` (`.docx`) hoặc `lyricsText`; gửi cả hai hoặc không gửi gì → `MATERIAL_LYRICS_SOURCE_INVALID`.
+  Lời dạng text trả về ở `lyricsText`, khi đó `fileName` và `fileUrl` là `null`; sửa lời qua `PUT {id}` với `lyricsText`
+  (bắt buộc với lời dạng text, phải bỏ trống với tư liệu có file). Gửi `lyricsText` cho loại khác `Lyrics` → 400 `VALIDATION_FAILED`.
+  Lời dạng `.pdf` / `.png` / `.jpg` tải lên trước 2026-10-30 vẫn xem được, nhưng thay file thì phải dùng `.docx`.
 - `targetSkillId` (tuỳ chọn): bè / nhạc cụ mà tư liệu dành cho, ví dụ audio riêng bè Tenor.
 - `fileUrl` là link có hạn (`Cloudinary__SignedUrlExpiryMinutes`); hết hạn thì gọi lại GET để lấy link mới.
   Đừng lưu link này lại.

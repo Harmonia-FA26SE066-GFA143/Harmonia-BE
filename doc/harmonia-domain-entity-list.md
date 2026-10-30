@@ -107,7 +107,7 @@ Written once here instead of repeated 47 times:
 `songId` Guid → Song · `skillId` Guid → Skill · `isMandatory` bool · unique `(songId, skillId)`
 
 **20. `MusicMaterial`** — sheet music / lyrics / sample audio / rehearsal material (FE-08/28) ***auditable***
-`songId` Guid → Song · `materialType` MaterialType · `title` string(200) · `filePublicId` string(255) (private, signed URL on read) · `fileName` string(200) · `fileSizeBytes` long? · `targetSkillId` Guid? → Skill · `isActive` bool
+`songId` Guid → Song · `materialType` MaterialType · `title` string(200) · `filePublicId` string(255)? (private, signed URL on read) · `fileName` string(200)? · `lyricsText` string(max)? (Lyrics typed as text — exactly one of file or text) · `fileSizeBytes` long? · `targetSkillId` Guid? → Skill · `isActive` bool
 
 **21. `MaterialLearningProgress`** — Learned / Needs practice (FE-09)
 `memberId` Guid → MemberProfile · `materialId` Guid → MusicMaterial · `status` LearningStatus · `updatedAt` DateTime · unique `(memberId, materialId)`

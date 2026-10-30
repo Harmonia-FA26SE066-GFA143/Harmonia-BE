@@ -735,12 +735,10 @@ namespace Harmonia.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("FileName")
-                        .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("FilePublicId")
-                        .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
@@ -749,6 +747,9 @@ namespace Harmonia.Infrastructure.Migrations
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
+
+                    b.Property<string>("LyricsText")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("MaterialType")
                         .HasColumnType("int");

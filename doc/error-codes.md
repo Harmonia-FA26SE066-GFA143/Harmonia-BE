@@ -184,6 +184,7 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `MATERIAL_FILE_REQUIRED` | 400 | Vui lòng chọn tệp |
 | `MATERIAL_FILE_TYPE_NOT_ALLOWED` | 400 | Định dạng tệp không được hỗ trợ |
 | `MATERIAL_FILE_TOO_LARGE` | 413 | Tệp vượt quá dung lượng cho phép |
+| `MATERIAL_LYRICS_SOURCE_INVALID` | 400 | Lời bài hát cần đúng một trong hai: tệp Word hoặc nội dung gõ trực tiếp |
 | `MATERIAL_LEARNING_STATUS_INVALID` | 400 | Trạng thái học tập không hợp lệ |
 
 ## 7. Danh sách bài hát & duyệt

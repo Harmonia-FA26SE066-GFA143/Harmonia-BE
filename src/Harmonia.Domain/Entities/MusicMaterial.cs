@@ -11,10 +11,16 @@ public class MusicMaterial : BaseAuditableEntity
 
     public string Title { get; set; } = string.Empty;
 
-    /// <summary>Private file: serve through IFileStorageService.GetSignedUrl, never as a stored URL.</summary>
-    public string FilePublicId { get; set; } = string.Empty;
+    /// <summary>
+    /// Private file: serve through IFileStorageService.GetSignedUrl, never as a stored URL.
+    /// Null only for lyrics typed as text (<see cref="LyricsText"/>).
+    /// </summary>
+    public string? FilePublicId { get; set; }
 
-    public string FileName { get; set; } = string.Empty;
+    public string? FileName { get; set; }
+
+    /// <summary>Lyrics typed in directly; a Lyrics material has either this or a file, never both.</summary>
+    public string? LyricsText { get; set; }
 
     public long? FileSizeBytes { get; set; }
 

@@ -8,5 +8,6 @@ public class UpdateMusicMaterialRequestValidator : AbstractValidator<UpdateMusic
     public UpdateMusicMaterialRequestValidator()
     {
         RuleFor(x => x.Title).NotEmpty().MaximumLength(200);
+        RuleFor(x => x.LyricsText).MaximumLength(UploadMusicMaterialRequestValidator.MaxLyricsTextLength);
     }
 }

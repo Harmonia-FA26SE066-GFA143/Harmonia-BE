@@ -27,6 +27,8 @@ public class MusicMaterialService(
 
     private static readonly string[] AudioExtensions = [".mp3", ".m4a", ".wav", ".mid", ".midi"];
 
+    private static readonly string[] LyricsExtensions = [".docx"];
+
     public async Task<Result<MusicMaterialDto>> UploadAsync(
         UploadMusicMaterialRequest request, FileContent? file, CancellationToken cancellationToken)
     {
@@ -35,6 +37,13 @@ public class MusicMaterialService(
 
         var (targetSkill, skillError) = await GetTargetSkillAsync(request.TargetSkillId, cancellationToken);
         if (skillError is not null) return Result<MusicMaterialDto>.Failure(skillError);
+
+        if (request.MaterialType == MaterialType.Lyrics)
+        {
+            var hasText = !string.IsNullOrWhiteSpace(request.LyricsText);
+            if (hasText == file is not null) return Result<MusicMaterialDto>.Failure(ErrorCodes.MaterialLyricsSourceInvalid);
+            if (hasText) return await AddLyricsTextAsync(request, targetSkill, cancellationToken);
+        }
 
         if (CheckFile(request.MaterialType, file) is { } fileError)
             return Result<MusicMaterialDto>.Failure(fileError);
@@ -136,6 +145,10 @@ public class MusicMaterialService(
         var (targetSkill, skillError) = await GetTargetSkillAsync(request.TargetSkillId, cancellationToken);
         if (skillError is not null) return Result<MusicMaterialDto>.Failure(skillError);
 
+        // Text lyrics must keep their text; a material with a file takes no text.
+        if ((material.FilePublicId is null) == string.IsNullOrWhiteSpace(request.LyricsText))
+            return Result<MusicMaterialDto>.Failure(ErrorCodes.MaterialLyricsSourceInvalid);
+
         mapper.Map(request, material);
         await musicMaterialRepository.SaveChangesAsync(cancellationToken);
 
@@ -148,6 +161,7 @@ public class MusicMaterialService(
     {
         var material = await musicMaterialRepository.GetByIdAsync(id, cancellationToken);
         if (material is not { IsActive: true }) return Result<MusicMaterialDto>.Failure(ErrorCodes.MaterialNotFound);
+        if (material.FilePublicId is null) return Result<MusicMaterialDto>.Failure(ErrorCodes.MaterialLyricsSourceInvalid);
 
         if (CheckFile(material.MaterialType, file) is { } fileError)
             return Result<MusicMaterialDto>.Failure(fileError);
@@ -201,8 +215,20 @@ public class MusicMaterialService(
     private TDto ToDto<TDto>(MusicMaterial material) where TDto : MusicMaterialDto
     {
         var dto = mapper.Map<TDto>(material);
-        dto.FileUrl = fileStorageService.GetSignedUrl(material.FilePublicId);
+        dto.FileUrl = material.FilePublicId is null ? null : fileStorageService.GetSignedUrl(material.FilePublicId);
         return dto;
+    }
+
+    private async Task<Result<MusicMaterialDto>> AddLyricsTextAsync(
+        UploadMusicMaterialRequest request, Skill? targetSkill, CancellationToken cancellationToken)
+    {
+        var material = mapper.Map<MusicMaterial>(request);
+        material.Id = Guid.NewGuid();
+        await musicMaterialRepository.AddAsync(material, cancellationToken);
+        await musicMaterialRepository.SaveChangesAsync(cancellationToken);
+
+        material.TargetSkill = targetSkill;
+        return Result<MusicMaterialDto>.Success(ToDto<MusicMaterialDto>(material));
     }
 
     private PagedList<TDto> ToDtoPage<TDto>(PagedList<MusicMaterial> page) where TDto : MusicMaterialDto =>
@@ -232,6 +258,7 @@ public class MusicMaterialService(
     private static string[] AllowedExtensions(MaterialType materialType) => materialType switch
     {
         MaterialType.SampleAudio => AudioExtensions,
+        MaterialType.Lyrics => LyricsExtensions,
         MaterialType.RehearsalMaterial => [.. DocumentExtensions, .. AudioExtensions],
         _ => DocumentExtensions,
     };

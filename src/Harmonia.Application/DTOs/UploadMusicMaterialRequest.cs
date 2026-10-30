@@ -12,4 +12,7 @@ public class UploadMusicMaterialRequest
     public MaterialType MaterialType { get; set; }
 
     public Guid? TargetSkillId { get; set; }
+
+    /// <summary>Lyrics only: the text itself, sent instead of a .docx file.</summary>
+    public string? LyricsText { get; set; }
 }

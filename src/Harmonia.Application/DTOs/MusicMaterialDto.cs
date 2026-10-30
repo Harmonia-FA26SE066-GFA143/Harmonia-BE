@@ -12,8 +12,8 @@ public class MusicMaterialDto
 
     public string Title { get; set; } = string.Empty;
 
-    /// <summary>Original name, for display only; the stored file has a generated name.</summary>
-    public string FileName { get; set; } = string.Empty;
+    /// <summary>Original name, for display only; the stored file has a generated name. Null for text lyrics.</summary>
+    public string? FileName { get; set; }
 
     public long? FileSizeBytes { get; set; }
 
@@ -21,8 +21,11 @@ public class MusicMaterialDto
 
     public string? TargetSkillName { get; set; }
 
-    /// <summary>Short-lived signed URL; request the list again once it expires.</summary>
-    public string FileUrl { get; set; } = string.Empty;
+    /// <summary>Short-lived signed URL; request the list again once it expires. Null for text lyrics.</summary>
+    public string? FileUrl { get; set; }
+
+    /// <summary>Lyrics typed as text; null for every material that has a file.</summary>
+    public string? LyricsText { get; set; }
 
     public DateTime CreatedAt { get; set; }
 }

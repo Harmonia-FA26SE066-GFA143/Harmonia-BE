@@ -117,10 +117,11 @@
 ## Upload file
 
 - Whitelist phần mở rộng, chặn theo whitelist, không blacklist:
-  - `MusicMaterial` theo `MaterialType` (chốt 2026-10-02): `SheetMusic`, `Lyrics` nhận
-    `.pdf`, `.png`, `.jpg`; `SampleAudio` nhận `.mp3`, `.m4a`, `.wav`, `.mid`, `.midi`
+  - `MusicMaterial` theo `MaterialType` (chốt 2026-10-02): `SheetMusic` nhận
+    `.pdf`, `.png`, `.jpg`; `Lyrics` chỉ nhận `.docx` (lưu Cloudinary dạng raw) hoặc lời gõ thẳng
+    `LyricsText`, không có file (chốt 2026-10-30); `SampleAudio` nhận `.mp3`, `.m4a`, `.wav`, `.mid`, `.midi`
     (MIDI thêm 2026-10-29, lưu Cloudinary dạng raw);
-    `RehearsalMaterial` nhận cả hai nhóm. Tối đa 20 MB một file.
+    `RehearsalMaterial` nhận nhóm của `SheetMusic` và `SampleAudio`. Tối đa 20 MB một file.
   - `PracticeSubmission` nhận `.mp3`, `.m4a`, `.wav`.
 - Không tin `Content-Type` client gửi — kiểm phần mở rộng lẫn dung lượng ở server.
 - Lưu bằng tên sinh mới (GUID), không dùng tên gốc — tránh path traversal và ghi đè.

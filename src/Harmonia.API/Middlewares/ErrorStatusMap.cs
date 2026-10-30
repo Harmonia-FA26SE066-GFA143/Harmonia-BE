@@ -99,6 +99,7 @@ public static class ErrorStatusMap
         [ErrorCodes.MaterialFileRequired] = StatusCodes.Status400BadRequest,
         [ErrorCodes.MaterialFileTypeNotAllowed] = StatusCodes.Status400BadRequest,
         [ErrorCodes.MaterialFileTooLarge] = StatusCodes.Status413PayloadTooLarge,
+        [ErrorCodes.MaterialLyricsSourceInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.MaterialLearningStatusInvalid] = StatusCodes.Status400BadRequest,
 
         // 7. Song list & review.

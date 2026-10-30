@@ -9,4 +9,7 @@ public class UpdateMusicMaterialRequest
     public string Title { get; set; } = string.Empty;
 
     public Guid? TargetSkillId { get; set; }
+
+    /// <summary>Required for text lyrics, which have no file to replace; must be empty for every other material.</summary>
+    public string? LyricsText { get; set; }
 }

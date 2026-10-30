@@ -181,6 +181,9 @@ public static class ErrorCodes
 
     public const string MaterialFileTooLarge = "MATERIAL_FILE_TOO_LARGE";
 
+    // Lyrics need exactly one of a .docx file or text; text is only for Lyrics; a text material has no file to replace.
+    public const string MaterialLyricsSourceInvalid = "MATERIAL_LYRICS_SOURCE_INVALID";
+
     public const string MaterialLearningStatusInvalid = "MATERIAL_LEARNING_STATUS_INVALID";
 
     // 7. Song list & review.

@@ -139,14 +139,14 @@ public class CloudinaryFileStorageService : IFileStorageService
     }
 
     // Cloudinary files audio under the "video" resource type; PDFs are served as "image".
-    // Exported report files other than PDF, and MIDI (which Cloudinary cannot transcode), are "raw":
+    // Exported report files other than PDF, MIDI (which Cloudinary cannot transcode) and Word lyrics are "raw":
     // stored as they are, never transformed.
     // An unsupported extension is a caller bug (callers whitelist first), so it still throws.
     private static ResourceType GetResourceType(string extension) => extension switch
     {
         ".mp3" or ".m4a" or ".wav" => ResourceType.Video,
         ".pdf" or ".png" or ".jpg" or ".jpeg" => ResourceType.Image,
-        ".csv" or ".xlsx" or ".xml" or ".json" or ".mid" or ".midi" => ResourceType.Raw,
+        ".csv" or ".xlsx" or ".xml" or ".json" or ".mid" or ".midi" or ".docx" => ResourceType.Raw,
         _ => throw new NotSupportedException($"File extension '{extension}' is not supported for storage.")
     };
 }

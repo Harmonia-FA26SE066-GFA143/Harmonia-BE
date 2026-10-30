@@ -73,7 +73,7 @@ public class MusicMaterialServiceTests
     [InlineData(MaterialType.SampleAudio, "sample.mp3", "music-materials/sample-audio")]
     [InlineData(MaterialType.SampleAudio, "sample.mid", "music-materials/sample-audio")]
     [InlineData(MaterialType.RehearsalMaterial, "tap.MIDI", "music-materials/rehearsal-material")]
-    [InlineData(MaterialType.Lyrics, "loi.JPG", "music-materials/lyrics")]
+    [InlineData(MaterialType.Lyrics, "loi.DOCX", "music-materials/lyrics")]
     [InlineData(MaterialType.RehearsalMaterial, "bass.wav", "music-materials/rehearsal-material")]
     [InlineData(MaterialType.RehearsalMaterial, "tap.pdf", "music-materials/rehearsal-material")]
     public async Task Upload_AllowedExtension_GoesToFolderOfItsType_Async(MaterialType type, string fileName, string folder)
@@ -90,6 +90,9 @@ public class MusicMaterialServiceTests
     [InlineData(MaterialType.SampleAudio, "sample.pdf")]
     [InlineData(MaterialType.RehearsalMaterial, "virus.exe")]
     [InlineData(MaterialType.SheetMusic, "no-extension")]
+    [InlineData(MaterialType.Lyrics, "loi.pdf")]
+    [InlineData(MaterialType.Lyrics, "loi.doc")]
+    [InlineData(MaterialType.SheetMusic, "ban-nhac.docx")]
     public async Task Upload_ExtensionNotAllowedForType_ReturnsFileTypeNotAllowed_Async(MaterialType type, string fileName)
     {
         var result = await _sut.UploadAsync(NewRequest(type), NewFile(fileName), _ct);
@@ -114,6 +117,38 @@ public class MusicMaterialServiceTests
         var result = await _sut.UploadAsync(NewRequest(), null, _ct);
 
         Assert.Equal(ErrorCodes.MaterialFileRequired, result.Code);
+    }
+
+    [Fact]
+    public async Task Upload_LyricsText_SavesTextWithoutFile_Async()
+    {
+        var request = NewRequest(MaterialType.Lyrics);
+        request.LyricsText = " Lay Chua xin thuong xot ";
+
+        var result = await _sut.UploadAsync(request, null, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Lay Chua xin thuong xot", result.Value!.LyricsText);
+        Assert.Null(result.Value.FileUrl);
+        Assert.Null(result.Value.FileName);
+        await _materials.Received(1).AddAsync(Arg.Is<MusicMaterial>(m => m.FilePublicId == null), _ct);
+        await _storage.DidNotReceiveWithAnyArgs().UploadAsync(default!, default!, default!, default, default);
+    }
+
+    [Theory]
+    [InlineData("loi", true)]
+    [InlineData(null, false)]
+    [InlineData("   ", false)]
+    public async Task Upload_LyricsWithBothOrNeitherSource_ReturnsLyricsSourceInvalid_Async(string? text, bool withFile)
+    {
+        var request = NewRequest(MaterialType.Lyrics);
+        request.LyricsText = text;
+
+        var result = await _sut.UploadAsync(request, withFile ? NewFile("loi.docx") : null, _ct);
+
+        Assert.Equal(ErrorCodes.MaterialLyricsSourceInvalid, result.Code);
+        await _storage.DidNotReceiveWithAnyArgs().UploadAsync(default!, default!, default!, default, default);
+        await _materials.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
     }
 
     [Fact]
@@ -203,6 +238,64 @@ public class MusicMaterialServiceTests
         await _materials.Received(1).SaveChangesAsync(_ct);
     }
 
+    private MusicMaterial StubLyricsTextMaterial()
+    {
+        var material = new MusicMaterial
+        {
+            Id = Guid.NewGuid(), SongId = _song.Id, Title = "Loi", MaterialType = MaterialType.Lyrics,
+            LyricsText = "Old text", IsActive = true,
+        };
+        _materials.GetByIdAsync(material.Id, _ct).Returns(material);
+        return material;
+    }
+
+    [Fact]
+    public async Task Update_LyricsText_ReplacesTheText_Async()
+    {
+        var material = StubLyricsTextMaterial();
+
+        var result = await _sut.UpdateAsync(
+            material.Id, new UpdateMusicMaterialRequest { Title = "Loi", LyricsText = "New text" }, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("New text", result.Value!.LyricsText);
+        Assert.Null(result.Value.FileUrl);
+    }
+
+    [Fact]
+    public async Task Update_TextLyricsWithoutText_ReturnsLyricsSourceInvalid_Async()
+    {
+        var material = StubLyricsTextMaterial();
+
+        var result = await _sut.UpdateAsync(material.Id, new UpdateMusicMaterialRequest { Title = "Loi" }, _ct);
+
+        Assert.Equal(ErrorCodes.MaterialLyricsSourceInvalid, result.Code);
+        Assert.Equal("Old text", material.LyricsText);
+        await _materials.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Update_FileMaterialWithText_ReturnsLyricsSourceInvalid_Async()
+    {
+        var material = StubAudioMaterial();
+
+        var result = await _sut.UpdateAsync(
+            material.Id, new UpdateMusicMaterialRequest { Title = "Alto", LyricsText = "text" }, _ct);
+
+        Assert.Equal(ErrorCodes.MaterialLyricsSourceInvalid, result.Code);
+    }
+
+    [Fact]
+    public async Task ReplaceFile_TextLyrics_ReturnsLyricsSourceInvalid_Async()
+    {
+        var material = StubLyricsTextMaterial();
+
+        var result = await _sut.ReplaceFileAsync(material.Id, new ReplaceMusicMaterialFileRequest(), NewFile("loi.docx"), _ct);
+
+        Assert.Equal(ErrorCodes.MaterialLyricsSourceInvalid, result.Code);
+        await _storage.DidNotReceiveWithAnyArgs().UploadAsync(default!, default!, default!, default, default);
+    }
+
     private MusicMaterial StubAudioMaterial()
     {
         var material = new MusicMaterial
@@ -284,7 +377,10 @@ public class MusicMaterialServiceTests
     [Fact]
     public async Task Update_ClearsTargetSkill_WhenNull_Async()
     {
-        var material = new MusicMaterial { Id = Guid.NewGuid(), Title = "T", TargetSkillId = Guid.NewGuid(), IsActive = true };
+        var material = new MusicMaterial
+        {
+            Id = Guid.NewGuid(), Title = "T", FilePublicId = "harmonia/x.pdf", TargetSkillId = Guid.NewGuid(), IsActive = true,
+        };
         _materials.GetByIdAsync(material.Id, _ct).Returns(material);
 
         var result = await _sut.UpdateAsync(material.Id, new UpdateMusicMaterialRequest { Title = "T" }, _ct);
