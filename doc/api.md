@@ -1071,7 +1071,8 @@ Thư viện bài hát và phân loại bài hát (UC-21 / FE-27, FE-29).
   lọc theo vị trí trong lễ (id từ `GET /api/lookups/liturgical-slots`).
 - `UpdateSongClassificationRequest` có thêm `liturgicalSlotIds` (Nhập lễ, Đáp ca, Dâng lễ, Hiệp lễ, Kết lễ...);
   `SongClassificationDto` có thêm `liturgicalSlots`. Luật trùng / không hợp lệ như các nhóm khác.
-- `keyword` tìm trong `title`, `composer`, `lyricist`, **không phân biệt hoa thường và dấu tiếng Việt**
+- `keyword` tìm trong `title`, `composer`, `lyricist` và lời bài hát gõ dạng text (`lyricsText` của tư liệu `Lyrics`
+  đang hoạt động — lời dạng file `.docx` không tìm được), **không phân biệt hoa thường và dấu tiếng Việt**
   ("con buoc" ra "Con Bước", "duc" ra "Đức"); kết quả sắp theo `title`. Tìm ca viên theo tên
   (`/api/member-profiles`) và tìm tài liệu (`/api/music-materials/mine`) cũng không phân biệt dấu.
 - `isClassified=false` chỉ lấy bài chưa phân loại (`true`: đã phân loại). `missingMaterialType=SampleAudio` chỉ lấy bài
@@ -1175,15 +1176,34 @@ Tư liệu của bài hát: bản nhạc, lời, audio mẫu, tài liệu tập 
 { "memberId": "guid", "fullName": "Nguyễn Văn An", "status": "NotStarted", "updatedAt": null }
 ```
 
+### `PlaybackDto` (bản phát của tư liệu MIDI, cho piano roll trên mobile)
+
+```json
+{
+  "id": "guid",
+  "songId": "guid",
+  "title": "Giai điệu bè Soprano",
+  "status": "Ready",
+  "schemaVersion": 1,
+  "durationSeconds": 95.5,
+  "instrument": "Piano",
+  "audioUrl": "https://...signed.../audio.wav",
+  "notesUrl": "https://...signed.../notes.json",
+  "createdAt": "2026-10-30T08:00:00Z"
+}
+```
+
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
-| POST | `/api/music-materials` | `multipart/form-data`: `songId`, `title`, `materialType`, `targetSkillId?`, `file` **hoặc** `lyricsText` (chỉ `Lyrics`) | 200 `MusicMaterialDto` | 400 `VALIDATION_FAILED`, `MATERIAL_FILE_REQUIRED`, `MATERIAL_FILE_TYPE_NOT_ALLOWED`, `MATERIAL_LYRICS_SOURCE_INVALID` · 404 `SONG_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE` · 413 `MATERIAL_FILE_TOO_LARGE` · 502 `EXTERNAL_STORAGE_FAILED` |
+| POST | `/api/music-materials` | `multipart/form-data`: `songId`, `title`, `materialType`, `targetSkillId?`, `file` **hoặc** `lyricsText` (chỉ `Lyrics`), `instrument?` (chỉ file MIDI, mặc định `Piano`) | 200 `MusicMaterialDto` | 400 `VALIDATION_FAILED`, `MATERIAL_FILE_REQUIRED`, `MATERIAL_FILE_TYPE_NOT_ALLOWED`, `MATERIAL_LYRICS_SOURCE_INVALID` · 404 `SONG_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE` · 413 `MATERIAL_FILE_TOO_LARGE` · 422 `MIDI_INVALID_FILE`, `MIDI_FORMAT_UNSUPPORTED`, `MIDI_NO_PLAYABLE_NOTES`, `MIDI_LIMIT_EXCEEDED` · 502 `EXTERNAL_STORAGE_FAILED` |
 | GET | `/api/music-materials?songId=&pageNumber=1&pageSize=20` | — | 200 `PagedList<MusicMaterialDto>` | 400 `VALIDATION_FAILED` (thiếu `songId`) · 404 `SONG_NOT_FOUND` |
 | GET | `/api/music-materials/mine?keyword=&songId=&liturgicalSeasonId=&skillId=&materialType=&learningStatus=&pageNumber=1&pageSize=20` · chỉ `ChoirMember` | — | 200 `PagedList<MusicMaterialDetailDto>` — tài liệu cho mọi người + tài liệu cho kỹ năng **đã duyệt** của ca viên (UC-07); bộ lọc xem bên dưới (UC-07E) | 404 `MEMBER_NOT_FOUND`, `SONG_NOT_FOUND` |
 | PUT | `/api/music-materials/{id}/learning-progress` · chỉ `ChoirMember` | `{ "status": "Learned" }` | 200 `MaterialLearningProgressDto` | 400 `VALIDATION_FAILED` (`errors.status`: `MATERIAL_LEARNING_STATUS_INVALID`) · 404 `MEMBER_NOT_FOUND`, `MATERIAL_NOT_FOUND` |
 | GET | `/api/music-materials/{id}/learning-progress?status=&pageNumber=1&pageSize=20` · chỉ `ChoirDirector` | — | 200 `PagedList<MaterialLearningProgressDetailDto>` | 404 `MATERIAL_NOT_FOUND` |
+| GET | `/api/music-materials/{id}/playback` | — | 200 `PlaybackDto` | 404 `MATERIAL_NOT_FOUND` · 409 `MATERIAL_PLAYBACK_UNAVAILABLE` |
+| POST | `/api/music-materials/{id}/extract-lyrics` · chỉ `ChoirDirector` | — | 200 `{ "lyricsText": "..." }` — bản nháp, **không lưu** | 400 `MATERIAL_NOT_SHEET_MUSIC` · 404 `MATERIAL_NOT_FOUND` · 502 `EXTERNAL_AI_FAILED` |
 | PUT | `/api/music-materials/{id}` | `{ "title", "targetSkillId", "lyricsText" }` | 200 `MusicMaterialDto` | 400 `VALIDATION_FAILED`, `MATERIAL_LYRICS_SOURCE_INVALID` · 404 `MATERIAL_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE` |
-| PUT | `/api/music-materials/{id}/file` | `multipart/form-data`: `file`, `resetProgress?` (mặc định `false`) | 200 `MusicMaterialDto` — giữ nguyên `id`, tiêu đề, loại, kỹ năng đích và bài luyện tập đang gắn; file cũ bị xoá khỏi kho. `resetProgress=true` xoá đánh dấu "đã học / cần luyện thêm" của ca viên với tài liệu này | 400 `MATERIAL_FILE_REQUIRED`, `MATERIAL_FILE_TYPE_NOT_ALLOWED` (theo loại hiện có của tài liệu), `MATERIAL_LYRICS_SOURCE_INVALID` (lời dạng text, không có file để thay) · 404 `MATERIAL_NOT_FOUND` · 413 `MATERIAL_FILE_TOO_LARGE` · 502 `EXTERNAL_STORAGE_FAILED` |
+| PUT | `/api/music-materials/{id}/file` | `multipart/form-data`: `file`, `resetProgress?` (mặc định `false`), `instrument?` (chỉ file MIDI, mặc định `Piano`) | 200 `MusicMaterialDto` — giữ nguyên `id`, tiêu đề, loại, kỹ năng đích và bài luyện tập đang gắn; file cũ bị xoá khỏi kho. `resetProgress=true` xoá đánh dấu "đã học / cần luyện thêm" của ca viên với tài liệu này | 400 `VALIDATION_FAILED`, `MATERIAL_FILE_REQUIRED`, `MATERIAL_FILE_TYPE_NOT_ALLOWED` (theo loại hiện có của tài liệu), `MATERIAL_LYRICS_SOURCE_INVALID` (lời dạng text, không có file để thay) · 404 `MATERIAL_NOT_FOUND` · 413 `MATERIAL_FILE_TOO_LARGE` · 422 `MIDI_INVALID_FILE`, `MIDI_FORMAT_UNSUPPORTED`, `MIDI_NO_PLAYABLE_NOTES`, `MIDI_LIMIT_EXCEEDED` · 502 `EXTERNAL_STORAGE_FAILED` |
 | DELETE | `/api/music-materials/{id}` | — | 204 | 404 `MATERIAL_NOT_FOUND` |
 
 - `materialType`: `SheetMusic` | `Lyrics` | `SampleAudio` | `RehearsalMaterial` (gửi tên hoặc số).
@@ -1193,7 +1213,7 @@ Tư liệu của bài hát: bản nhạc, lời, audio mẫu, tài liệu tập 
   |---|---|
   | `SheetMusic` | `.pdf`, `.png`, `.jpg` |
   | `Lyrics` | `.docx` — hoặc không gửi file mà gửi `lyricsText` (≤ 20 000 ký tự) |
-  | `SampleAudio` | `.mp3`, `.m4a`, `.wav`, `.mid`, `.midi` (MIDI trình duyệt không phát trực tiếp — FE cho tải về) |
+  | `SampleAudio` | `.mp3`, `.m4a`, `.wav`, `.mid`, `.midi` (MIDI trình duyệt không phát trực tiếp — phát qua `GET {id}/playback`, xem bên dưới) |
   | `RehearsalMaterial` | cả hai nhóm trên |
 
   Server chỉ xét đuôi file và dung lượng thật, bỏ qua `Content-Type` client gửi.
@@ -1206,9 +1226,29 @@ Tư liệu của bài hát: bản nhạc, lời, audio mẫu, tài liệu tập 
   Đừng lưu link này lại.
 - Danh sách sắp theo `materialType` rồi `title`.
 - `PUT` chỉ sửa `title` và `targetSkillId` (gửi `null` để bỏ gắn bè); `id`, file và `materialType` giữ nguyên,
-  nên tiến độ học của ca viên không mất. Muốn thay file hoặc đổi loại: xoá rồi upload lại.
+  nên tiến độ học của ca viên không mất. Muốn thay file: `PUT {id}/file`; đổi loại: xoá rồi upload lại.
 - `502 EXTERNAL_STORAGE_FAILED`: Cloudinary lỗi hoặc không phản hồi, không có gì được lưu; thử lại sau.
 - `DELETE` là xoá mềm, không khôi phục: tư liệu biến khỏi danh sách, file vẫn giữ trên storage.
+
+**Phát MIDI — `GET {id}/playback`.**
+
+- Upload hoặc thay file `.mid` / `.midi` (`SampleAudio` hoặc `RehearsalMaterial`) thì server render luôn trong request:
+  một file WAV và `notes.json` (schema v1: `durationSeconds`, `notesEndSeconds`, `minPitch`, `maxPitch`, `tracks[]`,
+  `notes[]` gồm `pitch`, `start`, `duration`, `velocity`, `track` — đơn vị giây) **chung một trục thời gian**, nên
+  piano roll khớp với audio. Bỏ kênh bộ gõ (kênh 10); mọi kênh khác chơi bằng `instrument`:
+  `Piano` | `Organ` | `Guitar` | `StringEnsemble`.
+- File MIDI hỏng, không đọc được hoặc vượt giới hạn (dài quá 10 phút, quá 100 000 nốt) → 422, không có gì được lưu.
+- `audioUrl`, `notesUrl` là link có hạn như `fileUrl`; hết hạn thì gọi lại endpoint (không render lại).
+  `status` hiện luôn là `Ready`.
+- Tư liệu không phải MIDI, hoặc MIDI tải lên trước khi có tính năng này → 409 `MATERIAL_PLAYBACK_UNAVAILABLE`;
+  thay lại file (`PUT {id}/file`) để render. Thay MIDI bằng file không phải MIDI thì bản phát cũ bị xoá.
+
+**Trích lời từ bản nhạc — `POST {id}/extract-lyrics`.**
+
+- Chỉ áp cho tư liệu `SheetMusic` có file (`.pdf`, `.png`, `.jpg`); loại khác → 400 `MATERIAL_NOT_SHEET_MUSIC`.
+- AI (Gemini) đọc lời in trên bản nhạc và trả bản nháp, **không lưu gì**. Ca trưởng sửa rồi lưu thành tư liệu
+  `Lyrics` qua `POST /api/music-materials` với `lyricsText`. Bản nhạc không có lời → `lyricsText` là chuỗi rỗng.
+- AI lỗi hoặc không phản hồi → 502 `EXTERNAL_AI_FAILED`; thử lại sau.
 
 **`/mine` — tìm và lọc (UC-07E).** Mọi tham số tuỳ chọn, kết hợp theo AND:
 
