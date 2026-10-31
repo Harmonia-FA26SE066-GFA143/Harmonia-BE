@@ -11,6 +11,37 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
   huống trước đây chưa có. FE bỏ qua trường lạ, hiển thị câu chung cho mã lạ.
 - Mỗi PR đổi hợp đồng thêm một dòng vào mục ngày tương ứng ở đây, cùng PR cập nhật `api.md` / `error-codes.md`.
 
+## 2026-10-29 / 30
+
+Tư liệu bài hát: lời dạng `.docx` hoặc gõ thẳng, phát MIDI, AI đọc lời từ bản nhạc, tìm bài theo lời. Cần migration
+`AddMusicMaterialLyricsText`, `AddMusicMaterialPlayback` trước khi deploy, và key `Gemini__*` (đã có từ gợi ý phân công).
+
+### [Phá vỡ] Tư liệu bài hát
+
+- `Lyrics` chỉ nhận file `.docx` **hoặc** lời gõ thẳng `lyricsText` (≤ 20 000 ký tự), đúng một trong hai — sai →
+  400 `MATERIAL_LYRICS_SOURCE_INVALID` (mã mới). **Bỏ** `.pdf`, `.png`, `.jpg` cho `Lyrics` (trước đây nhận): gửi các đuôi
+  này → 400 `MATERIAL_FILE_TYPE_NOT_ALLOWED`. Lời cũ dạng `.pdf` / `.png` / `.jpg` vẫn xem được; thay file thì phải `.docx`.
+- `MusicMaterialDto.fileName` và `fileUrl` **có thể `null`** (lời gõ thẳng, không có file). Client đang coi hai trường
+  này luôn có giá trị phải đổi. Thêm trường `lyricsText` (null với tư liệu có file).
+- `PUT api/music-materials/{id}` nhận thêm `lyricsText`: **bắt buộc** với lời gõ thẳng, **phải bỏ trống** với tư liệu có
+  file (sai → 400 `MATERIAL_LYRICS_SOURCE_INVALID`). Client không gửi trường này vẫn chạy với tư liệu có file.
+- `PUT api/music-materials/{id}/file` với lời gõ thẳng → 400 `MATERIAL_LYRICS_SOURCE_INVALID` (không có file để thay).
+
+### Không phá vỡ
+
+- `SampleAudio` và `RehearsalMaterial` nhận thêm `.mid`, `.midi`. Upload / thay file MIDI nhận `instrument?`
+  (`Piano` | `Organ` | `Guitar` | `StringEnsemble`, mặc định `Piano`); server render WAV + `notes.json` ngay trong request.
+  File MIDI không render được → 422 `MIDI_INVALID_FILE`, `MIDI_FORMAT_UNSUPPORTED`, `MIDI_NO_PLAYABLE_NOTES`,
+  `MIDI_LIMIT_EXCEEDED` (mã mới; quá 10 phút hoặc 100 000 nốt). Trình duyệt không phát MIDI trực tiếp.
+- Endpoint mới:
+  - `GET api/music-materials/{id}/playback` — `PlaybackDto` (`audioUrl`, `notesUrl` có hạn, `durationSeconds`,
+    `instrument`). Không phải MIDI, hoặc MIDI tải lên trước tính năng này → 409 `MATERIAL_PLAYBACK_UNAVAILABLE` (mã mới).
+  - `POST api/music-materials/{id}/extract-lyrics` · chỉ `ChoirDirector` — AI đọc lời từ bản nhạc, trả `{ lyricsText }`
+    bản nháp, **không lưu**; lưu bằng upload `Lyrics` với `lyricsText`. Không phải `SheetMusic` → 400
+    `MATERIAL_NOT_SHEET_MUSIC` (mã mới); AI lỗi → 502 `EXTERNAL_AI_FAILED`.
+- `GET api/songs?keyword=` tìm thêm trong lời gõ thẳng (`lyricsText`) của tư liệu `Lyrics` đang hoạt động, không phân
+  biệt dấu.
+
 ## 2026-10-27
 
 ### Phân công phục vụ: chặn trùng giờ (Web tbd-backlog B40)
