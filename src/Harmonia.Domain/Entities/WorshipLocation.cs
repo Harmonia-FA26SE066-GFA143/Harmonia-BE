@@ -13,4 +13,6 @@ public class WorshipLocation : BaseEntity
     public ICollection<LiturgicalEvent> LiturgicalEvents { get; set; } = [];
 
     public ICollection<Rehearsal> Rehearsals { get; set; } = [];
+
+    public ICollection<MassSchedule> MassSchedules { get; set; } = [];
 }

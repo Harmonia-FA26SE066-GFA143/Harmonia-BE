@@ -1,0 +1,55 @@
+using Harmonia.Application.Common.Models;
+using Harmonia.Application.DTOs;
+using Harmonia.Domain.Entities;
+using Harmonia.Domain.Enums;
+
+namespace Harmonia.Application.Interfaces.IRepositories;
+
+public interface IPracticeAssignmentRepository : IGenericRepository<PracticeAssignment>
+{
+    /// <summary>
+    /// Read-only page of the assignments the member currently receives: scope All, a target naming the member,
+    /// or a target skill the member holds approved today, and for an assignment of a choir only while the member is
+    /// active in it (D8). Ordered by due date, earliest first.
+    /// <see cref="PracticeAssignment.Song"/>, <see cref="PracticeAssignment.Material"/> and
+    /// <see cref="PracticeAssignment.LiturgicalEvent"/> are loaded; <see cref="PracticeAssignment.Submissions"/>
+    /// holds only the member's newest submission, if any.
+    /// </summary>
+    Task<PagedList<PracticeAssignment>> GetForMemberAsync(
+        Guid memberId, SearchMyPracticeAssignmentsRequest filter, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Read-only page of every assignment (or those of one event), latest due date first, with Targets loaded.
+    /// When <paramref name="choirIds"/> is set, only assignments of those choirs or of no choir.
+    /// </summary>
+    Task<PagedList<PracticeAssignment>> SearchAsync(
+        SearchPracticeAssignmentsRequest filter, IReadOnlyCollection<Guid>? choirIds, CancellationToken cancellationToken);
+
+    /// <summary>Due date and the member's newest attempt status of every assignment the member receives.</summary>
+    Task<List<(DateTime DueDate, SubmissionStatus? LatestStatus)>> GetProgressForMemberAsync(
+        Guid memberId, CancellationToken cancellationToken);
+
+    /// <summary>Same scope and loading as <see cref="GetForMemberAsync"/>; null when the member does not receive it.</summary>
+    Task<PracticeAssignment?> GetByIdForMemberAsync(Guid id, Guid memberId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Read-only assignments of the event, with <see cref="PracticeAssignment.Targets"/> and every member's
+    /// <see cref="PracticeAssignment.Submissions"/> loaded.
+    /// </summary>
+    Task<List<PracticeAssignment>> GetByEventWithSubmissionsAsync(Guid eventId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Read-only assignments of the given events that the member receives (same scope as <see cref="GetForMemberAsync"/>).
+    /// <see cref="PracticeAssignment.Submissions"/> holds only the member's newest submission, if any.
+    /// </summary>
+    Task<List<PracticeAssignment>> GetForMemberByEventsAsync(
+        Guid memberId, IReadOnlyCollection<Guid> eventIds, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Read-only assignments due inside the date range of <paramref name="filter"/> and, when an event or a
+    /// season is set, attached to that event or to an event of that season. <see cref="PracticeAssignment.Targets"/> is loaded;
+    /// <see cref="PracticeAssignment.Submissions"/> holds only those of <paramref name="memberIds"/>.
+    /// </summary>
+    Task<List<PracticeAssignment>> GetForReportAsync(
+        SearchReportsRequest filter, IReadOnlyCollection<Guid> memberIds, CancellationToken cancellationToken);
+}

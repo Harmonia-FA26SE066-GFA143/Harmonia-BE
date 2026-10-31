@@ -17,6 +17,12 @@ public class ServiceRoster : BaseAuditableEntity
 
     public Guid? FinalizedBy { get; set; }
 
+    /// <summary>
+    /// Set when the whole-service lines (organist, conductor) are locked ahead of the song list, so those members can
+    /// be told early; song lines stay open until the roster itself is finalized.
+    /// </summary>
+    public DateTime? WholeServiceFinalizedAt { get; set; }
+
     public LiturgicalEvent LiturgicalEvent { get; set; } = null!;
 
     public User? Generator { get; set; }
@@ -24,6 +30,4 @@ public class ServiceRoster : BaseAuditableEntity
     public User? Finalizer { get; set; }
 
     public ICollection<RosterAssignment> Assignments { get; set; } = [];
-
-    public ICollection<RosterShortage> Shortages { get; set; } = [];
 }

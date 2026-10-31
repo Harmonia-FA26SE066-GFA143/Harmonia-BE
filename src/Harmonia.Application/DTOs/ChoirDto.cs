@@ -1,0 +1,16 @@
+namespace Harmonia.Application.DTOs;
+
+public class ChoirDto
+{
+    public Guid Id { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    public string? Description { get; set; }
+
+    public bool IsActive { get; set; }
+
+    public Guid? DirectorId { get; set; }
+
+    public string? DirectorFullName { get; set; }
+}

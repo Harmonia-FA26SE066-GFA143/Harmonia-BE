@@ -1,11 +1,18 @@
 using System.Reflection;
 using Harmonia.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Harmonia.Infrastructure.Data;
 
 public class HarmoniaDbContext(DbContextOptions<HarmoniaDbContext> options) : DbContext(options)
 {
+    /// <summary>
+    /// Collation keyword searches compare under: ignores case and Vietnamese diacritics ("con buoc" finds
+    /// "Con Bước", "duc" finds "Đức"). Vietnamese_100_CI_AI does not: it keeps ư, ơ, đ as letters of their own.
+    /// </summary>
+    public const string SearchCollation = "Latin1_General_100_CI_AI";
+
     public DbSet<User> Users => Set<User>();
 
     public DbSet<Role> Roles => Set<Role>();
@@ -14,19 +21,31 @@ public class HarmoniaDbContext(DbContextOptions<HarmoniaDbContext> options) : Db
 
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+
     public DbSet<SkillCategory> SkillCategories => Set<SkillCategory>();
 
     public DbSet<Skill> Skills => Set<Skill>();
 
     public DbSet<MemberSkill> MemberSkills => Set<MemberSkill>();
 
-    public DbSet<LiturgicalWeek> LiturgicalWeeks => Set<LiturgicalWeek>();
+    public DbSet<Choir> Choirs => Set<Choir>();
+
+    public DbSet<ChoirMembership> ChoirMemberships => Set<ChoirMembership>();
+
+    public DbSet<LiturgicalEventChoir> LiturgicalEventChoirs => Set<LiturgicalEventChoir>();
+
+    public DbSet<LiturgicalDay> LiturgicalDays => Set<LiturgicalDay>();
+
+    public DbSet<LiturgicalNameTranslation> LiturgicalNameTranslations => Set<LiturgicalNameTranslation>();
 
     public DbSet<LiturgicalEvent> LiturgicalEvents => Set<LiturgicalEvent>();
 
     public DbSet<LiturgicalSeason> LiturgicalSeasons => Set<LiturgicalSeason>();
 
     public DbSet<MassType> MassTypes => Set<MassType>();
+
+    public DbSet<MassSchedule> MassSchedules => Set<MassSchedule>();
 
     public DbSet<CeremonyType> CeremonyTypes => Set<CeremonyType>();
 
@@ -60,19 +79,25 @@ public class HarmoniaDbContext(DbContextOptions<HarmoniaDbContext> options) : Db
 
     public DbSet<SongPersonnelRequirement> SongPersonnelRequirements => Set<SongPersonnelRequirement>();
 
+    public DbSet<EventPersonnelRequirement> EventPersonnelRequirements => Set<EventPersonnelRequirement>();
+
+    public DbSet<LiturgicalSlotRequirement> LiturgicalSlotRequirements => Set<LiturgicalSlotRequirement>();
+
     public DbSet<ServiceRoster> ServiceRosters => Set<ServiceRoster>();
 
     public DbSet<RosterAssignment> RosterAssignments => Set<RosterAssignment>();
-
-    public DbSet<RosterShortage> RosterShortages => Set<RosterShortage>();
 
     public DbSet<Rehearsal> Rehearsals => Set<Rehearsal>();
 
     public DbSet<RehearsalAttendance> RehearsalAttendances => Set<RehearsalAttendance>();
 
+    public DbSet<RehearsalSong> RehearsalSongs => Set<RehearsalSong>();
+
     public DbSet<PracticeAssignment> PracticeAssignments => Set<PracticeAssignment>();
 
     public DbSet<PracticeAssignmentTarget> PracticeAssignmentTargets => Set<PracticeAssignmentTarget>();
+
+    public DbSet<PracticeAssignmentMaterial> PracticeAssignmentMaterials => Set<PracticeAssignmentMaterial>();
 
     public DbSet<PracticeSubmission> PracticeSubmissions => Set<PracticeSubmission>();
 
@@ -93,6 +118,27 @@ public class HarmoniaDbContext(DbContextOptions<HarmoniaDbContext> options) : Db
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
+        ApplyUtcDateTimeConverter(modelBuilder);
         base.OnModelCreating(modelBuilder);
+    }
+
+    /// <summary>
+    /// Every DateTime is stored in UTC. The database keeps no time zone, so values read back are marked
+    /// as UTC; otherwise they would serialize without "Z" and clients could not tell what they mean.
+    /// </summary>
+    private static void ApplyUtcDateTimeConverter(ModelBuilder modelBuilder)
+    {
+        var converter = new ValueConverter<DateTime, DateTime>(
+            v => v.Kind == DateTimeKind.Local ? v.ToUniversalTime() : v,
+            v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+        var properties = modelBuilder.Model.GetEntityTypes()
+            .SelectMany(t => t.GetProperties())
+            .Where(p => p.ClrType == typeof(DateTime) || p.ClrType == typeof(DateTime?));
+
+        foreach (var property in properties)
+        {
+            property.SetValueConverter(converter);
+        }
     }
 }

@@ -11,17 +11,24 @@ namespace Harmonia.Infrastructure.ExternalServices;
 
 public class JwtTokenService(IOptions<JwtOptions> options) : IJwtTokenService
 {
+    /// <summary>Present ("true") only while the user still has the password the Admin emailed.</summary>
+    public const string PasswordChangeRequiredClaim = "pwd_change_required";
+
     private readonly JwtOptions _options = options.Value;
 
     public (string Token, DateTime ExpiresAt) GenerateAccessToken(User user)
     {
         var expiresAt = DateTime.UtcNow.AddMinutes(_options.ExpiryMinutes);
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Role, user.Role.Name),
+            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new(ClaimTypes.Role, user.Role.Name),
         };
+        if (user.IsPasswordChangeRequired)
+        {
+            claims.Add(new Claim(PasswordChangeRequiredClaim, "true"));
+        }
 
         var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.Key));
         var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
