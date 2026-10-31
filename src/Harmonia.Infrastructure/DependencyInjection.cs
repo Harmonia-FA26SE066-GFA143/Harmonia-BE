@@ -111,8 +111,9 @@ public static class DependencyInjection
         services.AddHttpClient<ILyricsExtractor, GeminiLyricsExtractor>(client =>
         {
             client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
-            // Per request: a 20 MB download or upload, or the model reading a multi-page PDF.
-            client.Timeout = TimeSpan.FromSeconds(60);
+            // Per request: a 20 MB download or upload, or the model reading a multi-page PDF. A thinking model
+            // took over 60 s on Azure; stays under the ~230 s App Service request limit.
+            client.Timeout = TimeSpan.FromSeconds(180);
         });
         services.AddHttpClient<ILiturgicalCalendarClient, LiturgicalCalendarApiClient>(client =>
         {

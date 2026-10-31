@@ -78,7 +78,10 @@ public class GeminiLyricsExtractor(
             using var response = await httpClient.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
-                logger.LogWarning("Gemini lyrics extraction failed with status {StatusCode}", (int)response.StatusCode);
+                // Gemini's error body names the cause (retired model, quota); it never echoes the API key.
+                var error = await response.Content.ReadAsStringAsync(cancellationToken);
+                logger.LogWarning("Gemini lyrics extraction failed with status {StatusCode}: {Error}",
+                    (int)response.StatusCode, error.Length > 500 ? error[..500] : error);
                 return Result<string>.Failure(ErrorCodes.ExternalAiFailed);
             }
 
