@@ -19,6 +19,7 @@ public class LiturgicalEventService(
     INotificationService notificationService,
     ILookupService lookupService,
     IChoirScopeService choirScope,
+    ISystemSettingService systemSettingService,
     IMapper mapper) : ILiturgicalEventService
 {
     public async Task<Result<PagedList<LiturgicalEventListItemDto>>> SearchAsync(
@@ -26,9 +27,13 @@ public class LiturgicalEventService(
     {
         var choirIds = await choirScope.GetDirectedChoirIdsAsync(cancellationToken);
         var page = await liturgicalEventRepository.SearchAsync(request, includeDrafts, choirIds, cancellationToken);
+        var leadDays = await systemSettingService.GetIntAsync(SystemSettingKeys.SongListLeadDays, cancellationToken);
+
+        var items = mapper.Map<List<LiturgicalEventListItemDto>>(page.Items);
+        foreach (var item in items) item.SongListDueDate = item.EventDate.AddDays(-leadDays);
 
         return Result<PagedList<LiturgicalEventListItemDto>>.Success(new PagedList<LiturgicalEventListItemDto>(
-            mapper.Map<List<LiturgicalEventListItemDto>>(page.Items), page.PageNumber, page.PageSize, page.TotalCount));
+            items, page.PageNumber, page.PageSize, page.TotalCount));
     }
 
     public async Task<Result<LiturgicalEventDto>> GetByIdAsync(Guid id, CancellationToken cancellationToken)

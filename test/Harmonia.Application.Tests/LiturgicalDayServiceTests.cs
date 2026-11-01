@@ -111,15 +111,15 @@ public class LiturgicalDayServiceTests
         };
         _cached.Add(cachedRow);
         CalendarReturns(
-            new CalendarDayResult(cachedDate, "Christmas", "Solemnity", "Christmas"),
+            new CalendarDayResult(cachedDate, "Christmas", "Solemnity", "Christmas", "white"),
             new CalendarDayResult(newDate, "Saint Stephen, The First Martyr", "Feast", "Christmas"));
 
         var result = await _sut.SyncAsync(new SyncLiturgicalDaysRequest { Year = 2026 }, _ct);
 
         Assert.Equal(2, result.Value);
         Assert.Equal(
-            ("Christmas", "Solemnity", "Christmas"),
-            (cachedRow.CelebrationName, cachedRow.Rank, cachedRow.SeasonName));
+            ("Christmas", "Solemnity", "Christmas", "white"),
+            (cachedRow.CelebrationName, cachedRow.Rank, cachedRow.SeasonName, cachedRow.Color));
         Assert.True(cachedRow.FetchedAt > new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
         var added = Assert.Single(_added);
         Assert.NotEqual(Guid.Empty, added.Id);

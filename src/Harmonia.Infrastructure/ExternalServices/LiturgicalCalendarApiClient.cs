@@ -70,7 +70,9 @@ public class LiturgicalCalendarApiClient(
             date,
             name.Length <= MaxCelebrationNameLength ? name : name[..MaxCelebrationNameLength],
             ToRank(calendarEvent.Grade),
-            ToSeason(calendarEvent.LiturgicalSeason));
+            ToSeason(calendarEvent.LiturgicalSeason),
+            // A day may list two colours (rose, purple on Gaudete); the first is the one of the day.
+            calendarEvent.Color?.FirstOrDefault()?.Trim().ToLowerInvariant());
     }
 
     // Grades: 7 precedence over solemnities, 6 solemnity, 5 feast of the Lord, 4 feast, 3 memorial,
@@ -98,5 +100,5 @@ public class LiturgicalCalendarApiClient(
     private sealed record CalendarResponse(List<CalendarEvent>? Litcal);
 
     private sealed record CalendarEvent(
-        string? Name, DateTimeOffset Date, int Grade, string? LiturgicalSeason, bool? IsVigilMass);
+        string? Name, DateTimeOffset Date, int Grade, string? LiturgicalSeason, bool? IsVigilMass, List<string>? Color);
 }

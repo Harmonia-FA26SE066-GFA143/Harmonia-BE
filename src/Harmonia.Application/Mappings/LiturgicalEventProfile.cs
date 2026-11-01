@@ -39,6 +39,8 @@ public class LiturgicalEventProfile : Profile
             .ForMember(dest => dest.MassTypeName, opt => opt.MapFrom(src => src.MassType!.Name))
             .ForMember(dest => dest.CeremonyTypeName, opt => opt.MapFrom(src => src.CeremonyType!.Name))
             .ForMember(dest => dest.LatestSongListStatus, opt => opt.MapFrom(src => src.SongLists
-                .OrderByDescending(s => s.Version).Select(s => (SongListStatus?)s.Status).FirstOrDefault()));
+                .OrderByDescending(s => s.Version).Select(s => (SongListStatus?)s.Status).FirstOrDefault()))
+            // The service sets it from a system setting.
+            .ForMember(dest => dest.SongListDueDate, opt => opt.Ignore());
     }
 }

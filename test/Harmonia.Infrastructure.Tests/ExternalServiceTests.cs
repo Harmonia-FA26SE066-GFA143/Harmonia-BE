@@ -165,9 +165,10 @@ public class ExternalServiceTests
               {"name":"Saint Sylvester I, Pope","date":"2025-12-31T00:00:00+00:00","grade":2,"liturgical_season":"CHRISTMAS"},
               {"name":"Thursday of the 4th Week of Advent","date":"2026-12-24T00:00:00+00:00","grade":0,"liturgical_season":"ADVENT"},
               {"name":"Christmas Vigil Mass","date":"2026-12-24T00:00:00+00:00","grade":7,"liturgical_season":"CHRISTMAS","is_vigil_mass":true},
-              {"name":"Christmas","date":"2026-12-25T00:00:00+00:00","grade":7,"liturgical_season":"CHRISTMAS"},
+              {"name":"Christmas","date":"2026-12-25T00:00:00+00:00","grade":7,"liturgical_season":"CHRISTMAS","color":["white"]},
               {"name":"Saint Stephen, The First Martyr","date":"2026-12-26T00:00:00+00:00","grade":4,"liturgical_season":"CHRISTMAS"},
-              {"name":"Good Friday","date":"2026-04-03T00:00:00+00:00","grade":7,"liturgical_season":"EASTER_TRIDUUM"},
+              {"name":"Good Friday","date":"2026-04-03T00:00:00+00:00","grade":7,"liturgical_season":"EASTER_TRIDUUM","color":["red"]},
+              {"name":"Third Sunday of Advent (Gaudete)","date":"2026-12-13T00:00:00+00:00","grade":7,"liturgical_season":"ADVENT","color":["rose","purple"]},
               {"name":"Saint Ignatius of Antioch","date":"2026-10-17T00:00:00+00:00","grade":3,"liturgical_season":"ORDINARY_TIME"},
               {"name":"29th Sunday of Ordinary Time Vigil Mass","date":"2026-10-17T00:00:00+00:00","grade":5,"liturgical_season":"ORDINARY_TIME","is_vigil_mass":true}
             ]}
@@ -178,13 +179,14 @@ public class ExternalServiceTests
 
         Assert.Equal(
             [
-                (new DateOnly(2026, 4, 3), "Good Friday", (string?)"Solemnity", (string?)"Lent"),
-                (new DateOnly(2026, 10, 17), "Saint Ignatius of Antioch", "Obligatory Memorial", "OrdinaryTime"),
-                (new DateOnly(2026, 12, 24), "Thursday of the 4th Week of Advent", null, "Advent"),
-                (new DateOnly(2026, 12, 25), "Christmas", "Solemnity", "Christmas"),
-                (new DateOnly(2026, 12, 26), "Saint Stephen, The First Martyr", "Feast", "Christmas"),
+                (new DateOnly(2026, 4, 3), "Good Friday", (string?)"Solemnity", (string?)"Lent", (string?)"red"),
+                (new DateOnly(2026, 10, 17), "Saint Ignatius of Antioch", "Obligatory Memorial", "OrdinaryTime", null),
+                (new DateOnly(2026, 12, 13), "Third Sunday of Advent (Gaudete)", "Solemnity", "Advent", "rose"),
+                (new DateOnly(2026, 12, 24), "Thursday of the 4th Week of Advent", null, "Advent", null),
+                (new DateOnly(2026, 12, 25), "Christmas", "Solemnity", "Christmas", "white"),
+                (new DateOnly(2026, 12, 26), "Saint Stephen, The First Martyr", "Feast", "Christmas", null),
             ],
-            result.Value!.Select(d => (d.Date, d.CelebrationName, d.Rank, d.SeasonName)));
+            result.Value!.Select(d => (d.Date, d.CelebrationName, d.Rank, d.SeasonName, d.Color)));
         var request = handler.LastRequest!.RequestUri!;
         Assert.Equal("/api/v5/calendar/2026", request.AbsolutePath);
         Assert.Contains("year_type=CIVIL", request.Query);

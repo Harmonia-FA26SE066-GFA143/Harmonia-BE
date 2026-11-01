@@ -11,6 +11,7 @@ public class LiturgicalDayConfiguration : IEntityTypeConfiguration<LiturgicalDay
         builder.Property(x => x.CelebrationName).IsRequired().HasMaxLength(200);
         builder.Property(x => x.Rank).HasMaxLength(50);
         builder.Property(x => x.SeasonName).HasMaxLength(50);
+        builder.Property(x => x.Color).HasMaxLength(20);
 
         builder.HasIndex(x => x.Date).IsUnique();
     }

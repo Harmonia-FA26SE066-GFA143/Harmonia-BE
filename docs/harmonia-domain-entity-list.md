@@ -1,6 +1,6 @@
 # Harmonia – Domain Entity List & Attributes (for ERD, Report 3/4)
 
-50 entities derived from FE-01→FE-54 (`claude/functional-requirements-by-actor.md`), the canonical use cases (`claude/use-case-list.md`) and the daily liturgical program model (D6). Diagram: `harmonia-erd.mmd`.
+51 entities derived from FE-01→FE-54 (`claude/functional-requirements-by-actor.md`), the canonical use cases (`claude/use-case-list.md`) and the daily liturgical program model (D6). Diagram: `harmonia-erd.mmd`.
 
 Conceptual/logical level: attribute names, types and constraints. No indexes, no migration syntax.
 
@@ -69,7 +69,7 @@ Written once here instead of repeated 47 times:
 ## C. Liturgical calendar
 
 **8. `LiturgicalDay`** — cached result of the external Catholic calendar API ([Liturgical Calendar API](https://litcal.johnromanodorazio.com/), General Roman Calendar) for one date (FE-15, D6)
-`date` DateOnly unique · `celebrationName` string(200) (English — the API has no Vietnamese) · `rank` string(50)? (Solemnity | Feast | Obligatory Memorial | Optional Memorial; null on a weekday) · `seasonName` string(50)? (Advent | Christmas | Lent | Easter | OrdinaryTime) · `fetchedAt` DateTime · no FK — `LiturgicalEvent` is matched by `eventDate = date`
+`date` DateOnly unique · `celebrationName` string(200) (English — the API has no Vietnamese) · `rank` string(50)? (Solemnity | Feast | Obligatory Memorial | Optional Memorial; null on a weekday) · `seasonName` string(50)? (Advent | Christmas | Lent | Easter | OrdinaryTime) · `color` string(20)? (white | red | green | purple | rose | black — first colour the API lists; null until the year is synced again) · `fetchedAt` DateTime · no FK — `LiturgicalEvent` is matched by `eventDate = date`
 
 **50. `LiturgicalNameTranslation`** — Vietnamese wording of an English calendar name, kept by the Admin (2026-10-25) ***auditable***
 `kind` LiturgicalNameKind · `englishName` string(200) · `vietnameseName` string(200) · unique `(kind, englishName)` · no FK — matched by text against `LiturgicalDay`. Weekdays and numbered Sundays are worded by code (`LiturgicalNamePatterns`) and need no row.
@@ -161,6 +161,10 @@ Written once here instead of repeated 47 times:
 **44. `RehearsalSong`** — one song on the programme of a rehearsal
 `rehearsalId` Guid → Rehearsal · `songId` Guid → Song · `displayOrder` int · `note` string(500)? · unique `(rehearsalId, songId)`
 Not a `SongList`: no version, no review, no liturgical slot. The director edits it freely.
+
+**51. `RehearsalRecording`** — a take the director records in the rehearsal practice room (Web B43, 2026-11-01) ***auditable***
+`rehearsalId` Guid → Rehearsal (cascade) · `songId` Guid? → Song (restrict; null = whole session) · `title` string(200)? · `audioPublicId` string(255) (private storage) · `fileName` string(255) · `fileSizeBytes` long · `durationSeconds` int? · index `(rehearsalId, createdAt)`
+Not a `PracticeSubmission`: recorded by the director, not graded. Members of the rehearsal's choir can listen to it.
 
 **33. `PracticeAssignment`** — practice task from the director (FE-41) ***auditable***
 `eventId` Guid? → LiturgicalEvent · `songId` Guid? → Song · `materialId` Guid? → MusicMaterial (first of the attached materials, kept for older clients) · `title` string(200) · `instruction` string(1000)? · `scope` AssignmentScope · `dueDate` DateTime · `choirId` Guid? → Choir (D7)
@@ -327,6 +331,8 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 - 2026-10-17: `LiturgicalDay` is filled from the Liturgical Calendar API instead of an uploaded GCatholic.org `.ics` file. The priest syncs one civil year and that year's cached days are overwritten; names are English, Epiphany / Ascension / Corpus Christi are moved to Sunday as in Vietnam. No column change, no migration.
 - 2026-10-20: `MassSchedule` added (47 → 48) — the parish's fixed weekly Mass times; `POST api/liturgical-events/generation` creates Draft events from them. Publishing an event now requires a season and active catalogs. Needs a migration.
 - 2026-10-25: `PracticeAssignmentMaterial` added (48 → 49) — several materials per practice assignment; `PracticeAssignment.materialId` stays as the first one for older clients, and DataSeeder copies it into the new table. `LiturgicalNameTranslation` added (49 → 50) with enum `LiturgicalNameKind` — Vietnamese calendar names kept by the Admin, seeded once from the Web's table. Enum `ReportPeriod` for the activity trend report (22 → 24). Needs a migration.
+- 2026-11-01: `RehearsalRecording` added (50 → 51) — the director's takes from the practice room, heard by the choir's members. Needs a migration.
+- 2026-11-01: `LiturgicalDay` gains `color` string(20)? — the liturgical colour the calendar API lists for the day (Web B45). Needs a migration; cached years are filled on the next sync.
 
 **Bổ sung 2026-10-26 — phân công 3 tầng**
 

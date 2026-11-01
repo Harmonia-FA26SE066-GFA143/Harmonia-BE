@@ -259,6 +259,10 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 | `REHEARSAL_ATTENDANCE_MEMBER_DUPLICATE` | 400 | Một ca viên xuất hiện nhiều lần trong danh sách điểm danh |
 | `REHEARSAL_SONG_DUPLICATE` | 400 | Một bài hát xuất hiện nhiều lần trong danh sách bài của buổi tập |
 | `REHEARSAL_HAS_ATTENDANCE` | 409 | Buổi tập đã có điểm danh, không thể xoá |
+| `REHEARSAL_RECORDING_NOT_FOUND` | 404 | Không tìm thấy bản thu buổi tập |
+| `REHEARSAL_RECORDING_REQUIRED` | 400 | Vui lòng chọn tệp ghi âm |
+| `REHEARSAL_RECORDING_TYPE_NOT_ALLOWED` | 400 | Định dạng ghi âm không được hỗ trợ (chỉ nhận .webm, .ogg, .m4a, .mp3, .wav) |
+| `REHEARSAL_RECORDING_TOO_LARGE` | 413 | Tệp ghi âm vượt quá 20 MB |
 
 ## 11. Bài tập & bản thu
 

@@ -173,9 +173,10 @@ public class SongListServiceTests
 
         var result = await _sut.GetVersionsForEventAsync(_eventId, includeDraft, _ct);
 
-        Assert.Equal([newer.Id, older.Id], result.Value!.Select(v => v.Id));
-        Assert.Equal([1, 2], result.Value[0].Items.Select(i => i.DisplayOrder));
-        Assert.Equal([new DateTime(2026, 10, 1), new DateTime(2026, 10, 2)], result.Value[0].Reviews.Select(r => r.ReviewedAt));
+        var versions = result.Value!;
+        Assert.Equal([newer.Id, older.Id], versions.Select(v => v.Id));
+        Assert.Equal([1, 2], versions[0].Items.Select(i => i.DisplayOrder));
+        Assert.Equal([new DateTime(2026, 10, 1), new DateTime(2026, 10, 2)], versions[0].Reviews.Select(r => r.ReviewedAt));
     }
 
     [Fact]

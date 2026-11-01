@@ -13,7 +13,7 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
 
 ## 2026-11-01
 
-Gỡ bớt việc FE tự tính (Web backlog B39, B41). Không cần migration.
+Gỡ bớt việc FE tự tính (Web backlog B39, B41, B43, B44, B45). Cần migration `AddLiturgicalDayColor` (B45) và `AddRehearsalRecording` (B43).
 
 ### [Phá vỡ] Thiếu người
 
@@ -28,6 +28,13 @@ Gỡ bớt việc FE tự tính (Web backlog B39, B41). Không cần migration.
 - Thêm `GET api/song-lists/event/{eventId}/versions` (`ChoirDirector`, `ParishPriest`): mọi phiên bản kèm `items` và
   `reviews`, mới nhất trước; cha xứ không thấy `Draft`.
 - `SongListDto.items` sắp theo `displayOrder`, `reviews` theo `reviewedAt` tăng dần.
+- **B45** `LiturgicalDayDto` thêm `color` (màu phụng vụ: `white` | `red` | `green` | `purple` | `rose` | `black`). Cần
+  migration `AddLiturgicalDayColor`; ngày đã cache có `color = null` tới khi cha xứ đồng bộ lại năm đó.
+- **B43** Bản thu buổi tập: `GET` / `POST api/rehearsals/{id}/recordings`, `DELETE …/recordings/{recordingId}`. Ca trưởng
+  ghi và xoá; ca viên của ca đoàn buổi tập nghe được. Nhận `.webm`, `.ogg`, `.m4a`, `.mp3`, `.wav` ≤ 20 MB. Mã mới
+  `REHEARSAL_RECORDING_NOT_FOUND`, `_REQUIRED`, `_TYPE_NOT_ALLOWED`, `_TOO_LARGE`. Cần migration `AddRehearsalRecording`.
+- **B44** `LiturgicalEventListItemDto` (`GET api/liturgical-events`) thêm `songListDueDate` = ngày lễ − setting mới
+  `SongList.LeadDays` (mặc định 7, Admin sửa ở trang cấu hình). Chỉ để nhắc, gửi trễ vẫn được.
 
 ## 2026-10-29 / 30
 

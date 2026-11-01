@@ -26,6 +26,7 @@
 | buổi tập | `Rehearsal` |
 | điểm danh | `RehearsalAttendance` |
 | bài hát của buổi tập | `RehearsalSong` — KHÔNG phải `SongList` (không phiên bản, không duyệt) |
+| bản thu buổi tập (ca trưởng ghi ở phòng tập) | `RehearsalRecording` — KHÔNG phải `PracticeSubmission` (bản thu ca viên nộp bài) |
 | bài tập về nhà | `PracticeAssignment` |
 | bản thu nộp | `PracticeSubmission` |
 | nhận xét của ca trưởng | `PracticeFeedback` |
@@ -37,7 +38,7 @@
 `LiturgicalEvent` là entity trung tâm — lịch tập, danh sách bài hát, phân công phục vụ
 và xác nhận tham gia đều móc vào nó. Ba hub còn lại: `MemberProfile`, `Song`, `Skill`.
 
-Nguồn chuẩn đầy đủ 50 entity + 24 enum: `docs/harmonia-domain-entity-list.md`.
+Nguồn chuẩn đầy đủ 51 entity + 24 enum: `docs/harmonia-domain-entity-list.md`.
 Bảng trên chỉ là lối vào nhanh. Gặp thuật ngữ chưa có ở cả hai chỗ: hỏi, đừng tự dịch.
 
 ## Quy ước tên khác

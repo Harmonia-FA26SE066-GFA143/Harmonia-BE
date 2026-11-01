@@ -14,5 +14,8 @@ public class LiturgicalDay : BaseEntity
 
     public string? SeasonName { get; set; }
 
+    // white, red, green, purple, rose or black, as the calendar returns it; null until the year is synced again.
+    public string? Color { get; set; }
+
     public DateTime FetchedAt { get; set; }
 }

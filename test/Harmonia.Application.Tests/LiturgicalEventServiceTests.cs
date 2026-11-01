@@ -19,6 +19,7 @@ public class LiturgicalEventServiceTests
     private readonly IUserRepository _users = Substitute.For<IUserRepository>();
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
     private readonly ILookupService _lookups = Substitute.For<ILookupService>();
+    private readonly ISystemSettingService _settings = Substitute.For<ISystemSettingService>();
     private readonly LiturgicalEventService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
 
@@ -37,10 +38,22 @@ public class LiturgicalEventServiceTests
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<LiturgicalEventProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new LiturgicalEventService(_repository, _users, _notifications, _lookups, ChoirScopeFakes.Unrestricted(), mapper);
+        _sut = new LiturgicalEventService(_repository, _users, _notifications, _lookups, ChoirScopeFakes.Unrestricted(), _settings, mapper);
         _lookups.CheckEventCatalogsAsync(default, default, default, default, default, default, default, default)
             .ReturnsForAnyArgs(Result.Success());
         _repository.GetWithLocationAsync(_event.Id, _ct).Returns(_event);
+    }
+
+    [Fact]
+    public async Task Search_SetsSongListDueDateFromLeadDaysSetting_Async()
+    {
+        _settings.GetIntAsync(SystemSettingKeys.SongListLeadDays, _ct).Returns(7);
+        _repository.SearchAsync(Arg.Any<SearchLiturgicalEventsRequest>(), true, null, _ct)
+            .Returns(new PagedList<LiturgicalEvent>([_event], 1, 20, 1));
+
+        var result = await _sut.SearchAsync(new SearchLiturgicalEventsRequest(), includeDrafts: true, _ct);
+
+        Assert.Equal(_event.EventDate.AddDays(-7), Assert.Single(result.Value!.Items).SongListDueDate);
     }
 
     private UpdateLiturgicalEventRequest UpdateRequest(Guid? locationId = null) => new()

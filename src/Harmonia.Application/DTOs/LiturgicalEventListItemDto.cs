@@ -13,4 +13,7 @@ public class LiturgicalEventListItemDto : LiturgicalEventDto
 
     /// <summary>Status of the newest song list version; null when the event has none yet.</summary>
     public SongListStatus? LatestSongListStatus { get; set; }
+
+    /// <summary>EventDate minus the SongList.LeadDays setting; a reminder for the Choir Director, not enforced.</summary>
+    public DateOnly SongListDueDate { get; set; }
 }

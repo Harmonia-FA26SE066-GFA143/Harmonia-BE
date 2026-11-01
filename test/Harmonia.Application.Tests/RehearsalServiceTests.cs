@@ -25,6 +25,8 @@ public class RehearsalServiceTests
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
     private readonly IMemberProfileRepository _members = Substitute.For<IMemberProfileRepository>();
     private readonly IChoirScopeService _scope = ChoirScopeFakes.Unrestricted();
+    private readonly IRehearsalRecordingRepository _recordings = Substitute.For<IRehearsalRecordingRepository>();
+    private readonly IFileStorageService _files = Substitute.For<IFileStorageService>();
     private readonly RehearsalService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly List<Rehearsal> _added = [];
@@ -44,7 +46,8 @@ public class RehearsalServiceTests
                 },
                 NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new RehearsalService(_rehearsals, _events, _locations, _songs, _users, _members, _scope, _notifications, mapper);
+        _sut = new RehearsalService(_rehearsals, _events, _locations, _songs, _users, _members, _scope, _notifications, _recordings, _files, mapper);
+        _recordings.GetByRehearsalAsync(default, default).ReturnsForAnyArgs([]);
 
         _events.GetByIdAsync(_event.Id, _ct).Returns(_event);
         _locations.GetByIdAsync(_hall.Id, _ct).Returns(_hall);
@@ -282,6 +285,19 @@ public class RehearsalServiceTests
 
         Assert.True((await _sut.DeleteAsync(rehearsal.Id, _ct)).IsSuccess);
         await _notifications.DidNotReceiveWithAnyArgs().SendAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task Delete_WithRecordings_DeletesTheirFiles_Async()
+    {
+        var rehearsal = Existing(DateTime.UtcNow.AddHours(-3));
+        _rehearsals.GetWithAttendancesForUpdateAsync(rehearsal.Id, _ct).Returns(rehearsal);
+        _recordings.GetByRehearsalAsync(rehearsal.Id, _ct)
+            .Returns([new RehearsalRecording { AudioPublicId = "a.webm" }, new RehearsalRecording { AudioPublicId = "b.m4a" }]);
+
+        Assert.True((await _sut.DeleteAsync(rehearsal.Id, _ct)).IsSuccess);
+        await _files.Received(1).DeleteAsync("a.webm", true, CancellationToken.None);
+        await _files.Received(1).DeleteAsync("b.m4a", true, CancellationToken.None);
     }
 
     [Fact]

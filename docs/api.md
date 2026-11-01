@@ -416,12 +416,14 @@ Chưa có kỹ năng nào → `[]`.
 
 ```json
 {
-  "date": "2026-12-25", "celebrationName": "Christmas", "rank": "Solemnity", "seasonName": "Christmas",
+  "date": "2026-12-25", "celebrationName": "Christmas", "rank": "Solemnity", "seasonName": "Christmas", "color": "white",
   "celebrationNameVi": "Chúa Giáng Sinh", "rankVi": "Lễ trọng", "seasonNameVi": "Mùa Giáng Sinh"
 }
 ```
 
 - `celebrationName`, `rank`, `seasonName` giữ nguyên tiếng Anh của lịch (dùng làm mã). FE hiển thị các trường `…Vi`.
+- `color`: màu phụng vụ của ngày — `white` | `red` | `green` | `purple` | `rose` | `black`. Lịch có ngày ghi hai màu
+  (Gaudete, Laetare: hồng hoặc tím) thì lấy màu đầu (`rose`). `null` với ngày đồng bộ trước 2026-11-01 — cha xứ đồng bộ lại năm đó.
 - `…Vi` lấy theo thứ tự: bản dịch Admin quản lý (mục 4h) → quy tắc mẫu cho tên lễ (vd. "29th Sunday of Ordinary Time"
   → "Chúa nhật XXIX Thường niên") → tiếng Anh nguyên văn khi chưa có bản dịch. Dịch lúc đọc nên Admin sửa là thấy ngay,
   không cần đồng bộ lại năm.
@@ -526,7 +528,8 @@ Chưa có kỹ năng nào → `[]`.
 **Danh sách sự kiện — `LiturgicalEventListItemDto`**
 
 Gồm mọi trường của `LiturgicalEventDto`, thêm `liturgicalSeasonName`, `massTypeName`, `ceremonyTypeName` (tên danh mục,
-`null` khi không chọn) và `latestSongListStatus` (trạng thái phiên bản danh sách bài hát mới nhất, `null` khi chưa có).
+`null` khi không chọn), `latestSongListStatus` (trạng thái phiên bản danh sách bài hát mới nhất, `null` khi chưa có) và
+`songListDueDate` (= `eventDate` − setting `SongList.LeadDays`; chỉ để nhắc, gửi trễ vẫn được).
 
 - Có cả sự kiện đã qua lẫn sắp tới; lọc bằng `fromDate` / `toDate` / `status`. Sắp theo ngày rồi giờ.
 - `ChoirDirector` **không thấy sự kiện `Draft`** (lọc `status=Draft` → trang rỗng); `ParishPriest` thấy mọi trạng thái.
@@ -828,6 +831,7 @@ dữ liệu trong khoảng lọc vẫn hiện với các số bằng 0.
 | `Roster.EventOverlapMinutes` | Int 0–720 | 120 | không | Không phân công một ca viên vào hai lễ cùng ngày bắt đầu cách nhau ít hơn N phút (`ROSTER_MEMBER_TIME_CONFLICT`; gợi ý bỏ qua người đó). 0 = chỉ chặn hai lễ cùng giờ |
 | `Practice.AllowLateSubmission` | Bool | false | không | Bật thì nộp bản thu sau hạn không còn bị `PRACTICE_SUBMISSION_PAST_DUE`; bài vẫn tính là quá hạn |
 | `Rehearsal.AttendanceOpensMinutesBefore` | Int 0–120 | 0 | không | Cho điểm danh sớm N phút trước giờ bắt đầu; sớm hơn nữa vẫn `REHEARSAL_NOT_STARTED` |
+| `SongList.LeadDays` | Int 0–60 | 7 | không | Hạn nộp danh sách bài hát = ngày lễ − N ngày (`songListDueDate` của danh sách sự kiện); chỉ nhắc, không chặn |
 
 ---
 
@@ -1886,6 +1890,30 @@ Lên lịch tập và điểm danh chỉ dành cho `ChoirDirector`. Danh sách b
 - Bài đã ngừng dùng (`isActive = false`) không thêm mới được (`SONG_INACTIVE`), nhưng bài đã có sẵn trong buổi tập thì được giữ lại.
 - Khác `SongList`: không có phiên bản, không qua cha xứ duyệt, không gắn vị trí phụng vụ. Sửa được cả sau khi buổi tập đã diễn ra.
 - Chưa có bài nào → `[]`.
+
+### Bản thu buổi tập — `RehearsalRecordingDto` (Web B43)
+
+Ca trưởng ghi âm ở phòng tập; ca viên của ca đoàn buổi tập nghe lại trên mobile.
+
+```json
+{
+  "id": "guid", "rehearsalId": "guid", "songId": "guid", "songTitle": "Kinh Hòa Bình", "title": "Lần 2 — điệp khúc",
+  "fileName": "take.webm", "fileSizeBytes": 812345, "durationSeconds": 95,
+  "audioUrl": "https://… (URL ký, hết hạn sau ít phút)", "createdAt": "2026-11-01T12:30:00Z"
+}
+```
+
+| Method | Route | Body | Thành công | Lỗi |
+|---|---|---|---|---|
+| GET | `/api/rehearsals/{id}/recordings` · `ChoirDirector`, `ChoirMember` | — | 200 `RehearsalRecordingDto[]` (mới nhất trước) | 404 `REHEARSAL_NOT_FOUND` |
+| POST | `/api/rehearsals/{id}/recordings` · `ChoirDirector` | multipart: `file`, `songId?`, `title?`, `durationSeconds?` | 200 `RehearsalRecordingDto` | 400 `VALIDATION_FAILED`, `REHEARSAL_RECORDING_REQUIRED`, `REHEARSAL_RECORDING_TYPE_NOT_ALLOWED` · 404 `REHEARSAL_NOT_FOUND`, `SONG_NOT_FOUND` · 413 `REHEARSAL_RECORDING_TOO_LARGE` · 502 `EXTERNAL_STORAGE_FAILED` |
+| DELETE | `/api/rehearsals/{id}/recordings/{recordingId}` · `ChoirDirector` | — | 204 | 404 `REHEARSAL_NOT_FOUND`, `REHEARSAL_RECORDING_NOT_FOUND` |
+
+- Phạm vi: ca trưởng chỉ đụng buổi tập của ca đoàn mình; ca viên xem được buổi tập thuộc ca đoàn mình (hoặc chưa gắn ca
+  đoàn) và sự kiện đã công bố. Ngoài phạm vi → 404 `REHEARSAL_NOT_FOUND`.
+- File: `.webm`, `.ogg`, `.m4a`, `.mp3`, `.wav`, tối đa 20 MB; server kiểm đuôi và dung lượng, không tin `Content-Type`.
+  `durationSeconds` (1–14400) do client báo, chỉ để hiển thị. `title` tối đa 200 ký tự. `songId` không bắt buộc (thu cả buổi).
+- `audioUrl` hết hạn sau ít phút — gọi lại `GET` để lấy URL mới. Xoá buổi tập thì xoá luôn các bản thu và file của nó.
 
 ---
 

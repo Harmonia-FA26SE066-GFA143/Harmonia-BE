@@ -299,6 +299,10 @@ namespace Harmonia.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<string>("Color")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date");
 
@@ -1187,6 +1191,59 @@ namespace Harmonia.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("RehearsalAttendances");
+                });
+
+            modelBuilder.Entity("Harmonia.Domain.Entities.RehearsalRecording", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AudioPublicId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("DurationSeconds")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<long>("FileSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("RehearsalId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("SongId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SongId");
+
+                    b.HasIndex("RehearsalId", "CreatedAt");
+
+                    b.ToTable("RehearsalRecordings");
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.RehearsalSong", b =>
@@ -2375,6 +2432,24 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Navigation("Rehearsal");
                 });
 
+            modelBuilder.Entity("Harmonia.Domain.Entities.RehearsalRecording", b =>
+                {
+                    b.HasOne("Harmonia.Domain.Entities.Rehearsal", "Rehearsal")
+                        .WithMany("Recordings")
+                        .HasForeignKey("RehearsalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Harmonia.Domain.Entities.Song", "Song")
+                        .WithMany()
+                        .HasForeignKey("SongId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Rehearsal");
+
+                    b.Navigation("Song");
+                });
+
             modelBuilder.Entity("Harmonia.Domain.Entities.RehearsalSong", b =>
                 {
                     b.HasOne("Harmonia.Domain.Entities.Rehearsal", "Rehearsal")
@@ -2753,6 +2828,8 @@ namespace Harmonia.Infrastructure.Migrations
             modelBuilder.Entity("Harmonia.Domain.Entities.Rehearsal", b =>
                 {
                     b.Navigation("Attendances");
+
+                    b.Navigation("Recordings");
 
                     b.Navigation("Songs");
                 });

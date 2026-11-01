@@ -32,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<IPracticeSubmissionService, PracticeSubmissionService>();
         services.AddScoped<IRehearsalAttendanceService, RehearsalAttendanceService>();
         services.AddScoped<IRehearsalSongService, RehearsalSongService>();
+        services.AddScoped<IRehearsalRecordingService, RehearsalRecordingService>();
         services.AddScoped<IEventPreparationService, EventPreparationService>();
         services.AddScoped<IDirectorNoteService, DirectorNoteService>();
         services.AddScoped<ISongListService, SongListService>();

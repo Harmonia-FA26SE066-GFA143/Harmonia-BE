@@ -23,6 +23,8 @@ public class RehearsalService(
     IMemberProfileRepository memberProfileRepository,
     IChoirScopeService choirScope,
     INotificationService notificationService,
+    IRehearsalRecordingRepository recordingRepository,
+    IFileStorageService fileStorageService,
     IMapper mapper) : IRehearsalService
 {
     public async Task<Result<PagedList<RehearsalDto>>> SearchAsync(
@@ -171,8 +173,14 @@ public class RehearsalService(
             return Result.Failure(ErrorCodes.RehearsalHasAttendance);
         }
 
+        // Recording rows cascade with the rehearsal; their files in storage do not.
+        var recordings = await recordingRepository.GetByRehearsalAsync(id, cancellationToken);
+
         rehearsalRepository.Remove(rehearsal);
         await rehearsalRepository.SaveChangesAsync(cancellationToken);
+
+        foreach (var recording in recordings)
+            await fileStorageService.DeleteAsync(recording.AudioPublicId, isPrivate: true, CancellationToken.None);
 
         // Nobody needs to hear that a rehearsal already over was removed.
         if (rehearsal.EndTime >= DateTime.UtcNow)

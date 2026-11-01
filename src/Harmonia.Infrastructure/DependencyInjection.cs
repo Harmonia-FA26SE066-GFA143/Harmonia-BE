@@ -125,6 +125,7 @@ public static class DependencyInjection
         services.AddScoped<ILiturgicalNameTranslationRepository, LiturgicalNameTranslationRepository>();
         services.AddScoped<ILiturgicalEventRepository, LiturgicalEventRepository>();
         services.AddScoped<IRehearsalRepository, RehearsalRepository>();
+        services.AddScoped<IRehearsalRecordingRepository, RehearsalRecordingRepository>();
         services.AddScoped<IPracticeAssignmentRepository, PracticeAssignmentRepository>();
         services.AddScoped<IPracticeSubmissionRepository, PracticeSubmissionRepository>();
         services.AddScoped<IDirectorNoteRepository, DirectorNoteRepository>();

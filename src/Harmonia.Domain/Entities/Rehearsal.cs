@@ -25,4 +25,6 @@ public class Rehearsal : BaseAuditableEntity
     public ICollection<RehearsalAttendance> Attendances { get; set; } = [];
 
     public ICollection<RehearsalSong> Songs { get; set; } = [];
+
+    public ICollection<RehearsalRecording> Recordings { get; set; } = [];
 }

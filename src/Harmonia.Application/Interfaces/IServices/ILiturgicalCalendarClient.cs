@@ -16,4 +16,4 @@ public interface ILiturgicalCalendarClient
 /// <paramref name="Rank"/> is Solemnity, Feast, Obligatory Memorial, Optional Memorial or null for a weekday;
 /// <paramref name="SeasonName"/> is Advent, Christmas, Lent, Easter or OrdinaryTime.
 /// </summary>
-public record CalendarDayResult(DateOnly Date, string CelebrationName, string? Rank, string? SeasonName);
+public record CalendarDayResult(DateOnly Date, string CelebrationName, string? Rank, string? SeasonName, string? Color = null);

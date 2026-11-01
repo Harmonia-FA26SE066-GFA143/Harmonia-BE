@@ -17,7 +17,8 @@ namespace Harmonia.API.Controllers;
 public class RehearsalsController(
     IRehearsalService rehearsalService,
     IRehearsalAttendanceService rehearsalAttendanceService,
-    IRehearsalSongService rehearsalSongService) : ApiControllerBase
+    IRehearsalSongService rehearsalSongService,
+    IRehearsalRecordingService rehearsalRecordingService) : ApiControllerBase
 {
     [HttpGet]
     [Authorize(Roles = RoleNames.ChoirDirector)]
@@ -78,4 +79,32 @@ public class RehearsalsController(
     public async Task<IActionResult> RecordAttendancesAsync(
         Guid id, [FromBody] RecordRehearsalAttendancesRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await rehearsalAttendanceService.RecordAsync(User.GetUserId(), id, request, cancellationToken));
+
+    /// <summary>Takes recorded in the practice room (Web B43); members of the rehearsal's choir listen on mobile.</summary>
+    [HttpGet("{id:guid}/recordings")]
+    [Authorize(Roles = $"{RoleNames.ChoirDirector},{RoleNames.ChoirMember}")]
+    [ProducesResponseType<List<RehearsalRecordingDto>>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetRecordingsAsync(Guid id, CancellationToken cancellationToken) =>
+        ToActionResult(await rehearsalRecordingService.GetAsync(
+            User.GetUserId(), User.IsInRole(RoleNames.ChoirDirector), id, cancellationToken));
+
+    [HttpPost("{id:guid}/recordings")]
+    [Authorize(Roles = RoleNames.ChoirDirector)]
+    [ProducesResponseType<RehearsalRecordingDto>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> CreateRecordingAsync(
+        Guid id, [FromForm] CreateRehearsalRecordingRequest request, IFormFile? file, CancellationToken cancellationToken)
+    {
+        if (file is null)
+            return ToActionResult(await rehearsalRecordingService.CreateAsync(id, request, null, cancellationToken));
+
+        await using var content = file.OpenReadStream();
+        return ToActionResult(await rehearsalRecordingService.CreateAsync(
+            id, request, new FileContent(content, file.FileName, file.Length), cancellationToken));
+    }
+
+    [HttpDelete("{id:guid}/recordings/{recordingId:guid}")]
+    [Authorize(Roles = RoleNames.ChoirDirector)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeleteRecordingAsync(Guid id, Guid recordingId, CancellationToken cancellationToken) =>
+        ToActionResult(await rehearsalRecordingService.DeleteAsync(id, recordingId, cancellationToken));
 }

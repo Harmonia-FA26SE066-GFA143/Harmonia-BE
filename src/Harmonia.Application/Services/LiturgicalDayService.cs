@@ -81,6 +81,7 @@ public class LiturgicalDayService(
             row.CelebrationName = day.CelebrationName;
             row.Rank = day.Rank;
             row.SeasonName = day.SeasonName;
+            row.Color = day.Color;
             row.FetchedAt = fetchedAt;
         }
 

@@ -297,6 +297,14 @@ public static class ErrorCodes
 
     public const string RehearsalHasAttendance = "REHEARSAL_HAS_ATTENDANCE";
 
+    public const string RehearsalRecordingNotFound = "REHEARSAL_RECORDING_NOT_FOUND";
+
+    public const string RehearsalRecordingRequired = "REHEARSAL_RECORDING_REQUIRED";
+
+    public const string RehearsalRecordingTypeNotAllowed = "REHEARSAL_RECORDING_TYPE_NOT_ALLOWED";
+
+    public const string RehearsalRecordingTooLarge = "REHEARSAL_RECORDING_TOO_LARGE";
+
     // 11. Practice assignment & submission.
     public const string PracticeAssignmentNotFound = "PRACTICE_ASSIGNMENT_NOT_FOUND";
 
