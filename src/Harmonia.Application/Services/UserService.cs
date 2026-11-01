@@ -21,8 +21,13 @@ public class UserService(
 	IPasswordHasherService passwordHasherService,
 	IEmailSender emailSender,
 	ICurrentUserService currentUserService,
+	IFileStorageService fileStorageService,
 	IMapper mapper) : IUserService
 {
+	private const string AvatarFolder = "avatars";
+	private const long MaxAvatarSizeBytes = 2 * 1024 * 1024;
+	private static readonly HashSet<string> AvatarExtensions = [".jpg", ".jpeg", ".png", ".webp"];
+
 	public async Task<Result<PagedList<UserDto>>> SearchAsync(SearchUsersRequest request, CancellationToken ct)
 	{
 		var keyword = string.IsNullOrWhiteSpace(request.Keyword) ? null : request.Keyword.Trim();
@@ -108,6 +113,53 @@ public class UserService(
 		return Result<UserDto>.Success(mapper.Map<UserDto>(user));
 	}
 
+	public async Task<Result<UserDto>> UpdateMyAvatarAsync(Guid userId, FileContent? file, CancellationToken ct)
+	{
+		if (CheckAvatar(file) is { } fileError) return Result<UserDto>.Failure(fileError);
+
+		var user = await userRepository.GetByIdAsync(userId, ct);
+		if (user is null) return Result<UserDto>.Failure(ErrorCodes.UserNotFound);
+
+		var upload = await fileStorageService.UploadAsync(file!.Content, file.FileName, AvatarFolder, isPrivate: false, ct);
+		if (!upload.IsSuccess) return Result<UserDto>.Failure(upload.Code!);
+
+		var oldPublicId = user.AvatarPublicId;
+		user.AvatarUrl = upload.Value!.Url;
+		user.AvatarPublicId = upload.Value.PublicId;
+		try
+		{
+			await userRepository.SaveChangesAsync(ct);
+		}
+		catch
+		{
+			// The row still points at the old image, so the new one is the orphan.
+			await fileStorageService.DeleteAsync(upload.Value.PublicId, isPrivate: false, CancellationToken.None);
+			throw;
+		}
+
+		// Best effort: a failure only leaves an unused image behind.
+		if (oldPublicId is not null)
+			await fileStorageService.DeleteAsync(oldPublicId, isPrivate: false, CancellationToken.None);
+
+		return Result<UserDto>.Success(mapper.Map<UserDto>(user));
+	}
+
+	public async Task<Result> DeleteMyAvatarAsync(Guid userId, CancellationToken ct)
+	{
+		var user = await userRepository.GetByIdAsync(userId, ct);
+		if (user is null) return Result.Failure(ErrorCodes.UserNotFound);
+		if (user.AvatarPublicId is null && user.AvatarUrl is null) return Result.Success();
+
+		var oldPublicId = user.AvatarPublicId;
+		user.AvatarUrl = null;
+		user.AvatarPublicId = null;
+		await userRepository.SaveChangesAsync(ct);
+
+		if (oldPublicId is not null)
+			await fileStorageService.DeleteAsync(oldPublicId, isPrivate: false, CancellationToken.None);
+		return Result.Success();
+	}
+
 	public async Task<Result> DeactivateAsync(Guid id, CancellationToken ct)
 	{
 		var user = await userRepository.GetByIdAsync(id, ct);
@@ -177,6 +229,16 @@ public class UserService(
 		do password = RandomNumberGenerator.GetString(InitialPasswordAlphabet, 12);
 		while (!password.Any(char.IsUpper) || !password.Any(char.IsLower) || !password.Any(char.IsDigit));
 		return password;
+	}
+
+	private static string? CheckAvatar(FileContent? file)
+	{
+		if (file is null || file.Length == 0) return ErrorCodes.AvatarFileRequired;
+
+		var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+		if (!AvatarExtensions.Contains(extension)) return ErrorCodes.AvatarFileTypeNotAllowed;
+
+		return file.Length > MaxAvatarSizeBytes ? ErrorCodes.AvatarFileTooLarge : null;
 	}
 
 	private static string? NormalizePhone(string? phone) => string.IsNullOrWhiteSpace(phone) ? null : phone.Trim();

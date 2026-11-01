@@ -1,5 +1,6 @@
 using Harmonia.API.Extensions;
 using Harmonia.API.Filters;
+using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IServices;
 using Microsoft.AspNetCore.Authorization;
@@ -67,6 +68,26 @@ public class AuthController(IAuthService authService, IUserService userService) 
     public async Task<IActionResult> UpdateMeAsync(
         [FromBody] UpdateMyUserRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await userService.UpdateMeAsync(User.GetUserId(), request, cancellationToken));
+
+    /// <summary>Every role replaces their own avatar (.jpg, .jpeg, .png, .webp, max 2 MB).</summary>
+    [HttpPut("me/avatar")]
+    [Authorize]
+    [ProducesResponseType<UserDto>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdateMyAvatarAsync(IFormFile? file, CancellationToken cancellationToken)
+    {
+        if (file is null)
+            return ToActionResult(await userService.UpdateMyAvatarAsync(User.GetUserId(), null, cancellationToken));
+
+        await using var content = file.OpenReadStream();
+        return ToActionResult(await userService.UpdateMyAvatarAsync(
+            User.GetUserId(), new FileContent(content, file.FileName, file.Length), cancellationToken));
+    }
+
+    [HttpDelete("me/avatar")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeleteMyAvatarAsync(CancellationToken cancellationToken) =>
+        ToActionResult(await userService.DeleteMyAvatarAsync(User.GetUserId(), cancellationToken));
 
     [HttpPost("forgot-password")]
     [AllowAnonymous]

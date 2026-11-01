@@ -121,6 +121,9 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `USER_CANNOT_MODIFY_SELF` | 409 | Không thể tự đổi quyền hoặc vô hiệu hoá chính mình |
 | `USER_LAST_ADMIN` | 409 | Không thể xoá quyền của quản trị viên cuối cùng |
 | `ROLE_NOT_FOUND` | 404 | Không tìm thấy vai trò |
+| `AVATAR_FILE_REQUIRED` | 400 | Vui lòng chọn ảnh đại diện |
+| `AVATAR_FILE_TYPE_NOT_ALLOWED` | 400 | Ảnh đại diện chỉ nhận JPG, PNG hoặc WEBP |
+| `AVATAR_FILE_TOO_LARGE` | 413 | Ảnh đại diện tối đa 2 MB |
 
 ## 3. MemberProfile
 

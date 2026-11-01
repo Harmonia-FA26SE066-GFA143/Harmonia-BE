@@ -145,7 +145,7 @@ public class CloudinaryFileStorageService : IFileStorageService
     private static ResourceType GetResourceType(string extension) => extension switch
     {
         ".mp3" or ".m4a" or ".wav" => ResourceType.Video,
-        ".pdf" or ".png" or ".jpg" or ".jpeg" => ResourceType.Image,
+        ".pdf" or ".png" or ".jpg" or ".jpeg" or ".webp" => ResourceType.Image,
         ".csv" or ".xlsx" or ".xml" or ".json" or ".mid" or ".midi" or ".docx" => ResourceType.Raw,
         _ => throw new NotSupportedException($"File extension '{extension}' is not supported for storage.")
     };

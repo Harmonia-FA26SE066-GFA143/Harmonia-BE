@@ -20,6 +20,7 @@ public class UserServiceTests
     private readonly IPasswordHasherService _hasher = Substitute.For<IPasswordHasherService>();
     private readonly IEmailSender _email = Substitute.For<IEmailSender>();
     private readonly ICurrentUserService _currentUser = Substitute.For<ICurrentUserService>();
+    private readonly IFileStorageService _storage = Substitute.For<IFileStorageService>();
     private readonly UserService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly List<User> _added = [];
@@ -32,7 +33,10 @@ public class UserServiceTests
     public UserServiceTests()
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<UserProfile>(), NullLoggerFactory.Instance).CreateMapper();
-        _sut = new UserService(_users, _memberProfiles, _hasher, _email, _currentUser, mapper);
+        _sut = new UserService(_users, _memberProfiles, _hasher, _email, _currentUser, _storage, mapper);
+        _storage.UploadAsync(default!, default!, default!, default, default)
+            .ReturnsForAnyArgs(Result<FileUploadResponse>.Success(new FileUploadResponse("harmonia/avatars/new.png", "https://cdn.test/new.png")));
+        _storage.DeleteAsync(default!, default, default).ReturnsForAnyArgs(Result.Success());
 
         _currentUser.UserId.Returns(_callerId);
         _hasher.HashPassword(Arg.Any<User>(), Arg.Do<string>(p => _hashedPassword = p)).Returns("hashed");
@@ -438,5 +442,110 @@ public class UserServiceTests
         var result = await _sut.AssignRoleAsync(user.Id, new AssignRoleRequest { RoleName = RoleNames.Admin }, _ct);
 
         Assert.True(result.IsSuccess);
+    }
+
+    // ---- Avatar ----
+
+    private static FileContent NewImage(string fileName, long length = 1024) => new(new MemoryStream([1, 2, 3]), fileName, length);
+
+    [Fact]
+    public async Task UpdateMyAvatar_Png_UploadsPubliclyAndReturnsUrl_Async()
+    {
+        var user = Existing(_directorRole);
+
+        var result = await _sut.UpdateMyAvatarAsync(user.Id, NewImage("me.PNG"), _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("https://cdn.test/new.png", result.Value!.AvatarUrl);
+        Assert.Equal("harmonia/avatars/new.png", user.AvatarPublicId);
+        await _storage.Received(1).UploadAsync(Arg.Any<Stream>(), "me.PNG", "avatars", false, _ct);
+        await _users.Received(1).SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task UpdateMyAvatar_Replacing_DeletesOldImageAfterSave_Async()
+    {
+        var user = Existing(_memberRole);
+        user.AvatarPublicId = "harmonia/avatars/old.jpg";
+        user.AvatarUrl = "https://cdn.test/old.jpg";
+
+        var result = await _sut.UpdateMyAvatarAsync(user.Id, NewImage("me.jpg"), _ct);
+
+        Assert.True(result.IsSuccess);
+        Received.InOrder(() =>
+        {
+            _users.SaveChangesAsync(_ct);
+            _storage.DeleteAsync("harmonia/avatars/old.jpg", false, CancellationToken.None);
+        });
+    }
+
+    [Fact]
+    public async Task UpdateMyAvatar_SaveFails_DeletesNewImage_Async()
+    {
+        var user = Existing(_memberRole);
+        _users.SaveChangesAsync(_ct).Returns(Task.FromException<int>(new InvalidOperationException("db down")));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _sut.UpdateMyAvatarAsync(user.Id, NewImage("me.png"), _ct));
+
+        await _storage.Received(1).DeleteAsync("harmonia/avatars/new.png", false, CancellationToken.None);
+    }
+
+    [Theory]
+    [InlineData(null, ErrorCodes.AvatarFileRequired)]
+    [InlineData("me.gif", ErrorCodes.AvatarFileTypeNotAllowed)]
+    [InlineData("me.svg", ErrorCodes.AvatarFileTypeNotAllowed)]
+    public async Task UpdateMyAvatar_InvalidFile_ReturnsCodeWithoutUpload_Async(string? fileName, string code)
+    {
+        var user = Existing(_memberRole);
+
+        var result = await _sut.UpdateMyAvatarAsync(user.Id, fileName is null ? null : NewImage(fileName), _ct);
+
+        Assert.Equal(code, result.Code);
+        await _storage.DidNotReceiveWithAnyArgs().UploadAsync(default!, default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task UpdateMyAvatar_Over2Mb_ReturnsTooLarge_Async()
+    {
+        var user = Existing(_memberRole);
+
+        var result = await _sut.UpdateMyAvatarAsync(user.Id, NewImage("me.png", 2 * 1024 * 1024 + 1), _ct);
+
+        Assert.Equal(ErrorCodes.AvatarFileTooLarge, result.Code);
+    }
+
+    [Fact]
+    public async Task UpdateMyAvatar_UnknownUser_ReturnsUserNotFound_Async()
+    {
+        var result = await _sut.UpdateMyAvatarAsync(Guid.NewGuid(), NewImage("me.png"), _ct);
+
+        Assert.Equal(ErrorCodes.UserNotFound, result.Code);
+        await _storage.DidNotReceiveWithAnyArgs().UploadAsync(default!, default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task DeleteMyAvatar_ClearsColumnsAndDeletesImage_Async()
+    {
+        var user = Existing(_memberRole);
+        user.AvatarPublicId = "harmonia/avatars/old.jpg";
+        user.AvatarUrl = "https://cdn.test/old.jpg";
+
+        var result = await _sut.DeleteMyAvatarAsync(user.Id, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(user.AvatarUrl);
+        Assert.Null(user.AvatarPublicId);
+        await _storage.Received(1).DeleteAsync("harmonia/avatars/old.jpg", false, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task DeleteMyAvatar_NoAvatar_SucceedsWithoutWrite_Async()
+    {
+        var user = Existing(_memberRole);
+
+        var result = await _sut.DeleteMyAvatarAsync(user.Id, _ct);
+
+        Assert.True(result.IsSuccess);
+        await _users.DidNotReceive().SaveChangesAsync(_ct);
     }
 }

@@ -149,6 +149,49 @@ public class UsersEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<Har
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    private static MultipartFormDataContent ImageForm(string fileName)
+    {
+        var file = new ByteArrayContent([1, 2, 3]);
+        file.Headers.ContentType = new("image/png"); // Deliberately lies for non-png names; the server must ignore it.
+        return new MultipartFormDataContent { { file, "file", fileName } };
+    }
+
+    [Fact]
+    public async Task MyAvatar_UploadThenDelete_UpdatesOwnAccount_Async()
+    {
+        var member = await factory.CreateClientAsAsync("member@test.com", _ct);
+
+        var upload = await member.PutAsync("api/auth/me/avatar", ImageForm("me.png"), _ct);
+        var afterUpload = (await member.GetFromJsonAsync<UserDto>("api/auth/me", TestJson.Options, _ct))!;
+        var delete = await member.DeleteAsync("api/auth/me/avatar", _ct);
+        var afterDelete = (await member.GetFromJsonAsync<UserDto>("api/auth/me", TestJson.Options, _ct))!;
+
+        Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
+        Assert.NotNull(afterUpload.AvatarUrl);
+        Assert.Equal(HttpStatusCode.NoContent, delete.StatusCode);
+        Assert.Null(afterDelete.AvatarUrl);
+    }
+
+    [Fact]
+    public async Task MyAvatar_DisallowedExtension_Returns400_Async()
+    {
+        var member = await factory.CreateClientAsAsync("member@test.com", _ct);
+
+        var response = await member.PutAsync("api/auth/me/avatar", ImageForm("virus.exe"), _ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>(TestJson.Options, _ct);
+        Assert.Equal(ErrorCodes.AvatarFileTypeNotAllowed, error!.Code);
+    }
+
+    [Fact]
+    public async Task MyAvatar_Anonymous_Returns401_Async()
+    {
+        var response = await factory.CreateClient().PutAsync("api/auth/me/avatar", ImageForm("me.png"), _ct);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
     [Fact]
     public async Task Search_AsNonAdmin_Returns403_Async()
     {

@@ -173,6 +173,12 @@ public static class ErrorCodes
 
     public const string SongSkillRequirementCategoryInvalid = "SONG_SKILL_REQUIREMENT_CATEGORY_INVALID";
 
+    public const string AvatarFileRequired = "AVATAR_FILE_REQUIRED";
+
+    public const string AvatarFileTypeNotAllowed = "AVATAR_FILE_TYPE_NOT_ALLOWED";
+
+    public const string AvatarFileTooLarge = "AVATAR_FILE_TOO_LARGE";
+
     public const string MaterialNotFound = "MATERIAL_NOT_FOUND";
 
     public const string MaterialFileRequired = "MATERIAL_FILE_REQUIRED";

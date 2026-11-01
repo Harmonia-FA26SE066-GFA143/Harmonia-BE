@@ -123,6 +123,8 @@
     (MIDI thêm 2026-10-29, lưu Cloudinary dạng raw);
     `RehearsalMaterial` nhận nhóm của `SheetMusic` và `SampleAudio`. Tối đa 20 MB một file.
   - `PracticeSubmission` nhận `.mp3`, `.m4a`, `.wav`.
+  - Avatar (`User.AvatarUrl`) nhận `.jpg`, `.jpeg`, `.png`, `.webp`, tối đa 2 MB, lưu Cloudinary **public**
+    — chỉ người dùng tự đổi qua `PUT/DELETE api/auth/me/avatar` (chốt 2026-11-01).
   - `RehearsalRecording` (bản thu ca trưởng ghi ở phòng tập) nhận `.webm`, `.ogg`, `.m4a`, `.mp3`, `.wav` — trình duyệt
     thu ra `.webm`/`.ogg` (Chrome, Firefox) hoặc `.m4a` (Safari). Tối đa 20 MB, lưu private (chốt 2026-11-01).
 - Không tin `Content-Type` client gửi — kiểm phần mở rộng lẫn dung lượng ở server.

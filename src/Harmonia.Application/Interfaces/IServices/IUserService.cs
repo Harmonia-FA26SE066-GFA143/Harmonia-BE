@@ -21,4 +21,10 @@ public interface IUserService
 
     /// <summary>Any signed-in user edits their own name and phone; empty name and phone are allowed.</summary>
     Task<Result<UserDto>> UpdateMeAsync(Guid userId, UpdateMyUserRequest request, CancellationToken ct);
+
+    /// <summary>Replaces the caller's avatar with a public image; the previous image is removed from storage.</summary>
+    Task<Result<UserDto>> UpdateMyAvatarAsync(Guid userId, FileContent? file, CancellationToken ct);
+
+    /// <summary>Removes the caller's avatar; succeeds when there is none.</summary>
+    Task<Result> DeleteMyAvatarAsync(Guid userId, CancellationToken ct);
 }
