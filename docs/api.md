@@ -203,6 +203,21 @@ Gửi đủ cả hai trường — trường bỏ trống bị xoá. Email và r
 | 400 | `VALIDATION_FAILED` |
 | 401 | Chưa đăng nhập |
 
+### `PUT /api/auth/me/avatar` · `DELETE /api/auth/me/avatar` — đã đăng nhập, mọi role
+
+Ảnh đại diện của chính người gọi. `PUT` nhận `multipart/form-data`, field `file`: `.jpg`, `.jpeg`, `.png`, `.webp`,
+tối đa 2 MB (server kiểm theo đuôi tệp, bỏ qua `Content-Type`). Ảnh cũ bị xoá khỏi kho. `avatarUrl` là URL công khai,
+dùng thẳng được, không hết hạn. `DELETE` xoá ảnh; chưa có ảnh cũng trả 204.
+Người chưa đổi mật khẩu lần đầu bị chặn (403 `AUTH_PASSWORD_CHANGE_REQUIRED`).
+
+| HTTP | Kết quả |
+|---|---|
+| 200 | `UserDto` (`PUT`) |
+| 204 | Xoá xong (`DELETE`) |
+| 400 | `AVATAR_FILE_REQUIRED`, `AVATAR_FILE_TYPE_NOT_ALLOWED` |
+| 413 | `AVATAR_FILE_TOO_LARGE` |
+| 502 | `EXTERNAL_STORAGE_FAILED` |
+
 ### `POST /api/auth/forgot-password` — anonymous
 
 ```json
@@ -235,11 +250,11 @@ Thành công thì mọi thiết bị bị đăng xuất.
 ### `UserDto`
 
 ```json
-{ "id": "guid", "email": "a@b.com", "fullName": "Nguyễn Văn A", "phone": "0900000000", "roleName": "ChoirDirector", "isActive": true, "isPasswordChangeRequired": false }
+{ "id": "guid", "email": "a@b.com", "fullName": "Nguyễn Văn A", "phone": "0900000000", "avatarUrl": null, "roleName": "ChoirDirector", "isActive": true, "isPasswordChangeRequired": false }
 ```
 
 `fullName` và `phone` có ở **mọi role** (lưu trên `User`). `fullName` có thể là `""` (Admin bỏ trống) — client
-hiển thị email thay tên. `phone` có thể `null`.
+hiển thị email thay tên. `phone`, `avatarUrl` có thể `null` (đổi ảnh: `PUT /api/auth/me/avatar`, mục 2).
 
 | Method | Route | Body / Query | Thành công | Lỗi |
 |---|---|---|---|---|
@@ -1099,6 +1114,7 @@ Thư viện bài hát và phân loại bài hát (UC-21 / FE-27, FE-29).
   "massTypes": [],
   "ceremonyTypes": [],
   "songThemes": [{ "id": "guid", "name": "Đức Mẹ" }],
+  "liturgicalSlots": [{ "id": "guid", "name": "Hiệp lễ" }],
   "vocalRequirements": [{ "skillId": "guid", "skillName": "Soprano", "isMandatory": true, "requiredCount": 1 }],
   "instrumentRequirements": [{ "skillId": "guid", "skillName": "Organ", "isMandatory": false, "requiredCount": 1 }]
 }
@@ -1110,6 +1126,7 @@ Thư viện bài hát và phân loại bài hát (UC-21 / FE-27, FE-29).
   "massTypeIds": [],
   "ceremonyTypeIds": [],
   "songThemeIds": ["guid"],
+  "liturgicalSlotIds": ["guid"],
   "vocalRequirements": [{ "skillId": "guid", "isMandatory": true, "requiredCount": 1 }],
   "instrumentRequirements": [{ "skillId": "guid", "isMandatory": false, "requiredCount": 1 }]
 }
@@ -1118,7 +1135,8 @@ Thư viện bài hát và phân loại bài hát (UC-21 / FE-27, FE-29).
 - `PUT` **thay cả bộ**: mục nào không gửi lên thì bị gỡ khỏi bài. Gửi `[]` để gỡ hết một nhóm.
 - Id trùng trong cùng một danh sách → 400, `errors.<field>` chứa `SONG_CLASSIFICATION_DUPLICATE` /
   `SONG_SKILL_REQUIREMENT_DUPLICATE` (bắt ở validator, chưa tới DB).
-- Mùa / loại lễ / nghi thức / chủ đề **thêm mới** phải tồn tại và đang hoạt động, nếu không → 400
+- `liturgicalSlotIds`: vị trí trong lễ bài hợp (Nhập lễ, Đáp ca, Hiệp lễ…), id từ `GET /api/lookups/liturgical-slots`.
+- Mùa / loại lễ / nghi thức / chủ đề / vị trí **thêm mới** phải tồn tại và đang hoạt động, nếu không → 400
   `SONG_CLASSIFICATION_TARGET_INVALID`. Skill **thêm mới** phải đang hoạt động (409 `SKILL_INACTIVE`).
   Mục bài đã có từ trước vẫn giữ được dù sau đó bị vô hiệu hoá, và `GET` vẫn hiển thị.
 - `instrumentRequirements` chỉ nhận skill thuộc nhóm Instrument; `vocalRequirements` nhận skill thuộc
@@ -1149,6 +1167,7 @@ Tư liệu của bài hát: bản nhạc, lời, audio mẫu, tài liệu tập 
   "targetSkillId": "guid",
   "targetSkillName": "Tenor",
   "fileUrl": "https://...signed...",
+  "lyricsText": null,
   "createdAt": "2026-10-02T08:00:00Z"
 }
 ```
@@ -1506,6 +1525,7 @@ Role `ParishPriest`, `ChoirDirector`. 200 `PagedList<SongSuggestionResponse>` ·
   "generatedAt": "2026-10-06T08:00:00Z",
   "finalizedAt": "2026-10-06T09:00:00Z",
   "finalizedBy": "guid",
+  "wholeServiceFinalizedAt": null,
   "assignments": [ /* RosterAssignmentDto */ ],
   "shortages": [ /* RosterShortageDto */ ]
 }
