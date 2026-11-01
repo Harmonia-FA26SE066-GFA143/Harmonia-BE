@@ -2,10 +2,10 @@ namespace Harmonia.Domain.Common;
 
 /// <summary>
 /// Business error codes returned to clients. The full catalogue and the Vietnamese wording
-/// live in doc/error-codes.md, which is the contract with the frontend.
+/// live in docs/error-codes.md, which is the contract with the frontend.
 /// Every code in that catalogue is declared here up front, and every code that reaches a
 /// client through a status other than its layer's default is listed in <c>ErrorStatusMap</c>.
-/// Sections below follow the sections of doc/error-codes.md.
+/// Sections below follow the sections of docs/error-codes.md.
 /// </summary>
 public static class ErrorCodes
 {

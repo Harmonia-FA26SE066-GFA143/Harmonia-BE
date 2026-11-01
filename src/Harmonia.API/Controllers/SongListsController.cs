@@ -27,6 +27,14 @@ public class SongListsController(ISongListService songListService) : ApiControll
         ToActionResult(await songListService.GetLatestForEventAsync(
             eventId, User.IsInRole(RoleNames.ChoirDirector), cancellationToken));
 
+    /// <summary>Every version of the event's song list, newest first; the priest does not see Draft versions.</summary>
+    [HttpGet("event/{eventId:guid}/versions")]
+    [Authorize(Roles = $"{RoleNames.ChoirDirector},{RoleNames.ParishPriest}")]
+    [ProducesResponseType<List<SongListDto>>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetVersionsForEventAsync(Guid eventId, CancellationToken cancellationToken) =>
+        ToActionResult(await songListService.GetVersionsForEventAsync(
+            eventId, User.IsInRole(RoleNames.ChoirDirector), cancellationToken));
+
     [HttpGet("{id:guid}")]
     [Authorize(Roles = $"{RoleNames.ChoirDirector},{RoleNames.ParishPriest}")]
     [ProducesResponseType<SongListDto>(StatusCodes.Status200OK)]

@@ -20,6 +20,9 @@ public interface ISongListService
     /// <summary>Without <paramref name="includeDraft"/> a Draft reads as missing, as in <see cref="GetLatestForEventAsync"/>.</summary>
     Task<Result<SongListDto>> GetByIdAsync(Guid id, bool includeDraft, CancellationToken cancellationToken);
 
+    /// <summary>Every version of the event's song list, newest first; Draft versions only with <paramref name="includeDraft"/>.</summary>
+    Task<Result<List<SongListDto>>> GetVersionsForEventAsync(Guid eventId, bool includeDraft, CancellationToken cancellationToken);
+
     Task<Result<List<SongListDto>>> GetPendingAsync(CancellationToken cancellationToken);
 
     Task<Result<SongListDto>> CreateAsync(CreateSongListRequest request, Guid proposedBy, CancellationToken cancellationToken);

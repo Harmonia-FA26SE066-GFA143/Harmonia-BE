@@ -115,8 +115,9 @@ public class RosterService(
             return Result<List<RosterShortageDto>>.Failure(ErrorCodes.LiturgicalEventNotFound);
 
         var songList = await rosterRepository.GetApprovedSongListAsync(eventId, cancellationToken);
+        // Nothing to staff yet is a normal state of a new event, so no shortage rather than an error (B39).
         if (songList is null && liturgicalEvent.PersonnelRequirements.Count == 0)
-            return Result<List<RosterShortageDto>>.Failure(ErrorCodes.RosterSongListNotApproved);
+            return Result<List<RosterShortageDto>>.Success([]);
 
         var assignments = liturgicalEvent.ServiceRoster?.Assignments.Where(x => x.Status == RosterAssignmentStatus.Active).ToList() ?? [];
 

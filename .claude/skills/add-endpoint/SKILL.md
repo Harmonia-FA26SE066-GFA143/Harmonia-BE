@@ -13,7 +13,7 @@ Theo workflow trong `.claude/rules/04-workflow.md` — đủ sáu giai đoạn, 
 
 ## READ
 
-- Use case trong `doc/harmonia-use-case-descriptions.md` — actor nào, có «include» S-05
+- Use case trong `docs/harmonia-use-case-descriptions.md` — actor nào, có «include» S-05
   Send Notification không.
 - Controller của resource trong `src/Harmonia.API/Controllers/` — route gốc, `[Authorize]`
   ở cấp controller, các action đã có (tránh trùng route).
@@ -56,7 +56,7 @@ Kèm một dòng: endpoint này chỉ đọc hay có ghi dữ liệu.
 | Profile | Thêm `CreateMap` vào `<Entity>Profile` cũ, không tạo profile thứ hai |
 | `I<X>Service` + `<X>Service` | Thêm method vào service cũ, trả `Result<T>` / `PagedList<T>` |
 | Controller | Thêm action vào controller cũ |
-| `ErrorCodes.cs` + `ErrorStatusMap.cs` + `doc/error-codes.md` | Chỉ khi có mã lỗi mới — cả ba trong cùng thay đổi |
+| `ErrorCodes.cs` + `ErrorStatusMap.cs` + `docs/error-codes.md` | Chỉ khi có mã lỗi mới — cả ba trong cùng thay đổi |
 | Test | Unit test service + endpoint test |
 
 Không đụng schema → không migration. Nếu phát hiện cần cột mới: dừng, báo.
@@ -104,5 +104,5 @@ Không commit. Báo lại:
 
 1. Hợp đồng endpoint mới (khối SUMMARIZE).
 2. File đã sửa / tạo.
-3. Mã lỗi mới (nếu có) và đã cập nhật `doc/error-codes.md` chưa.
-4. Nhắc chạy `/update-sheet` để đẩy endpoint lên `doc/api.md` và Google Sheet cho FE/mobile.
+3. Mã lỗi mới (nếu có) và đã cập nhật `docs/error-codes.md` chưa.
+4. Nhắc chạy `/update-sheet` để đẩy endpoint lên `docs/api.md` và Google Sheet cho FE/mobile.

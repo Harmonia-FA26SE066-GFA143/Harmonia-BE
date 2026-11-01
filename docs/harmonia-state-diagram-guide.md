@@ -324,7 +324,7 @@ flowchart LR
 
 - [ ] Mọi state trùng tên một giá trị enum trong `Domain/Enums/`.
 - [ ] Mọi mũi tên chỉ được tới một dòng gán `Status` trong code.
-- [ ] Mọi guard có mã lỗi tương ứng trong `doc/error-codes.md`.
+- [ ] Mọi guard có mã lỗi tương ứng trong `docs/error-codes.md`.
 - [ ] Có đúng một `[*] -->` cho mỗi cách tạo bản ghi.
 - [ ] State kết thúc không có mũi tên đi ra.
 - [ ] Không dùng tên cấm: `ChoirLeader`, `Event`, `Season`, `Assignment`, `Attendance`, `Feedback` trần.

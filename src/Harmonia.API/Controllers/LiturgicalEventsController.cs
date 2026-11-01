@@ -76,7 +76,7 @@ public class LiturgicalEventsController(
         ToActionResult(await eventPreparationService.GetProgressAsync(id, cancellationToken));
 
     [HttpGet("{id:guid}/preparation-status")]
-    [Authorize(Roles = RoleNames.ParishPriest)]
+    [Authorize(Roles = $"{RoleNames.ParishPriest},{RoleNames.ChoirDirector}")]
     [ProducesResponseType<EventPreparationStatusDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPreparationStatusAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await eventPreparationService.GetStatusAsync(id, cancellationToken));

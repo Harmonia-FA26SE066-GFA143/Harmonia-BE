@@ -13,7 +13,7 @@ tài liệu cho khớp code.
 
 ## READ
 
-Đọc tài liệu nguồn — mặc định `doc/domain-entity-list.md`; người dùng đưa đường dẫn
+Đọc tài liệu nguồn — mặc định `docs/domain-entity-list.md`; người dùng đưa đường dẫn
 khác thì dùng đường dẫn đó. Không tìm thấy file thì **hỏi, đừng đoán**.
 
 Rồi đọc trạng thái code hiện tại:

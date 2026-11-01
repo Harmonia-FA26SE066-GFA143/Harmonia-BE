@@ -83,15 +83,15 @@ Kiểm đúng 20 mục dưới đây, không phát sinh thêm. Mỗi phát hiệ
     trong file cấu hình phải là ASCII tiếng Anh; thông báo lỗi cho người dùng đi qua mã
     lỗi trong `Domain/Common/ErrorCodes.cs`.
     Lệnh trả về rỗng thì ghi "sạch" — đừng tự kết luận khi chưa chạy.
-    (Tài liệu trong `doc/` và `.claude/` vẫn viết tiếng Việt, không nằm trong phạm vi.)
+    (Tài liệu trong `docs/` và `.claude/` vẫn viết tiếng Việt, không nằm trong phạm vi.)
 17. `Title` / `Content` của mỗi `new SendNotificationRequest(` trong `Application/Services/` có
     viết tiếng Việt không — chuỗi chỉ toàn ASCII là vi phạm (ngược chiều với mục 16: thông báo
     hiển thị nguyên văn cho người dùng nên bắt buộc tiếng Việt).
 
 ## Tài liệu và test
 18. Mỗi route trong `API/Controllers/` (`[Route]` của controller ghép với `[Http*]` của action)
-    có dòng tương ứng trong `doc/api.md` không — báo từng endpoint thiếu.
-19. Mỗi hằng trong `Domain/Common/ErrorCodes.cs` có trong `doc/error-codes.md` không — thiếu là
+    có dòng tương ứng trong `docs/api.md` không — báo từng endpoint thiếu.
+19. Mỗi hằng trong `Domain/Common/ErrorCodes.cs` có trong `docs/error-codes.md` không — thiếu là
     vi phạm. Mã không có trong `API/Middlewares/ErrorStatusMap.cs` thì chỉ liệt kê kèm chữ
     "dùng status mặc định", không tính vi phạm (`StatusFor` có fallback).
 20. Mỗi `<X>Service` trong `Application/Services/` có `<X>ServiceTests.cs` trong

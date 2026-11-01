@@ -343,11 +343,14 @@ public class RosterServiceTests
     }
 
     [Fact]
-    public async Task GetShortages_NoApprovedSongList_ReturnsSongListNotApproved_Async()
+    public async Task GetShortages_NothingToStaff_ReturnsEmpty_Async()
     {
         _repository.GetApprovedSongListAsync(_event.Id, _ct).Returns((SongList?)null);
 
-        Assert.Equal(ErrorCodes.RosterSongListNotApproved, (await _sut.GetShortagesAsync(_event.Id, _ct)).Code);
+        var result = await _sut.GetShortagesAsync(_event.Id, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value!);
     }
 
     [Fact]

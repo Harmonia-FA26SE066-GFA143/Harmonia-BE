@@ -6,7 +6,7 @@ nguồn, việc cần sửa và lý do. Tick khi xong.
 **Trạng thái 26/10:** đã sửa xong các file chữ / mermaid (ERD `.mmd`, 4 guide, diagram plan). **Còn lại** (ô chưa tick ở
 mục 3): vẽ lại trong `../Class Diagram.drawio`, và chốt mã UC cho quản lý bản dịch tên lễ.
 
-## 1. ERD — `../doc/harmonia-erd.mmd` + `doc/harmonia-erd-guide.md`
+## 1. ERD — `../doc/harmonia-erd.mmd` + `docs/harmonia-erd-guide.md`
 
 `harmonia-erd.mmd` (sửa lần cuối 20/10) chưa có bảng nào của D7. Phải thêm 6 bảng và 2 cột:
 
@@ -25,7 +25,7 @@ mục 3): vẽ lại trong `../Class Diagram.drawio`, và chốt mã UC cho qu�
 - [x] Cột `ChoirId?` trên `SongList`, `Rehearsal`, `PracticeAssignment` → `Choir` (D7).
 - [x] Guide `harmonia-erd-guide.md`: bảng nhóm ở mục 1 — C: 9 → 10, G: 7 → 8; "48 bảng" → **50** (dòng 5, 21, 98 và checklist dòng 362).
 
-## 2. Conceptual — `doc/harmonia-conceptual-diagram-guide.md`
+## 2. Conceptual — `docs/harmonia-conceptual-diagram-guide.md`
 
 Sai theo D8 (đoạn mục 2 và bước 9 mục 3 vẫn viết "một ca trưởng chung cho mọi ca đoàn"):
 
@@ -38,7 +38,7 @@ Sai theo D8 (đoạn mục 2 và bước 9 mục 3 vẫn viết "một ca trư�
       `PracticeAssignmentMaterial` gộp thành n–n theo luật 2).
 - [x] Mục 2 luật 1 (entity kỹ thuật bị bỏ): thêm `LiturgicalNameTranslation`. Luật 2 (gộp n–n): thêm `PracticeAssignmentMaterial`.
 
-## 3. Class — `../Class Diagram.drawio` + `doc/harmonia-diagram-plan.md`
+## 3. Class — `../Class Diagram.drawio` + `docs/harmonia-diagram-plan.md`
 
 **D8 (ảnh hưởng nhiều tab):**
 
@@ -81,7 +81,7 @@ Sai theo D8 (đoạn mục 2 và bước 9 mục 3 vẫn viết "một ca trư�
 - [x] UC-34 (F12): thêm `activity-trend` (đọc mọi trang ca viên → bài tập → chia kỳ).
 - [x] Quản lý bản dịch tên lễ gộp vào UC-32 (chốt 2026-10-27).
 
-## 4. Activity — `doc/harmonia-activity-diagram-guide.md`
+## 4. Activity — `docs/harmonia-activity-diagram-guide.md`
 
 - [x] 4.1 "Chuẩn bị một sự kiện": thêm bước cha xứ **gán ca đoàn phục vụ + chọn ca đoàn phụ trách** giữa "Tạo" và
       "Publish"; publish báo cho ca đoàn phục vụ; lane ChoirDirector đổi thành "ca trưởng ca đoàn phụ trách".
@@ -153,7 +153,7 @@ flowchart TD
 Ghi chú dưới sơ đồ: lễ vọng 24/12 tối được gán mùa Giáng Sinh dù mùa bắt đầu 25/12 (cho phép sớm một ngày, `c93eac6`);
 lễ sáng 24/12 thuộc mùa Vọng. Sự kiện chưa gắn ca đoàn thì bỏ P3, ca trưởng nào cũng làm được (luồng 4.1).
 
-## 5. State — `doc/harmonia-state-diagram-guide.md`
+## 5. State — `docs/harmonia-state-diagram-guide.md`
 
 - [x] Bảng mục 1: `EventParticipation` đổi từ "Chưa" thành **"Có"** — service đã có từ `cea8553`. Thêm sơ đồ 5.x:
       `[*] → Invited : ca trưởng mời (mỗi ca viên một lần, sự kiện Published, chưa bắt đầu)` ·
@@ -180,9 +180,9 @@ sửa / xoá):
 | File | Thêm | Sửa | Xoá |
 |---|---|---|---|
 | `../doc/harmonia-erd.mmd` | 6 bảng (`Choir`, `ChoirMembership`, `LiturgicalEventChoir`, `MassSchedule`, `PracticeAssignmentMaterial`, `LiturgicalNameTranslation`) và 13 quan hệ | Đầu file 44 → 50 bảng, D1–D8; nhãn `MusicMaterial → PracticeAssignment` | Không |
-| `doc/harmonia-erd-guide.md` | 2 bảng vào nhóm C, G; 2 dòng trường hợp đặc biệt; 2 unique | 48 → 50 bảng, 22 → 24 enum | Không |
-| `doc/harmonia-conceptual-diagram-guide.md` | 2 quan hệ ở sơ đồ tổng | Đoạn ô `Choir` và bước 9 theo D8; luật lọc 1, 2; 48 → 50 | Câu "một `ChoirDirector` quản lý mọi ca đoàn — không vẽ quan hệ ca trưởng" |
-| `doc/harmonia-diagram-plan.md` | Quy ước `IChoirScopeService`; class mới ở 3.4, 3.5, 3.9, 3.12, 3.13, 3.14; dòng UC bản dịch (chưa mã) | Ghi chú sequence UC-12, 21, 28, 34, 37, 38, 39 | Không |
-| `doc/harmonia-activity-diagram-guide.md` | Mục 4.6 Lễ Giáng Sinh nhiều ca đoàn + dòng ở bảng mục 1 | 4.1 thêm bước gán ca đoàn, đổi tên lane; 4.4 ô `A1` | Không |
-| `doc/harmonia-state-diagram-guide.md` | 5.6 `EventParticipation`; `Song`, `MusicMaterial` ở vòng đời nhỏ | 5.1 guard publish và nhãn thông báo; mục 6; đánh số 5.6 → 5.7 | Dòng `EventParticipation` "Chưa" ở bảng mục 1 |
+| `docs/harmonia-erd-guide.md` | 2 bảng vào nhóm C, G; 2 dòng trường hợp đặc biệt; 2 unique | 48 → 50 bảng, 22 → 24 enum | Không |
+| `docs/harmonia-conceptual-diagram-guide.md` | 2 quan hệ ở sơ đồ tổng | Đoạn ô `Choir` và bước 9 theo D8; luật lọc 1, 2; 48 → 50 | Câu "một `ChoirDirector` quản lý mọi ca đoàn — không vẽ quan hệ ca trưởng" |
+| `docs/harmonia-diagram-plan.md` | Quy ước `IChoirScopeService`; class mới ở 3.4, 3.5, 3.9, 3.12, 3.13, 3.14; dòng UC bản dịch (chưa mã) | Ghi chú sequence UC-12, 21, 28, 34, 37, 38, 39 | Không |
+| `docs/harmonia-activity-diagram-guide.md` | Mục 4.6 Lễ Giáng Sinh nhiều ca đoàn + dòng ở bảng mục 1 | 4.1 thêm bước gán ca đoàn, đổi tên lane; 4.4 ô `A1` | Không |
+| `docs/harmonia-state-diagram-guide.md` | 5.6 `EventParticipation`; `Song`, `MusicMaterial` ở vòng đời nhỏ | 5.1 guard publish và nhãn thông báo; mục 6; đánh số 5.6 → 5.7 | Dòng `EventParticipation` "Chưa" ở bảng mục 1 |
 | `../Class Diagram.drawio` | — | **Chưa sửa** — mermaid nhúng trong draw.io, sửa tay theo mục 3 | — |

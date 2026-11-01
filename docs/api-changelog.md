@@ -11,6 +11,24 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
   huống trước đây chưa có. FE bỏ qua trường lạ, hiển thị câu chung cho mã lạ.
 - Mỗi PR đổi hợp đồng thêm một dòng vào mục ngày tương ứng ở đây, cùng PR cập nhật `api.md` / `error-codes.md`.
 
+## 2026-11-01
+
+Gỡ bớt việc FE tự tính (Web backlog B39, B41). Không cần migration.
+
+### [Phá vỡ] Thiếu người
+
+- `GET api/service-rosters/shortages` trả `[]` khi chưa có gì để phân công (chưa có danh sách bài đã duyệt, không có yêu
+  cầu cả buổi lễ), thay cho 409 `ROSTER_SONG_LIST_NOT_APPROVED`. `suggestions`, `finalize`, thêm tay vẫn trả 409 như cũ.
+- `EventPreparationStatusDto.rosterShortages` không còn `null`: trường hợp trên trả `[]`.
+
+### Không phá vỡ
+
+- `GET api/liturgical-events/{id}/preparation-status` mở thêm cho `ChoirDirector`, trong phạm vi ca đoàn mình phục vụ
+  (ngoài phạm vi → 404 `LITURGICAL_EVENT_NOT_FOUND`).
+- Thêm `GET api/song-lists/event/{eventId}/versions` (`ChoirDirector`, `ParishPriest`): mọi phiên bản kèm `items` và
+  `reviews`, mới nhất trước; cha xứ không thấy `Draft`.
+- `SongListDto.items` sắp theo `displayOrder`, `reviews` theo `reviewedAt` tăng dần.
+
 ## 2026-10-29 / 30
 
 Tư liệu bài hát: lời dạng `.docx` hoặc gõ thẳng, phát MIDI, AI đọc lời từ bản nhạc, tìm bài theo lời. Cần migration

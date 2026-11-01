@@ -4,7 +4,7 @@ Conceptual diagram (mô hình khái niệm / domain model) trả lời: **hệ t
 khái niệm nghiệp vụ nào và chúng liên hệ với nhau ra sao**. Nó không phải sơ đồ cơ sở dữ
 liệu: không có kiểu dữ liệu, không có khoá chính, khoá ngoại, không có bảng kỹ thuật.
 
-Nguồn dữ liệu: `doc/harmonia-domain-entity-list.md` (48 entity, mục "Relationships for the ERD").
+Nguồn dữ liệu: `docs/harmonia-domain-entity-list.md` (48 entity, mục "Relationships for the ERD").
 Sơ đồ nộp báo cáo thì **vẽ tay** (draw.io, Astah, Visual Paradigm hoặc giấy) theo mục 3.
 Các khối Mermaid ở mục 4 chỉ là **hình mẫu để nhìn theo** — mở Markdown Preview trong
 VS Code hoặc dán vào <https://mermaid.live> để xem hình.
@@ -228,11 +228,11 @@ classDiagram
 
 Các nhóm còn lại (kỹ năng, ca đoàn, phụng vụ, thư viện nhạc, tập hát, liên lạc) vẽ theo cùng cách
 — nhóm phụng vụ có thêm `MassType "1" -- "*" MassSchedule` và `WorshipLocation "1" -- "*" MassSchedule`, lấy quan hệ
-từ mục "Relationships for the ERD" của `doc/harmonia-domain-entity-list.md`.
+từ mục "Relationships for the ERD" của `docs/harmonia-domain-entity-list.md`.
 
 ## 5. Checklist trước khi nộp sơ đồ
 
-- [ ] Mọi tên ô có trong `doc/harmonia-domain-entity-list.md`, viết đúng, số ít.
+- [ ] Mọi tên ô có trong `docs/harmonia-domain-entity-list.md`, viết đúng, số ít.
 - [ ] Không có ô `Instrumentalist`, `Event`, `Season`, `SheetMusic`, `Assignment`.
 - [ ] Không có entity kỹ thuật (token, log, setting).
 - [ ] Không có kiểu dữ liệu, `id`, khoá ngoại.

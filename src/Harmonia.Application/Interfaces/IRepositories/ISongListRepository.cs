@@ -18,6 +18,9 @@ public interface ISongListRepository : IGenericRepository<SongList>
     /// <summary>Newest version of the event with Items and Reviews loaded; Draft versions are skipped unless <paramref name="includeDraft"/>.</summary>
     Task<SongList?> GetLatestWithDetailsAsync(Guid eventId, bool includeDraft, CancellationToken cancellationToken);
 
+    /// <summary>Every version of the event, newest first, with Items and Reviews loaded; Draft versions are skipped unless <paramref name="includeDraft"/>.</summary>
+    Task<List<SongList>> GetVersionsWithDetailsAsync(Guid eventId, bool includeDraft, CancellationToken cancellationToken);
+
     Task<List<SongList>> GetByStatusAsync(SongListStatus status, CancellationToken cancellationToken);
 
     Task<List<SongListItem>> GetItemsAsync(Guid songListId, CancellationToken cancellationToken);

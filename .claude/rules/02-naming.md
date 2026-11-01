@@ -1,6 +1,6 @@
 # Từ điển nghiệp vụ — dùng đúng tên, không tự đặt từ đồng nghĩa
 
-Nguồn chuẩn: `doc/harmonia-domain-entity-list.md` (50 entity, 24 enum).
+Nguồn chuẩn: `docs/harmonia-domain-entity-list.md` (50 entity, 24 enum).
 Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 
 | Tiếng Việt | Tên trong code |
@@ -128,7 +128,7 @@ Không trả entity ra controller, không nhận entity làm tham số action.
 - Khai thành hằng trong `Domain/Common/ErrorCodes.cs`, không gõ chuỗi trực tiếp.
 - Validation dùng `.WithErrorCode(ErrorCodes.X)` của FluentValidation.
 - `Result<T>` và `DomainException` mang mã lỗi, không mang câu tiếng Việt.
-- Danh mục đầy đủ và bản dịch: `doc/error-codes.md`. Thêm mã mới phải cập nhật
+- Danh mục đầy đủ và bản dịch: `docs/error-codes.md`. Thêm mã mới phải cập nhật
   file đó trong cùng PR, nếu không FE hiển thị mã thô cho người dùng.
 
 ## Infrastructure

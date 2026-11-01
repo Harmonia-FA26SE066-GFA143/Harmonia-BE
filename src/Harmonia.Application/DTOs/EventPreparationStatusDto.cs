@@ -29,8 +29,8 @@ public class EventPreparationStatusDto
 
     public int RosterActiveAssignments { get; set; }
 
-    /// <summary>Null when the event has no approved song list, so staffing needs are not known yet.</summary>
-    public List<RosterShortageDto>? RosterShortages { get; set; }
+    /// <summary>Empty when every position is staffed, or when there is nothing to staff yet (no approved song list, no whole-service role).</summary>
+    public List<RosterShortageDto> RosterShortages { get; set; } = [];
 
     public int RehearsalsTotal { get; set; }
 

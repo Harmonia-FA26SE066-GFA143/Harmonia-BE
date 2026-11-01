@@ -10,7 +10,7 @@ Nguồn dữ liệu, theo thứ tự ưu tiên khi hai bên lệch nhau:
 1. `src/Harmonia.Infrastructure/Data/Configurations/<Entity>Configuration.cs` — thứ thật sự
    nằm trong database (unique index, cột bắt buộc, hành vi xoá).
 2. `src/Harmonia.Domain/Entities/<Entity>.cs` — danh sách property.
-3. `doc/harmonia-domain-entity-list.md` — mô tả, kiểu, mục "Relationships for the ERD".
+3. `docs/harmonia-domain-entity-list.md` — mô tả, kiểu, mục "Relationships for the ERD".
 
 Sơ đồ nộp báo cáo thì **vẽ tay** (draw.io, Astah, Visual Paradigm hoặc giấy) theo mục 3.
 Các khối Mermaid ở mục 4 chỉ là **hình mẫu để nhìn theo** — mở Markdown Preview trong

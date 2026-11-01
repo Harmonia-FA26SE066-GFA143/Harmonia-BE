@@ -65,6 +65,19 @@ public class SongListService(
             : Result<SongListDto>.Success(mapper.Map<SongListDto>(songList));
     }
 
+    public async Task<Result<List<SongListDto>>> GetVersionsForEventAsync(
+        Guid eventId, bool includeDraft, CancellationToken cancellationToken)
+    {
+        if (await liturgicalEventRepository.GetByIdAsync(eventId, cancellationToken) is null
+            || !await choirScope.CanViewEventAsync(eventId, cancellationToken))
+        {
+            return Result<List<SongListDto>>.Failure(ErrorCodes.SongListNotFound);
+        }
+
+        var versions = await songListRepository.GetVersionsWithDetailsAsync(eventId, includeDraft, cancellationToken);
+        return Result<List<SongListDto>>.Success(mapper.Map<List<SongListDto>>(versions));
+    }
+
     public async Task<Result<List<SongListDto>>> GetPendingAsync(CancellationToken cancellationToken)
     {
         var pending = await songListRepository.GetByStatusAsync(SongListStatus.Submitted, cancellationToken);

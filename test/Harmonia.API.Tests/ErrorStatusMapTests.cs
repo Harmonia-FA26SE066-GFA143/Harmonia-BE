@@ -12,7 +12,7 @@ public partial class ErrorStatusMapTests
     [Fact]
     public void MappedStatus_MatchesDocErrorCodes()
     {
-        // ErrorStatusMap claims to be transcribed from the HTTP column of doc/error-codes.md.
+        // ErrorStatusMap claims to be transcribed from the HTTP column of docs/error-codes.md.
         var mismatches = ReadDocumentedStatuses()
             .Select(d => (d.Code, Doc: d.Status, Map: ErrorStatusMap.StatusFor(d.Code, NotMapped)))
             .Where(x => x.Map != NotMapped && x.Map != x.Doc)
@@ -53,7 +53,7 @@ public partial class ErrorStatusMapTests
 
     private static IEnumerable<(string Code, int Status)> ReadDocumentedStatuses()
     {
-        var doc = File.ReadAllText(Path.Combine(TestPaths.SolutionRoot(), "doc", "error-codes.md"));
+        var doc = File.ReadAllText(Path.Combine(TestPaths.SolutionRoot(), "docs", "error-codes.md"));
         return DocRow().Matches(doc).Select(m => (m.Groups[1].Value, int.Parse(m.Groups[2].Value)));
     }
 

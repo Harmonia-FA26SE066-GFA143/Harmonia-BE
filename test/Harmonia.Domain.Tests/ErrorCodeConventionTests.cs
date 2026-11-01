@@ -47,7 +47,7 @@ public partial class ErrorCodeConventionTests
     [Fact]
     public void ErrorCodes_AreAllDocumented()
     {
-        // 02-naming.md: a code missing from doc/error-codes.md shows up raw on the FE.
+        // 02-naming.md: a code missing from docs/error-codes.md shows up raw on the FE.
         var documented = ReadDocumentedCodes();
 
         Assert.Empty(AllCodes.Except(documented));
@@ -81,7 +81,7 @@ public partial class ErrorCodeConventionTests
 
     private static HashSet<string> ReadDocumentedCodes()
     {
-        var doc = File.ReadAllText(Path.Combine(SolutionRoot(), "doc", "error-codes.md"));
+        var doc = File.ReadAllText(Path.Combine(SolutionRoot(), "docs", "error-codes.md"));
 
         return DocTableCode().Matches(doc).Select(m => m.Groups[1].Value).ToHashSet();
     }

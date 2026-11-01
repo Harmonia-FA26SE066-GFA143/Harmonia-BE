@@ -4,7 +4,7 @@ namespace Harmonia.API.Middlewares;
 
 /// <summary>
 /// The single error code -> HTTP status table, transcribed from the HTTP column of
-/// doc/error-codes.md. Both the exception middleware and controllers returning
+/// docs/error-codes.md. Both the exception middleware and controllers returning
 /// <c>Result.Failure</c> read it, so a code's status is defined in exactly one place.
 /// The fallback only catches a code missing from this table: 409 for a domain exception,
 /// 400 for a service failure. Field-level FluentValidation codes are absent by design:

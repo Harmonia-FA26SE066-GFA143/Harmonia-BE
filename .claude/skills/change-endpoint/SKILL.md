@@ -24,7 +24,7 @@ Tìm và đọc toàn bộ chuỗi của endpoint đang sửa:
 - Service xử lý, và mã lỗi nó trả về
 - `AutoMapper` profile liên quan
 - Test trong `test/Harmonia.Application.Tests/` và `test/Harmonia.API.Tests/`
-- `doc/error-codes.md` nếu thay đổi đụng tới mã lỗi
+- `docs/error-codes.md` nếu thay đổi đụng tới mã lỗi
 
 ## SUMMARIZE
 
@@ -101,6 +101,6 @@ Từ trong ra ngoài, controller sửa cuối cùng. Bước nào không cần t
 Không commit. Báo lại ba thứ:
 
 1. Hợp đồng trước / sau, dạng như mục SUMMARIZE — đây là thứ gửi cho nhóm FE và mobile.
-2. Có mã lỗi mới không. Có thì nhắc cập nhật `doc/error-codes.md` **trong cùng PR**, nếu không FE sẽ hiển thị mã thô cho ca viên xem.
+2. Có mã lỗi mới không. Có thì nhắc cập nhật `docs/error-codes.md` **trong cùng PR**, nếu không FE sẽ hiển thị mã thô cho ca viên xem.
 3. Thay đổi phá client thì nói rõ bên nào phải sửa gì, và PR này **không được merge**
    trước khi hai bên hẹn nhau.

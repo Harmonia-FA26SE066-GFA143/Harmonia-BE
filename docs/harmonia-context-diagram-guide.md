@@ -4,7 +4,7 @@ Context diagram (sơ đồ ngữ cảnh, DFD mức 0) trả lời: **hệ thốn
 ở bên ngoài nó**. Cả Harmonia là **một** hình duy nhất ở giữa; xung quanh là các tác nhân
 (người dùng và hệ thống ngoài); mũi tên là luồng dữ liệu đi vào / đi ra. Không vẽ gì bên trong hệ thống.
 
-Nguồn dữ liệu: bảng 4 actor trong `CLAUDE.md`, `doc/harmonia-feature-list.md`, và
+Nguồn dữ liệu: bảng 4 actor trong `CLAUDE.md`, `docs/harmonia-feature-list.md`, và
 `src/Harmonia.Infrastructure/ExternalServices/` (mỗi class ở đó bọc một hệ thống ngoài).
 Sơ đồ nộp báo cáo thì **vẽ tay** (draw.io, Visual Paradigm, Lucidchart) theo mục 3.
 Khối Mermaid ở mục 4 chỉ là **hình mẫu để nhìn theo**.

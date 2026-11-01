@@ -153,6 +153,53 @@ public class SongListServiceTests
         if (!found) Assert.Equal(ErrorCodes.SongListNotFound, result.Code);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task GetVersionsForEvent_ReturnsVersionsWithOrderedItemsAndReviews_Async(bool includeDraft)
+    {
+        var newer = new SongList
+        {
+            Id = Guid.NewGuid(), EventId = _eventId, Version = 2,
+            Items = [new SongListItem { DisplayOrder = 2 }, new SongListItem { DisplayOrder = 1 }],
+            Reviews =
+            [
+                new SongListReview { ReviewedAt = new DateTime(2026, 10, 2) },
+                new SongListReview { ReviewedAt = new DateTime(2026, 10, 1) },
+            ],
+        };
+        var older = new SongList { Id = Guid.NewGuid(), EventId = _eventId, Version = 1 };
+        _songLists.GetVersionsWithDetailsAsync(_eventId, includeDraft, _ct).Returns([newer, older]);
+
+        var result = await _sut.GetVersionsForEventAsync(_eventId, includeDraft, _ct);
+
+        Assert.Equal([newer.Id, older.Id], result.Value!.Select(v => v.Id));
+        Assert.Equal([1, 2], result.Value[0].Items.Select(i => i.DisplayOrder));
+        Assert.Equal([new DateTime(2026, 10, 1), new DateTime(2026, 10, 2)], result.Value[0].Reviews.Select(r => r.ReviewedAt));
+    }
+
+    [Fact]
+    public async Task GetVersionsForEvent_EventMissing_ReturnsNotFound_Async()
+    {
+        var result = await _sut.GetVersionsForEventAsync(Guid.NewGuid(), includeDraft: true, _ct);
+
+        Assert.Equal(ErrorCodes.SongListNotFound, result.Code);
+    }
+
+    [Fact]
+    public async Task GetVersionsForEvent_OutOfChoirScope_ReturnsNotFound_Async()
+    {
+        var scope = ChoirScopeFakes.Unrestricted();
+        scope.CanViewEventAsync(_eventId, _ct).Returns(false);
+        var mapper = new MapperConfiguration(cfg => cfg.AddProfile<SongListProfile>(), NullLoggerFactory.Instance).CreateMapper();
+        var sut = new SongListService(_songLists, _events, _songs, _slots, _users, _notifications, scope, mapper);
+
+        var result = await sut.GetVersionsForEventAsync(_eventId, includeDraft: true, _ct);
+
+        Assert.Equal(ErrorCodes.SongListNotFound, result.Code);
+        await _songLists.DidNotReceive().GetVersionsWithDetailsAsync(Arg.Any<Guid>(), Arg.Any<bool>(), _ct);
+    }
+
     [Fact]
     public async Task GetPending_AsksForSubmittedLists_Async()
     {

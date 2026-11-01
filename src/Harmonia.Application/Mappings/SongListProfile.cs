@@ -8,6 +8,8 @@ public class SongListProfile : Profile
 {
     public SongListProfile()
     {
-        CreateMap<SongList, SongListDto>();
+        CreateMap<SongList, SongListDto>()
+            .ForMember(dest => dest.Items, opt => opt.MapFrom(src => src.Items.OrderBy(i => i.DisplayOrder)))
+            .ForMember(dest => dest.Reviews, opt => opt.MapFrom(src => src.Reviews.OrderBy(r => r.ReviewedAt)));
     }
 }

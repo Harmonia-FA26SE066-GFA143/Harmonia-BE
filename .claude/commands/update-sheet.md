@@ -1,5 +1,5 @@
 ---
-description: Đồng bộ endpoint trong code → doc/api.md → Google Sheet Harmonia_API_Doc
+description: Đồng bộ endpoint trong code → docs/api.md → Google Sheet Harmonia_API_Doc
 allowed-tools: Read, Grep, Glob, Edit, Bash(git diff:*), Bash(git status:*), Skill, mcp__claude_ai_Google_Sheets__get_spreadsheet, mcp__claude_ai_Google_Sheets__get_values, mcp__claude_ai_Google_Sheets__update_values, mcp__claude_ai_Google_Sheets__append_values, mcp__claude_ai_Google_Sheets__insert_dimension, mcp__claude_ai_Google_Sheets__batch_clear_values, mcp__claude_ai_Google_Sheets__update_spreadsheet
 ---
 
@@ -15,10 +15,10 @@ Trước lần ghi đầu tiên, nạp skill `anthropic-skills:google-workspace`
 
 | Tab | Cột | Nguồn |
 |---|---|---|
-| `Quy ước` | Mục · Giá trị · Ghi chú | Mục 1 của `doc/api.md` |
-| `Mã lỗi` | Feature · Endpoint · HTTP · Code · Ý nghĩa | Cột "Mã lỗi" của các tab endpoint + bản dịch ở `doc/error-codes.md` |
-| `Lookups (dùng chung)` | 9 cột endpoint | Mục Lookups của `doc/api.md` |
-| `F<n>. <tên>` | 9 cột endpoint | Endpoint thuộc feature F<n> của `doc/harmonia-feature-list.md` |
+| `Quy ước` | Mục · Giá trị · Ghi chú | Mục 1 của `docs/api.md` |
+| `Mã lỗi` | Feature · Endpoint · HTTP · Code · Ý nghĩa | Cột "Mã lỗi" của các tab endpoint + bản dịch ở `docs/error-codes.md` |
+| `Lookups (dùng chung)` | 9 cột endpoint | Mục Lookups của `docs/api.md` |
+| `F<n>. <tên>` | 9 cột endpoint | Endpoint thuộc feature F<n> của `docs/harmonia-feature-list.md` |
 
 9 cột endpoint: `STT · Function · Method · Route · Quyền · Request body · Response thành công · Mã lỗi · Ghi chú`.
 
@@ -31,11 +31,11 @@ Trước lần ghi đầu tiên, nạp skill `anthropic-skills:google-workspace`
 
 ## Các bước
 
-### 1. Code → `doc/api.md`
+### 1. Code → `docs/api.md`
 Quét `[Route]`, `[Http*]`, `[Authorize]`, `[AllowAnonymous]` trong `src/Harmonia.API/Controllers/`;
-đọc request/response DTO và service liên quan khi cần. So với `doc/api.md`.
-- Lệch (thiếu endpoint, sai DTO, thiếu query, sai role, thiếu mã lỗi) → sửa `doc/api.md` đúng văn phong
-  sẵn có, in `git diff doc/api.md`, rồi **DỪNG chờ người dùng xác nhận** mới sang bước 2.
+đọc request/response DTO và service liên quan khi cần. So với `docs/api.md`.
+- Lệch (thiếu endpoint, sai DTO, thiếu query, sai role, thiếu mã lỗi) → sửa `docs/api.md` đúng văn phong
+  sẵn có, in `git diff docs/api.md`, rồi **DỪNG chờ người dùng xác nhận** mới sang bước 2.
 - Khớp → nói "api.md khớp code" và đi tiếp.
 
 ### 2. Đọc sheet
@@ -44,7 +44,7 @@ rồi `get_values` từng tab cần so.
 
 ### 3. Xếp endpoint vào tab
 - Endpoint đã có dòng ở tab nào → giữ tab đó.
-- Endpoint mới → tab của feature F tương ứng trong `doc/harmonia-feature-list.md`. Không chắc thì hỏi.
+- Endpoint mới → tab của feature F tương ứng trong `docs/harmonia-feature-list.md`. Không chắc thì hỏi.
 
 ### 4. So từng dòng — khoá là `Method` + path (bỏ phần `?query`)
 - Có rồi, nội dung đổi → cập nhật `Route`, `Quyền`, `Request body`, `Response thành công`, `Mã lỗi`,
@@ -62,11 +62,11 @@ là UC-24 → F8, không phải F6.
 
 ### 6. Tab `Mã lỗi`
 Dựng lại toàn bộ từ cột `Mã lỗi` của mọi tab endpoint (thứ tự: tab F theo số, trong tab theo STT),
-`Ý nghĩa` lấy từ `doc/error-codes.md`. Xoá vùng dữ liệu cũ (`batch_clear_values`, giữ header) rồi ghi lại.
+`Ý nghĩa` lấy từ `docs/error-codes.md`. Xoá vùng dữ liệu cũ (`batch_clear_values`, giữ header) rồi ghi lại.
 Mã chưa có bản dịch → để trống `Ý nghĩa` và liệt kê trong báo cáo.
 
 ### 7. Tab `Quy ước`
-So với mục 1 của `doc/api.md`, chỉ sửa dòng thay đổi, thêm dòng mới ở cuối.
+So với mục 1 của `docs/api.md`, chỉ sửa dòng thay đổi, thêm dòng mới ở cuối.
 
 ### 8. Kiểm tra và báo cáo
 Đọc lại từng tab vừa ghi, đối chiếu với dữ liệu định ghi. Báo theo tab:
@@ -91,4 +91,4 @@ Kèm link: https://docs.google.com/spreadsheets/d/1fWlhDqXfSpFx2rIbqBStKx_mYAZSp
   sẵn có xuống các dòng mới, nếu không chúng thiếu viền và căn lề.
 - Đọc lại tab ngay trước khi ghi tab đó (Sheets không có revision guard).
 - Không xoá tab, không xoá dòng endpoint, không đổi tên tab sẵn có.
-- Không commit. Chỉ sửa `doc/api.md` và sheet.
+- Không commit. Chỉ sửa `docs/api.md` và sheet.

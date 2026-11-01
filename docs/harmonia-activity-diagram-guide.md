@@ -29,12 +29,12 @@ Use case chỉ xem dữ liệu (UC-01, UC-02, UC-04, UC-06, UC-14, UC-16, UC-18,
 
 ## 2. Quy trình vẽ một sơ đồ
 
-1. **Lấy phạm vi** từ `doc/harmonia-use-case-descriptions.md`: mã use case, actor,
+1. **Lấy phạm vi** từ `docs/harmonia-use-case-descriptions.md`: mã use case, actor,
    điểm bắt đầu và kết thúc.
 2. **Xác định swimlane**: một lane cho mỗi actor tham gia, thêm một lane `Hệ thống`.
    Tên lane dùng đúng tên role: `ParishPriest`, `ChoirDirector`, `ChoirMember`, `Admin`.
 3. **Liệt kê hành động của actor**: mỗi lời gọi API là một hành động — tra route ở
-   `doc/api.md` hoặc `src/Harmonia.API/Controllers/`.
+   `docs/api.md` hoặc `src/Harmonia.API/Controllers/`.
 4. **Liệt kê hành động của hệ thống**: mở method service tương ứng trong
    `src/Harmonia.Application/Services/`, đọc từ trên xuống. Mỗi khối việc (kiểm tra,
    lưu, gửi thông báo) là một hành động.
@@ -297,7 +297,7 @@ flowchart TD
         D2{Token đúng, còn hạn, chưa dùng?}
         B4[Đổi mật khẩu, đánh dấu token đã dùng]
         B5[Thu hồi mọi RefreshToken]
-        X1[/Trả lỗi token: AUTH_RESET_TOKEN_INVALID khi không tìm thấy, mã riêng khi hết hạn hoặc đã dùng — tra doc/error-codes.md/]
+        X1[/Trả lỗi token: AUTH_RESET_TOKEN_INVALID khi không tìm thấy, mã riêng khi hết hạn hoặc đã dùng — tra docs/error-codes.md/]
     end
 
     A1 --> D1
@@ -382,11 +382,11 @@ flowchart TD
 
 ## 5. Checklist trước khi nộp sơ đồ
 
-- [ ] Tiêu đề có mã use case, khớp `doc/harmonia-use-case-descriptions.md`.
+- [ ] Tiêu đề có mã use case, khớp `docs/harmonia-use-case-descriptions.md`.
 - [ ] Đúng một nút bắt đầu; mọi đường đi đều tới một nút kết thúc.
 - [ ] Mỗi hành động nằm trong đúng lane của người thực hiện.
 - [ ] Mỗi hình thoi là một câu hỏi, mọi nhánh ra đều có nhãn.
-- [ ] Mỗi nhánh lỗi ghi đúng mã trong `doc/error-codes.md`.
+- [ ] Mỗi nhánh lỗi ghi đúng mã trong `docs/error-codes.md`.
 - [ ] Tên lane là tên role trong code; không có `ChoirLeader`, `Instrumentalist`.
 - [ ] Trạng thái nhắc tới trong sơ đồ khớp với state diagram của entity đó.
 - [ ] Code đổi luồng thì sửa sơ đồ trong cùng PR.

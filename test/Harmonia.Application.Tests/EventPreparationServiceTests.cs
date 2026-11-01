@@ -170,18 +170,17 @@ public class EventPreparationServiceTests
     }
 
     [Fact]
-    public async Task GetStatus_NoApprovedSongListOrRoster_LeavesThemNull_Async()
+    public async Task GetStatus_NoApprovedSongListOrRoster_LeavesThemEmpty_Async()
     {
         _events.GetWithPreparationAsync(_eventId, _ct).Returns(new LiturgicalEvent { Id = _eventId });
-        _roster.GetShortagesAsync(_eventId, _ct)
-            .Returns(Result<List<RosterShortageDto>>.Failure(ErrorCodes.RosterSongListNotApproved));
+        _roster.GetShortagesAsync(_eventId, _ct).Returns(Result<List<RosterShortageDto>>.Success([]));
 
         var result = await _sut.GetStatusAsync(_eventId, _ct);
 
         Assert.True(result.IsSuccess);
         Assert.Null(result.Value!.SongListStatus);
         Assert.Null(result.Value.RosterStatus);
-        Assert.Null(result.Value.RosterShortages);
+        Assert.Empty(result.Value.RosterShortages);
         Assert.Equal(0, result.Value.AttendanceExpected);
     }
 
