@@ -16,7 +16,9 @@ public class MemberSkillProfile : Profile
         CreateMap<MemberSkill, MemberSkillDto>()
             .ForMember(dest => dest.SkillName, opt => opt.MapFrom(src => src.Skill.Name))
             .ForMember(dest => dest.CategoryId, opt => opt.MapFrom(src => src.Skill.CategoryId))
-            .ForMember(dest => dest.CategoryName, opt => opt.MapFrom(src => src.Skill.Category.Name));
+            .ForMember(dest => dest.CategoryName, opt => opt.MapFrom(src => src.Skill.Category.Name))
+            // The service signs the evidence URL after the access check.
+            .ForMember(dest => dest.Evidence, opt => opt.Ignore());
 
         CreateMap<MemberSkill, MemberSkillDetailDto>()
             .IncludeBase<MemberSkill, MemberSkillDto>()

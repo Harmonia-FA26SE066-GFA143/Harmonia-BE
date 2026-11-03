@@ -148,6 +148,9 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `MEMBER_SKILL_ALREADY_REVIEWED` | 409 | Kỹ năng này đã được duyệt hoặc từ chối |
 | `MEMBER_SKILL_REJECT_REASON_REQUIRED` | 400 | Vui lòng nhập lý do từ chối |
 | `MEMBER_SKILL_NOT_APPROVED` | 409 | Kỹ năng chưa được duyệt |
+| `MEMBER_SKILL_EVIDENCE_REQUIRED` | 400 | Vui lòng chọn tệp minh chứng |
+| `MEMBER_SKILL_EVIDENCE_TYPE_NOT_ALLOWED` | 400 | Minh chứng chỉ nhận ghi âm .mp3, .m4a, .wav hoặc clip .mp4, .mov |
+| `MEMBER_SKILL_EVIDENCE_TOO_LARGE` | 413 | Ghi âm tối đa 20 MB, clip tối đa 100 MB |
 
 ## 5. Lịch phụng vụ
 

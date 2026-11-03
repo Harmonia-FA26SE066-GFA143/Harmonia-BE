@@ -117,6 +117,12 @@ public static class ErrorCodes
 
     public const string MemberSkillNotApproved = "MEMBER_SKILL_NOT_APPROVED";
 
+    public const string MemberSkillEvidenceRequired = "MEMBER_SKILL_EVIDENCE_REQUIRED";
+
+    public const string MemberSkillEvidenceTypeNotAllowed = "MEMBER_SKILL_EVIDENCE_TYPE_NOT_ALLOWED";
+
+    public const string MemberSkillEvidenceTooLarge = "MEMBER_SKILL_EVIDENCE_TOO_LARGE";
+
     // 5. Liturgical calendar.
     public const string CalendarDayNotFound = "CALENDAR_DAY_NOT_FOUND";
 

@@ -24,4 +24,6 @@ public class MemberSkillDto
     public DateTime? ApprovedAt { get; set; }
 
     public string? RejectReason { get; set; }
+
+    public MemberSkillEvidenceDto? Evidence { get; set; }
 }

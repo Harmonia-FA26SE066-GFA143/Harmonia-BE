@@ -64,7 +64,7 @@ Written once here instead of repeated 47 times:
 `categoryId` Guid → SkillCategory · `name` string(50) · `description` string(300)? · `isActive` bool · unique `(categoryId, name)`
 
 **7. `MemberSkill`** — declared skill + approval outcome (FE-03/04/25)
-`memberId` Guid → MemberProfile · `skillId` Guid → Skill · `level` SkillLevel? · `status` ApprovalStatus · `declaredAt` DateTime · `approvedBy` Guid? → User · `approvedAt` DateTime? · `rejectReason` string(500)? · unique `(memberId, skillId)` where `status ≠ Rejected` — rejected rows stay as history and the skill can be declared again as a new Pending row
+`memberId` Guid → MemberProfile · `skillId` Guid → Skill · `level` SkillLevel? · `status` ApprovalStatus · `declaredAt` DateTime · `approvedBy` Guid? → User · `approvedAt` DateTime? · `rejectReason` string(500)? · `evidencePublicId` string(255)? · `evidenceFileName` string(255)? · `evidenceSizeBytes` long? · `evidenceUploadedAt` DateTime? · unique `(memberId, skillId)` where `status ≠ Rejected` — rejected rows stay as history and the skill can be declared again as a new Pending row
 
 ## C. Liturgical calendar
 
@@ -333,6 +333,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 - 2026-10-25: `PracticeAssignmentMaterial` added (48 → 49) — several materials per practice assignment; `PracticeAssignment.materialId` stays as the first one for older clients, and DataSeeder copies it into the new table. `LiturgicalNameTranslation` added (49 → 50) with enum `LiturgicalNameKind` — Vietnamese calendar names kept by the Admin, seeded once from the Web's table. Enum `ReportPeriod` for the activity trend report (22 → 24). Needs a migration.
 - 2026-11-01: `RehearsalRecording` added (50 → 51) — the director's takes from the practice room, heard by the choir's members. Needs a migration.
 - 2026-11-01: `LiturgicalDay` gains `color` string(20)? — the liturgical colour the calendar API lists for the day (Web B45). Needs a migration; cached years are filled on the next sync.
+- 2026-11-03: `MemberSkill` gains `evidencePublicId`, `evidenceFileName`, `evidenceSizeBytes`, `evidenceUploadedAt` — one private voice or clip file per declaration, shown to the Choir Director for review. Needs a migration.
 
 **Bổ sung 2026-10-26 — phân công 3 tầng**
 

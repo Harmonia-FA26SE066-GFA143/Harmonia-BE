@@ -10,6 +10,8 @@ public class MemberSkillConfiguration : IEntityTypeConfiguration<MemberSkill>
     public void Configure(EntityTypeBuilder<MemberSkill> builder)
     {
         builder.Property(x => x.RejectReason).HasMaxLength(500);
+        builder.Property(x => x.EvidencePublicId).HasMaxLength(255);
+        builder.Property(x => x.EvidenceFileName).HasMaxLength(255);
 
         // A review saves only while the row still holds the status it was read with, so two
         // directors reviewing the same Pending row cannot both succeed.

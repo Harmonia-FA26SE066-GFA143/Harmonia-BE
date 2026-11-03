@@ -17,6 +17,10 @@ namespace Harmonia.API.Controllers;
 [Authorize]
 public class MemberSkillsController(IMemberSkillService memberSkillService) : ApiControllerBase
 {
+    // A 100 MB clip plus multipart overhead, so the service still answers with its own error code.
+    // Keep in step with maxAllowedContentLength in web.config.
+    private const long MaxEvidenceRequestBytes = 101 * 1024 * 1024;
+
     [HttpPost]
     [Authorize(Roles = RoleNames.ChoirMember)]
     [ProducesResponseType<MemberSkillDto>(StatusCodes.Status200OK)]
@@ -36,6 +40,21 @@ public class MemberSkillsController(IMemberSkillService memberSkillService) : Ap
     [ProducesResponseType<MemberSkillDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMineByIdAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await memberSkillService.GetMineByIdAsync(User.GetUserId(), id, cancellationToken));
+
+    /// <summary>The member attaches a voice (.mp3, .m4a, .wav, max 20 MB) or clip (.mp4, .mov, max 100 MB) to their Pending declaration.</summary>
+    [HttpPut("{id:guid}/evidence")]
+    [Authorize(Roles = RoleNames.ChoirMember)]
+    [RequestSizeLimit(MaxEvidenceRequestBytes)]
+    [ProducesResponseType<MemberSkillDto>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> UploadEvidenceAsync(Guid id, IFormFile? file, CancellationToken cancellationToken)
+    {
+        if (file is null)
+            return ToActionResult(await memberSkillService.UploadEvidenceAsync(User.GetUserId(), id, null, cancellationToken));
+
+        await using var content = file.OpenReadStream();
+        return ToActionResult(await memberSkillService.UploadEvidenceAsync(
+            User.GetUserId(), id, new FileContent(content, file.FileName, file.Length), cancellationToken));
+    }
 
     [HttpGet("pending")]
     [Authorize(Roles = RoleNames.ChoirDirector)]

@@ -18,6 +18,7 @@ public class MemberSkillServiceTests
     private readonly IMemberSkillRepository _memberSkills = Substitute.For<IMemberSkillRepository>();
     private readonly IMemberProfileRepository _members = Substitute.For<IMemberProfileRepository>();
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
+    private readonly IFileStorageService _files = Substitute.For<IFileStorageService>();
     private readonly MemberSkillService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly Guid _userId = Guid.NewGuid();
@@ -28,7 +29,11 @@ public class MemberSkillServiceTests
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<MemberSkillProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new MemberSkillService(_memberSkills, _members, _notifications, mapper);
+        _sut = new MemberSkillService(_memberSkills, _members, _notifications, _files, mapper);
+        _files.UploadAsync(default!, default!, default!, default, default).ReturnsForAnyArgs(call =>
+            Result<FileUploadResponse>.Success(new FileUploadResponse(
+                $"harmonia/{call.ArgAt<string>(2)}/new{Path.GetExtension(call.ArgAt<string>(1))}", string.Empty)));
+        _files.GetSignedUrl(default!).ReturnsForAnyArgs(call => $"signed:{call.Arg<string>()}");
 
         _member = new MemberProfile { Id = Guid.NewGuid(), UserId = _userId, Status = MemberStatus.Active };
         var vocal = new SkillCategory { Id = SkillCategoryIds.Vocal, Name = "Vocal", IsActive = true };
@@ -316,5 +321,162 @@ public class MemberSkillServiceTests
         var result = await _sut.ApproveAsync(Guid.NewGuid(), Guid.NewGuid(), _ct);
 
         Assert.Equal(ErrorCodes.MemberSkillNotFound, result.Code);
+    }
+
+    private static FileContent Evidence(string name, long length = 1024) => new(Stream.Null, name, length);
+
+    [Theory]
+    [InlineData("take.mp3", MemberSkillService.MaxVoiceSizeBytes, "Voice")]
+    [InlineData("TAKE.M4A", 1024L, "Voice")]
+    [InlineData("take.wav", 1024L, "Voice")]
+    [InlineData("clip.mp4", MemberSkillService.MaxClipSizeBytes, "Clip")]
+    [InlineData("clip.mov", 1024L, "Clip")]
+    public async Task UploadEvidence_AllowedFile_StoresPrivatelyAndReturnsSignedUrl_Async(string name, long length, string type)
+    {
+        var row = StubForReview(ApprovalStatus.Pending);
+
+        var result = await _sut.UploadEvidenceAsync(_userId, row.Id, Evidence(name, length), _ct);
+
+        Assert.True(result.IsSuccess);
+        var evidence = result.Value!.Evidence!;
+        Assert.Equal((type, name, length), (evidence.Type, evidence.FileName, evidence.FileSizeBytes));
+        Assert.Equal($"signed:{row.EvidencePublicId}", evidence.Url);
+        await _files.Received(1).UploadAsync(Stream.Null, name, "member-skill-evidence", true, _ct);
+    }
+
+    [Theory]
+    [InlineData("take.exe", 1024L, ErrorCodes.MemberSkillEvidenceTypeNotAllowed)]
+    [InlineData("noextension", 1024L, ErrorCodes.MemberSkillEvidenceTypeNotAllowed)]
+    [InlineData("take.mp3", 0L, ErrorCodes.MemberSkillEvidenceRequired)]
+    [InlineData("take.mp3", MemberSkillService.MaxVoiceSizeBytes + 1, ErrorCodes.MemberSkillEvidenceTooLarge)]
+    [InlineData("clip.mp4", MemberSkillService.MaxClipSizeBytes + 1, ErrorCodes.MemberSkillEvidenceTooLarge)]
+    public async Task UploadEvidence_BadFile_ReturnsCode_AndUploadsNothing_Async(string name, long length, string code)
+    {
+        var row = StubForReview(ApprovalStatus.Pending);
+
+        var result = await _sut.UploadEvidenceAsync(_userId, row.Id, Evidence(name, length), _ct);
+
+        Assert.Equal(code, result.Code);
+        await _files.DidNotReceiveWithAnyArgs().UploadAsync(default!, default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task UploadEvidence_NoFile_ReturnsRequired_Async()
+    {
+        var row = StubForReview(ApprovalStatus.Pending);
+
+        var result = await _sut.UploadEvidenceAsync(_userId, row.Id, null, _ct);
+
+        Assert.Equal(ErrorCodes.MemberSkillEvidenceRequired, result.Code);
+    }
+
+    [Fact]
+    public async Task UploadEvidence_AnotherMembersDeclaration_ReturnsNotFound_AndUploadsNothing_Async()
+    {
+        var row = StubForReview(ApprovalStatus.Pending);
+        row.MemberId = Guid.NewGuid();
+
+        var result = await _sut.UploadEvidenceAsync(_userId, row.Id, Evidence("take.mp3"), _ct);
+
+        Assert.Equal(ErrorCodes.MemberSkillNotFound, result.Code);
+        await _files.DidNotReceiveWithAnyArgs().UploadAsync(default!, default!, default!, default, default);
+    }
+
+    [Theory]
+    [InlineData(ApprovalStatus.Approved)]
+    [InlineData(ApprovalStatus.Rejected)]
+    public async Task UploadEvidence_AlreadyReviewed_ReturnsAlreadyReviewed_Async(ApprovalStatus status)
+    {
+        var row = StubForReview(status);
+
+        var result = await _sut.UploadEvidenceAsync(_userId, row.Id, Evidence("take.mp3"), _ct);
+
+        Assert.Equal(ErrorCodes.MemberSkillAlreadyReviewed, result.Code);
+        await _files.DidNotReceiveWithAnyArgs().UploadAsync(default!, default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task UploadEvidence_MemberNotActive_ReturnsMemberNotActive_Async()
+    {
+        var row = StubForReview(ApprovalStatus.Pending);
+        _member.Status = MemberStatus.Left;
+
+        var result = await _sut.UploadEvidenceAsync(_userId, row.Id, Evidence("take.mp3"), _ct);
+
+        Assert.Equal(ErrorCodes.MemberNotActive, result.Code);
+    }
+
+    [Fact]
+    public async Task UploadEvidence_Replacing_DeletesPreviousFile_Async()
+    {
+        var row = StubForReview(ApprovalStatus.Pending);
+        row.EvidencePublicId = "harmonia/member-skill-evidence/old.mp3";
+
+        var result = await _sut.UploadEvidenceAsync(_userId, row.Id, Evidence("clip.mp4"), _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("harmonia/member-skill-evidence/new.mp4", row.EvidencePublicId);
+        await _files.Received(1).DeleteAsync("harmonia/member-skill-evidence/old.mp3", true, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task UploadEvidence_DirectorReviewsDuringUpload_RemovesNewFile_AndKeepsPrevious_Async()
+    {
+        var row = StubForReview(ApprovalStatus.Pending);
+        row.EvidencePublicId = "harmonia/member-skill-evidence/old.mp3";
+        _memberSkills.TrySaveReviewAsync(row, _ct).Returns(false);
+
+        var result = await _sut.UploadEvidenceAsync(_userId, row.Id, Evidence("clip.mp4"), _ct);
+
+        Assert.Equal(ErrorCodes.MemberSkillAlreadyReviewed, result.Code);
+        await _files.Received(1).DeleteAsync("harmonia/member-skill-evidence/new.mp4", true, CancellationToken.None);
+        await _files.DidNotReceive().DeleteAsync("harmonia/member-skill-evidence/old.mp3", Arg.Any<bool>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task UploadEvidence_SaveThrows_RemovesNewFile_AndRethrows_Async()
+    {
+        var row = StubForReview(ApprovalStatus.Pending);
+        _memberSkills.TrySaveReviewAsync(row, _ct).Returns<bool>(_ => throw new InvalidOperationException("db down"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _sut.UploadEvidenceAsync(_userId, row.Id, Evidence("take.mp3"), _ct));
+
+        await _files.Received(1).DeleteAsync("harmonia/member-skill-evidence/new.mp3", true, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task UploadEvidence_StorageFails_ReturnsCode_AndSavesNothing_Async()
+    {
+        var row = StubForReview(ApprovalStatus.Pending);
+        _files.UploadAsync(default!, default!, default!, default, default)
+            .ReturnsForAnyArgs(Result<FileUploadResponse>.Failure(ErrorCodes.ExternalStorageFailed));
+
+        var result = await _sut.UploadEvidenceAsync(_userId, row.Id, Evidence("take.mp3"), _ct);
+
+        Assert.Equal(ErrorCodes.ExternalStorageFailed, result.Code);
+        Assert.Null(row.EvidencePublicId);
+        await _memberSkills.DidNotReceive().TrySaveReviewAsync(Arg.Any<MemberSkill>(), _ct);
+    }
+
+    [Fact]
+    public async Task GetPending_RowWithEvidence_ReturnsSignedUrl_RowWithoutEvidence_ReturnsNull_Async()
+    {
+        var paging = new PagingRequest();
+        var directorId = Guid.NewGuid();
+        var withEvidence = StubForReview(ApprovalStatus.Pending);
+        withEvidence.EvidencePublicId = "harmonia/member-skill-evidence/a.mov";
+        withEvidence.EvidenceFileName = "a.mov";
+        withEvidence.EvidenceSizeBytes = 2048;
+        withEvidence.EvidenceUploadedAt = DateTime.UtcNow;
+        var without = StubForReview(ApprovalStatus.Pending);
+        _memberSkills.GetPendingAsync(directorId, paging, _ct)
+            .Returns(new PagedList<MemberSkill>([withEvidence, without], 1, 20, 2));
+
+        var result = await _sut.GetPendingAsync(directorId, paging, _ct);
+
+        Assert.Equal("Clip", result.Value!.Items[0].Evidence!.Type);
+        Assert.Equal("signed:harmonia/member-skill-evidence/a.mov", result.Value.Items[0].Evidence!.Url);
+        Assert.Null(result.Value.Items[1].Evidence);
     }
 }

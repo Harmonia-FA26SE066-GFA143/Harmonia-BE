@@ -201,6 +201,52 @@ public class MemberSkillsEndpointsTests(HarmoniaApiFactory factory) : IClassFixt
         Assert.Equal(HttpStatusCode.Forbidden, pending.StatusCode);
     }
 
+    private static MultipartFormDataContent EvidenceForm(string fileName)
+    {
+        var file = new ByteArrayContent([1, 2, 3]);
+        file.Headers.ContentType = new("audio/mpeg"); // Deliberately lies for non-mp3 names; the server must ignore it.
+        return new MultipartFormDataContent { { file, "file", fileName } };
+    }
+
+    [Fact]
+    public async Task Member_UploadsEvidence_DirectorSeesItInPending_Async()
+    {
+        var member = await CreateMemberClientAsync("ms-evidence@test.com", _ct);
+        var director = await factory.CreateClientAsAsync("director@test.com", _ct);
+        var skill = await AddSkillAsync("ms-Evidence", cancellationToken: _ct);
+        var declared = await DeclareAsync(member, skill.Id, _ct);
+
+        var upload = await member.PutAsync($"api/member-skills/{declared.Id}/evidence", EvidenceForm("clip.mp4"), _ct);
+        var pending = (await director.GetFromJsonAsync<DetailPage>("api/member-skills/pending?pageSize=100", TestJson.Options, _ct))!;
+
+        Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
+        var uploaded = (await upload.Content.ReadFromJsonAsync<MemberSkillDto>(TestJson.Options, _ct))!;
+        Assert.Equal(("Clip", "clip.mp4", 3L), (uploaded.Evidence!.Type, uploaded.Evidence.FileName, uploaded.Evidence.FileSizeBytes));
+        var evidence = pending.Items.Single(x => x.Id == declared.Id).Evidence!;
+        Assert.StartsWith("https://files.test/harmonia/member-skill-evidence/", evidence.Url);
+    }
+
+    [Fact]
+    public async Task UploadEvidence_WrongRoleOrOwner_IsRefused_AndBadType_Returns400_Async()
+    {
+        var owner = await CreateMemberClientAsync("ms-evidence-owner@test.com", _ct);
+        var other = await CreateMemberClientAsync("ms-evidence-other@test.com", _ct);
+        var director = await factory.CreateClientAsAsync("director@test.com", _ct);
+        var skill = await AddSkillAsync("ms-EvidenceOwner", cancellationToken: _ct);
+        var declared = await DeclareAsync(owner, skill.Id, _ct);
+        var route = $"api/member-skills/{declared.Id}/evidence";
+
+        var foreign = await other.PutAsync(route, EvidenceForm("take.mp3"), _ct);
+        var wrongRole = await director.PutAsync(route, EvidenceForm("take.mp3"), _ct);
+        var badType = await owner.PutAsync(route, EvidenceForm("take.exe"), _ct);
+
+        Assert.Equal(HttpStatusCode.NotFound, foreign.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, wrongRole.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, badType.StatusCode);
+        var error = (await badType.Content.ReadFromJsonAsync<ErrorResponse>(TestJson.Options, _ct))!;
+        Assert.Equal(ErrorCodes.MemberSkillEvidenceTypeNotAllowed, error.Code);
+    }
+
     [Fact]
     public async Task Director_CannotDeclareOrReadMine_Async()
     {

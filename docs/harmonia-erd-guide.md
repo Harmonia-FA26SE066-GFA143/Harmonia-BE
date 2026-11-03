@@ -224,6 +224,10 @@ erDiagram
         Guid ApprovedBy FK "null"
         DateTime ApprovedAt "null"
         string RejectReason "null"
+        string EvidencePublicId "null"
+        string EvidenceFileName "null"
+        long EvidenceSizeBytes "null"
+        DateTime EvidenceUploadedAt "null"
     }
 ```
 

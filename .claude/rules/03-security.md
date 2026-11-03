@@ -127,6 +127,8 @@
     — chỉ người dùng tự đổi qua `PUT/DELETE api/auth/me/avatar` (chốt 2026-11-01).
   - `RehearsalRecording` (bản thu ca trưởng ghi ở phòng tập) nhận `.webm`, `.ogg`, `.m4a`, `.mp3`, `.wav` — trình duyệt
     thu ra `.webm`/`.ogg` (Chrome, Firefox) hoặc `.m4a` (Safari). Tối đa 20 MB, lưu private (chốt 2026-11-01).
+  - Minh chứng `MemberSkill` nhận ghi âm `.mp3`, `.m4a`, `.wav` tối đa 20 MB hoặc clip `.mp4`, `.mov` tối đa 100 MB, lưu private
+    (chốt 2026-11-03). Chỉ action này nới giới hạn request lên 101 MB; IIS nâng tương ứng trong `src/Harmonia.API/web.config`.
 - Không tin `Content-Type` client gửi — kiểm phần mở rộng lẫn dung lượng ở server.
 - Lưu bằng tên sinh mới (GUID), không dùng tên gốc — tránh path traversal và ghi đè.
   `fileName` gốc chỉ để hiển thị.

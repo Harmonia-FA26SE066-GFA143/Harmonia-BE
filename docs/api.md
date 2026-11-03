@@ -383,19 +383,29 @@ Chưa có kỹ năng nào → `[]`.
   "status": "Pending",
   "declaredAt": "2026-10-05T08:00:00Z",
   "approvedAt": null,
-  "rejectReason": null
+  "rejectReason": null,
+  "evidence": {
+    "type": "Clip",
+    "fileName": "organ.mp4",
+    "fileSizeBytes": 10485760,
+    "uploadedAt": "2026-10-05T08:05:00Z",
+    "url": "https://..."
+  }
 }
 ```
 
 `level`: `Beginner` | `Intermediate` | `Advanced` | `null`. `status`: `Pending` | `Approved` | `Rejected`.
 `approvedAt` là lúc ca trưởng duyệt **hoặc** từ chối; `rejectReason` chỉ có khi `Rejected`.
+`evidence` là `null` khi chưa gửi minh chứng; `type`: `Voice` | `Clip`. `url` là link ký có hạn, hết hạn thì gọi lại API để lấy link mới.
 
 | Method | Route | Role | Body / Query | Thành công | Lỗi |
 |---|---|---|---|---|---|
 | POST | `/api/member-skills` | `ChoirMember` | `{ "skillId", "level" }` | 200 `MemberSkillDto` | 400 `VALIDATION_FAILED` · 404 `MEMBER_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `MEMBER_NOT_ACTIVE`, `SKILL_INACTIVE`, `MEMBER_SKILL_ALREADY_DECLARED` |
 | GET | `/api/member-skills/mine` | `ChoirMember` | query `status`, `pageNumber`, `pageSize` | 200 `PagedList<MemberSkillDto>` | 404 `MEMBER_NOT_FOUND` |
 | GET | `/api/member-skills/{id}` | `ChoirMember` | — | 200 `MemberSkillDto` | 404 `MEMBER_NOT_FOUND`, `MEMBER_SKILL_NOT_FOUND` |
+| PUT | `/api/member-skills/{id}/evidence` | `ChoirMember` | multipart `file` | 200 `MemberSkillDto` | 400 `MEMBER_SKILL_EVIDENCE_REQUIRED`, `MEMBER_SKILL_EVIDENCE_TYPE_NOT_ALLOWED` · 404 `MEMBER_NOT_FOUND`, `MEMBER_SKILL_NOT_FOUND` · 409 `MEMBER_NOT_ACTIVE`, `MEMBER_SKILL_ALREADY_REVIEWED` · 413 `MEMBER_SKILL_EVIDENCE_TOO_LARGE` · 502 `EXTERNAL_STORAGE_FAILED` |
 
+- Minh chứng: mỗi bản khai **một file**, ghi âm `.mp3`, `.m4a`, `.wav` tối đa 20 MB hoặc clip `.mp4`, `.mov` tối đa 100 MB. Chỉ gửi được khi bản khai còn `Pending` của chính mình; gửi lại sẽ thay file cũ. Không bắt buộc để được duyệt.
 - Ca viên luôn khai cho **chính mình** — không có `memberId` trong body. Kỹ năng mới vào trạng thái `Pending`.
 - `skillId` bắt buộc, lấy từ `GET /api/lookups/skills`. `level` tuỳ chọn.
 - Skill bị tắt, hoặc thuộc nhóm kỹ năng bị tắt → 409 `SKILL_INACTIVE`. Ca viên `Inactive` / `Left` → 409 `MEMBER_NOT_ACTIVE`.

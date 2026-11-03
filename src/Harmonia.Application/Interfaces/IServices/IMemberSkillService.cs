@@ -30,6 +30,14 @@ public interface IMemberSkillService
     Task<Result<MemberSkillDto>> GetMineByIdAsync(Guid userId, Guid id, CancellationToken cancellationToken);
 
     /// <summary>
+    /// The calling member attaches a voice (.mp3, .m4a, .wav, max 20 MB) or clip (.mp4, .mov, max 100 MB) to their
+    /// own Pending declaration, replacing any earlier one. A declaration that is no longer Pending fails with
+    /// MEMBER_SKILL_ALREADY_REVIEWED; another member's fails with MEMBER_SKILL_NOT_FOUND.
+    /// </summary>
+    Task<Result<MemberSkillDto>> UploadEvidenceAsync(
+        Guid userId, Guid id, FileContent? file, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Pending declarations of the members the Choir Director manages (D8), oldest first, for them to review (UC-19).
     /// </summary>
     Task<Result<PagedList<MemberSkillDetailDto>>> GetPendingAsync(
