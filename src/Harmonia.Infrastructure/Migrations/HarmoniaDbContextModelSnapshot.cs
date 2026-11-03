@@ -696,6 +696,20 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Property<DateTime>("DeclaredAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("EvidenceFileName")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("EvidencePublicId")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<long?>("EvidenceSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("EvidenceUploadedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<int?>("Level")
                         .HasColumnType("int");
 
