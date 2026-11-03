@@ -208,11 +208,22 @@ public class UserService(
 			&& await userRepository.CountActiveAdminsAsync(ct) <= 1)
 			return Result<UserDto>.Failure(ErrorCodes.UserLastAdmin);
 
+		var wasChoirMember = user.Role.Name == RoleNames.ChoirMember;
 		user.RoleId = newRole.Id;
-		// A profile is kept when the member later changes role, so their history stays attached.
-		if (newRole.Name == RoleNames.ChoirMember
-			&& await memberProfileRepository.GetByUserIdAsync(id, ct) is null)
-			await memberProfileRepository.AddAsync(NewMemberProfile(id), ct);
+		var profile = await memberProfileRepository.GetForRoleChangeAsync(id, ct);
+		if (newRole.Name == RoleNames.ChoirMember)
+		{
+			if (profile is null)
+				await memberProfileRepository.AddAsync(NewMemberProfile(id), ct);
+			else if (!wasChoirMember && profile.Status == MemberStatus.Inactive)
+				profile.Status = MemberStatus.Active;
+		}
+		else if (profile is not null)
+		{
+			// Only Choir Members sing: the profile is kept for its history but leaves every choir and member flow.
+			if (profile.Status == MemberStatus.Active) profile.Status = MemberStatus.Inactive;
+			foreach (var membership in profile.ChoirMemberships) membership.IsActive = false;
+		}
 		// The old role lives on in every issued token; force a fresh sign-in.
 		await userRepository.RevokeAllRefreshTokensAsync(id, ct);
 		await userRepository.SaveChangesAsync(ct);

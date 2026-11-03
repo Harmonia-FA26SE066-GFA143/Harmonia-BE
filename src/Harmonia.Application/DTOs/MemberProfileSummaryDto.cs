@@ -21,5 +21,7 @@ public class MemberProfileSummaryDto
 
     public string? AvatarUrl { get; set; }
 
+    public string RoleName { get; set; } = string.Empty;
+
     public List<MemberSkillSummaryDto> ApprovedSkills { get; set; } = [];
 }

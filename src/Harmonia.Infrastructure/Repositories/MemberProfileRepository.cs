@@ -31,9 +31,14 @@ public class MemberProfileRepository(HarmoniaDbContext dbContext)
             .Include(x => x.User)
             .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
 
+    public Task<MemberProfile?> GetForRoleChangeAsync(Guid userId, CancellationToken cancellationToken) =>
+        DbContext.MemberProfiles
+            .Include(x => x.ChoirMemberships.Where(m => m.IsActive))
+            .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+
     public Task<MemberProfile?> GetWithUserAsync(Guid id, CancellationToken cancellationToken) =>
         DbContext.MemberProfiles
-            .Include(x => x.User)
+            .Include(x => x.User.Role)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
     public Task<bool> IsManagedByDirectorAsync(Guid memberId, Guid directorUserId, CancellationToken cancellationToken) =>
@@ -69,7 +74,7 @@ public class MemberProfileRepository(HarmoniaDbContext dbContext)
         var totalCount = await query.CountAsync(cancellationToken);
 
         var items = await query
-            .Include(x => x.User)
+            .Include(x => x.User.Role)
             .Include(x => x.MemberSkills.Where(s => s.Status == ApprovalStatus.Approved && s.Skill.IsActive))
                 .ThenInclude(s => s.Skill.Category)
             .OrderBy(x => x.User.FullName)

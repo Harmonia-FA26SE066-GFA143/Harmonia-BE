@@ -11,7 +11,8 @@ using Microsoft.Extensions.Logging;
 namespace Harmonia.Infrastructure.Data;
 
 /// <summary>
-/// Runs at startup and only ever inserts, so it is safe against any existing database.
+/// Runs at startup and only inserts, so it is safe against any existing database. The one exception is
+/// <see cref="DeactivateRetainedMemberProfilesAsync"/>, which only touches profiles of accounts that left the Choir Member role.
 /// Roles are matched by name, not seeded through HasData: deployed databases already hold
 /// the four roles under random ids, and a HasData insert would collide on the unique Name index.
 /// </summary>
@@ -29,6 +30,7 @@ public class DataSeeder(
         await SeedRolesAsync(cancellationToken);
         await SeedFirstAdminAsync(cancellationToken);
         await SeedMissingMemberProfilesAsync(cancellationToken);
+        await DeactivateRetainedMemberProfilesAsync(cancellationToken);
         await SeedSystemSettingsAsync(cancellationToken);
         await SeedMissingAssignmentMaterialsAsync(cancellationToken);
         await SeedLiturgicalNameTranslationsAsync(cancellationToken);
@@ -193,6 +195,32 @@ public class DataSeeder(
         }));
         await dbContext.SaveChangesAsync(cancellationToken);
         logger.LogInformation("Seeded {Count} missing member profiles.", members.Count);
+    }
+
+    /// <summary>
+    /// Profiles retained before UserService.AssignRoleAsync started deactivating them. Finds nothing once they are
+    /// fixed, because role changes keep the same state from then on.
+    /// </summary>
+    private async Task DeactivateRetainedMemberProfilesAsync(CancellationToken cancellationToken)
+    {
+        var profiles = await dbContext.MemberProfiles
+            .Where(x => x.User.Role.Name != RoleNames.ChoirMember
+                && (x.Status == MemberStatus.Active || x.ChoirMemberships.Any(m => m.IsActive)))
+            .Include(x => x.ChoirMemberships.Where(m => m.IsActive))
+            .ToListAsync(cancellationToken);
+        if (profiles.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var profile in profiles)
+        {
+            if (profile.Status == MemberStatus.Active) profile.Status = MemberStatus.Inactive;
+            foreach (var membership in profile.ChoirMemberships) membership.IsActive = false;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        logger.LogInformation("Deactivated {Count} member profiles retained after a role change.", profiles.Count);
     }
 
     private async Task SeedRolesAsync(CancellationToken cancellationToken)

@@ -133,6 +133,40 @@ public sealed class DataSeederTests : IDisposable
     }
 
     [Fact]
+    public async Task SeedAsync_ProfileRetainedAfterRoleChange_IsDeactivated_ChoirMemberIsNot_Async()
+    {
+        var director = await _db.AddUserAsync("retained@test.com", RoleNames.ChoirDirector, _ct);
+        var left = await _db.AddUserAsync("retained-left@test.com", RoleNames.ParishPriest, _ct);
+        var member = await _db.AddUserAsync("member@test.com", RoleNames.ChoirMember, _ct);
+        MemberProfile Profile(User user, MemberStatus status) => new()
+        {
+            Id = Guid.NewGuid(), UserId = user.Id, JoinedDate = new DateOnly(2024, 1, 1), Status = status,
+        };
+        var (retained, retainedLeft, active) = (
+            Profile(director, MemberStatus.Active), Profile(left, MemberStatus.Left), Profile(member, MemberStatus.Active));
+        var choir = new Choir { Id = Guid.NewGuid(), Name = "Choir" };
+        ChoirMembership Membership(MemberProfile profile) => new()
+        {
+            Id = Guid.NewGuid(), ChoirId = choir.Id, MemberId = profile.Id, JoinedDate = new DateOnly(2024, 1, 1),
+        };
+        await using (var seedContext = _db.NewContext())
+        {
+            seedContext.AddRange(retained, retainedLeft, active, choir, Membership(retained), Membership(retainedLeft), Membership(active));
+            await seedContext.SaveChangesAsync(_ct);
+        }
+
+        await SeedAsync(_ct);
+        await SeedAsync(_ct);
+
+        await using var context = _db.NewContext();
+        var statuses = await context.MemberProfiles.ToDictionaryAsync(x => x.Id, x => x.Status, _ct);
+        Assert.Equal(MemberStatus.Inactive, statuses[retained.Id]);
+        Assert.Equal(MemberStatus.Left, statuses[retainedLeft.Id]);
+        Assert.Equal(MemberStatus.Active, statuses[active.Id]);
+        Assert.Equal(active.Id, (await context.ChoirMemberships.SingleAsync(x => x.IsActive, _ct)).MemberId);
+    }
+
+    [Fact]
     public async Task SeedAsync_AssignmentWithSingleMaterialColumn_GetsItAsItsFirstMaterialRow_Async()
     {
         var song = new Song { Id = Guid.NewGuid(), Title = "Song" };

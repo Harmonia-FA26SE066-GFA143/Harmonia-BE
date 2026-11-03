@@ -18,7 +18,10 @@ public interface IMemberProfileRepository : IGenericRepository<MemberProfile>
     /// <summary>Tracked, with <see cref="MemberProfile.User"/> loaded.</summary>
     Task<MemberProfile?> GetByUserIdForUpdateAsync(Guid userId, CancellationToken cancellationToken);
 
-    /// <summary>Tracked, with <see cref="MemberProfile.User"/> loaded.</summary>
+    /// <summary>Tracked. <see cref="MemberProfile.ChoirMemberships"/> holds only the active rows.</summary>
+    Task<MemberProfile?> GetForRoleChangeAsync(Guid userId, CancellationToken cancellationToken);
+
+    /// <summary>Tracked, with <see cref="MemberProfile.User"/> and its Role loaded.</summary>
     Task<MemberProfile?> GetWithUserAsync(Guid id, CancellationToken cancellationToken);
 
     /// <summary>

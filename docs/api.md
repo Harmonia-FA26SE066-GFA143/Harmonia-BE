@@ -302,8 +302,11 @@ hiển thị email thay tên. `phone`, `avatarUrl` có thể `null` (đổi ản
 
 ### `MemberProfileSummaryDto` / `MemberProfileDetailDto`
 
-`MemberProfileSummaryDto` = `MemberProfileDto` + `approvedSkills`.
-`MemberProfileDetailDto` = `MemberProfileSummaryDto` + `roleName`.
+`MemberProfileSummaryDto` và `MemberProfileDetailDto` có cùng field: `MemberProfileDto` + `roleName` + `approvedSkills`.
+`roleName` là role **hiện tại** của tài khoản. Ca trưởng và cha xứ không hát: hồ sơ được giữ lại khi ca viên đổi
+sang role khác để không mất lịch sử, nên `GET /api/member-profiles` vẫn có dòng với `roleName` khác `ChoirMember`.
+Hồ sơ đó chuyển sang `Inactive` và rời mọi ca đoàn, nên không còn trong luồng mời, giao bài, điểm danh mới và báo cáo.
+Đổi lại về `ChoirMember` thì `Inactive` về `Active` (`Left` giữ nguyên); ca trưởng phải thêm lại vào ca đoàn.
 
 ```json
 {
@@ -324,7 +327,7 @@ Chưa có kỹ năng nào → `[]`.
 | PUT | `/api/member-profiles/me` | `ChoirMember` | `{ "fullName", "phone", "dateOfBirth" }` | 200 `MemberProfileDto` | 400 `VALIDATION_FAILED` · 404 `MEMBER_NOT_FOUND` |
 | GET | `/api/member-profiles` | `ChoirDirector`, `Admin` | query `keyword`, `status`, `skillId`, `pageNumber`, `pageSize` | 200 `PagedList<MemberProfileSummaryDto>` | — |
 | GET | `/api/member-profiles/{id}` | `ChoirDirector` | — | 200 `MemberProfileDto` | 404 `MEMBER_NOT_FOUND` |
-| PUT | `/api/member-profiles/{id}` | `ChoirDirector` | `{ "phone", "dateOfBirth", "joinedDate", "status" }` | 200 `MemberProfileDto` | 400 `VALIDATION_FAILED`, `MEMBER_JOINED_DATE_IN_FUTURE` · 404 `MEMBER_NOT_FOUND` |
+| PUT | `/api/member-profiles/{id}` | `ChoirDirector` | `{ "phone", "dateOfBirth", "joinedDate", "status" }` | 200 `MemberProfileDto` | 400 `VALIDATION_FAILED`, `MEMBER_JOINED_DATE_IN_FUTURE` · 404 `MEMBER_NOT_FOUND` · 409 `MEMBER_NOT_ACTIVE` (tài khoản không còn là `ChoirMember`) |
 | GET | `/api/member-profiles/me/history` | `ChoirMember` | query `liturgicalSeasonId`, `fromDate`, `toDate`, `pageNumber`, `pageSize` | 200 `PagedList<ParticipationHistoryDto>` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`) · 404 `MEMBER_NOT_FOUND` |
 
 - `PUT` thay **toàn bộ** các field trong body: field bỏ trống / `null` sẽ bị xoá giá trị

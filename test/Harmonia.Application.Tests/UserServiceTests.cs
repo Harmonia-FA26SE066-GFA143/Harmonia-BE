@@ -370,12 +370,57 @@ public class UserServiceTests
     public async Task AssignRole_ToChoirMemberWithProfile_KeepsTheExistingProfile_Async()
     {
         var user = Existing(_directorRole);
-        _memberProfiles.GetByUserIdAsync(user.Id, _ct).Returns(new MemberProfile { Id = Guid.NewGuid(), UserId = user.Id });
+        _memberProfiles.GetForRoleChangeAsync(user.Id, _ct).Returns(new MemberProfile { Id = Guid.NewGuid(), UserId = user.Id });
 
         var result = await _sut.AssignRoleAsync(user.Id, new AssignRoleRequest { RoleName = RoleNames.ChoirMember }, _ct);
 
         Assert.True(result.IsSuccess);
         await _memberProfiles.DidNotReceiveWithAnyArgs().AddAsync(default!, _ct);
+    }
+
+    [Theory]
+    [InlineData(MemberStatus.Active, MemberStatus.Inactive)]
+    [InlineData(MemberStatus.Inactive, MemberStatus.Inactive)]
+    [InlineData(MemberStatus.Left, MemberStatus.Left)]
+    public async Task AssignRole_LeavingChoirMember_DeactivatesProfileAndMemberships_Async(
+        MemberStatus before, MemberStatus expected)
+    {
+        var user = Existing(_memberRole);
+        var membership = new ChoirMembership { Id = Guid.NewGuid(), IsActive = true };
+        var profile = new MemberProfile { Id = Guid.NewGuid(), UserId = user.Id, Status = before, ChoirMemberships = [membership] };
+        _memberProfiles.GetForRoleChangeAsync(user.Id, _ct).Returns(profile);
+
+        var result = await _sut.AssignRoleAsync(user.Id, new AssignRoleRequest { RoleName = RoleNames.ChoirDirector }, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(expected, profile.Status);
+        Assert.False(membership.IsActive);
+    }
+
+    [Theory]
+    [InlineData(MemberStatus.Inactive, MemberStatus.Active)]
+    [InlineData(MemberStatus.Left, MemberStatus.Left)]
+    public async Task AssignRole_BackToChoirMember_ReactivatesUnlessLeft_Async(MemberStatus before, MemberStatus expected)
+    {
+        var user = Existing(_directorRole);
+        var profile = new MemberProfile { Id = Guid.NewGuid(), UserId = user.Id, Status = before };
+        _memberProfiles.GetForRoleChangeAsync(user.Id, _ct).Returns(profile);
+
+        await _sut.AssignRoleAsync(user.Id, new AssignRoleRequest { RoleName = RoleNames.ChoirMember }, _ct);
+
+        Assert.Equal(expected, profile.Status);
+    }
+
+    [Fact]
+    public async Task AssignRole_ChoirMemberToChoirMember_KeepsSuspendedProfileInactive_Async()
+    {
+        var user = Existing(_memberRole);
+        var profile = new MemberProfile { Id = Guid.NewGuid(), UserId = user.Id, Status = MemberStatus.Inactive };
+        _memberProfiles.GetForRoleChangeAsync(user.Id, _ct).Returns(profile);
+
+        await _sut.AssignRoleAsync(user.Id, new AssignRoleRequest { RoleName = RoleNames.ChoirMember }, _ct);
+
+        Assert.Equal(MemberStatus.Inactive, profile.Status);
     }
 
     [Fact]

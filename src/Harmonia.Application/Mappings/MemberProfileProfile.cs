@@ -21,6 +21,7 @@ public class MemberProfileProfile : Profile
             .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => src.User.FullName))
             .ForMember(dest => dest.AvatarUrl, opt => opt.MapFrom(src => src.User.AvatarUrl))
             .ForMember(dest => dest.Phone, opt => opt.MapFrom(src => src.User.Phone))
+            .ForMember(dest => dest.RoleName, opt => opt.MapFrom(src => src.User.Role.Name))
             .ForMember(dest => dest.ApprovedSkills, opt => opt.MapFrom(src => src.MemberSkills));
 
         // MemberSkills must hold only the approved, active skills (see GetByUserIdWithApprovedSkillsAsync).

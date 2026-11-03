@@ -56,7 +56,7 @@ public class MemberProfileServiceTests
     public async Task Update_MemberTheDirectorManages_Saves_Async()
     {
         var directorId = Guid.NewGuid();
-        _member.User = new User { Id = _userId };
+        _member.User = new User { Id = _userId, Role = new Role { Name = RoleNames.ChoirMember } };
         _members.IsManagedByDirectorAsync(_member.Id, directorId, _ct).Returns(true);
         _members.GetWithUserAsync(_member.Id, _ct).Returns(_member);
 
@@ -66,6 +66,25 @@ public class MemberProfileServiceTests
         Assert.True(result.IsSuccess);
         Assert.Equal(MemberStatus.Inactive, _member.Status);
         await _members.Received(1).SaveChangesAsync(_ct);
+    }
+
+    [Theory]
+    [InlineData(RoleNames.ChoirDirector)]
+    [InlineData(RoleNames.ParishPriest)]
+    public async Task Update_RetainedProfileOfAnotherRole_ReturnsNotActive_AndSavesNothing_Async(string roleName)
+    {
+        var directorId = Guid.NewGuid();
+        _member.Status = MemberStatus.Inactive;
+        _member.User = new User { Id = _userId, Role = new Role { Name = roleName } };
+        _members.IsManagedByDirectorAsync(_member.Id, directorId, _ct).Returns(true);
+        _members.GetWithUserAsync(_member.Id, _ct).Returns(_member);
+
+        var result = await _sut.UpdateAsync(
+            directorId, _member.Id, new UpdateMemberProfileRequest { Status = MemberStatus.Active }, _ct);
+
+        Assert.Equal(ErrorCodes.MemberNotActive, result.Code);
+        Assert.Equal(MemberStatus.Inactive, _member.Status);
+        await _members.DidNotReceive().SaveChangesAsync(_ct);
     }
 
     private void HistoryPage(params LiturgicalEvent[] events) =>

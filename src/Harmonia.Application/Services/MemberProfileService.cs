@@ -113,6 +113,12 @@ public class MemberProfileService(
             return Result<MemberProfileDto>.Failure(ErrorCodes.MemberNotFound);
         }
 
+        // A retained profile belongs to another role now (see UserService.AssignRoleAsync): history only.
+        if (profile.User.Role.Name != RoleNames.ChoirMember)
+        {
+            return Result<MemberProfileDto>.Failure(ErrorCodes.MemberNotActive);
+        }
+
         profile.User.Phone = NormalizePhone(request.Phone);
         profile.DateOfBirth = request.DateOfBirth;
         profile.JoinedDate = request.JoinedDate;

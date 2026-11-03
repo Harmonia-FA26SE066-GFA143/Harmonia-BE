@@ -62,6 +62,61 @@ public class MemberProfilesEndpointsTests(HarmoniaApiFactory factory) : IClassFi
     }
 
     [Fact]
+    public async Task List_ReturnsCurrentRole_RetainedProfileShowsNewRole_Async()
+    {
+        var kept = await CreateUserAsync("mp-role-kept@test.com", "mp-role Kept", cancellationToken: _ct);
+        await CreateUserAsync("mp-role-member@test.com", "mp-role Member", cancellationToken: _ct);
+        var admin = await factory.CreateClientAsAsync("admin@test.com", _ct);
+        var director = await factory.CreateClientAsAsync("director@test.com", _ct);
+
+        var assign = await admin.PutAsJsonAsync($"api/users/{kept.Id}/role", new { roleName = RoleNames.ChoirDirector }, _ct);
+        var page = (await director.GetFromJsonAsync<Page>("api/member-profiles?keyword=mp-role", TestJson.Options, _ct))!;
+
+        Assert.True(assign.IsSuccessStatusCode);
+        var keptRow = page.Items.Single(x => x.Email == "mp-role-kept@test.com");
+        var memberRow = page.Items.Single(x => x.Email == "mp-role-member@test.com");
+        Assert.Equal((RoleNames.ChoirDirector, MemberStatus.Inactive), (keptRow.RoleName, keptRow.Status));
+        Assert.Equal((RoleNames.ChoirMember, MemberStatus.Active), (memberRow.RoleName, memberRow.Status));
+    }
+
+    [Fact]
+    public async Task AssignRole_MemberBecomesDirector_LeavesChoir_ProfileIsReadOnly_ReturningReactivates_Async()
+    {
+        var user = await CreateUserAsync("mp-leave@test.com", "mp-leave Singer", cancellationToken: _ct);
+        var admin = await factory.CreateClientAsAsync("admin@test.com", _ct);
+        var director = await factory.CreateClientAsAsync("director@test.com", _ct);
+        var memberId = await factory.WithDbAsync(async (db, ct) =>
+        {
+            var profile = await db.MemberProfiles.SingleAsync(x => x.UserId == user.Id, ct);
+            var choir = new Choir { Id = Guid.NewGuid(), Name = "mp-leave choir" };
+            db.Choirs.Add(choir);
+            db.ChoirMemberships.Add(new ChoirMembership
+            {
+                Id = Guid.NewGuid(), ChoirId = choir.Id, MemberId = profile.Id, JoinedDate = new DateOnly(2024, 1, 1),
+            });
+            await db.SaveChangesAsync(ct);
+            return profile.Id;
+        }, _ct);
+
+        await admin.PutAsJsonAsync($"api/users/{user.Id}/role", new { roleName = RoleNames.ChoirDirector }, _ct);
+        var isInChoir = await factory.WithDbAsync(
+            (db, ct) => db.ChoirMemberships.AnyAsync(x => x.MemberId == memberId && x.IsActive, ct), _ct);
+        var put = await director.PutAsJsonAsync(
+            $"api/member-profiles/{memberId}", new { joinedDate = "2020-01-15", status = "Active" }, _ct);
+        var whileDirector = await factory.WithDbAsync(
+            (db, ct) => db.MemberProfiles.Where(x => x.Id == memberId).Select(x => x.Status).SingleAsync(ct), _ct);
+
+        await admin.PutAsJsonAsync($"api/users/{user.Id}/role", new { roleName = RoleNames.ChoirMember }, _ct);
+        var afterReturn = await factory.WithDbAsync(
+            (db, ct) => db.MemberProfiles.Where(x => x.Id == memberId).Select(x => x.Status).SingleAsync(ct), _ct);
+
+        Assert.False(isInChoir);
+        Assert.Equal(HttpStatusCode.Conflict, put.StatusCode);
+        Assert.Equal(MemberStatus.Inactive, whileDirector);
+        Assert.Equal(MemberStatus.Active, afterReturn);
+    }
+
+    [Fact]
     public async Task Director_UpdatesStatusAndJoinedDate_Async()
     {
         await CreateUserAsync("mp-managed@test.com", "Anna Pham", cancellationToken: _ct);
