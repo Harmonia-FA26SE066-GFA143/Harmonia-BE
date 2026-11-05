@@ -15,7 +15,8 @@ public interface IRehearsalAttendanceService
     /// <summary>
     /// Records or corrects the listed members' attendance, stamped with the calling director.
     /// Allowed from the rehearsal's start time onward, including after it ends; before that fails with
-    /// REHEARSAL_NOT_STARTED. A missing member fails with MEMBER_NOT_FOUND, an inactive one with MEMBER_NOT_ACTIVE.
+    /// REHEARSAL_NOT_STARTED, unless the Rehearsal.AttendanceStartCheckEnabled setting turns that check off.
+    /// A missing member fails with MEMBER_NOT_FOUND, an inactive one with MEMBER_NOT_ACTIVE.
     /// </summary>
     Task<Result> RecordAsync(
         Guid directorUserId, Guid rehearsalId, RecordRehearsalAttendancesRequest request, CancellationToken cancellationToken);

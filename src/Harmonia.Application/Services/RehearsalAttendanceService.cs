@@ -41,9 +41,12 @@ public class RehearsalAttendanceService(
         }
 
         var now = DateTime.UtcNow;
-        var opensMinutesBefore = await systemSettingService.GetIntAsync(
-            SystemSettingKeys.RehearsalAttendanceOpensMinutesBefore, cancellationToken);
-        if (now < rehearsal.StartTime.AddMinutes(-opensMinutesBefore)) return Result.Failure(ErrorCodes.RehearsalNotStarted);
+        if (await systemSettingService.GetBoolAsync(SystemSettingKeys.RehearsalAttendanceStartCheckEnabled, cancellationToken))
+        {
+            var opensMinutesBefore = await systemSettingService.GetIntAsync(
+                SystemSettingKeys.RehearsalAttendanceOpensMinutesBefore, cancellationToken);
+            if (now < rehearsal.StartTime.AddMinutes(-opensMinutesBefore)) return Result.Failure(ErrorCodes.RehearsalNotStarted);
+        }
 
         var memberIds = request.Items.Select(i => i.MemberId).ToList();
         var members = await memberProfileRepository.ListAsync(x => memberIds.Contains(x.Id), cancellationToken);

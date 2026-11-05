@@ -26,6 +26,8 @@ public static class SystemSettingKeys
 
     public const string RehearsalAttendanceOpensMinutesBefore = "Rehearsal.AttendanceOpensMinutesBefore";
 
+    public const string RehearsalAttendanceStartCheckEnabled = "Rehearsal.AttendanceStartCheckEnabled";
+
     public const string SongListLeadDays = "SongList.LeadDays";
 
     private const string GeneralGroup = "Thông tin chung";
@@ -52,6 +54,8 @@ public static class SystemSettingKeys
             "Cho phép ca viên nộp bản thu sau hạn của bài tập."),
         new(RehearsalAttendanceOpensMinutesBefore, SettingDataType.Int, "0", "Mở điểm danh trước giờ tập (phút)",
             "Buổi tập", "Số phút trước giờ bắt đầu buổi tập được phép điểm danh.", MinValue: 0, MaxValue: 120),
+        new(RehearsalAttendanceStartCheckEnabled, SettingDataType.Bool, "true", "Chặn điểm danh trước giờ tập", "Buổi tập",
+            "Bật thì chỉ điểm danh được khi đến ngày và giờ của buổi tập; tắt thì điểm danh được bất cứ lúc nào (dùng khi demo)."),
         new(SongListLeadDays, SettingDataType.Int, "7", "Hạn nộp danh sách bài hát (số ngày trước lễ)", "Danh sách bài hát",
             "Ca trưởng nên gửi danh sách bài hát trước ngày cử hành ít nhất số ngày này; chỉ để nhắc, không chặn gửi trễ.",
             MinValue: 0, MaxValue: 60),

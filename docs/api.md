@@ -853,12 +853,14 @@ dữ liệu trong khoảng lọc vẫn hiện với các số bằng 0.
 |---|---|---|---|---|
 | `Parish.Name` | String | rỗng | có | Tên giáo xứ để hiển thị |
 | `Choir.Name` | String | rỗng | có | Tên ca đoàn để hiển thị |
+| `Contact.Email` | String | rỗng | có | Email liên hệ hiển thị ở trang chủ và trang đăng nhập |
 | `System.Announcement` | String | rỗng | có | Thông báo chung cho mọi người dùng; rỗng thì không hiện |
 | `Roster.RecentServiceDays` | Int 1–365 | 60 | không | Số ngày tính "phục vụ gần đây" khi gợi ý phân công |
 | `Roster.AiSuggestionEnabled` | Bool | true | không | Tắt thì gợi ý phân công không gọi AI, chỉ xếp theo luật (`isAiGenerated` = `false`) |
 | `Roster.EventOverlapMinutes` | Int 0–720 | 120 | không | Không phân công một ca viên vào hai lễ cùng ngày bắt đầu cách nhau ít hơn N phút (`ROSTER_MEMBER_TIME_CONFLICT`; gợi ý bỏ qua người đó). 0 = chỉ chặn hai lễ cùng giờ |
 | `Practice.AllowLateSubmission` | Bool | false | không | Bật thì nộp bản thu sau hạn không còn bị `PRACTICE_SUBMISSION_PAST_DUE`; bài vẫn tính là quá hạn |
 | `Rehearsal.AttendanceOpensMinutesBefore` | Int 0–120 | 0 | không | Cho điểm danh sớm N phút trước giờ bắt đầu; sớm hơn nữa vẫn `REHEARSAL_NOT_STARTED` |
+| `Rehearsal.AttendanceStartCheckEnabled` | Bool | true | không | Bật thì chỉ điểm danh được khi đến ngày và giờ của buổi tập. Tắt thì điểm danh được bất cứ lúc nào, không còn `REHEARSAL_NOT_STARTED` (dùng khi demo) |
 | `SongList.LeadDays` | Int 0–60 | 7 | không | Hạn nộp danh sách bài hát = ngày lễ − N ngày (`songListDueDate` của danh sách sự kiện); chỉ nhắc, không chặn |
 
 ---
@@ -1903,7 +1905,7 @@ Lên lịch tập và điểm danh chỉ dành cho `ChoirDirector`. Danh sách b
   hoạt động; sắp theo tên. Không phân trang.
 - `PUT` ghi hoặc sửa điểm danh cho từng ca viên trong `items`; ca viên không có trong `items` giữ nguyên.
   Ghi lại `checkedAt` = lúc gọi và người điểm danh là ca trưởng đang gọi.
-- Chỉ điểm danh được từ giờ bắt đầu buổi tập trở đi (sửa sau khi kết thúc vẫn được); trước đó → 409 `REHEARSAL_NOT_STARTED`.
+- Chỉ điểm danh được từ giờ bắt đầu buổi tập trở đi (sửa sau khi kết thúc vẫn được); trước đó → 409 `REHEARSAL_NOT_STARTED`. Setting `Rehearsal.AttendanceStartCheckEnabled` = `false` thì bỏ chặn này (dùng khi demo).
 - Ca viên trong `items` phải đang hoạt động; mọi lỗi đều chặn cả lô, không ghi dòng nào.
 - 409 `REHEARSAL_ATTENDANCE_ALREADY_RECORDED`: ca trưởng khác vừa điểm danh cùng ca viên — tải lại danh sách rồi gửi lại.
 

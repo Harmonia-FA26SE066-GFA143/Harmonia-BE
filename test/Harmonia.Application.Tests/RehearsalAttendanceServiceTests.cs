@@ -39,6 +39,7 @@ public class RehearsalAttendanceServiceTests
         _alice = new MemberProfile { Id = Guid.NewGuid(), Status = MemberStatus.Active, User = new User { FullName = "Alice" } };
         _bob = new MemberProfile { Id = Guid.NewGuid(), Status = MemberStatus.Active, User = new User { FullName = "Bob" } };
 
+        _settings.GetBoolAsync(SystemSettingKeys.RehearsalAttendanceStartCheckEnabled, _ct).Returns(true);
         _rehearsals.GetByIdAsync(_rehearsal.Id, _ct).Returns(_rehearsal);
         _rehearsals.GetWithAttendancesForUpdateAsync(_rehearsal.Id, _ct).Returns(_rehearsal);
         _rehearsals.TrySaveAttendancesAsync(_rehearsal, _ct).Returns(true);
@@ -103,6 +104,18 @@ public class RehearsalAttendanceServiceTests
         var result = await _sut.RecordAsync(_directorUserId, _rehearsal.Id, Request((_alice.Id, AttendanceStatus.Present)), _ct);
 
         Assert.Equal(isAllowed ? null : ErrorCodes.RehearsalNotStarted, result.Code);
+    }
+
+    [Fact]
+    public async Task Record_BeforeStart_StartCheckDisabled_IsAllowed_Async()
+    {
+        _rehearsal.StartTime = DateTime.UtcNow.AddDays(7);
+        _settings.GetBoolAsync(SystemSettingKeys.RehearsalAttendanceStartCheckEnabled, _ct).Returns(false);
+
+        var result = await _sut.RecordAsync(_directorUserId, _rehearsal.Id, Request((_alice.Id, AttendanceStatus.Present)), _ct);
+
+        Assert.True(result.IsSuccess);
+        await _rehearsals.Received(1).TrySaveAttendancesAsync(_rehearsal, _ct);
     }
 
     [Fact]
