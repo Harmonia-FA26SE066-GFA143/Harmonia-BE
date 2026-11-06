@@ -19,5 +19,8 @@ public interface IEventParticipationRepository : IGenericRepository<EventPartici
     Task<List<EventParticipation>> GetUpcomingForMemberAsync(
         Guid memberId, DateOnly fromDate, CancellationToken cancellationToken);
 
+    /// <summary>Tracked Invited requests of the event whose member is still Active.</summary>
+    Task<List<EventParticipation>> GetInvitedForUpdateAsync(Guid eventId, CancellationToken cancellationToken);
+
     Task<List<Guid>> GetRequestedMemberIdsAsync(Guid eventId, IReadOnlyCollection<Guid> memberIds, CancellationToken cancellationToken);
 }

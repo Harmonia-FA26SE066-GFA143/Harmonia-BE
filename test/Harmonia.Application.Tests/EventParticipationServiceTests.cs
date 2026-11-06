@@ -217,6 +217,38 @@ public class EventParticipationServiceTests
         Assert.Equal(ErrorCodes.LiturgicalEventNotFound, result.Code);
     }
 
+    // ---- ConfirmAll ----
+
+    [Fact]
+    public async Task ConfirmAll_ConfirmsInvitedRequests_AndSaves_Async()
+    {
+        List<EventParticipation> invited = [Invitation(_anna), Invitation(_ben)];
+        _participations.GetInvitedForUpdateAsync(_event.Id, _ct).Returns(invited);
+        _participations.GetByEventAsync(_event.Id, _ct).Returns(invited);
+
+        var result = await _sut.ConfirmAllAsync(_event.Id, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.All(invited, x =>
+        {
+            Assert.Equal(ParticipationStatus.Confirmed, x.Status);
+            Assert.NotNull(x.RespondedAt);
+        });
+        Assert.Equal(2, result.Value!.ConfirmedCount);
+        await _participations.Received(1).SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task ConfirmAll_CancelledEvent_ReturnsEventCancelled_Async()
+    {
+        _event.Status = EventStatus.Cancelled;
+
+        var result = await _sut.ConfirmAllAsync(_event.Id, _ct);
+
+        Assert.Equal(ErrorCodes.LiturgicalEventCancelled, result.Code);
+        await _participations.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
     // ---- Respond ----
 
     [Fact]

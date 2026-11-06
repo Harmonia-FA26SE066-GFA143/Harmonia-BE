@@ -28,6 +28,13 @@ public class EventParticipationsController(IEventParticipationService eventParti
         [FromQuery] Guid eventId, CancellationToken cancellationToken) =>
         ToActionResult(await eventParticipationService.GetByEventAsync(eventId, cancellationToken));
 
+    [HttpPost("confirm-all")]
+    [Authorize(Roles = RoleNames.ChoirDirector)]
+    [ProducesResponseType<EventParticipationSummaryDto>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ConfirmAllAsync(
+        [FromQuery] Guid eventId, CancellationToken cancellationToken) =>
+        ToActionResult(await eventParticipationService.ConfirmAllAsync(eventId, cancellationToken));
+
     [HttpGet("mine")]
     [Authorize(Roles = RoleNames.ChoirMember)]
     [ProducesResponseType<List<MyParticipationDto>>(StatusCodes.Status200OK)]

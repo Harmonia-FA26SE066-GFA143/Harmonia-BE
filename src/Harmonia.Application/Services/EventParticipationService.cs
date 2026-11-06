@@ -130,6 +130,40 @@ public class EventParticipationService(
         });
     }
 
+    public async Task<Result<EventParticipationSummaryDto>> ConfirmAllAsync(
+        Guid eventId, CancellationToken cancellationToken)
+    {
+        var liturgicalEvent = await liturgicalEventRepository.GetByIdAsync(eventId, cancellationToken);
+        if (liturgicalEvent is null)
+        {
+            return Result<EventParticipationSummaryDto>.Failure(ErrorCodes.LiturgicalEventNotFound);
+        }
+
+        if (await choirScope.CheckCanLeadEventAsync(
+                eventId, ErrorCodes.LiturgicalEventNotFound, cancellationToken) is { } scopeError)
+        {
+            return Result<EventParticipationSummaryDto>.Failure(scopeError);
+        }
+
+        if (liturgicalEvent.Status == EventStatus.Cancelled)
+        {
+            return Result<EventParticipationSummaryDto>.Failure(ErrorCodes.LiturgicalEventCancelled);
+        }
+
+        // No "event has passed" check on purpose: the demo runs on past seeded events too.
+        var invited = await participationRepository.GetInvitedForUpdateAsync(eventId, cancellationToken);
+        var now = DateTime.UtcNow;
+        foreach (var participation in invited)
+        {
+            participation.Status = ParticipationStatus.Confirmed;
+            participation.RespondedAt = now;
+        }
+
+        await participationRepository.SaveChangesAsync(cancellationToken);
+
+        return await GetByEventAsync(eventId, cancellationToken);
+    }
+
     public async Task<Result<EventParticipationDto>> RespondAsync(
         Guid userId, Guid eventId, RespondParticipationRequest request, CancellationToken cancellationToken)
     {
