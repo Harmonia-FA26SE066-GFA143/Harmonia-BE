@@ -135,8 +135,8 @@ flowchart TD
     J1 --> B4 --> B5 --> B6 --> M2 --> E(((" ")))
 ```
 
-Sự kiện chưa gắn ca đoàn thì bỏ bước gán ca đoàn: publish báo cả giáo xứ và ca trưởng nào cũng làm được các bước
-của lane `ChoirDirector`. Sự kiện nhiều ca đoàn xem mục 4.6.
+Tạo tay bắt buộc chọn ca đoàn; sự kiện sinh từ giờ lễ phải gán ca đoàn trước khi publish
+(`LITURGICAL_EVENT_CHOIR_REQUIRED`). Sự kiện nhiều ca đoàn xem mục 4.6.
 
 ### 4.2 Đề xuất và duyệt danh sách bài hát — UC-22, UC-13
 

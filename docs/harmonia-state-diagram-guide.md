@@ -106,7 +106,7 @@ stateDiagram-v2
     [*] --> Draft : create
     [*] --> Draft : generate từ giờ lễ cố định
     Draft --> Draft : update
-    Draft --> Published : publish [chưa qua, có loại lễ, có mùa, danh mục còn hoạt động, chưa trùng giờ] / báo ca đoàn phục vụ
+    Draft --> Published : publish [chưa qua, có loại lễ, có mùa, có ca đoàn phụ trách, danh mục còn hoạt động, chưa trùng giờ] / báo ca đoàn phục vụ
     Published --> Published : update
     Draft --> Cancelled : cancel [ngày lễ chưa qua]
     Published --> Cancelled : cancel [ngày lễ chưa qua] / báo ca đoàn phục vụ
@@ -116,7 +116,7 @@ stateDiagram-v2
     note right of Published
         Mọi role thấy. Mới được tạo SongList, ServiceRoster.
         "Báo ca đoàn phục vụ" = ca viên và ca trưởng các ca đoàn gắn với sự kiện;
-        chưa gắn ca đoàn thì báo cả giáo xứ.
+        sự kiện cũ chưa gắn ca đoàn thì báo cả giáo xứ.
     end note
 ```
 
@@ -127,6 +127,7 @@ stateDiagram-v2
 | publish / cancel khi ngày lễ đã qua | `LITURGICAL_EVENT_ALREADY_PASSED` |
 | publish khi thiếu cả loại lễ lẫn nghi thức | `LITURGICAL_EVENT_TYPE_REQUIRED` |
 | publish khi chưa chọn mùa phụng vụ | `LITURGICAL_EVENT_SEASON_REQUIRED` |
+| publish khi chưa có ca đoàn phụ trách | `LITURGICAL_EVENT_CHOIR_REQUIRED` |
 | publish khi danh mục đã tắt / ngày ngoài mùa (được sớm một ngày cho lễ vọng) | `LOOKUP_INACTIVE` / `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` |
 | publish khi trùng ngày + giờ + địa điểm | `LITURGICAL_EVENT_SLOT_TAKEN` |
 

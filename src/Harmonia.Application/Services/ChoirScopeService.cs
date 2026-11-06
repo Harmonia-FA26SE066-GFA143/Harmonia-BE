@@ -75,11 +75,6 @@ public class ChoirScopeService(
         }
 
         var eventChoirs = await eventChoirRepository.ListAsync(x => x.EventId == eventId, cancellationToken);
-        if (eventChoirs.Count == 0)
-        {
-            return true;
-        }
-
         var leads = eventChoirs.Where(x => x.IsLead).ToList();
         return (leads.Count > 0 ? leads : eventChoirs).Any(x => mine.Contains(x.ChoirId));
     }

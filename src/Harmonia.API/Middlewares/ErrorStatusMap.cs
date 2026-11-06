@@ -85,6 +85,7 @@ public static class ErrorStatusMap
         [ErrorCodes.LiturgicalEventTypeRequired] = StatusCodes.Status400BadRequest,
         [ErrorCodes.LiturgicalEventDateOutsideLiturgicalSeason] = StatusCodes.Status400BadRequest,
         [ErrorCodes.LiturgicalEventSeasonRequired] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.LiturgicalEventChoirRequired] = StatusCodes.Status400BadRequest,
         [ErrorCodes.LiturgicalEventGenerationRangeInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.LiturgicalSeasonDateOverlap] = StatusCodes.Status409Conflict,
         [ErrorCodes.LiturgicalSeasonDateInvalid] = StatusCodes.Status400BadRequest,

@@ -21,10 +21,11 @@ public class LiturgicalEventsEndpointsTests(HarmoniaApiFactory factory) : IClass
         {
             Id = Guid.NewGuid(), Name = "Event-test season", StartDate = new DateOnly(2045, 12, 1), EndDate = new DateOnly(2045, 12, 31),
         };
+        var choir = new Choir { Id = Guid.NewGuid(), Name = "Event-test choir", IsActive = true };
         await factory.WithDbAsync(
             (db, ct) =>
             {
-                db.AddRange(location, closed, massType, season);
+                db.AddRange(location, closed, massType, season, choir);
                 return db.SaveChangesAsync(ct);
             },
             _ct);
@@ -32,6 +33,7 @@ public class LiturgicalEventsEndpointsTests(HarmoniaApiFactory factory) : IClass
         object Body(Guid locationId, Guid massTypeId, string eventDate = "2045-12-25") => new
         {
             eventDate, time = "07:00:00", locationId, massTypeId, liturgicalSeasonId = season.Id,
+            choirIds = new[] { choir.Id }, leadChoirId = choir.Id,
         };
 
         var unknownMassType = await priest.PostAsJsonAsync("api/liturgical-events", Body(location.Id, Guid.NewGuid()), _ct);
@@ -46,6 +48,20 @@ public class LiturgicalEventsEndpointsTests(HarmoniaApiFactory factory) : IClass
         Assert.Equal(HttpStatusCode.BadRequest, outsideSeason.StatusCode);
         Assert.Contains(ErrorCodes.LiturgicalEventDateOutsideLiturgicalSeason, await outsideSeason.Content.ReadAsStringAsync(_ct));
         Assert.Equal(HttpStatusCode.OK, valid.StatusCode);
+
+        var created = await valid.Content.ReadFromJsonAsync<JsonElement>(_ct);
+        var choirs = await priest.GetFromJsonAsync<JsonElement>(
+            $"api/liturgical-events/{created.GetProperty("id").GetGuid()}/choirs", _ct);
+        var saved = Assert.Single(choirs.EnumerateArray());
+        Assert.Equal(choir.Id, saved.GetProperty("choirId").GetGuid());
+        Assert.True(saved.GetProperty("isLead").GetBoolean());
+
+        var noChoir = await priest.PostAsJsonAsync(
+            "api/liturgical-events",
+            new { eventDate = "2045-12-26", time = "07:00:00", locationId = location.Id, massTypeId = massType.Id },
+            _ct);
+        Assert.Equal(HttpStatusCode.BadRequest, noChoir.StatusCode);
+        Assert.Contains(ErrorCodes.LiturgicalEventChoirRequired, await noChoir.Content.ReadAsStringAsync(_ct));
     }
 
     [Fact]

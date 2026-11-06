@@ -486,10 +486,10 @@ Chưa có kỹ năng nào → `[]`.
 | POST | `/api/liturgical-days/sync` | `{ "year": 2027 }` | 200 số ngày đã lưu (`int`) | 400 `VALIDATION_FAILED` · 502 `EXTERNAL_CALENDAR_FAILED` |
 | GET | `/api/liturgical-events?fromDate=&toDate=&status=&pageNumber=&pageSize=` · `ParishPriest`, `ChoirDirector` | — | 200 `PagedList<LiturgicalEventListItemDto>` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`) |
 | GET | `/api/liturgical-events/{id}` | — | 200 `LiturgicalEventDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
-| POST | `/api/liturgical-events` | `{ "eventDate", "time", "liturgicalSeasonId?", "massTypeId?", "ceremonyTypeId?", "categoryId?", "locationId", "title?", "specialRequirements?" }` | 200 `LiturgicalEventDto` | 400 `VALIDATION_FAILED` (`LITURGICAL_EVENT_TYPE_REQUIRED`), `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` · 404 `LOOKUP_NOT_FOUND` · 409 `LITURGICAL_EVENT_SLOT_TAKEN`, `LOOKUP_INACTIVE` |
-| PUT | `/api/liturgical-events/{id}` | như `POST` | 200 `LiturgicalEventDto` | 400 `VALIDATION_FAILED` (`LITURGICAL_EVENT_TYPE_REQUIRED`), `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_SLOT_TAKEN`, `LOOKUP_INACTIVE` |
+| POST | `/api/liturgical-events` | `{ "eventDate", "time", "liturgicalSeasonId?", "massTypeId?", "ceremonyTypeId?", "categoryId?", "locationId", "title?", "specialRequirements?", "choirIds": ["guid"], "leadChoirId" }` | 200 `LiturgicalEventDto` | 400 `VALIDATION_FAILED` (`LITURGICAL_EVENT_TYPE_REQUIRED`, `LITURGICAL_EVENT_CHOIR_REQUIRED`, `CHOIR_LEAD_INVALID`), `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` · 404 `LOOKUP_NOT_FOUND`, `CHOIR_NOT_FOUND` · 409 `LITURGICAL_EVENT_SLOT_TAKEN`, `LOOKUP_INACTIVE`, `CHOIR_INACTIVE` |
+| PUT | `/api/liturgical-events/{id}` | như `POST`, trừ `choirIds`, `leadChoirId` (sửa qua `PUT .../choirs`) | 200 `LiturgicalEventDto` | 400 `VALIDATION_FAILED` (`LITURGICAL_EVENT_TYPE_REQUIRED`), `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_SLOT_TAKEN`, `LOOKUP_INACTIVE` |
 | POST | `/api/liturgical-events/generation` | `{ "fromDate", "toDate" }` | 200 `LiturgicalEventDto[]` (các sự kiện vừa tạo) | 400 `VALIDATION_FAILED` (`LITURGICAL_EVENT_GENERATION_RANGE_INVALID`) |
-| PATCH | `/api/liturgical-events/{id}/publish` | — | 200 `LiturgicalEventDto` | 400 `LITURGICAL_EVENT_TYPE_REQUIRED`, `LITURGICAL_EVENT_SEASON_REQUIRED`, `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND` · 409 `LITURGICAL_EVENT_ALREADY_PUBLISHED`, `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `LITURGICAL_EVENT_SLOT_TAKEN`, `LOOKUP_INACTIVE` |
+| PATCH | `/api/liturgical-events/{id}/publish` | — | 200 `LiturgicalEventDto` | 400 `LITURGICAL_EVENT_TYPE_REQUIRED`, `LITURGICAL_EVENT_SEASON_REQUIRED`, `LITURGICAL_EVENT_CHOIR_REQUIRED`, `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND` · 409 `LITURGICAL_EVENT_ALREADY_PUBLISHED`, `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `LITURGICAL_EVENT_SLOT_TAKEN`, `LOOKUP_INACTIVE` |
 | PATCH | `/api/liturgical-events/{id}/cancel` | — | 200 `LiturgicalEventDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED` |
 | GET | `/api/schedule/events` · mọi role | — | 200 `LiturgicalEventSummaryDto[]` | — |
 | GET | `/api/schedule/events/{id}` · mọi role | — | 200 `MemberEventDetailDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
@@ -518,16 +518,19 @@ Chưa có kỹ năng nào → `[]`.
   `errors` chứa `LITURGICAL_EVENT_TYPE_REQUIRED`. `title` tối đa 200, `specialRequirements` tối đa 1000 ký tự.
 - Một ngày có nhiều sự kiện được, nhưng trùng cả ngày + giờ + địa điểm → 409 `LITURGICAL_EVENT_SLOT_TAKEN`.
   Sự kiện đã huỷ không giữ chỗ: tạo lại sự kiện mới đúng ngày + giờ + địa điểm đó được.
+- `POST` bắt buộc `choirIds` (ít nhất một, thiếu → `LITURGICAL_EVENT_CHOIR_REQUIRED`) và `leadChoirId` (nằm trong
+  `choirIds`, sai → `CHOIR_LEAD_INVALID`), đều là 400 `VALIDATION_FAILED`. Ca đoàn phải tồn tại và đang hoạt động.
 - Sự kiện mới luôn ở `Draft`. Công bố (`publish`) chuyển sang `Published`, ghi `publishedAt`, rồi gửi
   notification `type = EventPublished` cho mọi ca trưởng và ca viên đang hoạt động,
   `referenceType = "LiturgicalEvent"`, `referenceId` = id sự kiện (S-05).
 - Mỗi sự kiện công bố riêng (D6). Ca viên chỉ thấy sự kiện `Published`.
 - **Kiểm trước khi công bố** — sự kiện phải đủ và còn hợp lệ, kiểm theo thứ tự, gặp lỗi đầu tiên thì dừng:
   chưa qua ngày (409 `LITURGICAL_EVENT_ALREADY_PASSED`) · có `massTypeId` hoặc `ceremonyTypeId` (400
-  `LITURGICAL_EVENT_TYPE_REQUIRED`) · có `liturgicalSeasonId` (400 `LITURGICAL_EVENT_SEASON_REQUIRED`) · mọi danh mục
+  `LITURGICAL_EVENT_TYPE_REQUIRED`) · có `liturgicalSeasonId` (400 `LITURGICAL_EVENT_SEASON_REQUIRED`) · có ca đoàn phụ
+  trách, hoặc đúng một ca đoàn phục vụ (400 `LITURGICAL_EVENT_CHOIR_REQUIRED`) · mọi danh mục
   còn hoạt động (409 `LOOKUP_INACTIVE` — **kể cả** mục bị tắt sau lần lưu cuối, khác với `PUT`) và ngày nằm trong mùa ·
-  ngày + giờ + địa điểm chưa bị sự kiện khác chiếm (409 `LITURGICAL_EVENT_SLOT_TAKEN`). Hai lỗi 400 ở đây trả thẳng mã,
-  không bọc trong `VALIDATION_FAILED`. Sửa bằng `PUT` rồi công bố lại.
+  ngày + giờ + địa điểm chưa bị sự kiện khác chiếm (409 `LITURGICAL_EVENT_SLOT_TAKEN`). Ba lỗi 400 ở đây trả thẳng mã,
+  không bọc trong `VALIDATION_FAILED`. Sửa bằng `PUT` (ca đoàn: `PUT .../choirs`) rồi công bố lại.
 - **Sinh sự kiện từ giờ lễ cố định** (`POST /generation`, `ParishPriest`): `fromDate`, `toDate` tính cả hai đầu,
   `fromDate` không trước hôm nay (giờ Việt Nam), dài tối đa 62 ngày. Với mỗi ngày trong khoảng, mỗi giờ lễ cố định
   (mục 4g) đang bật có `dayOfWeek` trùng thứ của ngày → tạo một sự kiện `Draft` với `time`, `massTypeId`, `locationId`,
@@ -892,7 +895,7 @@ Admin thấy và quản lý mọi ca đoàn.
 | POST | `/api/choirs/{id}/members` | `Admin`, `ChoirDirector` | `{ "memberIds": ["guid"] }` | 204 | 400 `VALIDATION_FAILED` (`CHOIR_MEMBER_INVALID`), `CHOIR_MEMBER_INVALID` · 404 `CHOIR_NOT_FOUND` · 409 `CHOIR_INACTIVE` |
 | DELETE | `/api/choirs/{id}/members/{memberId}` | `Admin`, `ChoirDirector` | — | 204 | 404 `CHOIR_NOT_FOUND`, `CHOIR_MEMBERSHIP_NOT_FOUND` |
 | GET | `/api/liturgical-events/{id}/choirs` | `ParishPriest`, `ChoirDirector` | — | 200 `LiturgicalEventChoirDto[]` (ca đoàn phụ trách trước, rồi theo tên) | 404 `LITURGICAL_EVENT_NOT_FOUND` |
-| PUT | `/api/liturgical-events/{id}/choirs` | `ParishPriest` | `{ "choirIds": ["guid"], "leadChoirId?" }` | 200 `LiturgicalEventChoirDto[]` (danh sách sau khi lưu) | 400 `VALIDATION_FAILED` (`CHOIR_LEAD_INVALID`) · 404 `LITURGICAL_EVENT_NOT_FOUND`, `CHOIR_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `CHOIR_INACTIVE` |
+| PUT | `/api/liturgical-events/{id}/choirs` | `ParishPriest` | `{ "choirIds": ["guid"], "leadChoirId" }` | 200 `LiturgicalEventChoirDto[]` (danh sách sau khi lưu) | 400 `VALIDATION_FAILED` (`LITURGICAL_EVENT_CHOIR_REQUIRED`, `CHOIR_LEAD_INVALID`) · 404 `LITURGICAL_EVENT_NOT_FOUND`, `CHOIR_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `CHOIR_INACTIVE` |
 
 - `name` bắt buộc, ≤ 100 ký tự, không trùng ca đoàn khác; `description` ≤ 500 ký tự.
 - `directorId` là id `User` (lấy từ `GET /api/users?roleName=ChoirDirector`); bỏ trống / `null` = chưa có ca trưởng.
@@ -904,11 +907,11 @@ Admin thấy và quản lý mọi ca đoàn.
   hoặc ca viên không ở trạng thái `Active` → 400 `CHOIR_MEMBER_INVALID`, không lưu gì.
   Ca viên đã ở trong ca đoàn thì bỏ qua; ca viên từng rời ca đoàn thì vào lại, `joinedDate` = hôm nay.
 - `DELETE .../members/{memberId}`: ca viên rời ca đoàn, lịch sử vẫn giữ; thêm lại bằng `POST .../members`.
-- `PUT /api/liturgical-events/{id}/choirs` **thay toàn bộ** danh sách ca đoàn của sự kiện; gửi `[]` là gỡ hết.
+- `PUT /api/liturgical-events/{id}/choirs` **thay toàn bộ** danh sách ca đoàn của sự kiện; không nhận `[]`
+  (400 `LITURGICAL_EVENT_CHOIR_REQUIRED`).
   Sự kiện đã huỷ hoặc đã qua ngày thì không sửa được. Ca đoàn đã tắt vẫn được giữ lại nếu đã gán từ trước,
   nhưng không thêm mới được.
-- `leadChoirId` là **ca đoàn phụ trách** (D8): bắt buộc khi `choirIds` không rỗng và phải nằm trong `choirIds`;
-  gửi `choirIds: []` thì bỏ trống. Sai → 400 `CHOIR_LEAD_INVALID`.
+- `leadChoirId` là **ca đoàn phụ trách** (D8): bắt buộc và phải nằm trong `choirIds`. Sai → 400 `CHOIR_LEAD_INVALID`.
 
 ```json
 { "choirId": "guid", "name": "Ca đoàn Cêcilia", "isActive": true, "isLead": true,
@@ -918,8 +921,9 @@ Admin thấy và quản lý mọi ca đoàn.
 ### Phạm vi của ca trưởng (D8)
 
 Mỗi ca đoàn có **một** ca trưởng; ca trưởng chỉ quản lý ca đoàn của mình. Admin, cha xứ không bị giới hạn.
-Bản ghi **chưa gắn ca đoàn** (dữ liệu trước D8: buổi tập / bài tập `choirId = null`, sự kiện chưa gán ca đoàn nào)
-thì ca trưởng nào cũng quản lý được.
+Buổi tập / bài tập **chưa gắn ca đoàn** (dữ liệu trước D8, `choirId = null`) thì ca trưởng nào cũng quản lý được.
+Sự kiện chưa gán ca đoàn (nháp sinh từ giờ lễ, dữ liệu cũ) thì ca trưởng nào cũng xem được nhưng không ai lập danh sách
+bài, mời hay phân công được: trả 403 `CHOIR_NOT_LEAD` cho tới khi cha xứ gán ca đoàn (chốt 2026-11-05).
 
 | Nhóm | Ca trưởng thấy / làm được | Ngoài phạm vi |
 |---|---|---|
@@ -927,7 +931,7 @@ thì ca trưởng nào cũng quản lý được.
 | Buổi tập, bài hát buổi tập, điểm danh | Buổi tập có `choirId` thuộc mình. Tạo mới **bắt buộc** `choirId` của mình; gắn sự kiện thì ca đoàn đó phải phục vụ sự kiện. Danh sách điểm danh và thông báo chỉ gồm ca viên của ca đoàn | 404 `REHEARSAL_NOT_FOUND`; tạo: 404 `CHOIR_NOT_FOUND`, 409 `CHOIR_INACTIVE`, `CHOIR_NOT_SERVING_EVENT`; điểm danh người ngoài ca đoàn → 404 `MEMBER_NOT_FOUND` |
 | Bài tập về nhà, bản nộp | Bài tập có `choirId` thuộc mình. Tạo mới **bắt buộc** `choirId`; `All` = cả ca đoàn, `SkillGroup` / `Individual` chỉ trong ca đoàn | 404 `PRACTICE_ASSIGNMENT_NOT_FOUND` / `PRACTICE_SUBMISSION_NOT_FOUND`; chỉ định người ngoài ca đoàn → 404 `MEMBER_NOT_FOUND` |
 | Sự kiện (danh sách, tiến độ chuẩn bị) | Sự kiện có ca đoàn của mình phục vụ, hoặc chưa gán ca đoàn | 404 `LITURGICAL_EVENT_NOT_FOUND` |
-| Danh sách bài, yêu cầu nhân sự, xác nhận tham gia, phân công | **Xem**: ca trưởng mọi ca đoàn phục vụ. **Tạo / sửa / nộp / mời / phân công / chốt / gửi thông báo**: chỉ ca trưởng của ca đoàn phụ trách (sự kiện có ca đoàn nhưng chưa chọn phụ trách: ca trưởng mọi ca đoàn phục vụ). Người được mời / phân công phải là ca viên của các ca đoàn phục vụ | Không phục vụ: 404 như cũ (`LITURGICAL_EVENT_NOT_FOUND`, `SONG_LIST_NOT_FOUND`, `ROSTER_NOT_FOUND`…); phục vụ nhưng không phụ trách: 403 `CHOIR_NOT_LEAD`; người ngoài ca đoàn: 404 `MEMBER_NOT_FOUND` |
+| Danh sách bài, yêu cầu nhân sự, xác nhận tham gia, phân công | **Xem**: ca trưởng mọi ca đoàn phục vụ. **Tạo / sửa / nộp / mời / phân công / chốt / gửi thông báo**: chỉ ca trưởng của ca đoàn phụ trách (sự kiện có ca đoàn nhưng chưa chọn phụ trách: ca trưởng mọi ca đoàn phục vụ). Người được mời / phân công phải là ca viên của các ca đoàn phục vụ | Không phục vụ: 404 như cũ (`LITURGICAL_EVENT_NOT_FOUND`, `SONG_LIST_NOT_FOUND`, `ROSTER_NOT_FOUND`…); phục vụ nhưng không phụ trách, hoặc sự kiện chưa gán ca đoàn: 403 `CHOIR_NOT_LEAD`; người ngoài ca đoàn: 404 `MEMBER_NOT_FOUND` |
 | Lịch sắp tới `GET /api/schedule/rehearsals` | Ca viên: buổi tập của ca đoàn mình; ca trưởng: của ca đoàn mình phụ trách; cả hai cộng buổi tập chưa gắn ca đoàn | — |
 
 `SongList.choirId` được gán bằng ca đoàn phụ trách lúc tạo. Ca viên chỉ nhận bài tập của ca đoàn mình đang ở.

@@ -18,5 +18,16 @@ public class CreateLiturgicalEventRequestValidator : AbstractValidator<CreateLit
             .Must(x => x.MassTypeId.HasValue || x.CeremonyTypeId.HasValue)
             .WithErrorCode(ErrorCodes.LiturgicalEventTypeRequired)
             .WithMessage("Either MassTypeId or CeremonyTypeId is required.");
+
+        RuleFor(x => x.ChoirIds)
+            .NotEmpty()
+            .WithErrorCode(ErrorCodes.LiturgicalEventChoirRequired)
+            .WithMessage("At least one choir is required.");
+        RuleForEach(x => x.ChoirIds).NotEmpty();
+        RuleFor(x => x.LeadChoirId)
+            .Must((request, leadId) => leadId is { } id && request.ChoirIds.Contains(id))
+            .When(x => x.ChoirIds is { Count: > 0 })
+            .WithErrorCode(ErrorCodes.ChoirLeadInvalid)
+            .WithMessage("LeadChoirId must be one of ChoirIds.");
     }
 }

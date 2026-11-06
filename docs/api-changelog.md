@@ -11,6 +11,22 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
   huống trước đây chưa có. FE bỏ qua trường lạ, hiển thị câu chung cho mã lạ.
 - Mỗi PR đổi hợp đồng thêm một dòng vào mục ngày tương ứng ở đây, cùng PR cập nhật `api.md` / `error-codes.md`.
 
+## 2026-11-05
+
+### [Phá vỡ] Sự kiện bắt buộc có ca đoàn
+
+Web cha xứ phải sửa theo: form tạo sự kiện, thẻ gán ca đoàn, bản dịch mã mới. Mobile không ảnh hưởng.
+
+- `POST api/liturgical-events` thêm **bắt buộc** `choirIds` (ít nhất một) và `leadChoirId` (nằm trong `choirIds`).
+  Thiếu → 400 `VALIDATION_FAILED` (`LITURGICAL_EVENT_CHOIR_REQUIRED`, `CHOIR_LEAD_INVALID`). Ca đoàn sai → 404
+  `CHOIR_NOT_FOUND`, đã tắt → 409 `CHOIR_INACTIVE`.
+- `PATCH api/liturgical-events/{id}/publish`: sự kiện chưa có ca đoàn phụ trách → 400 `LITURGICAL_EVENT_CHOIR_REQUIRED`.
+  `POST .../generation` vẫn sinh nháp không ca đoàn; gán qua `PUT .../choirs` rồi mới công bố.
+- `PUT api/liturgical-events/{id}/choirs` không nhận `choirIds: []` nữa → 400 `VALIDATION_FAILED`
+  (`LITURGICAL_EVENT_CHOIR_REQUIRED`); `leadChoirId` luôn bắt buộc.
+- Sự kiện cũ chưa gán ca đoàn: ca trưởng vẫn xem được, nhưng tạo / sửa / nộp danh sách bài, mời, phân công trả 403
+  `CHOIR_NOT_LEAD` cho tới khi cha xứ gán ca đoàn.
+
 ## 2026-11-01
 
 Gỡ bớt việc FE tự tính (Web backlog B39, B41, B43, B44, B45). Cần migration `AddLiturgicalDayColor` (B45) và `AddRehearsalRecording` (B43).

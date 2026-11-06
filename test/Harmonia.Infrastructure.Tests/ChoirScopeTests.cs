@@ -147,7 +147,8 @@ public sealed class ChoirScopeTests : IDisposable
         Assert.Null(await scope.CheckCanLeadEventAsync(iLead, "HIDDEN", _ct));
         Assert.Equal(ErrorCodes.ChoirNotLead, await scope.CheckCanLeadEventAsync(iServe, "HIDDEN", _ct));
         Assert.Equal("HIDDEN", await scope.CheckCanLeadEventAsync(notMine, "HIDDEN", _ct));
-        Assert.Null(await scope.CheckCanLeadEventAsync(noChoir, "HIDDEN", _ct));
+        Assert.Equal(ErrorCodes.ChoirNotLead, await scope.CheckCanLeadEventAsync(noChoir, "HIDDEN", _ct));
+        Assert.True(await scope.CanViewEventAsync(noChoir, _ct));
         Assert.Null(await scope.CheckCanLeadEventAsync(noLeadMarked, "HIDDEN", _ct));
         Assert.True(await scope.CanViewEventAsync(iServe, _ct));
         Assert.False(await scope.CanViewEventAsync(notMine, _ct));

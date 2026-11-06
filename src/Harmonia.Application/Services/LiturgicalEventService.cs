@@ -8,6 +8,7 @@ using Harmonia.Domain.Entities;
 using Harmonia.Domain.Enums;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -16,6 +17,7 @@ namespace Harmonia.Application.Services;
 public class LiturgicalEventService(
     ILiturgicalEventRepository liturgicalEventRepository,
     IUserRepository userRepository,
+    IGenericRepository<Choir> choirRepository,
     INotificationService notificationService,
     ILookupService lookupService,
     IChoirScopeService choirScope,
@@ -59,15 +61,28 @@ public class LiturgicalEventService(
             return Result<LiturgicalEventDto>.Failure(catalogs.Code!);
         }
 
+        var choirIds = request.ChoirIds.Distinct().ToList();
+        var choirs = await choirRepository.ListAsync(x => choirIds.Contains(x.Id), cancellationToken);
+        if (choirs.Count != choirIds.Count)
+        {
+            return Result<LiturgicalEventDto>.Failure(ErrorCodes.ChoirNotFound);
+        }
+
+        if (choirs.Any(x => !x.IsActive))
+        {
+            return Result<LiturgicalEventDto>.Failure(ErrorCodes.ChoirInactive);
+        }
+
         if (await liturgicalEventRepository.ExistsBySlotAsync(
                 request.EventDate, request.Time, request.LocationId, null, cancellationToken))
         {
             return Result<LiturgicalEventDto>.Failure(ErrorCodes.LiturgicalEventSlotTaken);
         }
 
+        var eventId = Guid.NewGuid();
         var liturgicalEvent = new LiturgicalEvent
         {
-            Id = Guid.NewGuid(),
+            Id = eventId,
             EventDate = request.EventDate,
             Time = request.Time,
             LiturgicalSeasonId = seasonId,
@@ -78,6 +93,10 @@ public class LiturgicalEventService(
             Title = request.Title,
             SpecialRequirements = request.SpecialRequirements,
             Status = EventStatus.Draft,
+            EventChoirs = choirIds.Select(choirId => new LiturgicalEventChoir
+            {
+                Id = Guid.NewGuid(), EventId = eventId, ChoirId = choirId, IsLead = choirId == request.LeadChoirId,
+            }).ToList(),
         };
 
         await liturgicalEventRepository.AddAsync(liturgicalEvent, cancellationToken);
@@ -205,8 +224,8 @@ public class LiturgicalEventService(
     }
 
     /// <summary>
-    /// A published event must be complete and still valid: not past, with a type and a season, every catalog active
-    /// (a row switched off since the last save no longer passes) and the date + time + location still free.
+    /// A published event must be complete and still valid: not past, with a type, a season and a lead choir, every
+    /// catalog active (a row switched off since the last save no longer passes) and the date + time + location still free.
     /// </summary>
     private async Task<string?> CheckPublishableAsync(LiturgicalEvent liturgicalEvent, CancellationToken cancellationToken)
     {
@@ -217,6 +236,12 @@ public class LiturgicalEventService(
         }
 
         if (liturgicalEvent.LiturgicalSeasonId is null) return ErrorCodes.LiturgicalEventSeasonRequired;
+
+        // Generated drafts have no choir yet, and only a lead choir may plan a published event.
+        if (await choirScope.GetLeadChoirIdAsync(liturgicalEvent.Id, cancellationToken) is null)
+        {
+            return ErrorCodes.LiturgicalEventChoirRequired;
+        }
 
         var catalogs = await lookupService.CheckEventCatalogsAsync(
             liturgicalEvent.EventDate, liturgicalEvent.LiturgicalSeasonId, liturgicalEvent.MassTypeId,

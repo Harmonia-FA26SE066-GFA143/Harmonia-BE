@@ -20,6 +20,9 @@ public class LiturgicalEventServiceTests
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
     private readonly ILookupService _lookups = Substitute.For<ILookupService>();
     private readonly ISystemSettingService _settings = Substitute.For<ISystemSettingService>();
+    private readonly IGenericRepository<Choir> _choirs = Substitute.For<IGenericRepository<Choir>>();
+    private readonly IChoirScopeService _scope = ChoirScopeFakes.Unrestricted();
+    private readonly Choir _choir = new() { Id = Guid.NewGuid(), Name = "Cecilia", IsActive = true };
     private readonly LiturgicalEventService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
 
@@ -38,9 +41,10 @@ public class LiturgicalEventServiceTests
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<LiturgicalEventProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new LiturgicalEventService(_repository, _users, _notifications, _lookups, ChoirScopeFakes.Unrestricted(), _settings, mapper);
+        _sut = new LiturgicalEventService(_repository, _users, _choirs, _notifications, _lookups, _scope, _settings, mapper);
         _lookups.CheckEventCatalogsAsync(default, default, default, default, default, default, default, default)
             .ReturnsForAnyArgs(Result.Success());
+        _choirs.ListAsync(default!, default).ReturnsForAnyArgs([_choir]);
         _repository.GetWithLocationAsync(_event.Id, _ct).Returns(_event);
     }
 
@@ -87,6 +91,7 @@ public class LiturgicalEventServiceTests
         {
             EventDate = _event.EventDate, Time = _event.Time, LocationId = Guid.NewGuid(), MassTypeId = Guid.NewGuid(),
             LiturgicalSeasonId = Guid.NewGuid(), CeremonyTypeId = Guid.NewGuid(), CategoryId = Guid.NewGuid(),
+            ChoirIds = [_choir.Id], LeadChoirId = _choir.Id,
         };
         _lookups.CheckEventCatalogsAsync(
                 request.EventDate, request.LiturgicalSeasonId, request.MassTypeId, request.CeremonyTypeId,
@@ -106,6 +111,7 @@ public class LiturgicalEventServiceTests
         var request = new CreateLiturgicalEventRequest
         {
             EventDate = _event.EventDate, Time = _event.Time, LocationId = Guid.NewGuid(), MassTypeId = Guid.NewGuid(),
+            ChoirIds = [_choir.Id], LeadChoirId = _choir.Id,
         };
         _lookups.FindLiturgicalSeasonIdAsync(request.EventDate, _ct).Returns(advent);
 
@@ -114,6 +120,48 @@ public class LiturgicalEventServiceTests
         Assert.Equal(advent, result.Value!.LiturgicalSeasonId);
         await _lookups.Received(1).CheckEventCatalogsAsync(
             request.EventDate, advent, request.MassTypeId, null, null, request.LocationId, null, _ct);
+    }
+
+    private CreateLiturgicalEventRequest CreateRequestWithChoirs(params Guid[] choirIds) => new()
+    {
+        EventDate = _event.EventDate, Time = _event.Time, LocationId = Guid.NewGuid(), MassTypeId = Guid.NewGuid(),
+        ChoirIds = [.. choirIds], LeadChoirId = choirIds[0],
+    };
+
+    [Fact]
+    public async Task Create_SavesServingChoirsAndMarksTheLead_Async()
+    {
+        var second = new Choir { Id = Guid.NewGuid(), Name = "Second", IsActive = true };
+        _choirs.ListAsync(default!, default).ReturnsForAnyArgs([_choir, second]);
+        LiturgicalEvent? added = null;
+        await _repository.AddAsync(Arg.Do<LiturgicalEvent>(x => added = x), _ct);
+
+        var result = await _sut.CreateAsync(CreateRequestWithChoirs(second.Id, _choir.Id), _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, added!.EventChoirs.Count);
+        Assert.All(added.EventChoirs, x => Assert.Equal(added.Id, x.EventId));
+        Assert.Equal(second.Id, Assert.Single(added.EventChoirs, x => x.IsLead).ChoirId);
+    }
+
+    [Fact]
+    public async Task Create_UnknownChoir_ReturnsChoirNotFound_AndAddsNothing_Async()
+    {
+        var result = await _sut.CreateAsync(CreateRequestWithChoirs(_choir.Id, Guid.NewGuid()), _ct);
+
+        Assert.Equal(ErrorCodes.ChoirNotFound, result.Code);
+        await _repository.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task Create_InactiveChoir_ReturnsChoirInactive_AndAddsNothing_Async()
+    {
+        _choir.IsActive = false;
+
+        var result = await _sut.CreateAsync(CreateRequestWithChoirs(_choir.Id), _ct);
+
+        Assert.Equal(ErrorCodes.ChoirInactive, result.Code);
+        await _repository.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
     }
 
     [Fact]
@@ -218,6 +266,18 @@ public class LiturgicalEventServiceTests
         _event.Status = EventStatus.Draft;
         _event.LiturgicalSeasonId = Guid.NewGuid();
         _repository.GetByIdAsync(_event.Id, _ct).Returns(_event);
+        _scope.GetLeadChoirIdAsync(_event.Id, _ct).Returns(_choir.Id);
+    }
+
+    [Fact]
+    public async Task Publish_WithoutLeadChoir_ReturnsChoirRequired_AndStaysDraft_Async()
+    {
+        DraftReadyToPublish();
+        _scope.GetLeadChoirIdAsync(_event.Id, _ct).Returns((Guid?)null);
+
+        Assert.Equal(ErrorCodes.LiturgicalEventChoirRequired, (await _sut.PublishAsync(_event.Id, _ct)).Code);
+        Assert.Equal(EventStatus.Draft, _event.Status);
+        await _repository.DidNotReceive().SaveChangesAsync(_ct);
     }
 
     [Fact]

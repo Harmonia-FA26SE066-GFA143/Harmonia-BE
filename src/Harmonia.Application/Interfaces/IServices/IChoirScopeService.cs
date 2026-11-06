@@ -24,14 +24,15 @@ public interface IChoirScopeService
     Task<bool> CanViewEventAsync(Guid eventId, CancellationToken cancellationToken);
 
     /// <summary>
-    /// True when the caller may plan the event: no choir serves it, or the caller leads its lead choir. An event whose
-    /// choirs were assigned without a lead lets the director of any serving choir plan it.
+    /// True when the caller may plan the event: the caller leads its lead choir. An event whose choirs were assigned
+    /// without a lead lets the director of any serving choir plan it; an event with no choir lets no director plan it.
     /// </summary>
     Task<bool> CanLeadEventAsync(Guid eventId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Null when the caller may plan the event (<see cref="CanLeadEventAsync"/>); <paramref name="notFoundCode"/> when
-    /// they cannot even see it, so it stays hidden; CHOIR_NOT_LEAD when one of their choirs serves it but does not lead.
+    /// they cannot even see it, so it stays hidden; CHOIR_NOT_LEAD when they can see it but do not lead, including an
+    /// event with no choir yet.
     /// </summary>
     Task<string?> CheckCanLeadEventAsync(Guid eventId, string notFoundCode, CancellationToken cancellationToken);
 

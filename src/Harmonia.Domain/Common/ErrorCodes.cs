@@ -148,6 +148,8 @@ public static class ErrorCodes
 
     public const string LiturgicalEventSeasonRequired = "LITURGICAL_EVENT_SEASON_REQUIRED";
 
+    public const string LiturgicalEventChoirRequired = "LITURGICAL_EVENT_CHOIR_REQUIRED";
+
     public const string LiturgicalEventGenerationRangeInvalid = "LITURGICAL_EVENT_GENERATION_RANGE_INVALID";
 
     public const string LiturgicalSeasonDateOverlap = "LITURGICAL_SEASON_DATE_OVERLAP";

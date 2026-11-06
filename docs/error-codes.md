@@ -168,6 +168,7 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `LITURGICAL_EVENT_TYPE_REQUIRED` | 400 | Phải chọn loại lễ hoặc loại nghi thức |
 | `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` | 400 | Ngày sự kiện không thuộc mùa phụng vụ đã chọn (được phép sớm hơn ngày bắt đầu mùa 1 ngày cho lễ vọng) |
 | `LITURGICAL_EVENT_SEASON_REQUIRED` | 400 | Phải chọn mùa phụng vụ trước khi công bố sự kiện |
+| `LITURGICAL_EVENT_CHOIR_REQUIRED` | 400 | Sự kiện phải có ca đoàn phục vụ và ca đoàn phụ trách |
 | `LITURGICAL_EVENT_GENERATION_RANGE_INVALID` | 400 | Khoảng ngày không hợp lệ: không bắt đầu trong quá khứ và dài tối đa 62 ngày |
 | `LITURGICAL_SEASON_DATE_OVERLAP` | 409 | Khoảng thời gian trùng với mùa phụng vụ khác |
 | `LITURGICAL_SEASON_DATE_INVALID` | 400 | Ngày kết thúc phải sau ngày bắt đầu |
@@ -424,3 +425,5 @@ xem — trả 404, để không lộ sự tồn tại của bản ghi.
   đang có dòng phân công `Active`. `ROSTER_ALREADY_FINALIZED` còn trả khi sửa dòng / yêu cầu cả buổi lễ đã chốt sớm.
 - 2026-10-27: thêm `ROSTER_MEMBER_TIME_CONFLICT` — thêm / thay người vào phân công khi ca viên đang có dòng `Active` ở một
   lễ khác (chưa huỷ, mọi ca đoàn) cùng ngày, bắt đầu cách nhau ít hơn `Roster.EventOverlapMinutes` phút.
+- 2026-11-05: thêm `LITURGICAL_EVENT_CHOIR_REQUIRED` — tạo sự kiện hoặc `PUT .../choirs` với danh sách ca đoàn rỗng, công bố
+  sự kiện chưa có ca đoàn phụ trách. `CHOIR_NOT_LEAD` còn trả khi ca trưởng lập kế hoạch cho sự kiện chưa gán ca đoàn.

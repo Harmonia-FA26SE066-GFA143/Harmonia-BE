@@ -691,20 +691,38 @@ public class ValidatorTests
     };
 
     [Fact]
-    public void UpdateEventChoirs_LeadMustBeOneOfTheChoirs_AndEmptyListTakesNoLead()
+    public void UpdateEventChoirs_LeadMustBeOneOfTheChoirs_AndListCannotBeEmpty()
     {
         var validator = new UpdateEventChoirsRequestValidator();
         var a = Guid.NewGuid();
         var b = Guid.NewGuid();
 
         Assert.Empty(ErrorCodesOf(validator, new UpdateEventChoirsRequest { ChoirIds = [a, b], LeadChoirId = b }));
-        Assert.Empty(ErrorCodesOf(validator, new UpdateEventChoirsRequest { ChoirIds = [] }));
+        Assert.Equal([ErrorCodes.LiturgicalEventChoirRequired],
+            ErrorCodesOf(validator, new UpdateEventChoirsRequest { ChoirIds = [] }));
         Assert.Equal([ErrorCodes.ChoirLeadInvalid],
             ErrorCodesOf(validator, new UpdateEventChoirsRequest { ChoirIds = [a] }));
         Assert.Equal([ErrorCodes.ChoirLeadInvalid],
             ErrorCodesOf(validator, new UpdateEventChoirsRequest { ChoirIds = [a], LeadChoirId = Guid.NewGuid() }));
-        Assert.Equal([ErrorCodes.ChoirLeadInvalid],
+        Assert.Equal([ErrorCodes.LiturgicalEventChoirRequired],
             ErrorCodesOf(validator, new UpdateEventChoirsRequest { ChoirIds = [], LeadChoirId = a }));
+    }
+
+    [Fact]
+    public void CreateLiturgicalEvent_ChoirsAndLeadAreRequired()
+    {
+        var validator = new CreateLiturgicalEventRequestValidator();
+        var a = Guid.NewGuid();
+        CreateLiturgicalEventRequest Request(List<Guid> choirIds, Guid? leadChoirId) => new()
+        {
+            EventDate = new DateOnly(2045, 12, 25), Time = new TimeOnly(7, 0), LocationId = Guid.NewGuid(),
+            MassTypeId = Guid.NewGuid(), ChoirIds = choirIds, LeadChoirId = leadChoirId,
+        };
+
+        Assert.Empty(ErrorCodesOf(validator, Request([a], a)));
+        Assert.Equal([ErrorCodes.LiturgicalEventChoirRequired], ErrorCodesOf(validator, Request([], null)));
+        Assert.Equal([ErrorCodes.ChoirLeadInvalid], ErrorCodesOf(validator, Request([a], null)));
+        Assert.Equal([ErrorCodes.ChoirLeadInvalid], ErrorCodesOf(validator, Request([a], Guid.NewGuid())));
     }
 
     [Fact]
