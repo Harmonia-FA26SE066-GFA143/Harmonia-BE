@@ -895,7 +895,8 @@ Admin thấy và quản lý mọi ca đoàn.
 | POST | `/api/choirs/{id}/members` | `Admin`, `ChoirDirector` | `{ "memberIds": ["guid"] }` | 204 | 400 `VALIDATION_FAILED` (`CHOIR_MEMBER_INVALID`), `CHOIR_MEMBER_INVALID` · 404 `CHOIR_NOT_FOUND` · 409 `CHOIR_INACTIVE` |
 | DELETE | `/api/choirs/{id}/members/{memberId}` | `Admin`, `ChoirDirector` | — | 204 | 404 `CHOIR_NOT_FOUND`, `CHOIR_MEMBERSHIP_NOT_FOUND` |
 | GET | `/api/liturgical-events/{id}/choirs` | `ParishPriest`, `ChoirDirector` | — | 200 `LiturgicalEventChoirDto[]` (ca đoàn phụ trách trước, rồi theo tên) | 404 `LITURGICAL_EVENT_NOT_FOUND` |
-| PUT | `/api/liturgical-events/{id}/choirs` | `ParishPriest` | `{ "choirIds": ["guid"], "leadChoirId" }` | 200 `LiturgicalEventChoirDto[]` (danh sách sau khi lưu) | 400 `VALIDATION_FAILED` (`LITURGICAL_EVENT_CHOIR_REQUIRED`, `CHOIR_LEAD_INVALID`) · 404 `LITURGICAL_EVENT_NOT_FOUND`, `CHOIR_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `CHOIR_INACTIVE` |
+| PUT | `/api/liturgical-events/{id}/choirs/{choirId}/substitute-director` | `ParishPriest` | `{ "directorId?", "reason?" }` | 200 `LiturgicalEventChoirDto[]` | 400 `VALIDATION_FAILED` (`CHOIR_CHANGE_REASON_REQUIRED`), `CHOIR_DIRECTOR_INVALID` · 404 `LITURGICAL_EVENT_NOT_FOUND` · 409 `CHOIR_NOT_SERVING_EVENT`, `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED` |
+| PUT | `/api/liturgical-events/{id}/choirs` | `ParishPriest` | `{ "choirIds": ["guid"], "leadChoirId", "reason?" }` | 200 `LiturgicalEventChoirDto[]` (danh sách sau khi lưu) | 400 `VALIDATION_FAILED` (`LITURGICAL_EVENT_CHOIR_REQUIRED`, `CHOIR_LEAD_INVALID`), `CHOIR_CHANGE_REASON_REQUIRED` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `CHOIR_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `CHOIR_INACTIVE` |
 
 - `name` bắt buộc, ≤ 100 ký tự, không trùng ca đoàn khác; `description` ≤ 500 ký tự.
 - `directorId` là id `User` (lấy từ `GET /api/users?roleName=ChoirDirector`); bỏ trống / `null` = chưa có ca trưởng.
@@ -912,10 +913,23 @@ Admin thấy và quản lý mọi ca đoàn.
   Sự kiện đã huỷ hoặc đã qua ngày thì không sửa được. Ca đoàn đã tắt vẫn được giữ lại nếu đã gán từ trước,
   nhưng không thêm mới được.
 - `leadChoirId` là **ca đoàn phụ trách** (D8): bắt buộc và phải nằm trong `choirIds`. Sai → 400 `CHOIR_LEAD_INVALID`.
+- Đổi ca đoàn khi ca đoàn không tham gia được (2026-11-07): gỡ ca đoàn khỏi sự kiện `Published` bắt buộc `reason`
+  (≤ 500 ký tự, thiếu → 400 `CHOIR_CHANGE_REASON_REQUIRED`). Ca viên của ca đoàn bị gỡ mà không thuộc ca đoàn nào còn lại
+  bị **xoá lời mời** (`EventParticipation`) và **dòng phân công**; phân công đã chốt mở lại `Draft` (chốt sớm cả buổi lễ
+  cũng mở lại nếu mất dòng cả buổi). Đổi ca đoàn phụ trách thì mọi phiên bản `SongList` của sự kiện chuyển sang ca đoàn
+  mới, giữ nguyên trạng thái. Gửi thông báo `EventChoirChanged` (kèm lý do) cho ca trưởng ca đoàn bị gỡ, ca đoàn mới /
+  ca đoàn phụ trách mới, và ca viên bị huỷ.
+
+- Ca trưởng thay thế khi ca trưởng vắng đột xuất (2026-11-07): `directorId` là một `ChoirDirector` đang hoạt động khác
+  ca trưởng chính của ca đoàn (sai → 400 `CHOIR_DIRECTOR_INVALID`); đặt người thay thì `reason` bắt buộc. Người thay có
+  quyền của ca trưởng ca đoàn đó **chỉ ở sự kiện này** (xem, lập danh sách bài, mời, phân công nếu là ca đoàn phụ trách)
+  và thấy sự kiện trong `GET /api/liturgical-events`; ca trưởng chính vẫn giữ quyền. `directorId: null` gỡ người thay.
+  Thông báo `EventChoirChanged` gửi người thay mới, người thay cũ và ca trưởng chính.
 
 ```json
 { "choirId": "guid", "name": "Ca đoàn Cêcilia", "isActive": true, "isLead": true,
-  "directorId": "guid", "directorFullName": "Nguyễn Văn A" }
+  "directorId": "guid", "directorFullName": "Nguyễn Văn A",
+  "substituteDirectorId": "guid", "substituteDirectorFullName": "Trần Thị B", "reason": "Ca trưởng ốm" }
 ```
 
 ### Phạm vi của ca trưởng (D8)

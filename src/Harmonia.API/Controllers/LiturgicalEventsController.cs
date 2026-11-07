@@ -96,6 +96,14 @@ public class LiturgicalEventsController(
         Guid id, [FromBody] UpdateEventChoirsRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await choirService.UpdateEventChoirsAsync(id, request, cancellationToken));
 
+    /// <summary>Sets or clears the director standing in for a serving choir's own director at this event.</summary>
+    [HttpPut("{id:guid}/choirs/{choirId:guid}/substitute-director")]
+    [Authorize(Roles = RoleNames.ParishPriest)]
+    [ProducesResponseType<List<LiturgicalEventChoirDto>>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdateSubstituteDirectorAsync(
+        Guid id, Guid choirId, [FromBody] UpdateSubstituteDirectorRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await choirService.UpdateSubstituteDirectorAsync(id, choirId, request, cancellationToken));
+
     /// <summary>Library songs that fit the event (season, Mass or ceremony type) and optionally one slot, best first.</summary>
     [HttpGet("{id:guid}/song-suggestions")]
     [Authorize(Roles = $"{RoleNames.ParishPriest},{RoleNames.ChoirDirector}")]

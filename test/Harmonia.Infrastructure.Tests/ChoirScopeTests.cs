@@ -4,6 +4,7 @@ using Harmonia.Domain.Common;
 using Harmonia.Domain.Entities;
 using Harmonia.Domain.Enums;
 using Harmonia.Infrastructure.Repositories;
+using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 
 namespace Harmonia.Infrastructure.Tests;
@@ -253,9 +254,31 @@ public sealed class ChoirScopeTests : IDisposable
         await using var context = _db.NewContext();
 
         var page = await new LiturgicalEventRepository(context)
-            .SearchAsync(new SearchLiturgicalEventsRequest(), false, [_mine.Id], _ct);
+            .SearchAsync(new SearchLiturgicalEventsRequest(), false, [_mine.Id], Guid.NewGuid(), _ct);
 
         Assert.Equal(new[] { served, noChoir }.Order(), page.Items.Select(x => x.Id).Order());
+        Assert.DoesNotContain(notMine, page.Items.Select(x => x.Id));
+    }
+
+    [Fact]
+    public async Task SubstituteDirector_PlansAndListsThatEventOnly_Async()
+    {
+        var standIn = await AddEventAsync((_theirs.Id, true));
+        var notMine = await AddEventAsync((_theirs.Id, true));
+        await using (var seed = _db.NewContext())
+        {
+            (await seed.LiturgicalEventChoirs.SingleAsync(x => x.EventId == standIn, _ct)).SubstituteDirectorId = _meId;
+            await seed.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var scope = NewScope(context);
+        var page = await new LiturgicalEventRepository(context)
+            .SearchAsync(new SearchLiturgicalEventsRequest(), false, [_mine.Id], _meId, _ct);
+
+        Assert.Null(await scope.CheckCanLeadEventAsync(standIn, "HIDDEN", _ct));
+        Assert.Equal("HIDDEN", await scope.CheckCanLeadEventAsync(notMine, "HIDDEN", _ct));
+        Assert.Contains(standIn, page.Items.Select(x => x.Id));
         Assert.DoesNotContain(notMine, page.Items.Select(x => x.Id));
     }
 

@@ -412,6 +412,8 @@ public static class ErrorCodes
 
     public const string ChoirNotLead = "CHOIR_NOT_LEAD";
 
+    public const string ChoirChangeReasonRequired = "CHOIR_CHANGE_REASON_REQUIRED";
+
     // 16. Mass schedule.
     public const string MassScheduleNotFound = "MASS_SCHEDULE_NOT_FOUND";
 

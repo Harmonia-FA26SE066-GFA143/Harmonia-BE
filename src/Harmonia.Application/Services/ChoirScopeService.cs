@@ -64,7 +64,7 @@ public class ChoirScopeService(
         }
 
         var eventChoirs = await eventChoirRepository.ListAsync(x => x.EventId == eventId, cancellationToken);
-        return eventChoirs.Count == 0 || eventChoirs.Any(x => mine.Contains(x.ChoirId));
+        return eventChoirs.Count == 0 || eventChoirs.Any(x => IsDirectedBy(x, mine));
     }
 
     public async Task<bool> CanLeadEventAsync(Guid eventId, CancellationToken cancellationToken)
@@ -76,8 +76,12 @@ public class ChoirScopeService(
 
         var eventChoirs = await eventChoirRepository.ListAsync(x => x.EventId == eventId, cancellationToken);
         var leads = eventChoirs.Where(x => x.IsLead).ToList();
-        return (leads.Count > 0 ? leads : eventChoirs).Any(x => mine.Contains(x.ChoirId));
+        return (leads.Count > 0 ? leads : eventChoirs).Any(x => IsDirectedBy(x, mine));
     }
+
+    /// <summary>The caller directs the choir, or stands in for its director at this event.</summary>
+    private bool IsDirectedBy(LiturgicalEventChoir eventChoir, IReadOnlyCollection<Guid> mine) =>
+        mine.Contains(eventChoir.ChoirId) || eventChoir.SubstituteDirectorId == currentUser.UserId;
 
     public async Task<string?> CheckCanLeadEventAsync(
         Guid eventId, string notFoundCode, CancellationToken cancellationToken)

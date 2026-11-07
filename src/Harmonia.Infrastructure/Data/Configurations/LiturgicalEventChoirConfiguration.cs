@@ -21,5 +21,12 @@ public class LiturgicalEventChoirConfiguration : IEntityTypeConfiguration<Liturg
             .WithMany(x => x.EventChoirs)
             .HasForeignKey(x => x.ChoirId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne(x => x.SubstituteDirector)
+            .WithMany()
+            .HasForeignKey(x => x.SubstituteDirectorId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Property(x => x.Reason).HasMaxLength(500);
     }
 }

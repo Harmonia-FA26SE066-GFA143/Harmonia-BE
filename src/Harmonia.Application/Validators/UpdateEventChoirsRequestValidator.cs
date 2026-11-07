@@ -22,5 +22,6 @@ public class UpdateEventChoirsRequestValidator : AbstractValidator<UpdateEventCh
             .When(x => x.ChoirIds is { Count: > 0 })
             .WithErrorCode(ErrorCodes.ChoirLeadInvalid)
             .WithMessage("LeadChoirId must be one of ChoirIds.");
+        RuleFor(x => x.Reason).MaximumLength(500);
     }
 }

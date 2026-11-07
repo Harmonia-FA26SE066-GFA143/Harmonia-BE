@@ -2375,8 +2375,8 @@ public sealed class RepositoryTests : IDisposable
         await using var context = _db.NewContext();
         var repository = new LiturgicalEventRepository(context);
 
-        var all = await repository.SearchAsync(new SearchLiturgicalEventsRequest(), true, null, _ct);
-        var published = await repository.SearchAsync(new SearchLiturgicalEventsRequest(), false, null, _ct);
+        var all = await repository.SearchAsync(new SearchLiturgicalEventsRequest(), true, null, null, _ct);
+        var published = await repository.SearchAsync(new SearchLiturgicalEventsRequest(), false, null, null, _ct);
 
         Assert.Equal(3, all.TotalCount);
         Assert.Equal([seed.DraftOnlyEventId, seed.MixedEventId], published.Items.Select(x => x.Id));

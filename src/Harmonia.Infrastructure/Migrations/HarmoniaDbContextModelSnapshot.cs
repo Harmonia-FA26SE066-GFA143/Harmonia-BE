@@ -412,9 +412,18 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Property<bool>("IsLead")
                         .HasColumnType("bit");
 
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid?>("SubstituteDirectorId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ChoirId");
+
+                    b.HasIndex("SubstituteDirectorId");
 
                     b.HasIndex("EventId", "ChoirId")
                         .IsUnique();
@@ -2125,9 +2134,16 @@ namespace Harmonia.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Harmonia.Domain.Entities.User", "SubstituteDirector")
+                        .WithMany()
+                        .HasForeignKey("SubstituteDirectorId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Choir");
 
                     b.Navigation("LiturgicalEvent");
+
+                    b.Navigation("SubstituteDirector");
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.LiturgicalSlotRequirement", b =>

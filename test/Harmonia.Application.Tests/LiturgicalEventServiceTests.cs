@@ -41,7 +41,7 @@ public class LiturgicalEventServiceTests
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<LiturgicalEventProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new LiturgicalEventService(_repository, _users, _choirs, _notifications, _lookups, _scope, _settings, mapper);
+        _sut = new LiturgicalEventService(_repository, _users, _choirs, _notifications, _lookups, _scope, _settings, Substitute.For<ICurrentUserService>(), mapper);
         _lookups.CheckEventCatalogsAsync(default, default, default, default, default, default, default, default)
             .ReturnsForAnyArgs(Result.Success());
         _choirs.ListAsync(default!, default).ReturnsForAnyArgs([_choir]);
@@ -52,7 +52,7 @@ public class LiturgicalEventServiceTests
     public async Task Search_SetsSongListDueDateFromLeadDaysSetting_Async()
     {
         _settings.GetIntAsync(SystemSettingKeys.SongListLeadDays, _ct).Returns(7);
-        _repository.SearchAsync(Arg.Any<SearchLiturgicalEventsRequest>(), true, null, _ct)
+        _repository.SearchAsync(Arg.Any<SearchLiturgicalEventsRequest>(), true, null, Arg.Any<Guid?>(), _ct)
             .Returns(new PagedList<LiturgicalEvent>([_event], 1, 20, 1));
 
         var result = await _sut.SearchAsync(new SearchLiturgicalEventsRequest(), includeDrafts: true, _ct);

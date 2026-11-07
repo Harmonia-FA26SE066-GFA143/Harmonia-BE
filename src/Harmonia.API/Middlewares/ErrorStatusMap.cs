@@ -221,6 +221,7 @@ public static class ErrorStatusMap
         [ErrorCodes.ChoirNotServingEvent] = StatusCodes.Status409Conflict,
         [ErrorCodes.ChoirLeadInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.ChoirNotLead] = StatusCodes.Status403Forbidden,
+        [ErrorCodes.ChoirChangeReasonRequired] = StatusCodes.Status400BadRequest,
 
         // 16. Mass schedule.
         [ErrorCodes.MassScheduleNotFound] = StatusCodes.Status404NotFound,

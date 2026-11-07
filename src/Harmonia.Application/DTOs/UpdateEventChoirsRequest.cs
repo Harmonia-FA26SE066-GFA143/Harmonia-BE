@@ -10,4 +10,10 @@ public class UpdateEventChoirsRequest
 
     /// <summary>The lead choir (D8): required, and must be one of <see cref="ChoirIds"/>.</summary>
     public Guid? LeadChoirId { get; set; }
+
+    /// <summary>
+    /// Why the choirs change, e.g. a choir cannot serve. Required when a choir leaves a published event; it goes into
+    /// the notifications.
+    /// </summary>
+    public string? Reason { get; set; }
 }

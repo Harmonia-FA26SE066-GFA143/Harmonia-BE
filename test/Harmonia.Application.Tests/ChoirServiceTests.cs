@@ -21,8 +21,16 @@ public class ChoirServiceTests
     private readonly IMemberProfileRepository _members = Substitute.For<IMemberProfileRepository>();
     private readonly ILiturgicalEventRepository _events = Substitute.For<ILiturgicalEventRepository>();
     private readonly IUserRepository _users = Substitute.For<IUserRepository>();
+    private readonly IEventParticipationRepository _participations = Substitute.For<IEventParticipationRepository>();
+    private readonly IServiceRosterRepository _rosters = Substitute.For<IServiceRosterRepository>();
+    private readonly IGenericRepository<SongList> _songLists = Substitute.For<IGenericRepository<SongList>>();
+    private readonly INotificationService _notifications = Substitute.For<INotificationService>();
     private readonly ICurrentUserService _currentUser = Substitute.For<ICurrentUserService>();
     private readonly ChoirService _sut;
+    private readonly List<EventParticipation> _participationRows = [];
+    private readonly List<EventParticipation> _removedParticipations = [];
+    private readonly List<SongList> _songListRows = [];
+    private readonly List<SendNotificationRequest> _sent = [];
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly Choir _choir;
     private readonly LiturgicalEvent _event;
@@ -40,7 +48,9 @@ public class ChoirServiceTests
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<ChoirProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new ChoirService(_choirs, _memberships, _eventChoirs, _members, _events, _users, _currentUser, mapper);
+        _sut = new ChoirService(
+            _choirs, _memberships, _eventChoirs, _members, _events, _users, _participations, _rosters, _songLists,
+            _notifications, _currentUser, mapper);
         _currentUser.RoleName.Returns(RoleNames.Admin);
 
         // The fakes evaluate the service's predicate against in-memory rows, as the database would.
@@ -59,9 +69,28 @@ public class ChoirServiceTests
         _memberships.AddAsync(Arg.Do<ChoirMembership>(_addedMemberships.Add), _ct).Returns(Task.CompletedTask);
         _eventChoirs.ListAsync(Arg.Any<Expression<Func<LiturgicalEventChoir, bool>>>(), _ct)
             .Returns(call => _eventChoirRows.Where(call.Arg<Expression<Func<LiturgicalEventChoir, bool>>>().Compile()).ToList());
-        _eventChoirs.AddAsync(Arg.Do<LiturgicalEventChoir>(_addedEventChoirs.Add), _ct).Returns(Task.CompletedTask);
-        _eventChoirs.When(x => x.Remove(Arg.Any<LiturgicalEventChoir>()))
-            .Do(call => _removedEventChoirs.Add(call.Arg<LiturgicalEventChoir>()));
+        _eventChoirs.GetByIdAsync(Arg.Any<Guid>(), _ct)
+            .Returns(call => _eventChoirRows.SingleOrDefault(x => x.Id == call.Arg<Guid>()));
+        // Added and removed rows show up in later reads, as they would once saved.
+        _eventChoirs.AddAsync(Arg.Any<LiturgicalEventChoir>(), _ct).Returns(Task.CompletedTask).AndDoes(call =>
+        {
+            _addedEventChoirs.Add(call.Arg<LiturgicalEventChoir>());
+            _eventChoirRows.Add(call.Arg<LiturgicalEventChoir>());
+        });
+        _eventChoirs.When(x => x.Remove(Arg.Any<LiturgicalEventChoir>())).Do(call =>
+        {
+            _removedEventChoirs.Add(call.Arg<LiturgicalEventChoir>());
+            _eventChoirRows.Remove(call.Arg<LiturgicalEventChoir>());
+        });
+        _participations.ListAsync(Arg.Any<Expression<Func<EventParticipation, bool>>>(), _ct)
+            .Returns(call => _participationRows.Where(call.Arg<Expression<Func<EventParticipation, bool>>>().Compile()).ToList());
+        _participations.When(x => x.Remove(Arg.Any<EventParticipation>()))
+            .Do(call => _removedParticipations.Add(call.Arg<EventParticipation>()));
+        _songLists.ListAsync(Arg.Any<Expression<Func<SongList, bool>>>(), _ct)
+            .Returns(call => _songListRows.Where(call.Arg<Expression<Func<SongList, bool>>>().Compile()).ToList());
+        _songLists.GetByIdAsync(Arg.Any<Guid>(), _ct)
+            .Returns(call => _songListRows.SingleOrDefault(x => x.Id == call.Arg<Guid>()));
+        _notifications.SendAsync(Arg.Do<SendNotificationRequest>(_sent.Add), _ct).Returns(Task.CompletedTask);
         _users.ListAsync(Arg.Any<Expression<Func<User, bool>>>(), _ct)
             .Returns(call => _userRows.Where(call.Arg<Expression<Func<User, bool>>>().Compile()).ToList());
         _users.GetActiveByRoleAsync(RoleNames.ChoirDirector, _ct).Returns(_ => _activeDirectors.ToList());
@@ -479,8 +508,6 @@ public class ChoirServiceTests
         var oldLead = AssignToEvent(_choir);
         oldLead.IsLead = true;
         var newLead = AssignToEvent(other);
-        _eventChoirs.GetByIdAsync(Arg.Any<Guid>(), _ct)
-            .Returns(call => _eventChoirRows.SingleOrDefault(x => x.Id == call.Arg<Guid>()));
 
         var result = await _sut.UpdateEventChoirsAsync(
             _event.Id, new UpdateEventChoirsRequest { ChoirIds = [_choir.Id, other.Id], LeadChoirId = _choir.Id }, _ct);
@@ -515,7 +542,7 @@ public class ChoirServiceTests
         AssignToEvent(keptInactive);
 
         var result = await _sut.UpdateEventChoirsAsync(
-            _event.Id, new UpdateEventChoirsRequest { ChoirIds = [keptInactive.Id, added.Id] }, _ct);
+            _event.Id, new UpdateEventChoirsRequest { ChoirIds = [keptInactive.Id, added.Id], Reason = "Busy" }, _ct);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(["Added Choir", "Kept Choir"], result.Value!.Select(x => x.Name));
@@ -574,5 +601,111 @@ public class ChoirServiceTests
             Guid.NewGuid(), new UpdateEventChoirsRequest { ChoirIds = [_choir.Id] }, _ct);
 
         Assert.Equal(ErrorCodes.LiturgicalEventNotFound, result.Code);
+    }
+
+    [Fact]
+    public async Task UpdateEventChoirs_LeadSwapped_DropsLeavingMembers_ReopensRoster_MovesSongList_Async()
+    {
+        var oldDirector = NewDirector("Old Director");
+        var newDirector = NewDirector("New Director");
+        _choir.DirectorId = oldDirector.Id;
+        var other = NewChoir("Agnes Choir", directorId: newDirector.Id);
+        AssignToEvent(_choir).IsLead = true;
+        var leaver = NewMember(fullName: "Leaver");
+        var inBoth = NewMember(fullName: "In Both");
+        NewMembership(leaver);
+        NewMembership(inBoth);
+        _membershipRows.Add(new ChoirMembership { Id = Guid.NewGuid(), ChoirId = other.Id, MemberId = inBoth.Id, IsActive = true });
+        var leaverInvite = new EventParticipation { Id = Guid.NewGuid(), EventId = _event.Id, MemberId = leaver.Id };
+        _participationRows.AddRange(
+            [leaverInvite, new EventParticipation { Id = Guid.NewGuid(), EventId = _event.Id, MemberId = inBoth.Id }]);
+        var keptLine = new RosterAssignment { Id = Guid.NewGuid(), MemberId = inBoth.Id, SongListItemId = Guid.NewGuid() };
+        var roster = new ServiceRoster
+        {
+            Id = Guid.NewGuid(), EventId = _event.Id, Status = RosterStatus.Finalized,
+            FinalizedAt = DateTime.UtcNow, WholeServiceFinalizedAt = DateTime.UtcNow,
+            Assignments = [new RosterAssignment { Id = Guid.NewGuid(), MemberId = leaver.Id }, keptLine],
+        };
+        _rosters.GetEventWithRosterAsync(_event.Id, _ct).Returns(new LiturgicalEvent { Id = _event.Id, ServiceRoster = roster });
+        var songList = new SongList { Id = Guid.NewGuid(), EventId = _event.Id, ChoirId = _choir.Id };
+        _songListRows.Add(songList);
+
+        var result = await _sut.UpdateEventChoirsAsync(
+            _event.Id,
+            new UpdateEventChoirsRequest { ChoirIds = [other.Id], LeadChoirId = other.Id, Reason = "Ca đoàn bận" },
+            _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Same(leaverInvite, Assert.Single(_removedParticipations));
+        Assert.Same(keptLine, Assert.Single(roster.Assignments));
+        Assert.Equal(RosterStatus.Draft, roster.Status);
+        Assert.Null(roster.FinalizedAt);
+        Assert.Null(roster.WholeServiceFinalizedAt);
+        Assert.Equal(other.Id, songList.ChoirId);
+        Assert.Equal(
+            new[] { oldDirector.Id, newDirector.Id, leaver.UserId }.Order(),
+            _sent.SelectMany(x => x.RecipientUserIds).Order());
+        Assert.All(_sent, x => Assert.EndsWith("Lý do: Ca đoàn bận", x.Content));
+        Assert.Equal("Agnes Choir", Assert.Single(result.Value!).Name);
+    }
+
+    [Fact]
+    public async Task UpdateEventChoirs_ChoirLeavesPublishedEventWithoutReason_ReturnsReasonRequired_Async()
+    {
+        var other = NewChoir("Agnes Choir");
+        AssignToEvent(_choir).IsLead = true;
+
+        var result = await _sut.UpdateEventChoirsAsync(
+            _event.Id, new UpdateEventChoirsRequest { ChoirIds = [other.Id], LeadChoirId = other.Id }, _ct);
+
+        Assert.Equal(ErrorCodes.ChoirChangeReasonRequired, result.Code);
+        await _eventChoirs.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task UpdateSubstituteDirector_SetsStandIn_NotifiesBothDirectors_Async()
+    {
+        var director = NewDirector("Own Director");
+        var standIn = NewDirector("Stand In");
+        _choir.DirectorId = director.Id;
+        var row = AssignToEvent(_choir);
+
+        var result = await _sut.UpdateSubstituteDirectorAsync(
+            _event.Id, _choir.Id, new UpdateSubstituteDirectorRequest { DirectorId = standIn.Id, Reason = " Ốm " }, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(standIn.Id, row.SubstituteDirectorId);
+        Assert.Equal("Ốm", row.Reason);
+        Assert.Equal("Stand In", Assert.Single(result.Value!).SubstituteDirectorFullName);
+        Assert.Equal(
+            new[] { standIn.Id, director.Id }.Order(), _sent.SelectMany(x => x.RecipientUserIds).Order());
+    }
+
+    [Fact]
+    public async Task UpdateSubstituteDirector_OwnOrInactiveDirector_ReturnsDirectorInvalid_Async()
+    {
+        var director = NewDirector("Own Director");
+        var inactive = NewDirector("Gone", isActive: false);
+        _choir.DirectorId = director.Id;
+        AssignToEvent(_choir);
+
+        foreach (var directorId in new[] { director.Id, inactive.Id })
+        {
+            var result = await _sut.UpdateSubstituteDirectorAsync(
+                _event.Id, _choir.Id, new UpdateSubstituteDirectorRequest { DirectorId = directorId, Reason = "x" }, _ct);
+
+            Assert.Equal(ErrorCodes.ChoirDirectorInvalid, result.Code);
+        }
+
+        await _eventChoirs.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task UpdateSubstituteDirector_ChoirNotServingEvent_ReturnsNotServing_Async()
+    {
+        var result = await _sut.UpdateSubstituteDirectorAsync(
+            _event.Id, _choir.Id, new UpdateSubstituteDirectorRequest { DirectorId = NewDirector("X").Id, Reason = "x" }, _ct);
+
+        Assert.Equal(ErrorCodes.ChoirNotServingEvent, result.Code);
     }
 }

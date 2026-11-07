@@ -20,7 +20,10 @@ public interface IChoirScopeService
     /// </summary>
     Task<string?> CheckChoirForNewRecordAsync(Guid choirId, Guid? eventId, CancellationToken cancellationToken);
 
-    /// <summary>True when no choir serves the event or one of the caller's choirs does.</summary>
+    /// <summary>
+    /// True when no choir serves the event or one of the caller's choirs does. A substitute director counts as the
+    /// director of the choir they stand in for, on that event only (here and in <see cref="CanLeadEventAsync"/>).
+    /// </summary>
     Task<bool> CanViewEventAsync(Guid eventId, CancellationToken cancellationToken);
 
     /// <summary>

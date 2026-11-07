@@ -29,8 +29,16 @@ public interface IChoirService
 
     /// <summary>
     /// The Parish Priest replaces the choirs serving the event and picks the lead choir (D8). Cancelled and past
-    /// events are locked.
+    /// events are locked. Members left in no serving choir lose their invitation and roster lines (a finalized roster
+    /// reopens), the event's song lists move to a new lead, and the affected directors and members are notified.
     /// </summary>
     Task<Result<List<LiturgicalEventChoirDto>>> UpdateEventChoirsAsync(
         Guid eventId, UpdateEventChoirsRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The Parish Priest sets or clears another Choir Director to stand in for the choir's own director at this event
+    /// only, e.g. when the director is suddenly absent. Cancelled and past events are locked.
+    /// </summary>
+    Task<Result<List<LiturgicalEventChoirDto>>> UpdateSubstituteDirectorAsync(
+        Guid eventId, Guid choirId, UpdateSubstituteDirectorRequest request, CancellationToken cancellationToken);
 }

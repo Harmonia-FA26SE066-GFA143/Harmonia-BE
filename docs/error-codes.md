@@ -339,6 +339,7 @@ lọc theo cặp `(NotificationId, UserId)` nên "không tồn tại" và "của
 | `CHOIR_NOT_SERVING_EVENT` | 409 | Ca đoàn này không phục vụ sự kiện đã chọn |
 | `CHOIR_LEAD_INVALID` | 400 | Ca đoàn phụ trách phải là một trong các ca đoàn phục vụ sự kiện |
 | `CHOIR_NOT_LEAD` | 403 | Chỉ ca trưởng của ca đoàn phụ trách mới được thực hiện thao tác này |
+| `CHOIR_CHANGE_REASON_REQUIRED` | 400 | Vui lòng nhập lý do thay đổi ca trưởng / ca đoàn |
 
 ## 16. Giờ lễ cố định
 
@@ -429,3 +430,6 @@ xem — trả 404, để không lộ sự tồn tại của bản ghi.
   lễ khác (chưa huỷ, mọi ca đoàn) cùng ngày, bắt đầu cách nhau ít hơn `Roster.EventOverlapMinutes` phút.
 - 2026-11-05: thêm `LITURGICAL_EVENT_CHOIR_REQUIRED` — tạo sự kiện hoặc `PUT .../choirs` với danh sách ca đoàn rỗng, công bố
   sự kiện chưa có ca đoàn phụ trách. `CHOIR_NOT_LEAD` còn trả khi ca trưởng lập kế hoạch cho sự kiện chưa gán ca đoàn.
+- 2026-11-07: thêm `CHOIR_CHANGE_REASON_REQUIRED` — cha xứ gán ca trưởng thay thế cho một sự kiện
+  (`PUT .../choirs/{choirId}/substitute-director`) hoặc gỡ ca đoàn khỏi sự kiện đã công bố (`PUT .../choirs`) mà không nhập lý do.
+  Người thay không phải ca trưởng đang hoạt động, hoặc trùng ca trưởng chính của ca đoàn, trả `CHOIR_DIRECTOR_INVALID`.

@@ -73,13 +73,14 @@ public class LiturgicalEventRepository(HarmoniaDbContext dbContext)
 
     public async Task<PagedList<LiturgicalEvent>> SearchAsync(
         SearchLiturgicalEventsRequest filter, bool includeDrafts, IReadOnlyCollection<Guid>? choirIds,
-        CancellationToken cancellationToken)
+        Guid? substituteDirectorId, CancellationToken cancellationToken)
     {
         var query = DbContext.LiturgicalEvents.AsNoTracking();
 
         if (choirIds is not null)
         {
-            query = query.Where(x => !x.EventChoirs.Any() || x.EventChoirs.Any(c => choirIds.Contains(c.ChoirId)));
+            query = query.Where(x => !x.EventChoirs.Any()
+                || x.EventChoirs.Any(c => choirIds.Contains(c.ChoirId) || c.SubstituteDirectorId == substituteDirectorId));
         }
 
         if (!includeDrafts)

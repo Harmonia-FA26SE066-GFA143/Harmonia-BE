@@ -22,13 +22,15 @@ public class LiturgicalEventService(
     ILookupService lookupService,
     IChoirScopeService choirScope,
     ISystemSettingService systemSettingService,
+    ICurrentUserService currentUser,
     IMapper mapper) : ILiturgicalEventService
 {
     public async Task<Result<PagedList<LiturgicalEventListItemDto>>> SearchAsync(
         SearchLiturgicalEventsRequest request, bool includeDrafts, CancellationToken cancellationToken)
     {
         var choirIds = await choirScope.GetDirectedChoirIdsAsync(cancellationToken);
-        var page = await liturgicalEventRepository.SearchAsync(request, includeDrafts, choirIds, cancellationToken);
+        var page = await liturgicalEventRepository.SearchAsync(
+            request, includeDrafts, choirIds, currentUser.UserId, cancellationToken);
         var leadDays = await systemSettingService.GetIntAsync(SystemSettingKeys.SongListLeadDays, cancellationToken);
 
         var items = mapper.Map<List<LiturgicalEventListItemDto>>(page.Items);

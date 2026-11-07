@@ -12,5 +12,6 @@ public enum NotificationType
     SkillReview,
     EventCancelled,
     SongListSubmitted,
-    RehearsalChanged
+    RehearsalChanged,
+    EventChoirChanged
 }
