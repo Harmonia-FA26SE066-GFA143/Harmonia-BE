@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using AutoMapper;
 using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
@@ -17,12 +18,15 @@ public class MusicMaterialService(
     IMaterialLearningProgressRepository learningProgressRepository,
     IFileStorageService fileStorageService,
     IMidiRenderer midiRenderer,
+    IScoreConverter scoreConverter,
     ILyricsExtractor lyricsExtractor,
     IMapper mapper) : IMusicMaterialService
 {
     private const string PlaybackFolder = "music-materials/playback";
 
     private static readonly string[] MidiExtensions = [".mid", ".midi"];
+
+    private static readonly string[] ScoreExtensions = [".musicxml", ".mxl"];
 
     public const long MaxFileSizeBytes = 20 * 1024 * 1024;
 
@@ -252,6 +256,22 @@ public class MusicMaterialService(
         return Result<PlaybackDto>.Success(dto);
     }
 
+    public async Task<Result<InteractiveScoreDto>> GetScoreAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var material = await musicMaterialRepository.GetByIdAsync(id, cancellationToken);
+        if (material is not { IsActive: true }) return Result<InteractiveScoreDto>.Failure(ErrorCodes.MaterialNotFound);
+        if (material.MaterialType != MaterialType.InteractiveScore)
+            return Result<InteractiveScoreDto>.Failure(ErrorCodes.MaterialNotInteractiveScore);
+        // Upload and replacement save the score and its playback together, so this only guards a hand-edited row.
+        if (material.FilePublicId is null || material.PlaybackAudioPublicId is null || material.PlaybackDurationSeconds is null)
+            return Result<InteractiveScoreDto>.Failure(ErrorCodes.MaterialPlaybackUnavailable);
+
+        var dto = mapper.Map<InteractiveScoreDto>(material);
+        dto.ScoreUrl = fileStorageService.GetSignedUrl(material.FilePublicId);
+        dto.AudioUrl = fileStorageService.GetSignedUrl(material.PlaybackAudioPublicId);
+        return Result<InteractiveScoreDto>.Success(dto);
+    }
+
     public async Task<Result<ExtractedLyricsResponse>> ExtractLyricsAsync(Guid id, CancellationToken cancellationToken)
     {
         var material = await musicMaterialRepository.GetByIdAsync(id, cancellationToken);
@@ -267,17 +287,32 @@ public class MusicMaterialService(
     }
 
     /// <summary>
-    /// Renders a MIDI upload and stores its playback files before the MIDI itself, so a file the renderer rejects
-    /// never reaches storage. Any other file returns success with no playback files.
+    /// Renders a MIDI or MusicXML/MXL upload and stores its playback files before the file itself, so a file the
+    /// converter or renderer rejects never reaches storage. Any other file returns success with no playback files.
+    /// A score is first converted to MIDI in memory; that MIDI is not stored.
     /// </summary>
     private async Task<Result<PlaybackFiles?>> StorePlaybackAsync(
         FileContent file, PlaybackInstrument instrument, CancellationToken cancellationToken)
     {
-        if (!MidiExtensions.Contains(Path.GetExtension(file.FileName).ToLowerInvariant()))
-            return Result<PlaybackFiles?>.Success(null);
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        var isScore = ScoreExtensions.Contains(extension);
+        if (!isScore && !MidiExtensions.Contains(extension)) return Result<PlaybackFiles?>.Success(null);
 
-        var render = midiRenderer.Render(file.Content, instrument);
-        // The MIDI itself is uploaded next from the same stream; IFormFile streams are seekable.
+        // The file itself is uploaded next from the same stream, so every read rewinds; IFormFile streams are seekable.
+        string? scoreSha256 = null;
+        MemoryStream? convertedMidi = null;
+        if (isScore)
+        {
+            scoreSha256 = Convert.ToHexStringLower(SHA256.HashData(file.Content));
+            file.Content.Position = 0;
+            var converted = scoreConverter.ToMidi(file.Content, isCompressed: extension == ".mxl");
+            file.Content.Position = 0;
+            if (!converted.IsSuccess) return Result<PlaybackFiles?>.Failure(converted.Code!);
+            convertedMidi = new MemoryStream(converted.Value!);
+        }
+
+        Result<PlaybackRender> render;
+        using (convertedMidi) render = midiRenderer.Render(convertedMidi ?? file.Content, instrument);
         file.Content.Position = 0;
         if (!render.IsSuccess) return Result<PlaybackFiles?>.Failure(render.Code!);
 
@@ -293,8 +328,9 @@ public class MusicMaterialService(
             return Result<PlaybackFiles?>.Failure(notes.Code!);
         }
 
-        return Result<PlaybackFiles?>.Success(
-            new PlaybackFiles(audio.Value!.PublicId, notes.Value!.PublicId, render.Value.DurationSeconds, instrument));
+        return Result<PlaybackFiles?>.Success(new PlaybackFiles(
+            audio.Value!.PublicId, notes.Value!.PublicId, render.Value.DurationSeconds, instrument,
+            scoreSha256, isScore ? Convert.ToHexStringLower(SHA256.HashData(render.Value.AudioWav)) : null));
     }
 
     private static void SetPlayback(MusicMaterial material, PlaybackFiles? playback)
@@ -303,6 +339,10 @@ public class MusicMaterialService(
         material.PlaybackNotesPublicId = playback?.NotesPublicId;
         material.PlaybackDurationSeconds = playback?.DurationSeconds;
         material.PlaybackInstrument = playback?.Instrument;
+        material.ScoreSha256 = playback?.ScoreSha256;
+        material.PlaybackAudioSha256 = playback?.AudioSha256;
+        // Only an interactive score has a revision: 1 on upload, +1 on each replacement that saves.
+        material.ScoreRevision = playback?.ScoreSha256 is null ? null : (material.ScoreRevision ?? 0) + 1;
     }
 
     // Best effort, like the other cleanups here: a failed delete is logged by the storage service.
@@ -313,7 +353,8 @@ public class MusicMaterialService(
     }
 
     private sealed record PlaybackFiles(
-        string AudioPublicId, string NotesPublicId, double DurationSeconds, PlaybackInstrument Instrument);
+        string AudioPublicId, string NotesPublicId, double DurationSeconds, PlaybackInstrument Instrument,
+        string? ScoreSha256, string? AudioSha256);
 
     private TDto ToDto<TDto>(MusicMaterial material) where TDto : MusicMaterialDto
     {
@@ -363,6 +404,7 @@ public class MusicMaterialService(
         MaterialType.SampleAudio => AudioExtensions,
         MaterialType.Lyrics => LyricsExtensions,
         MaterialType.RehearsalMaterial => [.. DocumentExtensions, .. AudioExtensions],
+        MaterialType.InteractiveScore => ScoreExtensions,
         _ => DocumentExtensions,
     };
 
@@ -373,6 +415,7 @@ public class MusicMaterialService(
         MaterialType.Lyrics => "music-materials/lyrics",
         MaterialType.SampleAudio => "music-materials/sample-audio",
         MaterialType.RehearsalMaterial => "music-materials/rehearsal-material",
+        MaterialType.InteractiveScore => "music-materials/interactive-score",
         _ => throw new ArgumentOutOfRangeException(nameof(materialType), materialType, "Unknown material type."),
     };
 }

@@ -1251,18 +1251,19 @@ Tư liệu của bài hát: bản nhạc, lời, audio mẫu, tài liệu tập 
 
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
-| POST | `/api/music-materials` | `multipart/form-data`: `songId`, `title`, `materialType`, `targetSkillId?`, `file` **hoặc** `lyricsText` (chỉ `Lyrics`), `instrument?` (chỉ file MIDI, mặc định `Piano`) | 200 `MusicMaterialDto` | 400 `VALIDATION_FAILED`, `MATERIAL_FILE_REQUIRED`, `MATERIAL_FILE_TYPE_NOT_ALLOWED`, `MATERIAL_LYRICS_SOURCE_INVALID` · 404 `SONG_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE` · 413 `MATERIAL_FILE_TOO_LARGE` · 422 `MIDI_INVALID_FILE`, `MIDI_FORMAT_UNSUPPORTED`, `MIDI_NO_PLAYABLE_NOTES`, `MIDI_LIMIT_EXCEEDED` · 502 `EXTERNAL_STORAGE_FAILED` |
+| POST | `/api/music-materials` | `multipart/form-data`: `songId`, `title`, `materialType`, `targetSkillId?`, `file` **hoặc** `lyricsText` (chỉ `Lyrics`), `instrument?` (chỉ file MIDI / MusicXML, mặc định `Piano`) | 200 `MusicMaterialDto` | 400 `VALIDATION_FAILED`, `MATERIAL_FILE_REQUIRED`, `MATERIAL_FILE_TYPE_NOT_ALLOWED`, `MATERIAL_LYRICS_SOURCE_INVALID` · 404 `SONG_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE` · 413 `MATERIAL_FILE_TOO_LARGE` · 422 `MIDI_INVALID_FILE`, `MIDI_FORMAT_UNSUPPORTED`, `MIDI_NO_PLAYABLE_NOTES`, `MIDI_LIMIT_EXCEEDED`, `MATERIAL_SCORE_INVALID`, `MATERIAL_SCORE_UNSUPPORTED` · 502 `EXTERNAL_STORAGE_FAILED` |
 | GET | `/api/music-materials?songId=&pageNumber=1&pageSize=20` | — | 200 `PagedList<MusicMaterialDto>` | 400 `VALIDATION_FAILED` (thiếu `songId`) · 404 `SONG_NOT_FOUND` |
 | GET | `/api/music-materials/mine?keyword=&songId=&liturgicalSeasonId=&skillId=&materialType=&learningStatus=&pageNumber=1&pageSize=20` · chỉ `ChoirMember` | — | 200 `PagedList<MusicMaterialDetailDto>` — tài liệu cho mọi người + tài liệu cho kỹ năng **đã duyệt** của ca viên (UC-07); bộ lọc xem bên dưới (UC-07E) | 404 `MEMBER_NOT_FOUND`, `SONG_NOT_FOUND` |
 | PUT | `/api/music-materials/{id}/learning-progress` · chỉ `ChoirMember` | `{ "status": "Learned" }` | 200 `MaterialLearningProgressDto` | 400 `VALIDATION_FAILED` (`errors.status`: `MATERIAL_LEARNING_STATUS_INVALID`) · 404 `MEMBER_NOT_FOUND`, `MATERIAL_NOT_FOUND` |
 | GET | `/api/music-materials/{id}/learning-progress?status=&pageNumber=1&pageSize=20` · chỉ `ChoirDirector` | — | 200 `PagedList<MaterialLearningProgressDetailDto>` | 404 `MATERIAL_NOT_FOUND` |
 | GET | `/api/music-materials/{id}/playback` | — | 200 `PlaybackDto` | 404 `MATERIAL_NOT_FOUND` · 409 `MATERIAL_PLAYBACK_UNAVAILABLE` |
+| GET | `/api/music-materials/{id}/score` | — | 200 `InteractiveScoreDto` | 404 `MATERIAL_NOT_FOUND` · 409 `MATERIAL_NOT_INTERACTIVE_SCORE`, `MATERIAL_PLAYBACK_UNAVAILABLE` |
 | POST | `/api/music-materials/{id}/extract-lyrics` · chỉ `ChoirDirector` | — | 200 `{ "lyricsText": "..." }` — bản nháp, **không lưu** | 400 `MATERIAL_NOT_SHEET_MUSIC` · 404 `MATERIAL_NOT_FOUND` · 502 `EXTERNAL_AI_FAILED` |
 | PUT | `/api/music-materials/{id}` | `{ "title", "targetSkillId", "lyricsText" }` | 200 `MusicMaterialDto` | 400 `VALIDATION_FAILED`, `MATERIAL_LYRICS_SOURCE_INVALID` · 404 `MATERIAL_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE` |
-| PUT | `/api/music-materials/{id}/file` | `multipart/form-data`: `file`, `resetProgress?` (mặc định `false`), `instrument?` (chỉ file MIDI, mặc định `Piano`) | 200 `MusicMaterialDto` — giữ nguyên `id`, tiêu đề, loại, kỹ năng đích và bài luyện tập đang gắn; file cũ bị xoá khỏi kho. `resetProgress=true` xoá đánh dấu "đã học / cần luyện thêm" của ca viên với tài liệu này | 400 `VALIDATION_FAILED`, `MATERIAL_FILE_REQUIRED`, `MATERIAL_FILE_TYPE_NOT_ALLOWED` (theo loại hiện có của tài liệu), `MATERIAL_LYRICS_SOURCE_INVALID` (lời dạng text, không có file để thay) · 404 `MATERIAL_NOT_FOUND` · 413 `MATERIAL_FILE_TOO_LARGE` · 422 `MIDI_INVALID_FILE`, `MIDI_FORMAT_UNSUPPORTED`, `MIDI_NO_PLAYABLE_NOTES`, `MIDI_LIMIT_EXCEEDED` · 502 `EXTERNAL_STORAGE_FAILED` |
+| PUT | `/api/music-materials/{id}/file` | `multipart/form-data`: `file`, `resetProgress?` (mặc định `false`), `instrument?` (chỉ file MIDI / MusicXML, mặc định `Piano`) | 200 `MusicMaterialDto` — giữ nguyên `id`, tiêu đề, loại, kỹ năng đích và bài luyện tập đang gắn; file cũ bị xoá khỏi kho. `resetProgress=true` xoá đánh dấu "đã học / cần luyện thêm" của ca viên với tài liệu này | 400 `VALIDATION_FAILED`, `MATERIAL_FILE_REQUIRED`, `MATERIAL_FILE_TYPE_NOT_ALLOWED` (theo loại hiện có của tài liệu), `MATERIAL_LYRICS_SOURCE_INVALID` (lời dạng text, không có file để thay) · 404 `MATERIAL_NOT_FOUND` · 413 `MATERIAL_FILE_TOO_LARGE` · 422 `MIDI_INVALID_FILE`, `MIDI_FORMAT_UNSUPPORTED`, `MIDI_NO_PLAYABLE_NOTES`, `MIDI_LIMIT_EXCEEDED`, `MATERIAL_SCORE_INVALID`, `MATERIAL_SCORE_UNSUPPORTED` · 502 `EXTERNAL_STORAGE_FAILED` |
 | DELETE | `/api/music-materials/{id}` | — | 204 | 404 `MATERIAL_NOT_FOUND` |
 
-- `materialType`: `SheetMusic` | `Lyrics` | `SampleAudio` | `RehearsalMaterial` (gửi tên hoặc số).
+- `materialType`: `SheetMusic` | `Lyrics` | `SampleAudio` | `RehearsalMaterial` | `InteractiveScore` (gửi tên hoặc số).
 - Định dạng theo loại, tối đa **20 MB**:
 
   | `materialType` | Đuôi file |
@@ -1271,6 +1272,7 @@ Tư liệu của bài hát: bản nhạc, lời, audio mẫu, tài liệu tập 
   | `Lyrics` | `.docx` — hoặc không gửi file mà gửi `lyricsText` (≤ 20 000 ký tự) |
   | `SampleAudio` | `.mp3`, `.m4a`, `.wav`, `.mid`, `.midi` (MIDI trình duyệt không phát trực tiếp — phát qua `GET {id}/playback`, xem bên dưới) |
   | `RehearsalMaterial` | cả hai nhóm trên |
+  | `InteractiveScore` | `.musicxml`, `.mxl` (MusicXML nén) — server render WAV từ chính file này, đọc qua `GET {id}/score`, xem bên dưới |
 
   Server chỉ xét đuôi file và dung lượng thật, bỏ qua `Content-Type` client gửi.
 - `Lyrics` cần **đúng một** trong `file` (`.docx`) hoặc `lyricsText`; gửi cả hai hoặc không gửi gì → `MATERIAL_LYRICS_SOURCE_INVALID`.
@@ -1298,6 +1300,37 @@ Tư liệu của bài hát: bản nhạc, lời, audio mẫu, tài liệu tập 
   `status` hiện luôn là `Ready`.
 - Tư liệu không phải MIDI, hoặc MIDI tải lên trước khi có tính năng này → 409 `MATERIAL_PLAYBACK_UNAVAILABLE`;
   thay lại file (`PUT {id}/file`) để render. Thay MIDI bằng file không phải MIDI thì bản phát cũ bị xoá.
+- `InteractiveScore` cũng có bản phát (render từ MIDI mà server tự chuyển từ score), nên endpoint này dùng được cho cả
+  loại đó.
+
+**Bản nhạc tương tác — `GET {id}/score`** (Web tbd-backlog B47).
+
+```json
+{
+  "id": "guid", "songId": "guid", "title": "Kinh Hoà Bình — 4 bè", "status": "Ready",
+  "revision": 2, "scoreFormat": "mxl", "fileName": "kinh-hoa-binh.mxl",
+  "scoreUrl": "https://...", "scoreSha256": "9f86d0…",
+  "audioUrl": "https://...", "audioSha256": "2c26b4…",
+  "durationSeconds": 182.4, "instrument": "Piano", "updatedAt": "2026-11-07T08:00:00Z"
+}
+```
+
+- Upload hoặc thay file `.musicxml` / `.mxl` thì server, ngay trong request: chuyển score sang MIDI (không lưu MIDI này),
+  render WAV + `notes.json` như MIDI ở trên, rồi lưu score và bản phát **cùng một phiên bản**. Bất kỳ bước nào lỗi →
+  không có gì được lưu, phiên bản cũ giữ nguyên.
+- `revision` = 1 khi upload, +1 mỗi lần `PUT {id}/file` thành công. Mỗi phiên bản là file mới với id mới, nên link của
+  phiên bản cũ không bao giờ trả nội dung mới. `scoreSha256`, `audioSha256` là SHA-256 (hex chữ thường) của đúng hai file
+  đó — client so hash sau khi tải để loại file cũ hoặc lẫn phiên bản.
+- `scoreUrl`, `audioUrl` là link có hạn như `fileUrl`; hết hạn thì gọi lại endpoint (không render lại). `status` luôn
+  `Ready`. `durationSeconds` gồm khoảng ngân 2 giây cuối bài.
+- Cách tính thời gian (để khớp timemap của Verovio với cấu hình mặc định): đọc mọi ô nhịp **một lần** theo thứ tự viết,
+  không mở rộng dấu nhắc lại; tempo lấy từ `<sound tempo>`, chưa có thì 120 BPM; nốt hoa mỹ (`grace`) và nốt `cue`
+  không chiếm thời gian / không phát; mỗi `part` là một track mang tên `part-name`.
+- Chỉ nhận `score-partwise`. Đọc an toàn: bỏ qua DTD, không tải tài nguyên ngoài, entity → lỗi; `.mxl` đọc trong bộ nhớ,
+  tối đa 100 entry và 50 MB sau giải nén.
+- Lỗi: XML / ZIP hỏng, dùng entity, vượt giới hạn giải nén → 422 `MATERIAL_SCORE_INVALID`; `score-timewise`, không có
+  nốt nào phát được → 422 `MATERIAL_SCORE_UNSUPPORTED`; dài quá 10 phút / quá 100 000 nốt → 422 `MIDI_LIMIT_EXCEEDED`.
+  Tư liệu loại khác → 409 `MATERIAL_NOT_INTERACTIVE_SCORE`.
 
 **Trích lời từ bản nhạc — `POST {id}/extract-lyrics`.**
 
@@ -1705,6 +1738,19 @@ Role `ParishPriest`, `ChoirDirector`. 200 `PagedList<SongSuggestionResponse>` ·
 | GET | `/api/practice-assignments/mine?isOpen=&status=&hasSubmission=&pageNumber=&pageSize=` | 200 `PagedList<PracticeAssignmentDetailDto>` | 404 `MEMBER_NOT_FOUND` |
 | GET | `/api/practice-assignments/mine/counts` | 200 `MyPracticeAssignmentCountsResponse` | 404 `MEMBER_NOT_FOUND` |
 | GET | `/api/practice-assignments/mine/{id}` | 200 `PracticeAssignmentDetailDto` | 404 `MEMBER_NOT_FOUND`, `PRACTICE_ASSIGNMENT_NOT_FOUND` |
+| POST | `/api/practice-assignments/mine/{id}/score` — multipart `file` (`.mp3`, `.m4a`, `.wav`, ≤ 20 MB) | 200 `PracticeAudioScoreResponse` | 400 `PRACTICE_AUDIO_REQUIRED`, `PRACTICE_AUDIO_TYPE_NOT_ALLOWED` · 404 `MEMBER_NOT_FOUND`, `PRACTICE_ASSIGNMENT_NOT_FOUND` · 413 `PRACTICE_AUDIO_TOO_LARGE` · 422 `PRACTICE_AUDIO_UNREADABLE`, `PRACTICE_REFERENCE_MISSING` · 502 `EXTERNAL_STORAGE_FAILED` |
+
+**Chấm thử trước khi nộp — `POST mine/{id}/score`.** Điểm tham khảo, **không lưu**, không nộp bài; file phân tích xong bỏ
+luôn. Hạn nộp và trạng thái bài không ảnh hưởng. So với bản mẫu MIDI của bài tập (`notes.json` của tư liệu MIDI hoặc
+`InteractiveScore` gắn với bài); chưa có → 422 `PRACTICE_REFERENCE_MISSING`.
+
+```json
+{ "score": 82, "pitchScore": 85, "rhythmScore": 75, "coveragePercent": 90, "trackName": "Soprano" }
+```
+
+- Thang 0–100; `score` = 70% `pitchScore` + 30% `rhythmScore`. `coveragePercent`: phần giai điệu mẫu bản thu đã hát
+  tới, chỉ để xem, không tính vào điểm. `trackName`: track (bè) của MIDI khớp nhất với bản thu.
+- Bản thu không đọc được hoặc quá ít tiếng hát → 422 `PRACTICE_AUDIO_UNREADABLE`.
 
 - Ca viên thấy bài tập khi: scope `All`; có tên trong target; hoặc **hiện đang** được duyệt một skill của target.
   Skill được duyệt sau vẫn thấy bài giao trước đó; ca viên vào đoàn sau thấy cả bài `All` cũ.
@@ -1802,6 +1848,7 @@ Role `ParishPriest`, `ChoirDirector`. 200 `PagedList<SongSuggestionResponse>` ·
 | GET | `/api/practice-assignments/{id}/submissions?status=&allAttempts=&pageNumber=&pageSize=` | 200 `PagedList<PracticeSubmissionDetailDto>` | 404 `PRACTICE_ASSIGNMENT_NOT_FOUND` |
 | GET | `/api/practice-submissions?status=&allAttempts=&pageNumber=&pageSize=` | 200 `PagedList<PracticeSubmissionDetailDto>` | — |
 | GET | `/api/practice-submissions/{id}` | 200 `PracticeSubmissionDetailDto` | 404 `PRACTICE_SUBMISSION_NOT_FOUND` |
+| POST | `/api/practice-submissions/{id}/score` | 200 `PracticeAudioScoreResponse` — điểm tự động tham khảo cho ca trưởng, **không lưu** (cùng cách chấm với `POST /api/practice-assignments/mine/{id}/score`) | 404 `PRACTICE_SUBMISSION_NOT_FOUND` · 422 `PRACTICE_AUDIO_UNREADABLE`, `PRACTICE_REFERENCE_MISSING` · 502 `EXTERNAL_STORAGE_FAILED` |
 
 - `allAttempts`: mặc định `false` = mỗi ca viên chỉ lần nộp **mới nhất** của mỗi bài; `true` = mọi lần nộp.
 - `status` (`Submitted` | `Passed` | `NeedsRevision` | `Overdue`) lọc **sau** bước trên: hàng chờ chấm là

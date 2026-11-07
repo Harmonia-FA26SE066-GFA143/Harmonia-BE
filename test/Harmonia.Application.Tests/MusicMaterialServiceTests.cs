@@ -23,6 +23,7 @@ public class MusicMaterialServiceTests
     private readonly IMaterialLearningProgressRepository _progresses = Substitute.For<IMaterialLearningProgressRepository>();
     private readonly IFileStorageService _storage = Substitute.For<IFileStorageService>();
     private readonly IMidiRenderer _midi = Substitute.For<IMidiRenderer>();
+    private readonly IScoreConverter _scores = Substitute.For<IScoreConverter>();
     private readonly ILyricsExtractor _lyrics = Substitute.For<ILyricsExtractor>();
     private readonly MusicMaterialService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
@@ -38,7 +39,7 @@ public class MusicMaterialServiceTests
                 cfg.AddProfile<MemberProfileProfile>();
             }, NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new MusicMaterialService(_materials, _songs, _skills, _members, _progresses, _storage, _midi, _lyrics, mapper);
+        _sut = new MusicMaterialService(_materials, _songs, _skills, _members, _progresses, _storage, _midi, _scores, _lyrics, mapper);
 
         _songs.GetByIdAsync(_song.Id, _ct).Returns(_song);
         _storage.UploadAsync(default!, default!, default!, default, default)
@@ -47,7 +48,10 @@ public class MusicMaterialServiceTests
         _storage.DeleteAsync(default!, default, default).ReturnsForAnyArgs(Result.Success());
         _storage.GetSignedUrl(Arg.Any<string>()).Returns(call => $"signed:{call.Arg<string>()}");
         _midi.Render(default!, default).ReturnsForAnyArgs(Result<PlaybackRender>.Success(new PlaybackRender([1], [2], 12.5)));
+        _scores.ToMidi(default!, default).ReturnsForAnyArgs(Result<byte[]>.Success([9]));
     }
+
+    private static string Sha256(params byte[] bytes) => Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes));
 
     private UploadMusicMaterialRequest NewRequest(MaterialType type = MaterialType.SheetMusic) =>
         new() { SongId = _song.Id, Title = " Ban nhac ", MaterialType = type };
@@ -734,6 +738,143 @@ public class MusicMaterialServiceTests
     public async Task GetPlayback_Missing_ReturnsMaterialNotFound_Async()
     {
         var result = await _sut.GetPlaybackAsync(Guid.NewGuid(), _ct);
+
+        Assert.Equal(ErrorCodes.MaterialNotFound, result.Code);
+    }
+
+    [Theory]
+    [InlineData("bai.mxl", true)]
+    [InlineData("bai.MusicXML", false)]
+    public async Task Upload_InteractiveScore_ConvertsRendersAndStoresRevisionOneWithHashes_Async(string fileName, bool isCompressed)
+    {
+        var file = NewFile(fileName);
+
+        var result = await _sut.UploadAsync(NewRequest(MaterialType.InteractiveScore), file, _ct);
+
+        Assert.True(result.IsSuccess);
+        _scores.Received(1).ToMidi(file.Content, isCompressed);
+        // The renderer gets the converted MIDI (disposed by now, so compared by reference), not the score.
+        _midi.Received(1).Render(Arg.Is<Stream>(s => !ReferenceEquals(s, file.Content)), PlaybackInstrument.Piano);
+        await _storage.Received(1).UploadAsync(Arg.Any<Stream>(), fileName, "music-materials/interactive-score", true, _ct);
+        await _materials.Received(1).AddAsync(
+            Arg.Is<MusicMaterial>(m => m.ScoreRevision == 1
+                && m.ScoreSha256 == Sha256(1, 2, 3) // NewFile content
+                && m.PlaybackAudioSha256 == Sha256(2) // stubbed WAV
+                && m.PlaybackAudioPublicId == "harmonia/music-materials/playback/stored.wav"), _ct);
+    }
+
+    [Fact]
+    public async Task Upload_ScoreRejectedByConverter_ReturnsItsCodeAndStoresNothing_Async()
+    {
+        _scores.ToMidi(default!, default).ReturnsForAnyArgs(Result<byte[]>.Failure(ErrorCodes.MaterialScoreInvalid));
+
+        var result = await _sut.UploadAsync(NewRequest(MaterialType.InteractiveScore), NewFile("hong.mxl"), _ct);
+
+        Assert.Equal(ErrorCodes.MaterialScoreInvalid, result.Code);
+        _midi.DidNotReceiveWithAnyArgs().Render(default!, default);
+        await _storage.DidNotReceiveWithAnyArgs().UploadAsync(default!, default!, default!, default, default);
+        await _materials.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+    }
+
+    [Theory]
+    [InlineData(MaterialType.InteractiveScore, "bai.mid")]
+    [InlineData(MaterialType.InteractiveScore, "bai.pdf")]
+    [InlineData(MaterialType.SampleAudio, "bai.mxl")]
+    [InlineData(MaterialType.SheetMusic, "bai.musicxml")]
+    public async Task Upload_ScoreAndTypeMismatch_ReturnsTypeNotAllowed_Async(MaterialType type, string fileName)
+    {
+        var result = await _sut.UploadAsync(NewRequest(type), NewFile(fileName), _ct);
+
+        Assert.Equal(ErrorCodes.MaterialFileTypeNotAllowed, result.Code);
+        _scores.DidNotReceiveWithAnyArgs().ToMidi(default!, default);
+    }
+
+    [Fact]
+    public async Task Upload_Midi_HasNoScoreRevisionOrHashes_Async()
+    {
+        await _sut.UploadAsync(NewRequest(MaterialType.SampleAudio), NewFile("dem-thanh.mid"), _ct);
+
+        _scores.DidNotReceiveWithAnyArgs().ToMidi(default!, default);
+        await _materials.Received(1).AddAsync(
+            Arg.Is<MusicMaterial>(m => m.ScoreRevision == null && m.ScoreSha256 == null && m.PlaybackAudioSha256 == null), _ct);
+    }
+
+    private MusicMaterial StubScoreMaterial()
+    {
+        var material = new MusicMaterial
+        {
+            Id = Guid.NewGuid(), SongId = _song.Id, Title = "Score", MaterialType = MaterialType.InteractiveScore,
+            FilePublicId = "harmonia/old.mxl", FileName = "old.mxl", FileSizeBytes = 10, IsActive = true,
+            PlaybackAudioPublicId = "harmonia/old.wav", PlaybackNotesPublicId = "harmonia/old.json",
+            PlaybackDurationSeconds = 30, PlaybackInstrument = PlaybackInstrument.Piano,
+            ScoreRevision = 3, ScoreSha256 = "old-score", PlaybackAudioSha256 = "old-audio",
+            CreatedAt = new DateTime(2026, 11, 1, 0, 0, 0, DateTimeKind.Utc),
+        };
+        _materials.GetByIdAsync(material.Id, _ct).Returns(material);
+        return material;
+    }
+
+    [Fact]
+    public async Task ReplaceFile_InteractiveScore_BumpsRevisionAndDropsTheOldFiles_Async()
+    {
+        var material = StubScoreMaterial();
+
+        var result = await _sut.ReplaceFileAsync(material.Id, new ReplaceMusicMaterialFileRequest(), NewFile("new.musicxml"), _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(4, material.ScoreRevision);
+        Assert.Equal(Sha256(1, 2, 3), material.ScoreSha256);
+        Assert.Equal(Sha256(2), material.PlaybackAudioSha256);
+        Assert.Equal("harmonia/music-materials/interactive-score/stored.musicxml", material.FilePublicId);
+        await _storage.Received(1).DeleteAsync("harmonia/old.mxl", true, CancellationToken.None);
+        await _storage.Received(1).DeleteAsync("harmonia/old.wav", true, CancellationToken.None);
+        await _storage.Received(1).DeleteAsync("harmonia/old.json", true, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task ReplaceFile_ScoreRejected_KeepsTheRevisionAndFiles_Async()
+    {
+        var material = StubScoreMaterial();
+        _scores.ToMidi(default!, default).ReturnsForAnyArgs(Result<byte[]>.Failure(ErrorCodes.MaterialScoreUnsupported));
+
+        var result = await _sut.ReplaceFileAsync(material.Id, new ReplaceMusicMaterialFileRequest(), NewFile("new.mxl"), _ct);
+
+        Assert.Equal(ErrorCodes.MaterialScoreUnsupported, result.Code);
+        Assert.Equal(3, material.ScoreRevision);
+        Assert.Equal("harmonia/old.mxl", material.FilePublicId);
+        await _storage.DidNotReceiveWithAnyArgs().DeleteAsync(default!, default, default);
+    }
+
+    [Fact]
+    public async Task GetScore_InteractiveScore_ReturnsRevisionHashesAndFreshSignedUrls_Async()
+    {
+        var material = StubScoreMaterial();
+
+        var result = await _sut.GetScoreAsync(material.Id, _ct);
+
+        Assert.True(result.IsSuccess);
+        var dto = result.Value!;
+        Assert.Equal(("Ready", 3, "mxl", "old.mxl"), (dto.Status, dto.Revision, dto.ScoreFormat, dto.FileName));
+        Assert.Equal(("signed:harmonia/old.mxl", "old-score"), (dto.ScoreUrl, dto.ScoreSha256));
+        Assert.Equal(("signed:harmonia/old.wav", "old-audio"), (dto.AudioUrl, dto.AudioSha256));
+        Assert.Equal(30, dto.DurationSeconds);
+        Assert.Equal(material.CreatedAt, dto.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task GetScore_OtherMaterialType_ReturnsNotInteractiveScore_Async()
+    {
+        var material = StubAudioMaterial();
+
+        var result = await _sut.GetScoreAsync(material.Id, _ct);
+
+        Assert.Equal(ErrorCodes.MaterialNotInteractiveScore, result.Code);
+    }
+
+    [Fact]
+    public async Task GetScore_Missing_ReturnsMaterialNotFound_Async()
+    {
+        var result = await _sut.GetScoreAsync(Guid.NewGuid(), _ct);
 
         Assert.Equal(ErrorCodes.MaterialNotFound, result.Code);
     }

@@ -34,6 +34,18 @@ public class MusicMaterial : BaseAuditableEntity
 
     public PlaybackInstrument? PlaybackInstrument { get; set; }
 
+    /// <summary>
+    /// Interactive score only: starts at 1 and goes up on every successful file replacement, so a client can tell
+    /// a score and a playback of different revisions apart. Null for every other material.
+    /// </summary>
+    public int? ScoreRevision { get; set; }
+
+    /// <summary>Interactive score only: lowercase hex SHA-256 of the uploaded MusicXML/MXL file.</summary>
+    public string? ScoreSha256 { get; set; }
+
+    /// <summary>Interactive score only: lowercase hex SHA-256 of the WAV at <see cref="PlaybackAudioPublicId"/>.</summary>
+    public string? PlaybackAudioSha256 { get; set; }
+
     public Guid? TargetSkillId { get; set; }
 
     public bool IsActive { get; set; } = true;

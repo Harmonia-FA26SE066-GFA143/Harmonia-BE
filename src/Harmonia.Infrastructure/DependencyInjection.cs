@@ -142,6 +142,7 @@ public static class DependencyInjection
         services.AddSingleton<IReportFileWriter, ReportFileWriter>();
         // Singleton so the SoundFont is loaded once.
         services.AddSingleton<IMidiRenderer, MidiRenderer>();
+        services.AddSingleton<IScoreConverter, MusicXmlScoreConverter>();
         services.AddSingleton<IEmailSender, BrevoEmailSender>();
         services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
         services.AddScoped<DataSeeder>();

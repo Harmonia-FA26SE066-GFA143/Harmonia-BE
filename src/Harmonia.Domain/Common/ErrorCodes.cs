@@ -206,6 +206,15 @@ public static class ErrorCodes
     // Lyrics extraction reads sheet music only.
     public const string MaterialNotSheetMusic = "MATERIAL_NOT_SHEET_MUSIC";
 
+    // Broken XML or ZIP, an entity reference (DTDs are ignored), or an MXL past the decompression limits.
+    public const string MaterialScoreInvalid = "MATERIAL_SCORE_INVALID";
+
+    // Well-formed but not playable: score-timewise, no part, or no pitched note.
+    public const string MaterialScoreUnsupported = "MATERIAL_SCORE_UNSUPPORTED";
+
+    // GET .../score on a material that is not an interactive score.
+    public const string MaterialNotInteractiveScore = "MATERIAL_NOT_INTERACTIVE_SCORE";
+
     public const string MidiInvalidFile = "MIDI_INVALID_FILE";
 
     // Format 2 or SMPTE time division.

@@ -785,6 +785,10 @@ namespace Harmonia.Infrastructure.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
+                    b.Property<string>("PlaybackAudioSha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
                     b.Property<double?>("PlaybackDurationSeconds")
                         .HasColumnType("float");
 
@@ -794,6 +798,13 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Property<string>("PlaybackNotesPublicId")
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
+
+                    b.Property<int?>("ScoreRevision")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ScoreSha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
 
                     b.Property<Guid>("SongId")
                         .HasColumnType("uniqueidentifier");

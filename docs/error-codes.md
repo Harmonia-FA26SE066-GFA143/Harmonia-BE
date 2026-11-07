@@ -195,6 +195,9 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `MATERIAL_LEARNING_STATUS_INVALID` | 400 | Trạng thái học tập không hợp lệ |
 | `MATERIAL_PLAYBACK_UNAVAILABLE` | 409 | Tài liệu chưa có bản phát nhạc. Hãy tải lại tệp MIDI |
 | `MATERIAL_NOT_SHEET_MUSIC` | 400 | Chỉ trích được lời từ bản nhạc |
+| `MATERIAL_SCORE_INVALID` | 422 | Tệp MusicXML / MXL bị hỏng hoặc quá lớn khi giải nén |
+| `MATERIAL_SCORE_UNSUPPORTED` | 422 | Bản nhạc không có nốt nào phát được hoặc định dạng chưa hỗ trợ |
+| `MATERIAL_NOT_INTERACTIVE_SCORE` | 409 | Tài liệu này không phải bản nhạc tương tác |
 | `MIDI_INVALID_FILE` | 422 | Tệp MIDI không hợp lệ |
 | `MIDI_FORMAT_UNSUPPORTED` | 422 | Định dạng MIDI chưa được hỗ trợ |
 | `MIDI_NO_PLAYABLE_NOTES` | 422 | Tệp MIDI không có nốt nào để phát |

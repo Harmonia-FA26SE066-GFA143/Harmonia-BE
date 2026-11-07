@@ -110,6 +110,10 @@ public static class ErrorStatusMap
         [ErrorCodes.MaterialLearningStatusInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.MaterialPlaybackUnavailable] = StatusCodes.Status409Conflict,
         [ErrorCodes.MaterialNotSheetMusic] = StatusCodes.Status400BadRequest,
+        // 422 like the MIDI_* render errors: the file arrived but cannot be turned into playback.
+        [ErrorCodes.MaterialScoreInvalid] = StatusCodes.Status422UnprocessableEntity,
+        [ErrorCodes.MaterialScoreUnsupported] = StatusCodes.Status422UnprocessableEntity,
+        [ErrorCodes.MaterialNotInteractiveScore] = StatusCodes.Status409Conflict,
         // 422 as agreed with mobile (Harmonia_MIDI_Backend_Spec §7): the file arrived but its content cannot be played.
         [ErrorCodes.MidiInvalidFile] = StatusCodes.Status422UnprocessableEntity,
         [ErrorCodes.MidiFormatUnsupported] = StatusCodes.Status422UnprocessableEntity,

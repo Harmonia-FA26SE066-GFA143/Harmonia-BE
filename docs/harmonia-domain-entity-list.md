@@ -107,7 +107,7 @@ Written once here instead of repeated 47 times:
 `songId` Guid → Song · `skillId` Guid → Skill · `isMandatory` bool · unique `(songId, skillId)`
 
 **20. `MusicMaterial`** — sheet music / lyrics / sample audio / rehearsal material (FE-08/28) ***auditable***
-`songId` Guid → Song · `materialType` MaterialType · `title` string(200) · `filePublicId` string(255)? (private, signed URL on read) · `fileName` string(200)? · `lyricsText` string(max)? (Lyrics typed as text — exactly one of file or text) · `fileSizeBytes` long? · `targetSkillId` Guid? → Skill · `isActive` bool
+`songId` Guid → Song · `materialType` MaterialType · `title` string(200) · `filePublicId` string(255)? (private, signed URL on read) · `fileName` string(200)? · `lyricsText` string(max)? (Lyrics typed as text — exactly one of file or text) · `fileSizeBytes` long? · `scoreRevision` int? · `scoreSha256` string(64)? · `playbackAudioSha256` string(64)? (the last three for InteractiveScore only) · `targetSkillId` Guid? → Skill · `isActive` bool
 
 **21. `MaterialLearningProgress`** — Learned / Needs practice (FE-09)
 `memberId` Guid → MemberProfile · `materialId` Guid → MusicMaterial · `status` LearningStatus · `updatedAt` DateTime · unique `(memberId, materialId)`
@@ -223,7 +223,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 | `ApprovalStatus` | Pending, Approved, Rejected |
 | `EventStatus` | Draft, Published, Cancelled |
 | `ClassificationTarget` | LiturgicalSeason, MassType, CeremonyType, SongTheme, LiturgicalSlot |
-| `MaterialType` | SheetMusic, Lyrics, SampleAudio, RehearsalMaterial |
+| `MaterialType` | SheetMusic, Lyrics, SampleAudio, RehearsalMaterial, InteractiveScore |
 | `LearningStatus` | NotStarted, NeedsPractice, Learned |
 | `SongListStatus` | Draft, Submitted, Approved, Rejected, NeedsRevision |
 | `ReviewDecision` | Approve, Reject, RequestRevision |
@@ -334,6 +334,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 - 2026-11-01: `RehearsalRecording` added (50 → 51) — the director's takes from the practice room, heard by the choir's members. Needs a migration.
 - 2026-11-01: `LiturgicalDay` gains `color` string(20)? — the liturgical colour the calendar API lists for the day (Web B45). Needs a migration; cached years are filled on the next sync.
 - 2026-11-03: `MemberSkill` gains `evidencePublicId`, `evidenceFileName`, `evidenceSizeBytes`, `evidenceUploadedAt` — one private voice or clip file per declaration, shown to the Choir Director for review. Needs a migration.
+- 2026-11-07: Web B47 — `MaterialType.InteractiveScore` (MusicXML/MXL, appended last, stored as int) and `MusicMaterial` gains `scoreRevision`, `scoreSha256`, `playbackAudioSha256`: the score and the WAV rendered from it form one revision. Count stays 51. Needs migration `AddInteractiveScore`.
 
 **Bổ sung 2026-10-26 — phân công 3 tầng**
 

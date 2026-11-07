@@ -60,6 +60,12 @@ public interface IMusicMaterialService
     Task<Result<PlaybackDto>> GetPlaybackAsync(Guid id, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Fresh signed URLs of an interactive score and the WAV rendered from the same revision, with both hashes,
+    /// for the Web practice room. MATERIAL_NOT_FOUND, MATERIAL_NOT_INTERACTIVE_SCORE, MATERIAL_PLAYBACK_UNAVAILABLE.
+    /// </summary>
+    Task<Result<InteractiveScoreDto>> GetScoreAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Draft lyrics read by AI from an active SheetMusic material. Nothing is saved: the director edits the draft
     /// and saves it as a Lyrics material through <see cref="UploadAsync"/>.
     /// MATERIAL_NOT_FOUND, MATERIAL_NOT_SHEET_MUSIC, EXTERNAL_AI_FAILED.

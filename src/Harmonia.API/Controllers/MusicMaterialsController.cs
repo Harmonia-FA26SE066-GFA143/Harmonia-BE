@@ -75,6 +75,15 @@ public class MusicMaterialsController(IMusicMaterialService musicMaterialService
     public async Task<IActionResult> GetPlaybackAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await musicMaterialService.GetPlaybackAsync(id, cancellationToken));
 
+    /// <summary>
+    /// Fresh signed URLs of an interactive score (MusicXML/MXL) and the WAV rendered from the same revision, with
+    /// hashes to verify them. Call again once the URLs expire; nothing is rendered again.
+    /// </summary>
+    [HttpGet("{id:guid}/score")]
+    [ProducesResponseType<InteractiveScoreDto>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetScoreAsync(Guid id, CancellationToken cancellationToken) =>
+        ToActionResult(await musicMaterialService.GetScoreAsync(id, cancellationToken));
+
     /// <summary>Draft lyrics read by AI from a sheet music file; nothing is saved. Save the edited text as a Lyrics material.</summary>
     [HttpPost("{id:guid}/extract-lyrics")]
     [Authorize(Roles = RoleNames.ChoirDirector)]

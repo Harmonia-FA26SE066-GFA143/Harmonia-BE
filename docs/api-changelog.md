@@ -11,7 +11,65 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
   huống trước đây chưa có. FE bỏ qua trường lạ, hiển thị câu chung cho mã lạ.
 - Mỗi PR đổi hợp đồng thêm một dòng vào mục ngày tương ứng ở đây, cùng PR cập nhật `api.md` / `error-codes.md`.
 
+## 2026-11-07
+
+Ca trưởng thay thế cho một sự kiện, chấm điểm tự động bản thu tập hát, và bản nhạc tương tác MusicXML (Web tbd-backlog
+B47). Cần migration `AddEventChoirSubstituteDirector` và `AddInteractiveScore` trước khi deploy.
+
+### Không phá vỡ — bản nhạc tương tác (B47)
+
+- `materialType` thêm `InteractiveScore` (số 4): nhận `.musicxml`, `.mxl` ≤ 20 MB qua `POST api/music-materials` và
+  `PUT …/{id}/file` như các loại khác (`instrument?` dùng được). Server chuyển score sang MIDI rồi render WAV +
+  `notes.json` ngay trong request; lỗi thì không lưu gì. Mã mới 422 `MATERIAL_SCORE_INVALID`, `MATERIAL_SCORE_UNSUPPORTED`.
+- Endpoint mới `GET api/music-materials/{id}/score` · mọi role — `InteractiveScoreDto`: `revision`, `scoreFormat`,
+  `scoreUrl` + `scoreSha256`, `audioUrl` + `audioSha256`, `durationSeconds`, `instrument`, `status` (luôn `Ready`). Loại
+  khác → 409 `MATERIAL_NOT_INTERACTIVE_SCORE` (mã mới). Quy tắc thời gian (không mở rộng nhắc lại, 120 BPM mặc định, nốt
+  hoa mỹ không chiếm thời gian) ở `api.md` mục 7.
+- `GET …/{id}/playback` (v1, không đổi) cũng trả bản phát của `InteractiveScore`; bài tập gắn tư liệu này dùng được cho
+  chấm điểm bản thu.
+- `materialCounts` của `SongDto` có thêm khoá `InteractiveScore`; `missingMaterialType` nhận giá trị mới.
+
+### [Phá vỡ] Đổi ca đoàn của sự kiện đã công bố
+
+- `PUT api/liturgical-events/{id}/choirs` nhận thêm `reason?` (≤ 500 ký tự). **Bắt buộc** khi gỡ một ca đoàn khỏi sự kiện
+  đã công bố — thiếu → 400 `CHOIR_CHANGE_REASON_REQUIRED` (mã mới). Client đang gỡ ca đoàn mà không gửi lý do sẽ bị chặn.
+- Gỡ ca đoàn: ca viên không thuộc ca đoàn nào còn lại bị **xoá lời mời** và **dòng phân công**; phân công đã chốt mở lại
+  `Draft`. Đổi ca đoàn phụ trách thì mọi phiên bản `SongList` của sự kiện chuyển sang ca đoàn mới, giữ trạng thái. Gửi
+  thông báo `EventChoirChanged` kèm lý do.
+
+### Không phá vỡ
+
+- Endpoint mới `PUT api/liturgical-events/{id}/choirs/{choirId}/substitute-director` · `ParishPriest` — body
+  `{ directorId?, reason? }`. Đặt ca trưởng thay thế cho một ca đoàn **chỉ ở sự kiện này** (`reason` bắt buộc khi đặt);
+  `directorId: null` gỡ người thay. Người thay có quyền ca trưởng của ca đoàn đó ở sự kiện này và thấy sự kiện trong
+  `GET api/liturgical-events`; ca trưởng chính vẫn giữ quyền. Lỗi: 400 `CHOIR_CHANGE_REASON_REQUIRED`,
+  `CHOIR_DIRECTOR_INVALID` · 404 `LITURGICAL_EVENT_NOT_FOUND` · 409 `CHOIR_NOT_SERVING_EVENT`, `LITURGICAL_EVENT_CANCELLED`,
+  `LITURGICAL_EVENT_ALREADY_PASSED`.
+- `LiturgicalEventChoirDto` thêm `substituteDirectorId`, `substituteDirectorFullName`, `reason` (có thể `null`).
+- Chấm điểm bản thu theo bản mẫu MIDI của bài tập — chỉ để tham khảo, **không lưu**, không nộp bài. Trả
+  `PracticeAudioScoreResponse` `{ score, pitchScore, rhythmScore, coveragePercent, trackName }` (0–100; `score` gồm 70% cao độ
+  và 30% nhịp):
+  - `POST api/practice-assignments/mine/{id}/score` · `ChoirMember` — multipart `file` (`.mp3`, `.m4a`, `.wav`), chấm trước
+    khi nộp.
+  - `POST api/practice-submissions/{id}/score` · `ChoirDirector` — chấm bản đã nộp, hỗ trợ ca trưởng nhận xét.
+  - Mã mới 422 `PRACTICE_AUDIO_UNREADABLE` (không đọc được / quá ít tiếng hát), 422 `PRACTICE_REFERENCE_MISSING` (bài tập
+    chưa có bản mẫu MIDI).
+
+## 2026-11-06
+
+### Không phá vỡ
+
+- Endpoint mới `POST api/event-participations/confirm-all?eventId=` · `ChoirDirector` (ca đoàn phụ trách) — xác nhận hộ mọi
+  lời mời `Invited` của ca viên `Active` (giữ `Declined` / `Unsure`), phục vụ demo; không gửi thông báo. Trả
+  `EventParticipationSummaryDto`. Lỗi: 403 `CHOIR_NOT_LEAD` · 404 `LITURGICAL_EVENT_NOT_FOUND` · 409
+  `LITURGICAL_EVENT_CANCELLED`.
+
 ## 2026-11-05
+
+### Không phá vỡ
+
+- Setting mới `Rehearsal.AttendanceStartCheckEnabled` (Bool, mặc định `true` = như cũ). Tắt thì điểm danh được bất cứ lúc
+  nào, không còn `REHEARSAL_NOT_STARTED` (dùng khi demo). Tự thêm khi khởi động, không cần migration.
 
 ### [Phá vỡ] Sự kiện bắt buộc có ca đoàn
 
@@ -26,6 +84,29 @@ Web cha xứ phải sửa theo: form tạo sự kiện, thẻ gán ca đoàn, b�
   (`LITURGICAL_EVENT_CHOIR_REQUIRED`); `leadChoirId` luôn bắt buộc.
 - Sự kiện cũ chưa gán ca đoàn: ca trưởng vẫn xem được, nhưng tạo / sửa / nộp danh sách bài, mời, phân công trả 403
   `CHOIR_NOT_LEAD` cho tới khi cha xứ gán ca đoàn.
+
+## 2026-11-03
+
+Minh chứng kỹ năng và role trên hồ sơ ca viên. Cần migration `AddMemberSkillEvidence` trước khi deploy.
+
+### [Phá vỡ] Hồ sơ ca viên đã đổi role
+
+- Đổi tài khoản từ `ChoirMember` sang role khác: hồ sơ được **giữ lại** nhưng chuyển `Inactive` và rời mọi ca đoàn. Đổi
+  lại về `ChoirMember` thì `Inactive` về `Active`; ca trưởng phải thêm lại vào ca đoàn.
+- `PUT api/member-profiles/{id}` với hồ sơ đó → 409 `MEMBER_NOT_ACTIVE` (trước đây sửa được).
+
+### Không phá vỡ
+
+- `MemberProfileSummaryDto` (`GET api/member-profiles`) thêm `roleName` — role **hiện tại** của tài khoản (Web tbd-backlog
+  B46). `MemberProfileDetailDto` vẫn có `roleName` như cũ.
+- Endpoint mới `PUT api/member-skills/{id}/evidence` · `ChoirMember` — multipart `file`, minh chứng cho kỹ năng đang
+  `Pending`: ghi âm `.mp3`, `.m4a`, `.wav` ≤ 20 MB hoặc clip `.mp4`, `.mov` ≤ 100 MB; gửi lại thì thay file cũ. Trả
+  `MemberSkillDto`. Mã mới 400 `MEMBER_SKILL_EVIDENCE_REQUIRED`, `MEMBER_SKILL_EVIDENCE_TYPE_NOT_ALLOWED`, 413
+  `MEMBER_SKILL_EVIDENCE_TOO_LARGE`; ngoài ra 404 `MEMBER_NOT_FOUND`, `MEMBER_SKILL_NOT_FOUND` · 409 `MEMBER_NOT_ACTIVE`,
+  `MEMBER_SKILL_ALREADY_REVIEWED` · 502 `EXTERNAL_STORAGE_FAILED`.
+- `MemberSkillDto` thêm `evidence` (`null` khi chưa gửi): `{ type: Voice | Clip, fileName, fileSizeBytes, uploadedAt, url }`
+  — `url` là link ký có hạn, hết hạn thì gọi lại API. Ca trưởng thấy ở `GET api/member-skills/pending`; duyệt không bắt
+  buộc có minh chứng.
 
 ## 2026-11-01
 
@@ -46,6 +127,9 @@ Gỡ bớt việc FE tự tính (Web backlog B39, B41, B43, B44, B45). Cần mig
 - `SongListDto.items` sắp theo `displayOrder`, `reviews` theo `reviewedAt` tăng dần.
 - **B45** `LiturgicalDayDto` thêm `color` (màu phụng vụ: `white` | `red` | `green` | `purple` | `rose` | `black`). Cần
   migration `AddLiturgicalDayColor`; ngày đã cache có `color = null` tới khi cha xứ đồng bộ lại năm đó.
+- Ảnh đại diện: `PUT api/auth/me/avatar` (multipart `file`, `.jpg`, `.jpeg`, `.png`, `.webp` ≤ 2 MB) và
+  `DELETE api/auth/me/avatar` · mọi role, chỉ ảnh của chính mình. Ảnh cũ bị xoá khỏi kho. `UserDto`, `MemberProfileDto`
+  thêm `avatarUrl` — URL **công khai**, có thể `null`.
 - **B43** Bản thu buổi tập: `GET` / `POST api/rehearsals/{id}/recordings`, `DELETE …/recordings/{recordingId}`. Ca trưởng
   ghi và xoá; ca viên của ca đoàn buổi tập nghe được. Nhận `.webm`, `.ogg`, `.m4a`, `.mp3`, `.wav` ≤ 20 MB. Mã mới
   `REHEARSAL_RECORDING_NOT_FOUND`, `_REQUIRED`, `_TYPE_NOT_ALLOWED`, `_TOO_LARGE`. Cần migration `AddRehearsalRecording`.
@@ -142,6 +226,11 @@ Phân loại bài hát chi tiết hơn (theo dieuca.net) và phân công 3 tần
   lấy từ thư viện (bỏ bè S/A/T/B) + mặc định của vị trí. Sửa danh sách không còn làm mất yêu cầu đã khai.
 - Dữ liệu mẫu (loại lễ, nghi thức, vị trí trong lễ, cây chủ đề, mặc định Đáp ca / Tung hô Tin Mừng) chỉ nạp vào **bảng đang
   trống**. Trên Azure các bảng đã có dữ liệu thì Admin tự cấu hình; mặc định Đáp ca chỉ nạp khi đã có kỹ năng nhóm Đáp ca.
+- Mở quyền (Web tbd-backlog B37, B38): `GET api/choirs` mở thêm cho `ParishPriest` (nhận mọi ca đoàn, như Admin);
+  `GET api/member-profiles` mở thêm cho `Admin`.
+- `GET api/schedule/rehearsals` nhận thêm `fromDate?`, `toDate?` (ngày giáo xứ, tính cả hai đầu, ≤ 93 ngày): gửi đủ cả hai
+  thì trả buổi tập bắt đầu trong khoảng, cả quá khứ lẫn tương lai; không gửi thì như cũ (sắp tới). Gửi một trong hai hoặc
+  `fromDate > toDate` → 400 `REPORT_DATE_RANGE_INVALID`, quá 93 ngày → 400 `REPORT_DATE_RANGE_TOO_LARGE`.
 
 ## 2026-10-25
 
