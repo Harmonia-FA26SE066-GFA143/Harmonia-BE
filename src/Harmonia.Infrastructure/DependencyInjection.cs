@@ -115,6 +115,8 @@ public static class DependencyInjection
             // took over 60 s on Azure; stays under the ~230 s App Service request limit.
             client.Timeout = TimeSpan.FromSeconds(180);
         });
+        // Downloads a 20 MB recording and a notes.json from signed storage URLs.
+        services.AddHttpClient<IPracticeAudioScorer, PracticeAudioScorer>(client => client.Timeout = TimeSpan.FromSeconds(60));
         services.AddHttpClient<ILiturgicalCalendarClient, LiturgicalCalendarApiClient>(client =>
         {
             client.BaseAddress = new Uri("https://litcal.johnromanodorazio.com/");

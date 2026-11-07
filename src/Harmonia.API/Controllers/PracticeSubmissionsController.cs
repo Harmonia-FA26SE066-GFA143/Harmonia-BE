@@ -31,6 +31,13 @@ public class PracticeSubmissionsController(IPracticeSubmissionService practiceSu
     public async Task<IActionResult> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await practiceSubmissionService.GetByIdAsync(id, cancellationToken));
 
+    /// <summary>Advisory automatic score against the assignment's MIDI reference, to help grading. Not stored.</summary>
+    [HttpPost("{id:guid}/score")]
+    [Authorize(Roles = RoleNames.ChoirDirector)]
+    [ProducesResponseType<PracticeAudioScoreResponse>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ScoreAsync(Guid id, CancellationToken cancellationToken) =>
+        ToActionResult(await practiceSubmissionService.ScoreAsync(id, cancellationToken));
+
     /// <summary>Grades the submission as Passed or NeedsRevision with an optional comment (FE-43, FE-44).</summary>
     [HttpPost("{id:guid}/feedback")]
     [Authorize(Roles = RoleNames.ChoirDirector)]

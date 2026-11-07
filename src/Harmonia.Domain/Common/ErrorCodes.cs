@@ -351,6 +351,12 @@ public static class ErrorCodes
 
     public const string PracticeAudioTooLarge = "PRACTICE_AUDIO_TOO_LARGE";
 
+    // The recording cannot be decoded, or has too little singing in it to score.
+    public const string PracticeAudioUnreadable = "PRACTICE_AUDIO_UNREADABLE";
+
+    // Automatic scoring compares against a MIDI material; the assignment has none attached.
+    public const string PracticeReferenceMissing = "PRACTICE_REFERENCE_MISSING";
+
     // 12. Notification.
     // A notification belonging to someone else is reported as NOTIFICATION_NOT_FOUND, so there is
     // deliberately no "not for you" code: a 403 would confirm the record exists.

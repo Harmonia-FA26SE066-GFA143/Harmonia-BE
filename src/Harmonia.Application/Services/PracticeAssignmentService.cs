@@ -22,6 +22,7 @@ public class PracticeAssignmentService(
     IFileStorageService fileStorageService,
     ISystemSettingService systemSettingService,
     IChoirScopeService choirScope,
+    IPracticeAudioScorer audioScorer,
     IMapper mapper) : IPracticeAssignmentService
 {
     public const long MaxAudioSizeBytes = 20 * 1024 * 1024;
@@ -270,6 +271,25 @@ public class PracticeAssignmentService(
     }
 
     /// <summary>Extension and size come from the server-side upload; the client's Content-Type is never trusted.</summary>
+    public async Task<Result<PracticeAudioScoreResponse>> ScoreMyRecordingAsync(
+        Guid userId, Guid assignmentId, FileContent? file, CancellationToken cancellationToken)
+    {
+        var member = await memberProfileRepository.GetByUserIdAsync(userId, cancellationToken);
+        if (member is null) return Result<PracticeAudioScoreResponse>.Failure(ErrorCodes.MemberNotFound);
+
+        // Same scope as SubmitAsync; due date and status do not matter, nothing is stored.
+        var assignment = await practiceAssignmentRepository.GetByIdForMemberAsync(assignmentId, member.Id, cancellationToken);
+        if (assignment is null) return Result<PracticeAudioScoreResponse>.Failure(ErrorCodes.PracticeAssignmentNotFound);
+
+        if (CheckAudio(file) is { } fileError) return Result<PracticeAudioScoreResponse>.Failure(fileError);
+
+        var notesId = await practiceAssignmentRepository.GetReferenceNotesPublicIdAsync(assignment.Id, cancellationToken);
+        if (notesId is null) return Result<PracticeAudioScoreResponse>.Failure(ErrorCodes.PracticeReferenceMissing);
+
+        return await audioScorer.ScoreAsync(
+            file!.Content, file.FileName, fileStorageService.GetSignedUrl(notesId), cancellationToken);
+    }
+
     private static string? CheckAudio(FileContent? file)
     {
         if (file is null || file.Length == 0) return ErrorCodes.PracticeAudioRequired;

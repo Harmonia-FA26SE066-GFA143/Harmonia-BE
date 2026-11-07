@@ -28,6 +28,7 @@ public class PracticeAssignmentServiceTests
     private readonly IFileStorageService _storage = Substitute.For<IFileStorageService>();
     private readonly ISystemSettingService _settings = Substitute.For<ISystemSettingService>();
     private readonly IChoirScopeService _scope = ChoirScopeFakes.Unrestricted();
+    private readonly IPracticeAudioScorer _scorer = Substitute.For<IPracticeAudioScorer>();
     private readonly PracticeAssignmentService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
 
@@ -46,7 +47,7 @@ public class PracticeAssignmentServiceTests
             .CreateMapper();
         _sut = new PracticeAssignmentService(
             _assignments, _events, _songs, _materials, _skills, _members, _memberSkills, _submissions,
-            _notifications, _storage, _settings, _scope, mapper);
+            _notifications, _storage, _settings, _scope, _scorer, mapper);
 
         _storage.UploadAsync(default!, default!, default!, default, default)
             .ReturnsForAnyArgs(Result<FileUploadResponse>.Success(new FileUploadResponse(StoredAudio, "unused")));
@@ -570,5 +571,51 @@ public class PracticeAssignmentServiceTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => SubmitAsync(assignment, NewAudio()));
 
         await _storage.Received(1).DeleteAsync(StoredAudio, true, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task ScoreMyRecording_WithMidiReference_ScoresWithoutStoring_Async()
+    {
+        var assignment = ReceivedAssignment();
+        var expected = new PracticeAudioScoreResponse(90, 92, 85, 100, "Alto");
+        _assignments.GetReferenceNotesPublicIdAsync(assignment.Id, _ct).Returns("notes.json");
+        _scorer.ScoreAsync(Arg.Any<Stream>(), "take.m4a", "signed:notes.json", _ct)
+            .Returns(Result<PracticeAudioScoreResponse>.Success(expected));
+
+        var result = await _sut.ScoreMyRecordingAsync(_activeMember.UserId, assignment.Id, NewAudio(), _ct);
+
+        Assert.Equal(expected, result.Value);
+        await AssertNothingUploadedAsync();
+    }
+
+    [Fact]
+    public async Task ScoreMyRecording_NoMidiReference_ReturnsReferenceMissing_Async()
+    {
+        var assignment = ReceivedAssignment();
+        _assignments.GetReferenceNotesPublicIdAsync(assignment.Id, _ct).Returns((string?)null);
+
+        var result = await _sut.ScoreMyRecordingAsync(_activeMember.UserId, assignment.Id, NewAudio(), _ct);
+
+        Assert.Equal(ErrorCodes.PracticeReferenceMissing, result.Code);
+    }
+
+    [Fact]
+    public async Task ScoreMyRecording_AssignmentNotReceived_ReturnsNotFound_Async()
+    {
+        _members.GetByUserIdAsync(_activeMember.UserId, _ct).Returns(_activeMember);
+
+        var result = await _sut.ScoreMyRecordingAsync(_activeMember.UserId, Guid.NewGuid(), NewAudio(), _ct);
+
+        Assert.Equal(ErrorCodes.PracticeAssignmentNotFound, result.Code);
+    }
+
+    [Fact]
+    public async Task ScoreMyRecording_DisallowedExtension_ReturnsTypeNotAllowed_Async()
+    {
+        var assignment = ReceivedAssignment();
+
+        var result = await _sut.ScoreMyRecordingAsync(_activeMember.UserId, assignment.Id, NewAudio("take.ogg"), _ct);
+
+        Assert.Equal(ErrorCodes.PracticeAudioTypeNotAllowed, result.Code);
     }
 }

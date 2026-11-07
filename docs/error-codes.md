@@ -289,6 +289,8 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 | `PRACTICE_AUDIO_REQUIRED` | 400 | Vui lòng chọn tệp ghi âm |
 | `PRACTICE_AUDIO_TYPE_NOT_ALLOWED` | 400 | Định dạng ghi âm không được hỗ trợ |
 | `PRACTICE_AUDIO_TOO_LARGE` | 413 | Tệp ghi âm vượt quá dung lượng cho phép |
+| `PRACTICE_AUDIO_UNREADABLE` | 422 | Không đọc được bản thu hoặc bản thu quá ít tiếng hát để chấm |
+| `PRACTICE_REFERENCE_MISSING` | 422 | Bài tập chưa có bản mẫu MIDI nên không so sánh được |
 
 ## 12. Thông báo
 

@@ -73,4 +73,22 @@ public class PracticeAssignmentsController(
         return ToActionResult(await practiceAssignmentService.SubmitAsync(
             User.GetUserId(), id, request, new FileContent(content, file.FileName, file.Length), cancellationToken));
     }
+
+    /// <summary>
+    /// Scores a recording against the assignment's MIDI reference before the member submits it. Advisory only:
+    /// the file is analysed and discarded, nothing is submitted.
+    /// </summary>
+    [HttpPost("mine/{id:guid}/score")]
+    [Authorize(Roles = RoleNames.ChoirMember)]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType<PracticeAudioScoreResponse>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ScoreMyRecordingAsync(Guid id, IFormFile? file, CancellationToken cancellationToken)
+    {
+        if (file is null)
+            return ToActionResult(await practiceAssignmentService.ScoreMyRecordingAsync(User.GetUserId(), id, null, cancellationToken));
+
+        await using var content = file.OpenReadStream();
+        return ToActionResult(await practiceAssignmentService.ScoreMyRecordingAsync(
+            User.GetUserId(), id, new FileContent(content, file.FileName, file.Length), cancellationToken));
+    }
 }

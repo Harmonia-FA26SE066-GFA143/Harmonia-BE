@@ -16,8 +16,28 @@ public class PracticeSubmissionService(
     INotificationService notificationService,
     IFileStorageService fileStorageService,
     IChoirScopeService choirScope,
+    IPracticeAudioScorer audioScorer,
     IMapper mapper) : IPracticeSubmissionService
 {
+    public async Task<Result<PracticeAudioScoreResponse>> ScoreAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var submission = await practiceSubmissionRepository.GetWithMemberAsync(id, cancellationToken);
+        if (submission is null
+            || !await choirScope.CanManageChoirAsync(submission.PracticeAssignment.ChoirId, cancellationToken))
+        {
+            return Result<PracticeAudioScoreResponse>.Failure(ErrorCodes.PracticeSubmissionNotFound);
+        }
+
+        var notesId = await practiceAssignmentRepository.GetReferenceNotesPublicIdAsync(
+            submission.PracticeAssignmentId, cancellationToken);
+        if (notesId is null) return Result<PracticeAudioScoreResponse>.Failure(ErrorCodes.PracticeReferenceMissing);
+
+        // The public id keeps the file extension, which picks the decoder.
+        return await audioScorer.ScoreAsync(
+            fileStorageService.GetSignedUrl(submission.AudioPublicId), submission.AudioPublicId,
+            fileStorageService.GetSignedUrl(notesId), cancellationToken);
+    }
+
     public async Task<Result<PagedList<PracticeSubmissionDetailDto>>> GetByAssignmentAsync(
         Guid assignmentId, SearchPracticeSubmissionsRequest request, CancellationToken cancellationToken)
     {

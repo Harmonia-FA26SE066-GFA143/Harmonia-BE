@@ -187,6 +187,8 @@ public static class ErrorStatusMap
         [ErrorCodes.PracticeAudioRequired] = StatusCodes.Status400BadRequest,
         [ErrorCodes.PracticeAudioTypeNotAllowed] = StatusCodes.Status400BadRequest,
         [ErrorCodes.PracticeAudioTooLarge] = StatusCodes.Status413PayloadTooLarge,
+        [ErrorCodes.PracticeAudioUnreadable] = StatusCodes.Status422UnprocessableEntity,
+        [ErrorCodes.PracticeReferenceMissing] = StatusCodes.Status422UnprocessableEntity,
 
         // 12. Notification.
         [ErrorCodes.NotificationNotFound] = StatusCodes.Status404NotFound,

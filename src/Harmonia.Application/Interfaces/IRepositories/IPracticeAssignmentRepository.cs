@@ -32,6 +32,9 @@ public interface IPracticeAssignmentRepository : IGenericRepository<PracticeAssi
     /// <summary>Same scope and loading as <see cref="GetForMemberAsync"/>; null when the member does not receive it.</summary>
     Task<PracticeAssignment?> GetByIdForMemberAsync(Guid id, Guid memberId, CancellationToken cancellationToken);
 
+    /// <summary>notes.json public id of the first active MIDI material attached to the assignment, or null.</summary>
+    Task<string?> GetReferenceNotesPublicIdAsync(Guid id, CancellationToken cancellationToken);
+
     /// <summary>
     /// Read-only assignments of the event, with <see cref="PracticeAssignment.Targets"/> and every member's
     /// <see cref="PracticeAssignment.Submissions"/> loaded.

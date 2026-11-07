@@ -21,6 +21,7 @@ public class PracticeSubmissionServiceTests
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
     private readonly IMemberProfileRepository _members = Substitute.For<IMemberProfileRepository>();
     private readonly IChoirScopeService _scope = ChoirScopeFakes.Unrestricted();
+    private readonly IPracticeAudioScorer _scorer = Substitute.For<IPracticeAudioScorer>();
     private readonly PracticeSubmissionService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
 
@@ -41,7 +42,7 @@ public class PracticeSubmissionServiceTests
                 },
                 NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new PracticeSubmissionService(_submissions, _assignments, _members, _notifications, _storage, _scope, mapper);
+        _sut = new PracticeSubmissionService(_submissions, _assignments, _members, _notifications, _storage, _scope, _scorer, mapper);
         _storage.GetSignedUrl(Arg.Any<string>()).Returns(call => $"signed:{call.Arg<string>()}");
 
         _submission = new PracticeSubmission
@@ -401,5 +402,42 @@ public class PracticeSubmissionServiceTests
 
         Assert.Equal(ErrorCodes.PracticeSubmissionNotFound, result.Code);
         _storage.DidNotReceiveWithAnyArgs().GetSignedUrl(default!);
+    }
+
+    [Fact]
+    public async Task Score_WithMidiReference_ScoresStoredAudio_Async()
+    {
+        var expected = new PracticeAudioScoreResponse(80, 85, 70, 100, "Soprano");
+        _submissions.GetWithMemberAsync(_submission.Id, _ct).Returns(_submission);
+        _assignments.GetReferenceNotesPublicIdAsync(_assignment.Id, _ct).Returns("notes.json");
+        _scorer.ScoreAsync($"signed:{_submission.AudioPublicId}", _submission.AudioPublicId, "signed:notes.json", _ct)
+            .Returns(Result<PracticeAudioScoreResponse>.Success(expected));
+
+        var result = await _sut.ScoreAsync(_submission.Id, _ct);
+
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task Score_NoMidiReference_ReturnsReferenceMissing_Async()
+    {
+        _submissions.GetWithMemberAsync(_submission.Id, _ct).Returns(_submission);
+        _assignments.GetReferenceNotesPublicIdAsync(_assignment.Id, _ct).Returns((string?)null);
+
+        var result = await _sut.ScoreAsync(_submission.Id, _ct);
+
+        Assert.Equal(ErrorCodes.PracticeReferenceMissing, result.Code);
+    }
+
+    [Fact]
+    public async Task Score_OutsideDirectorsChoirs_ReturnsNotFound_Async()
+    {
+        _submissions.GetWithMemberAsync(_submission.Id, _ct).Returns(_submission);
+        _scope.CanManageChoirAsync(Arg.Any<Guid?>(), _ct).Returns(false);
+
+        var result = await _sut.ScoreAsync(_submission.Id, _ct);
+
+        Assert.Equal(ErrorCodes.PracticeSubmissionNotFound, result.Code);
+        await _scorer.DidNotReceiveWithAnyArgs().ScoreAsync(default(string)!, default!, default!, _ct);
     }
 }

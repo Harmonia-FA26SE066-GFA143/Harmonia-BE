@@ -34,4 +34,11 @@ public interface IPracticeAssignmentService
     Task<Result<PracticeSubmissionDto>> SubmitAsync(
         Guid userId, Guid assignmentId, CreatePracticeSubmissionRequest request, FileContent? file,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Scores a recording against the assignment's MIDI reference so the member can check it before submitting.
+    /// Nothing is uploaded or stored.
+    /// </summary>
+    Task<Result<PracticeAudioScoreResponse>> ScoreMyRecordingAsync(
+        Guid userId, Guid assignmentId, FileContent? file, CancellationToken cancellationToken);
 }
