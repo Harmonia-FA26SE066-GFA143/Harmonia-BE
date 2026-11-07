@@ -1,0 +1,346 @@
+using AutoMapper;
+using Harmonia.Application.Common.Models;
+using Harmonia.Application.DTOs;
+using Harmonia.Application.Interfaces.IRepositories;
+using Harmonia.Application.Interfaces.IServices;
+using Harmonia.Application.Mappings;
+using Harmonia.Application.Services;
+using Harmonia.Domain.Common;
+using Harmonia.Domain.Entities;
+using Harmonia.Domain.Enums;
+using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
+
+namespace Harmonia.Application.Tests;
+
+public class LiturgicalEventServiceTests
+{
+    private readonly ILiturgicalEventRepository _repository = Substitute.For<ILiturgicalEventRepository>();
+    private readonly IUserRepository _users = Substitute.For<IUserRepository>();
+    private readonly INotificationService _notifications = Substitute.For<INotificationService>();
+    private readonly ILookupService _lookups = Substitute.For<ILookupService>();
+    private readonly ISystemSettingService _settings = Substitute.For<ISystemSettingService>();
+    private readonly IGenericRepository<Choir> _choirs = Substitute.For<IGenericRepository<Choir>>();
+    private readonly IChoirScopeService _scope = ChoirScopeFakes.Unrestricted();
+    private readonly Choir _choir = new() { Id = Guid.NewGuid(), Name = "Cecilia", IsActive = true };
+    private readonly LiturgicalEventService _sut;
+    private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
+
+    private readonly LiturgicalEvent _event = new()
+    {
+        Id = Guid.NewGuid(),
+        EventDate = VietnamTime.Today.AddDays(3),
+        Time = new TimeOnly(8, 0),
+        LocationId = Guid.NewGuid(),
+        Location = new WorshipLocation { Name = "Main church" },
+        MassTypeId = Guid.NewGuid(),
+        Status = EventStatus.Published,
+    };
+
+    public LiturgicalEventServiceTests()
+    {
+        var mapper = new MapperConfiguration(cfg => cfg.AddProfile<LiturgicalEventProfile>(), NullLoggerFactory.Instance)
+            .CreateMapper();
+        _sut = new LiturgicalEventService(_repository, _users, _choirs, _notifications, _lookups, _scope, _settings, Substitute.For<ICurrentUserService>(), mapper);
+        _lookups.CheckEventCatalogsAsync(default, default, default, default, default, default, default, default)
+            .ReturnsForAnyArgs(Result.Success());
+        _choirs.ListAsync(default!, default).ReturnsForAnyArgs([_choir]);
+        _repository.GetWithLocationAsync(_event.Id, _ct).Returns(_event);
+    }
+
+    [Fact]
+    public async Task Search_SetsSongListDueDateFromLeadDaysSetting_Async()
+    {
+        _settings.GetIntAsync(SystemSettingKeys.SongListLeadDays, _ct).Returns(7);
+        _repository.SearchAsync(Arg.Any<SearchLiturgicalEventsRequest>(), true, null, Arg.Any<Guid?>(), _ct)
+            .Returns(new PagedList<LiturgicalEvent>([_event], 1, 20, 1));
+
+        var result = await _sut.SearchAsync(new SearchLiturgicalEventsRequest(), includeDrafts: true, _ct);
+
+        Assert.Equal(_event.EventDate.AddDays(-7), Assert.Single(result.Value!.Items).SongListDueDate);
+    }
+
+    private UpdateLiturgicalEventRequest UpdateRequest(Guid? locationId = null) => new()
+    {
+        EventDate = _event.EventDate.AddDays(1),
+        Time = new TimeOnly(9, 30),
+        LocationId = locationId ?? _event.LocationId,
+        MassTypeId = _event.MassTypeId,
+        Title = "Updated",
+    };
+
+    [Fact]
+    public async Task Update_PublishedEvent_ChangesFieldsAndChecksSlotExcludingItself_Async()
+    {
+        var request = UpdateRequest();
+
+        var result = await _sut.UpdateAsync(_event.Id, request, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(request.EventDate, _event.EventDate);
+        Assert.Equal("Updated", result.Value!.Title);
+        Assert.Equal(EventStatus.Published, _event.Status);
+        await _repository.Received(1).ExistsBySlotAsync(request.EventDate, request.Time, request.LocationId, _event.Id, _ct);
+        await _repository.Received(1).SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Create_CatalogCheckFails_ReturnsItsCode_AndAddsNothing_Async()
+    {
+        var request = new CreateLiturgicalEventRequest
+        {
+            EventDate = _event.EventDate, Time = _event.Time, LocationId = Guid.NewGuid(), MassTypeId = Guid.NewGuid(),
+            LiturgicalSeasonId = Guid.NewGuid(), CeremonyTypeId = Guid.NewGuid(), CategoryId = Guid.NewGuid(),
+            ChoirIds = [_choir.Id], LeadChoirId = _choir.Id,
+        };
+        _lookups.CheckEventCatalogsAsync(
+                request.EventDate, request.LiturgicalSeasonId, request.MassTypeId, request.CeremonyTypeId,
+                request.CategoryId, request.LocationId, null, _ct)
+            .Returns(Result.Failure(ErrorCodes.LookupInactive));
+
+        var result = await _sut.CreateAsync(request, _ct);
+
+        Assert.Equal(ErrorCodes.LookupInactive, result.Code);
+        await _repository.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task Create_NoSeasonPicked_UsesSeasonCoveringTheDate_Async()
+    {
+        var advent = Guid.NewGuid();
+        var request = new CreateLiturgicalEventRequest
+        {
+            EventDate = _event.EventDate, Time = _event.Time, LocationId = Guid.NewGuid(), MassTypeId = Guid.NewGuid(),
+            ChoirIds = [_choir.Id], LeadChoirId = _choir.Id,
+        };
+        _lookups.FindLiturgicalSeasonIdAsync(request.EventDate, _ct).Returns(advent);
+
+        var result = await _sut.CreateAsync(request, _ct);
+
+        Assert.Equal(advent, result.Value!.LiturgicalSeasonId);
+        await _lookups.Received(1).CheckEventCatalogsAsync(
+            request.EventDate, advent, request.MassTypeId, null, null, request.LocationId, null, _ct);
+    }
+
+    private CreateLiturgicalEventRequest CreateRequestWithChoirs(params Guid[] choirIds) => new()
+    {
+        EventDate = _event.EventDate, Time = _event.Time, LocationId = Guid.NewGuid(), MassTypeId = Guid.NewGuid(),
+        ChoirIds = [.. choirIds], LeadChoirId = choirIds[0],
+    };
+
+    [Fact]
+    public async Task Create_SavesServingChoirsAndMarksTheLead_Async()
+    {
+        var second = new Choir { Id = Guid.NewGuid(), Name = "Second", IsActive = true };
+        _choirs.ListAsync(default!, default).ReturnsForAnyArgs([_choir, second]);
+        LiturgicalEvent? added = null;
+        await _repository.AddAsync(Arg.Do<LiturgicalEvent>(x => added = x), _ct);
+
+        var result = await _sut.CreateAsync(CreateRequestWithChoirs(second.Id, _choir.Id), _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, added!.EventChoirs.Count);
+        Assert.All(added.EventChoirs, x => Assert.Equal(added.Id, x.EventId));
+        Assert.Equal(second.Id, Assert.Single(added.EventChoirs, x => x.IsLead).ChoirId);
+    }
+
+    [Fact]
+    public async Task Create_UnknownChoir_ReturnsChoirNotFound_AndAddsNothing_Async()
+    {
+        var result = await _sut.CreateAsync(CreateRequestWithChoirs(_choir.Id, Guid.NewGuid()), _ct);
+
+        Assert.Equal(ErrorCodes.ChoirNotFound, result.Code);
+        await _repository.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task Create_InactiveChoir_ReturnsChoirInactive_AndAddsNothing_Async()
+    {
+        _choir.IsActive = false;
+
+        var result = await _sut.CreateAsync(CreateRequestWithChoirs(_choir.Id), _ct);
+
+        Assert.Equal(ErrorCodes.ChoirInactive, result.Code);
+        await _repository.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task Update_CatalogCheckFails_ReturnsItsCode_AndIsGivenTheCurrentEvent_Async()
+    {
+        var request = UpdateRequest();
+        _lookups.CheckEventCatalogsAsync(
+                request.EventDate, request.LiturgicalSeasonId, request.MassTypeId, request.CeremonyTypeId,
+                request.CategoryId, request.LocationId, _event, _ct)
+            .Returns(Result.Failure(ErrorCodes.LiturgicalEventDateOutsideLiturgicalSeason));
+
+        var result = await _sut.UpdateAsync(_event.Id, request, _ct);
+
+        Assert.Equal(ErrorCodes.LiturgicalEventDateOutsideLiturgicalSeason, result.Code);
+        await _repository.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Update_SlotTakenByAnotherEvent_ReturnsSlotTaken_Async()
+    {
+        _repository.ExistsBySlotAsync(Arg.Any<DateOnly>(), Arg.Any<TimeOnly>(), Arg.Any<Guid>(), _event.Id, _ct).Returns(true);
+
+        var result = await _sut.UpdateAsync(_event.Id, UpdateRequest(), _ct);
+
+        Assert.Equal(ErrorCodes.LiturgicalEventSlotTaken, result.Code);
+        await _repository.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Update_CancelledEvent_ReturnsEventCancelled_Async()
+    {
+        _event.Status = EventStatus.Cancelled;
+
+        Assert.Equal(ErrorCodes.LiturgicalEventCancelled, (await _sut.UpdateAsync(_event.Id, UpdateRequest(), _ct)).Code);
+    }
+
+    [Fact]
+    public async Task Update_MissingEvent_ReturnsEventNotFound_Async()
+    {
+        Assert.Equal(ErrorCodes.LiturgicalEventNotFound, (await _sut.UpdateAsync(Guid.NewGuid(), UpdateRequest(), _ct)).Code);
+    }
+
+    [Fact]
+    public async Task Cancel_PublishedEvent_CancelsAndNotifiesDirectorsAndMembers_Async()
+    {
+        var recipients = new List<Guid> { Guid.NewGuid() };
+        _users.GetActiveUserIdsByRolesAsync(Arg.Any<IReadOnlyCollection<string>>(), _ct).Returns(recipients);
+
+        var result = await _sut.CancelAsync(_event.Id, _ct);
+
+        Assert.Equal(EventStatus.Cancelled, result.Value!.Status);
+        await _repository.Received(1).SaveChangesAsync(_ct);
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(x => x.Type == NotificationType.EventCancelled
+                && x.ReferenceId == _event.Id && x.RecipientUserIds == recipients),
+            _ct);
+    }
+
+    [Fact]
+    public async Task Cancel_EventWithChoirs_NotifiesOnlyTheirPeople_Async()
+    {
+        var choirPeople = new List<Guid> { Guid.NewGuid() };
+        _users.GetActiveUserIdsOfEventChoirsAsync(_event.Id, _ct).Returns(choirPeople);
+
+        await _sut.CancelAsync(_event.Id, _ct);
+
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(x => x.RecipientUserIds == choirPeople), _ct);
+        await _users.DidNotReceiveWithAnyArgs().GetActiveUserIdsByRolesAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task Cancel_DraftEvent_CancelsWithoutNotification_Async()
+    {
+        _event.Status = EventStatus.Draft;
+
+        var result = await _sut.CancelAsync(_event.Id, _ct);
+
+        Assert.Equal(EventStatus.Cancelled, result.Value!.Status);
+        await _notifications.DidNotReceiveWithAnyArgs().SendAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task Cancel_AlreadyCancelled_ReturnsEventCancelled_Async()
+    {
+        _event.Status = EventStatus.Cancelled;
+
+        Assert.Equal(ErrorCodes.LiturgicalEventCancelled, (await _sut.CancelAsync(_event.Id, _ct)).Code);
+    }
+
+    [Fact]
+    public async Task Cancel_PastEvent_ReturnsEventAlreadyPassed_Async()
+    {
+        _event.EventDate = VietnamTime.Today.AddDays(-1);
+
+        Assert.Equal(ErrorCodes.LiturgicalEventAlreadyPassed, (await _sut.CancelAsync(_event.Id, _ct)).Code);
+        await _repository.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    private void DraftReadyToPublish()
+    {
+        _event.Status = EventStatus.Draft;
+        _event.LiturgicalSeasonId = Guid.NewGuid();
+        _repository.GetByIdAsync(_event.Id, _ct).Returns(_event);
+        _scope.GetLeadChoirIdAsync(_event.Id, _ct).Returns(_choir.Id);
+    }
+
+    [Fact]
+    public async Task Publish_WithoutLeadChoir_ReturnsChoirRequired_AndStaysDraft_Async()
+    {
+        DraftReadyToPublish();
+        _scope.GetLeadChoirIdAsync(_event.Id, _ct).Returns((Guid?)null);
+
+        Assert.Equal(ErrorCodes.LiturgicalEventChoirRequired, (await _sut.PublishAsync(_event.Id, _ct)).Code);
+        Assert.Equal(EventStatus.Draft, _event.Status);
+        await _repository.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Publish_CompleteDraft_ChecksCatalogsAsNewAndSlot_ThenPublishes_Async()
+    {
+        DraftReadyToPublish();
+
+        var result = await _sut.PublishAsync(_event.Id, _ct);
+
+        Assert.Equal(EventStatus.Published, result.Value!.Status);
+        // current = null: a catalog switched off since the last save no longer passes.
+        await _lookups.Received(1).CheckEventCatalogsAsync(
+            _event.EventDate, _event.LiturgicalSeasonId, _event.MassTypeId, _event.CeremonyTypeId,
+            _event.CategoryId, _event.LocationId, null, _ct);
+        await _repository.Received(1).ExistsBySlotAsync(_event.EventDate, _event.Time, _event.LocationId, _event.Id, _ct);
+    }
+
+    [Fact]
+    public async Task Publish_WithoutSeason_ReturnsSeasonRequired_AndStaysDraft_Async()
+    {
+        DraftReadyToPublish();
+        _event.LiturgicalSeasonId = null;
+
+        Assert.Equal(ErrorCodes.LiturgicalEventSeasonRequired, (await _sut.PublishAsync(_event.Id, _ct)).Code);
+        Assert.Equal(EventStatus.Draft, _event.Status);
+        await _repository.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Publish_WithoutMassOrCeremonyType_ReturnsTypeRequired_Async()
+    {
+        DraftReadyToPublish();
+        _event.MassTypeId = null;
+
+        Assert.Equal(ErrorCodes.LiturgicalEventTypeRequired, (await _sut.PublishAsync(_event.Id, _ct)).Code);
+    }
+
+    [Fact]
+    public async Task Publish_PastDraft_ReturnsAlreadyPassed_Async()
+    {
+        DraftReadyToPublish();
+        _event.EventDate = VietnamTime.Today.AddDays(-1);
+
+        Assert.Equal(ErrorCodes.LiturgicalEventAlreadyPassed, (await _sut.PublishAsync(_event.Id, _ct)).Code);
+    }
+
+    [Fact]
+    public async Task Publish_InactiveCatalog_ReturnsItsCode_Async()
+    {
+        DraftReadyToPublish();
+        _lookups.CheckEventCatalogsAsync(default, default, default, default, default, default, default, default)
+            .ReturnsForAnyArgs(Result.Failure(ErrorCodes.LookupInactive));
+
+        Assert.Equal(ErrorCodes.LookupInactive, (await _sut.PublishAsync(_event.Id, _ct)).Code);
+        Assert.Equal(EventStatus.Draft, _event.Status);
+    }
+
+    [Fact]
+    public async Task Publish_SlotTaken_ReturnsSlotTaken_Async()
+    {
+        DraftReadyToPublish();
+        _repository.ExistsBySlotAsync(_event.EventDate, _event.Time, _event.LocationId, _event.Id, _ct).Returns(true);
+
+        Assert.Equal(ErrorCodes.LiturgicalEventSlotTaken, (await _sut.PublishAsync(_event.Id, _ct)).Code);
+    }
+}

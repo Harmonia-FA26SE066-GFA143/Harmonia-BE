@@ -4,7 +4,7 @@ namespace Harmonia.Domain.Entities;
 
 public class DirectorNote : BaseEntity
 {
-    public Guid? WeekId { get; set; }
+    public DateOnly? NoteDate { get; set; }
 
     public Guid? EventId { get; set; }
 
@@ -15,8 +15,6 @@ public class DirectorNote : BaseEntity
     public string Content { get; set; } = string.Empty;
 
     public DateTime SentAt { get; set; }
-
-    public LiturgicalWeek? Week { get; set; }
 
     public LiturgicalEvent? LiturgicalEvent { get; set; }
 

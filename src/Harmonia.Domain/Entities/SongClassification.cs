@@ -9,7 +9,7 @@ public class SongClassification : BaseEntity
 
     public ClassificationTarget TargetType { get; set; }
 
-    // Points at LiturgicalSeason / MassType / CeremonyType / SongTheme depending on
+    // Points at LiturgicalSeason / MassType / CeremonyType / SongTheme / LiturgicalSlot depending on
     // TargetType, so no real foreign key can be declared.
     public Guid TargetId { get; set; }
 

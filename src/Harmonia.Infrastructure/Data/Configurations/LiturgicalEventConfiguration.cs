@@ -11,12 +11,13 @@ public class LiturgicalEventConfiguration : IEntityTypeConfiguration<LiturgicalE
         builder.Property(x => x.Title).HasMaxLength(200);
         builder.Property(x => x.SpecialRequirements).HasMaxLength(1000);
 
-        builder.HasIndex(x => new { x.EventDate, x.Time, x.LocationId }).IsUnique();
+        // A cancelled event frees its slot, so it can be scheduled again. 2 = EventStatus.Cancelled.
+        builder.HasIndex(x => new { x.EventDate, x.Time, x.LocationId }).IsUnique().HasFilter("[Status] <> 2");
 
-        builder.HasOne(x => x.Week)
+        builder.HasOne(x => x.LiturgicalSeason)
             .WithMany(x => x.LiturgicalEvents)
-            .HasForeignKey(x => x.WeekId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .HasForeignKey(x => x.LiturgicalSeasonId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasOne(x => x.MassType)
             .WithMany(x => x.LiturgicalEvents)

@@ -23,6 +23,11 @@ public class PagingRequest
     public int PageSize
     {
         get => _pageSize;
-        set => _pageSize = value < 1 ? DefaultPageSize : value > MaxPageSize ? MaxPageSize : value;
+        set => _pageSize = value switch
+        {
+            < 1 => DefaultPageSize,
+            > MaxPageSize => MaxPageSize,
+            _ => value,
+        };
     }
 }

@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Harmonia.Domain.Common;
 
 namespace Harmonia.Application.Interfaces.IRepositories;
@@ -10,6 +11,9 @@ public interface IGenericRepository<T> where T : BaseEntity
 {
     /// <summary>Tracked, so the caller can modify the entity and then call <see cref="SaveChangesAsync"/>.</summary>
     Task<T?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Read-only rows matching <paramref name="predicate"/>, unordered.</summary>
+    Task<List<T>> ListAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken);
 
     Task AddAsync(T entity, CancellationToken cancellationToken);
 

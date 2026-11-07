@@ -7,10 +7,6 @@ public class MemberProfile : BaseAuditableEntity
 {
     public Guid UserId { get; set; }
 
-    public string FullName { get; set; } = string.Empty;
-
-    public string? Phone { get; set; }
-
     public DateOnly? DateOfBirth { get; set; }
 
     public DateOnly JoinedDate { get; set; }
@@ -18,6 +14,8 @@ public class MemberProfile : BaseAuditableEntity
     public MemberStatus Status { get; set; }
 
     public User User { get; set; } = null!;
+
+    public ICollection<ChoirMembership> ChoirMemberships { get; set; } = [];
 
     public ICollection<MemberSkill> MemberSkills { get; set; } = [];
 

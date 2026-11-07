@@ -5,4 +5,10 @@
     <Project Path="src/Harmonia.Application/Harmonia.Application.csproj" />
     <Project Path="src/Harmonia.Infrastructure/Harmonia.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/Harmonia.API.Tests/Harmonia.API.Tests.csproj" />
+    <Project Path="test/Harmonia.Application.Tests/Harmonia.Application.Tests.csproj" />
+    <Project Path="test/Harmonia.Domain.Tests/Harmonia.Domain.Tests.csproj" />
+    <Project Path="test/Harmonia.Infrastructure.Tests/Harmonia.Infrastructure.Tests.csproj" />
+  </Folder>
 </Solution>

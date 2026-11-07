@@ -16,41 +16,10 @@ public class ValidationFilter : IAsyncActionFilter
     {
         var errors = new Dictionary<string, HashSet<string>>();
 
-        // Binding failures such as malformed JSON or a wrong value type.
-        foreach (var (key, entry) in context.ModelState)
-        {
-            if (entry.Errors.Count > 0)
-            {
-                // "$" is the JSON root, i.e. the whole body could not be read.
-                var field = key.StartsWith("$.") ? key[2..] : key;
-                Add(errors, field is "$" or "" ? "request" : field, ErrorCodes.ValidationFailed);
-            }
-        }
-
+        CollectBindingErrors(context, errors);
         if (errors.Count == 0)
         {
-            foreach (var argument in context.ActionArguments.Values)
-            {
-                if (argument is null ||
-                    context.HttpContext.RequestServices.GetService(typeof(IValidator<>).MakeGenericType(argument.GetType()))
-                        is not IValidator validator)
-                {
-                    continue;
-                }
-
-                var result = await validator.ValidateAsync(
-                    new ValidationContext<object>(argument),
-                    context.HttpContext.RequestAborted);
-
-                foreach (var failure in result.Errors)
-                {
-                    // Without .WithErrorCode(...) FluentValidation reports the validator's class name.
-                    var code = failure.ErrorCode is { Length: > 0 } c && !c.EndsWith("Validator")
-                        ? c
-                        : ErrorCodes.ValidationFailed;
-                    Add(errors, failure.PropertyName, code);
-                }
-            }
+            await CollectValidatorErrorsAsync(context, errors);
         }
 
         if (errors.Count > 0)
@@ -60,6 +29,47 @@ public class ValidationFilter : IAsyncActionFilter
         }
 
         await next();
+    }
+
+    /// <summary>Binding failures such as malformed JSON or a wrong value type.</summary>
+    private static void CollectBindingErrors(ActionExecutingContext context, Dictionary<string, HashSet<string>> errors)
+    {
+        foreach (var (key, entry) in context.ModelState)
+        {
+            if (entry.Errors.Count > 0)
+            {
+                // "$" is the JSON root, i.e. the whole body could not be read.
+                var field = key.StartsWith("$.") ? key[2..] : key;
+                Add(errors, field is "$" or "" ? "request" : field, ErrorCodes.ValidationFailed);
+            }
+        }
+    }
+
+    private static async Task CollectValidatorErrorsAsync(
+        ActionExecutingContext context, Dictionary<string, HashSet<string>> errors)
+    {
+        foreach (var argument in context.ActionArguments.Values)
+        {
+            if (argument is null ||
+                context.HttpContext.RequestServices.GetService(typeof(IValidator<>).MakeGenericType(argument.GetType()))
+                    is not IValidator validator)
+            {
+                continue;
+            }
+
+            var result = await validator.ValidateAsync(
+                new ValidationContext<object>(argument),
+                context.HttpContext.RequestAborted);
+
+            foreach (var failure in result.Errors)
+            {
+                // Without .WithErrorCode(...) FluentValidation reports the validator's class name.
+                var code = failure.ErrorCode is { Length: > 0 } c && !c.EndsWith("Validator")
+                    ? c
+                    : ErrorCodes.ValidationFailed;
+                Add(errors, failure.PropertyName, code);
+            }
+        }
     }
 
     private static void Add(Dictionary<string, HashSet<string>> errors, string field, string code)

@@ -4,7 +4,7 @@ namespace Harmonia.API.Middlewares;
 
 /// <summary>
 /// The single error code -> HTTP status table, transcribed from the HTTP column of
-/// doc/error-codes.md. Both the exception middleware and controllers returning
+/// docs/error-codes.md. Both the exception middleware and controllers returning
 /// <c>Result.Failure</c> read it, so a code's status is defined in exactly one place.
 /// The fallback only catches a code missing from this table: 409 for a domain exception,
 /// 400 for a service failure. Field-level FluentValidation codes are absent by design:
@@ -29,6 +29,7 @@ public static class ErrorStatusMap
         // 1. Auth.
         [ErrorCodes.AuthInvalidCredentials] = StatusCodes.Status401Unauthorized,
         [ErrorCodes.AuthAccountInactive] = StatusCodes.Status403Forbidden,
+        [ErrorCodes.AuthPasswordChangeRequired] = StatusCodes.Status403Forbidden,
         [ErrorCodes.AuthTokenInvalid] = StatusCodes.Status401Unauthorized,
         [ErrorCodes.AuthTokenExpired] = StatusCodes.Status401Unauthorized,
         [ErrorCodes.AuthRefreshTokenNotFound] = StatusCodes.Status401Unauthorized,
@@ -39,11 +40,13 @@ public static class ErrorStatusMap
         [ErrorCodes.AuthResetTokenInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.AuthResetTokenExpired] = StatusCodes.Status400BadRequest,
         [ErrorCodes.AuthResetTokenUsed] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.AuthGoogleTokenInvalid] = StatusCodes.Status401Unauthorized,
 
         // 2. User & Role.
         [ErrorCodes.UserNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.UserEmailAlreadyExists] = StatusCodes.Status409Conflict,
         [ErrorCodes.UserAlreadyInactive] = StatusCodes.Status409Conflict,
+        [ErrorCodes.UserAlreadyActive] = StatusCodes.Status409Conflict,
         [ErrorCodes.UserCannotModifySelf] = StatusCodes.Status409Conflict,
         [ErrorCodes.UserLastAdmin] = StatusCodes.Status409Conflict,
         [ErrorCodes.RoleNotFound] = StatusCodes.Status404NotFound,
@@ -58,40 +61,64 @@ public static class ErrorStatusMap
         [ErrorCodes.SkillNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.SkillNameDuplicate] = StatusCodes.Status409Conflict,
         [ErrorCodes.SkillInactive] = StatusCodes.Status409Conflict,
+        [ErrorCodes.SkillInUse] = StatusCodes.Status409Conflict,
         [ErrorCodes.SkillCategoryNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.MemberSkillNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.MemberSkillAlreadyDeclared] = StatusCodes.Status409Conflict,
         [ErrorCodes.MemberSkillAlreadyReviewed] = StatusCodes.Status409Conflict,
         [ErrorCodes.MemberSkillRejectReasonRequired] = StatusCodes.Status400BadRequest,
         [ErrorCodes.MemberSkillNotApproved] = StatusCodes.Status409Conflict,
+        [ErrorCodes.MemberSkillEvidenceRequired] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.MemberSkillEvidenceTypeNotAllowed] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.MemberSkillEvidenceTooLarge] = StatusCodes.Status413PayloadTooLarge,
 
         // 5. Liturgical calendar.
-        [ErrorCodes.WeekNotFound] = StatusCodes.Status404NotFound,
-        [ErrorCodes.WeekAlreadyExists] = StatusCodes.Status409Conflict,
-        [ErrorCodes.WeekStartNotMonday] = StatusCodes.Status400BadRequest,
-        [ErrorCodes.WeekAlreadyPublished] = StatusCodes.Status409Conflict,
-        [ErrorCodes.WeekNotPublished] = StatusCodes.Status409Conflict,
-        [ErrorCodes.EventNotFound] = StatusCodes.Status404NotFound,
-        [ErrorCodes.EventSlotTaken] = StatusCodes.Status409Conflict,
-        [ErrorCodes.EventDateOutsideWeek] = StatusCodes.Status400BadRequest,
-        [ErrorCodes.EventCancelled] = StatusCodes.Status409Conflict,
-        [ErrorCodes.EventAlreadyPassed] = StatusCodes.Status409Conflict,
-        [ErrorCodes.EventTypeRequired] = StatusCodes.Status400BadRequest,
-        [ErrorCodes.SeasonDateOverlap] = StatusCodes.Status409Conflict,
-        [ErrorCodes.SeasonDateInvalid] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.CalendarDayNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.LiturgicalNameTranslationNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.LiturgicalNameTranslationDuplicate] = StatusCodes.Status409Conflict,
+        [ErrorCodes.LiturgicalEventNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.LiturgicalEventSlotTaken] = StatusCodes.Status409Conflict,
+        [ErrorCodes.LiturgicalEventAlreadyPublished] = StatusCodes.Status409Conflict,
+        [ErrorCodes.LiturgicalEventNotPublished] = StatusCodes.Status409Conflict,
+        [ErrorCodes.LiturgicalEventCancelled] = StatusCodes.Status409Conflict,
+        [ErrorCodes.LiturgicalEventAlreadyPassed] = StatusCodes.Status409Conflict,
+        [ErrorCodes.LiturgicalEventTypeRequired] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.LiturgicalEventDateOutsideLiturgicalSeason] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.LiturgicalEventSeasonRequired] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.LiturgicalEventChoirRequired] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.LiturgicalEventGenerationRangeInvalid] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.LiturgicalSeasonDateOverlap] = StatusCodes.Status409Conflict,
+        [ErrorCodes.LiturgicalSeasonDateInvalid] = StatusCodes.Status400BadRequest,
 
         // 6. Song library.
         [ErrorCodes.SongNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.SongInactive] = StatusCodes.Status409Conflict,
         [ErrorCodes.SongTitleDuplicate] = StatusCodes.Status409Conflict,
-        [ErrorCodes.SongClassificationDuplicate] = StatusCodes.Status409Conflict,
+        [ErrorCodes.SongInUse] = StatusCodes.Status409Conflict,
         [ErrorCodes.SongClassificationTargetInvalid] = StatusCodes.Status400BadRequest,
-        [ErrorCodes.SongSkillRequirementDuplicate] = StatusCodes.Status409Conflict,
+        [ErrorCodes.SongThemeParentInvalid] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.SongThemeHasActiveChildren] = StatusCodes.Status409Conflict,
+        [ErrorCodes.SongSkillRequirementCategoryInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.MaterialNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.AvatarFileRequired] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.AvatarFileTypeNotAllowed] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.AvatarFileTooLarge] = StatusCodes.Status413PayloadTooLarge,
         [ErrorCodes.MaterialFileRequired] = StatusCodes.Status400BadRequest,
         [ErrorCodes.MaterialFileTypeNotAllowed] = StatusCodes.Status400BadRequest,
         [ErrorCodes.MaterialFileTooLarge] = StatusCodes.Status413PayloadTooLarge,
+        [ErrorCodes.MaterialLyricsSourceInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.MaterialLearningStatusInvalid] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.MaterialPlaybackUnavailable] = StatusCodes.Status409Conflict,
+        [ErrorCodes.MaterialNotSheetMusic] = StatusCodes.Status400BadRequest,
+        // 422 like the MIDI_* render errors: the file arrived but cannot be turned into playback.
+        [ErrorCodes.MaterialScoreInvalid] = StatusCodes.Status422UnprocessableEntity,
+        [ErrorCodes.MaterialScoreUnsupported] = StatusCodes.Status422UnprocessableEntity,
+        [ErrorCodes.MaterialNotInteractiveScore] = StatusCodes.Status409Conflict,
+        // 422 as agreed with mobile (Harmonia_MIDI_Backend_Spec §7): the file arrived but its content cannot be played.
+        [ErrorCodes.MidiInvalidFile] = StatusCodes.Status422UnprocessableEntity,
+        [ErrorCodes.MidiFormatUnsupported] = StatusCodes.Status422UnprocessableEntity,
+        [ErrorCodes.MidiNoPlayableNotes] = StatusCodes.Status422UnprocessableEntity,
+        [ErrorCodes.MidiLimitExceeded] = StatusCodes.Status422UnprocessableEntity,
 
         // 7. Song list & review.
         [ErrorCodes.SongListNotFound] = StatusCodes.Status404NotFound,
@@ -109,24 +136,27 @@ public static class ErrorStatusMap
         [ErrorCodes.ReviewNotesRequired] = StatusCodes.Status400BadRequest,
 
         // 8. Event participation.
-        [ErrorCodes.ParticipationNotFound] = StatusCodes.Status404NotFound,
-        [ErrorCodes.ParticipationAlreadyRequested] = StatusCodes.Status409Conflict,
-        [ErrorCodes.ParticipationAlreadyResponded] = StatusCodes.Status409Conflict,
-        [ErrorCodes.ParticipationEventPassed] = StatusCodes.Status409Conflict,
-        [ErrorCodes.ParticipationNotInvited] = StatusCodes.Status409Conflict,
+        [ErrorCodes.EventParticipationNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.EventParticipationAlreadyRequested] = StatusCodes.Status409Conflict,
+        [ErrorCodes.EventParticipationAlreadyResponded] = StatusCodes.Status409Conflict,
+        [ErrorCodes.EventParticipationClosed] = StatusCodes.Status409Conflict,
+        [ErrorCodes.EventParticipationNotInvited] = StatusCodes.Status409Conflict,
 
         // 9. Service roster.
         [ErrorCodes.RosterNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.RosterAlreadyExists] = StatusCodes.Status409Conflict,
         [ErrorCodes.RosterAlreadyFinalized] = StatusCodes.Status409Conflict,
+        [ErrorCodes.RosterNotFinalized] = StatusCodes.Status409Conflict,
         [ErrorCodes.RosterSongListNotApproved] = StatusCodes.Status409Conflict,
         [ErrorCodes.RosterNoPersonnelRequirement] = StatusCodes.Status409Conflict,
         [ErrorCodes.RosterInsufficientMembers] = StatusCodes.Status409Conflict,
-        [ErrorCodes.AssignmentNotFound] = StatusCodes.Status404NotFound,
-        [ErrorCodes.AssignmentMemberSkillNotApproved] = StatusCodes.Status409Conflict,
-        [ErrorCodes.AssignmentMemberNotConfirmed] = StatusCodes.Status409Conflict,
-        [ErrorCodes.AssignmentDuplicate] = StatusCodes.Status409Conflict,
+        [ErrorCodes.RosterAssignmentNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.RosterAssignmentMemberSkillNotApproved] = StatusCodes.Status409Conflict,
+        [ErrorCodes.RosterAssignmentMemberNotConfirmed] = StatusCodes.Status409Conflict,
+        [ErrorCodes.RosterAssignmentDuplicate] = StatusCodes.Status409Conflict,
+        [ErrorCodes.RosterMemberTimeConflict] = StatusCodes.Status409Conflict,
         [ErrorCodes.PersonnelRequirementNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.PersonnelRequirementInUse] = StatusCodes.Status409Conflict,
         [ErrorCodes.PersonnelRequiredCountInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.PersonnelRequirementDuplicate] = StatusCodes.Status409Conflict,
 
@@ -135,8 +165,16 @@ public static class ErrorStatusMap
         [ErrorCodes.RehearsalTimeInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.RehearsalTimeConflict] = StatusCodes.Status409Conflict,
         [ErrorCodes.RehearsalAlreadyPassed] = StatusCodes.Status409Conflict,
-        [ErrorCodes.AttendanceNotFound] = StatusCodes.Status404NotFound,
-        [ErrorCodes.AttendanceAlreadyRecorded] = StatusCodes.Status409Conflict,
+        [ErrorCodes.RehearsalHasAttendance] = StatusCodes.Status409Conflict,
+        [ErrorCodes.RehearsalRecordingNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.RehearsalRecordingRequired] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.RehearsalRecordingTypeNotAllowed] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.RehearsalRecordingTooLarge] = StatusCodes.Status413PayloadTooLarge,
+        [ErrorCodes.RehearsalAttendanceNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.RehearsalAttendanceAlreadyRecorded] = StatusCodes.Status409Conflict,
+        [ErrorCodes.RehearsalNotStarted] = StatusCodes.Status409Conflict,
+        [ErrorCodes.RehearsalAttendanceMemberDuplicate] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.RehearsalSongDuplicate] = StatusCodes.Status400BadRequest,
 
         // 11. Practice assignment & submission.
         [ErrorCodes.PracticeAssignmentNotFound] = StatusCodes.Status404NotFound,
@@ -146,17 +184,26 @@ public static class ErrorStatusMap
         [ErrorCodes.PracticeSubmissionNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.PracticeSubmissionPastDue] = StatusCodes.Status409Conflict,
         [ErrorCodes.PracticeSubmissionAlreadyReviewed] = StatusCodes.Status409Conflict,
+        [ErrorCodes.PracticeSubmissionAlreadyPassed] = StatusCodes.Status409Conflict,
+        [ErrorCodes.PracticeSubmissionSuperseded] = StatusCodes.Status409Conflict,
+        [ErrorCodes.PracticeSubmissionNotReviewed] = StatusCodes.Status409Conflict,
+        [ErrorCodes.PracticeSubmissionConflict] = StatusCodes.Status409Conflict,
         [ErrorCodes.PracticeAudioRequired] = StatusCodes.Status400BadRequest,
         [ErrorCodes.PracticeAudioTypeNotAllowed] = StatusCodes.Status400BadRequest,
         [ErrorCodes.PracticeAudioTooLarge] = StatusCodes.Status413PayloadTooLarge,
+        [ErrorCodes.PracticeAudioUnreadable] = StatusCodes.Status422UnprocessableEntity,
+        [ErrorCodes.PracticeReferenceMissing] = StatusCodes.Status422UnprocessableEntity,
 
         // 12. Notification.
         [ErrorCodes.NotificationNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.DirectorNoteTargetRequired] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.DirectorNoteNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.DirectorNoteRecipientInvalid] = StatusCodes.Status400BadRequest,
 
         // 13. System settings & reports.
         [ErrorCodes.SettingNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.SettingValueTypeMismatch] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.SettingValueOutOfRange] = StatusCodes.Status400BadRequest,
         [ErrorCodes.ReportTypeNotSupported] = StatusCodes.Status400BadRequest,
         [ErrorCodes.ReportDateRangeInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.ReportDateRangeTooLarge] = StatusCodes.Status400BadRequest,
@@ -166,6 +213,23 @@ public static class ErrorStatusMap
         [ErrorCodes.ExternalEmailFailed] = StatusCodes.Status502BadGateway,
         [ErrorCodes.ExternalStorageFailed] = StatusCodes.Status502BadGateway,
         [ErrorCodes.ExternalAiFailed] = StatusCodes.Status502BadGateway,
+        [ErrorCodes.ExternalCalendarFailed] = StatusCodes.Status502BadGateway,
+
+        // 15. Choir.
+        [ErrorCodes.ChoirNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.ChoirNameAlreadyExists] = StatusCodes.Status409Conflict,
+        [ErrorCodes.ChoirMemberInvalid] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.ChoirInactive] = StatusCodes.Status409Conflict,
+        [ErrorCodes.ChoirMembershipNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.ChoirDirectorInvalid] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.ChoirNotServingEvent] = StatusCodes.Status409Conflict,
+        [ErrorCodes.ChoirLeadInvalid] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.ChoirNotLead] = StatusCodes.Status403Forbidden,
+        [ErrorCodes.ChoirChangeReasonRequired] = StatusCodes.Status400BadRequest,
+
+        // 16. Mass schedule.
+        [ErrorCodes.MassScheduleNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.MassScheduleSlotTaken] = StatusCodes.Status409Conflict,
     };
 
     public static int StatusFor(string code, int fallback) => StatusByCode.GetValueOrDefault(code, fallback);
