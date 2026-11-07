@@ -185,6 +185,9 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Property<DateOnly?>("NoteDate")
                         .HasColumnType("date");
 
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateTime>("SentAt")
                         .HasColumnType("datetime2");
 

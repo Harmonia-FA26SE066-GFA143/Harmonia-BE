@@ -16,6 +16,9 @@ public class DirectorNote : BaseEntity
 
     public DateTime SentAt { get; set; }
 
+    /// <summary>When the recipient opened the conversation; null while unread.</summary>
+    public DateTime? ReadAt { get; set; }
+
     public LiturgicalEvent? LiturgicalEvent { get; set; }
 
     public User FromUser { get; set; } = null!;

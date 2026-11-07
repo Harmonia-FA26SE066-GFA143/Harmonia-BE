@@ -2057,6 +2057,43 @@ public sealed class RepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task DirectorNotes_Conversations_LatestPerParty_UnreadCount_ThreadAndMarkRead_Async()
+    {
+        var priest = await _db.AddUserAsync("priest@test.com", RoleNames.ParishPriest, _ct, "Priest");
+        var directorA = await _db.AddUserAsync("a@test.com", RoleNames.ChoirDirector, _ct, "A");
+        var directorB = await _db.AddUserAsync("b@test.com", RoleNames.ChoirDirector, _ct, "B");
+        var start = new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc);
+        DirectorNote Note(Guid from, Guid to, int hours) => new()
+        {
+            Id = Guid.NewGuid(), FromUserId = from, ToUserId = to, Content = "x", SentAt = start.AddHours(hours),
+        };
+        var fromA1 = Note(directorA.Id, priest.Id, 1);
+        var fromA2 = Note(directorA.Id, priest.Id, 2);
+        var toB = Note(priest.Id, directorB.Id, 3);
+        var replyToA = Note(priest.Id, directorA.Id, 4);
+        await using (var seed = _db.NewContext())
+        {
+            seed.DirectorNotes.AddRange(fromA1, fromA2, toB, replyToA);
+            await seed.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var repository = new DirectorNoteRepository(context);
+
+        var conversations = await repository.GetConversationsAsync(priest.Id, _ct);
+        Assert.Equal([(replyToA.Id, 2), (toB.Id, 0)], conversations.Select(c => (c.LastNote.Id, c.UnreadCount)));
+        Assert.Equal("A", conversations[0].LastNote.ToUser.FullName);
+
+        var thread = await repository.SearchForUserAsync(
+            priest.Id, new SearchDirectorNotesRequest { WithUserId = directorA.Id }, _ct);
+        Assert.Equal([replyToA.Id, fromA2.Id, fromA1.Id], thread.Items.Select(n => n.Id));
+
+        Assert.Equal(2, await repository.MarkReadAsync(priest.Id, directorA.Id, start, _ct));
+        Assert.Equal(0, await repository.MarkReadAsync(priest.Id, directorA.Id, start, _ct));
+        Assert.All(await repository.GetConversationsAsync(priest.Id, _ct), c => Assert.Equal(0, c.UnreadCount));
+    }
+
+    [Fact]
     public async Task GetActiveByRole_ReturnsOnlyActiveUsersOfThatRole_OrderedByName_Async()
     {
         await _db.AddUserAsync("z@test.com", RoleNames.ChoirDirector, _ct, "Zeta");

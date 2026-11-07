@@ -6,4 +6,7 @@ namespace Harmonia.Application.DTOs;
 public class SearchDirectorNotesRequest : PagingRequest
 {
     public Guid? EventId { get; set; }
+
+    /// <summary>Narrows to the conversation between the caller and this user.</summary>
+    public Guid? WithUserId { get; set; }
 }

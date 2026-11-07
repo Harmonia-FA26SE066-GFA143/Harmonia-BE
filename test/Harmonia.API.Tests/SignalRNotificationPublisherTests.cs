@@ -36,6 +36,18 @@ public class SignalRNotificationPublisherTests
     }
 
     [Fact]
+    public async Task PublishDirectorNoteAsync_SendsOncePerDistinctUser_Async()
+    {
+        var note = new DirectorNoteDto { Id = Guid.NewGuid() };
+
+        await _sut.PublishDirectorNoteAsync(note, [_userIds[0], _userIds[0], _userIds[1]], _ct);
+
+        _hub.Clients.Received(1).Users(Arg.Is<IReadOnlyList<string>>(ids =>
+            ids.SequenceEqual(_userIds.Select(id => id.ToString()))));
+        await _client.Received(1).ReceiveDirectorNoteAsync(note, _ct);
+    }
+
+    [Fact]
     public async Task PublishAsync_TransportFails_DoesNotThrow_Async()
     {
         _client.ReceiveNotificationAsync(_notification, _ct).ThrowsAsync(new IOException("backplane down"));

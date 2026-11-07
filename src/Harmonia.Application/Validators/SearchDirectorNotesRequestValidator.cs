@@ -8,5 +8,6 @@ public class SearchDirectorNotesRequestValidator : AbstractValidator<SearchDirec
     public SearchDirectorNotesRequestValidator()
     {
         RuleFor(x => x.EventId).NotEqual(Guid.Empty);
+        RuleFor(x => x.WithUserId).NotEqual(Guid.Empty);
     }
 }

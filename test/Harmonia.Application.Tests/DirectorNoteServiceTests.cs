@@ -18,6 +18,7 @@ public class DirectorNoteServiceTests
     private readonly IUserRepository _users = Substitute.For<IUserRepository>();
     private readonly ILiturgicalEventRepository _events = Substitute.For<ILiturgicalEventRepository>();
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
+    private readonly INotificationPublisher _publisher = Substitute.For<INotificationPublisher>();
     private readonly DirectorNoteService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly Guid _priestId = Guid.NewGuid();
@@ -30,11 +31,14 @@ public class DirectorNoteServiceTests
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<DirectorNoteProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new DirectorNoteService(_notes, _users, _events, _notifications, mapper);
+        _sut = new DirectorNoteService(_notes, _users, _events, _notifications, _publisher, mapper);
 
         _users.GetActiveUserIdsByRolesAsync(
                 Arg.Is<IReadOnlyCollection<string>>(r => r.SequenceEqual(new[] { RoleNames.ChoirDirector })), _ct)
             .Returns([_director1, _director2]);
+        _users.GetActiveUserIdsByRolesAsync(
+                Arg.Is<IReadOnlyCollection<string>>(r => r.SequenceEqual(new[] { RoleNames.ParishPriest })), _ct)
+            .Returns([_priestId]);
         _events.GetByIdAsync(_eventId, _ct).Returns(new LiturgicalEvent { Id = _eventId, Title = "Christmas" });
         _notes.AddAsync(Arg.Do<DirectorNote>(_added.Add), _ct).Returns(Task.CompletedTask);
         _notes.GetWithDetailsAsync(Arg.Any<Guid>(), _ct).Returns(call =>
@@ -140,5 +144,85 @@ public class DirectorNoteServiceTests
         var result = await _sut.GetByIdAsync(_priestId, Guid.NewGuid(), _ct);
 
         Assert.Equal(ErrorCodes.DirectorNoteNotFound, result.Code);
+    }
+
+    [Fact]
+    public async Task SendMessage_DirectorToPriest_StoresAndPushesToBoth_WithoutNotification_Async()
+    {
+        var result = await _sut.SendMessageAsync(
+            _director1, new SendDirectorNoteMessageRequest { ToUserId = _priestId, Content = "  Thưa cha  " }, _ct);
+
+        Assert.True(result.IsSuccess);
+        var note = Assert.Single(_added);
+        Assert.Equal((_director1, _priestId, "Thưa cha"), (note.FromUserId, note.ToUserId, note.Content));
+        Assert.Null(note.EventId);
+        await _publisher.Received(1).PublishDirectorNoteAsync(
+            Arg.Is<DirectorNoteDto>(d => d.Id == note.Id),
+            Arg.Is<IReadOnlyCollection<Guid>>(ids => ids.SequenceEqual(new[] { _priestId, _director1 })), _ct);
+        await _notifications.DidNotReceiveWithAnyArgs().SendAsync(default!, default);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task SendMessage_SameRoleOrUnknownRecipient_ReturnsRecipientInvalid_Async(bool toOtherDirector)
+    {
+        var request = new SendDirectorNoteMessageRequest
+        {
+            ToUserId = toOtherDirector ? _director2 : Guid.NewGuid(), Content = "hi",
+        };
+
+        var result = await _sut.SendMessageAsync(_director1, request, _ct);
+
+        Assert.Equal(ErrorCodes.DirectorNoteRecipientInvalid, result.Code);
+        Assert.Empty(_added);
+        await _publisher.DidNotReceiveWithAnyArgs().PublishDirectorNoteAsync(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task Create_PushesEachCopyInRealTime_Async()
+    {
+        await _sut.CreateAsync(_priestId, NewRequest(_director1, _director2), _ct);
+
+        await _publisher.ReceivedWithAnyArgs(2).PublishDirectorNoteAsync(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task MarkConversationRead_SomethingRead_PushesReceiptToBoth_Async()
+    {
+        _notes.MarkReadAsync(_priestId, _director1, Arg.Any<DateTime>(), _ct).Returns(3);
+
+        var result = await _sut.MarkConversationReadAsync(_priestId, _director1, _ct);
+
+        Assert.True(result.IsSuccess);
+        await _publisher.Received(1).PublishDirectorNotesReadAsync(
+            Arg.Is<DirectorNotesReadDto>(r => r.ReaderUserId == _priestId && r.SenderUserId == _director1),
+            Arg.Is<IReadOnlyCollection<Guid>>(ids => ids.SequenceEqual(new[] { _director1, _priestId })), _ct);
+    }
+
+    [Fact]
+    public async Task MarkConversationRead_NothingUnread_SucceedsWithoutPush_Async()
+    {
+        var result = await _sut.MarkConversationReadAsync(_priestId, Guid.NewGuid(), _ct);
+
+        Assert.True(result.IsSuccess);
+        await _publisher.DidNotReceiveWithAnyArgs().PublishDirectorNotesReadAsync(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task GetConversations_NamesTheOtherParty_Async()
+    {
+        var note = new DirectorNote
+        {
+            Id = Guid.NewGuid(), FromUserId = _director1, ToUserId = _priestId, Content = "x",
+            FromUser = new User { Id = _director1, FullName = "Director" },
+            ToUser = new User { Id = _priestId, FullName = "Priest" },
+        };
+        _notes.GetConversationsAsync(_priestId, _ct).Returns([(note, 2)]);
+
+        var result = await _sut.GetConversationsAsync(_priestId, _ct);
+
+        var row = Assert.Single(result.Value!);
+        Assert.Equal((_director1, "Director", 2), (row.UserId, row.FullName, row.UnreadCount));
     }
 }

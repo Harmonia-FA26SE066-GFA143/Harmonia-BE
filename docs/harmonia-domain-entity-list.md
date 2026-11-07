@@ -192,8 +192,8 @@ Not a `PracticeSubmission`: recorded by the director, not graded. Members of the
 **38. ⚪ `NotificationRecipient`** — recipient + read state
 `notificationId` Guid → Notification · `userId` Guid → User · `isRead` bool = false · `readAt` DateTime? · unique `(notificationId, userId)`
 
-**39. ⚪ `DirectorNote`** — priest → director note about a day/event (FE-23)
-`noteDate` DateOnly? · `eventId` Guid? → LiturgicalEvent · `fromUserId` Guid → User · `toUserId` Guid → User · `content` string(2000) · `sentAt` DateTime
+**39. ⚪ `DirectorNote`** — priest → director note about a day/event, or a chat message priest ↔ director (FE-23)
+`noteDate` DateOnly? · `eventId` Guid? → LiturgicalEvent · `fromUserId` Guid → User · `toUserId` Guid → User · `content` string(2000) · `sentAt` DateTime · `readAt` DateTime?
 
 ⚪ `NotificationRecipient`: needed only for broadcast notifications.
 ⚪ `DirectorNote`: reuse `Notification` if no reply thread is required.
@@ -335,6 +335,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 - 2026-11-01: `LiturgicalDay` gains `color` string(20)? — the liturgical colour the calendar API lists for the day (Web B45). Needs a migration; cached years are filled on the next sync.
 - 2026-11-03: `MemberSkill` gains `evidencePublicId`, `evidenceFileName`, `evidenceSizeBytes`, `evidenceUploadedAt` — one private voice or clip file per declaration, shown to the Choir Director for review. Needs a migration.
 - 2026-11-07: Web B47 — `MaterialType.InteractiveScore` (MusicXML/MXL, appended last, stored as int) and `MusicMaterial` gains `scoreRevision`, `scoreSha256`, `playbackAudioSha256`: the score and the WAV rendered from it form one revision. Count stays 51. Needs migration `AddInteractiveScore`.
+- 2026-11-07: `DirectorNote` gains `readAt` — the same table now also carries chat messages Parish Priest ↔ Choir Director (no `noteDate`/`eventId`), pushed over `NotificationHub`. Count stays 51. Needs a migration.
 
 **Bổ sung 2026-10-26 — phân công 3 tầng**
 

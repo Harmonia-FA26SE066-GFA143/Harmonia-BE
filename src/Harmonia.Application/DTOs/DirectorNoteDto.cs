@@ -21,4 +21,6 @@ public class DirectorNoteDto
     public string Content { get; set; } = string.Empty;
 
     public DateTime SentAt { get; set; }
+
+    public DateTime? ReadAt { get; set; }
 }

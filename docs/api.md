@@ -1047,7 +1047,7 @@ thì mở màn nào.
 
 ---
 
-## 5a. Director notes — `api/director-notes` · gửi: `ParishPriest` · đọc: `ParishPriest`, `ChoirDirector` (UC-17 / FE-23)
+## 5a. Director notes — `api/director-notes` · ghi chú: `ParishPriest` gửi · chat: `ParishPriest` ↔ `ChoirDirector` (UC-17 / FE-23)
 
 ### `DirectorNoteDto`
 
@@ -1060,15 +1060,22 @@ thì mở màn nào.
   "fromUserId": "guid", "fromUserName": "Cha Giuse",
   "toUserId": "guid", "toUserName": "Anh Phêrô",
   "content": "Xin ca đoàn chuẩn bị thêm bài Đáp ca...",
-  "sentAt": "2026-10-09T08:00:00Z"
+  "sentAt": "2026-10-09T08:00:00Z",
+  "readAt": null
 }
 ```
 
+`DirectorNoteConversationDto`: `{ "userId", "fullName", "lastNote": DirectorNoteDto, "unreadCount" }` — `userId`/`fullName`
+là người bên kia; `unreadCount` = số tin người đó gửi mình chưa đọc.
+
 | Method | Route | Role | Body / Query | Thành công | Lỗi |
 |---|---|---|---|---|---|
-| GET | `/api/director-notes/recipients` | `ParishPriest` | — | 200 `UserSummaryDto[]` (ca trưởng đang hoạt động) | — |
+| GET | `/api/director-notes/recipients` | cả hai | — | 200 `UserSummaryDto[]` (cha xứ gọi: ca trưởng đang hoạt động; ca trưởng gọi: cha xứ) | — |
 | POST | `/api/director-notes` | `ParishPriest` | `{ "noteDate?", "eventId?", "toUserIds": ["guid"], "content" }` | 200 `DirectorNoteDto[]` | 400 `VALIDATION_FAILED` (`DIRECTOR_NOTE_TARGET_REQUIRED`, `DIRECTOR_NOTE_RECIPIENT_INVALID`), `DIRECTOR_NOTE_RECIPIENT_INVALID` · 404 `LITURGICAL_EVENT_NOT_FOUND` |
-| GET | `/api/director-notes?eventId=&pageNumber=&pageSize=` | cả hai | — | 200 `PagedList<DirectorNoteDto>` | — |
+| POST | `/api/director-notes/messages` | cả hai | `{ "toUserId": "guid", "content" }` | 200 `DirectorNoteDto` | 400 `VALIDATION_FAILED`, `DIRECTOR_NOTE_RECIPIENT_INVALID` |
+| GET | `/api/director-notes/conversations` | cả hai | — | 200 `DirectorNoteConversationDto[]` (mới nhất trước) | — |
+| PUT | `/api/director-notes/conversations/{userId}/read` | cả hai | — | 204 | — |
+| GET | `/api/director-notes?eventId=&withUserId=&pageNumber=&pageSize=` | cả hai | — | 200 `PagedList<DirectorNoteDto>` | — |
 | GET | `/api/director-notes/{id}` | cả hai | — | 200 `DirectorNoteDto` | 404 `DIRECTOR_NOTE_NOT_FOUND` |
 
 - Phải có `noteDate` **hoặc** `eventId` (có cả hai cũng được). `content` bắt buộc, ≤ 2000 ký tự.
@@ -1078,7 +1085,14 @@ thì mở màn nào.
   `type = DirectorNote`, `referenceType = "DirectorNote"`, `referenceId` = id bản ghi chú của chính người đó;
   `content` của notification là 200 ký tự đầu, đọc đủ bằng `GET /api/director-notes/{referenceId}`.
 - `GET` danh sách: cha xứ thấy ghi chú **đã gửi**, ca trưởng thấy ghi chú **nhận được**; mới nhất trước.
-  Ghi chú giữa người khác → 404 `DIRECTOR_NOTE_NOT_FOUND`.
+  Ghi chú giữa người khác → 404 `DIRECTOR_NOTE_NOT_FOUND`. `withUserId` lọc ra luồng chat với một người.
+- **Chat** (`POST messages`): chỉ cha xứ → ca trưởng hoặc ca trưởng → cha xứ, cả hai đang hoạt động; cặp khác → 400
+  `DIRECTOR_NOTE_RECIPIENT_INVALID`. Tin chat không gắn ngày/sự kiện và **không** tạo notification.
+- **Đã đọc** (`PUT .../read`): đánh dấu mọi tin `{userId}` gửi mình là đã đọc. Không có gì để đánh dấu (kể cả id lạ)
+  vẫn trả 204.
+- **Realtime** qua `/hubs/notifications` (xem mục SignalR): mọi tin mới (cả ghi chú lẫn chat) đẩy
+  `ReceiveDirectorNoteAsync(DirectorNoteDto)` tới người nhận **và** người gửi (đồng bộ tab khác); đánh dấu đã đọc đẩy
+  `ReceiveDirectorNotesReadAsync({ readerUserId, senderUserId, readAt })` tới cả hai. Lỡ push thì gọi lại `GET` là đủ.
 
 ---
 
@@ -2081,6 +2095,8 @@ const conn = new signalR.HubConnectionBuilder()
   .withAutomaticReconnect()
   .build();
 conn.on("ReceiveNotificationAsync", (n) => { /* n: NotificationDto */ });
+conn.on("ReceiveDirectorNoteAsync", (note) => { /* note: DirectorNoteDto — chat cha xứ ↔ ca trưởng, mục 5a */ });
+conn.on("ReceiveDirectorNotesReadAsync", (r) => { /* r: { readerUserId, senderUserId, readAt } */ });
 await conn.start();
 ```
 
