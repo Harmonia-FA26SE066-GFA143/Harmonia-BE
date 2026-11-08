@@ -147,6 +147,78 @@ public class ExternalServiceTests
         Assert.Equal(ErrorCodes.ExternalAiFailed, result.Code);
     }
 
+    // ---- GeminiLyricsExtractor ----
+
+    private const string LyricsBody = """{"candidates":[{"content":{"parts":[{"text":"{\"lyricsText\":\" ĐK: Alleluia \"}"}]}}]}""";
+
+    /// <summary>Fakes the sheet download, the two-step Gemini upload, the file delete, and generateContent per model.</summary>
+    private sealed class LyricsHandler(Dictionary<string, HttpStatusCode> modelStatus) : HttpMessageHandler
+    {
+        public List<string> GenerateCalls { get; } = [];
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}") };
+            if (path.EndsWith(":generateContent"))
+            {
+                var model = path.Split('/')[^1].Split(':')[0];
+                GenerateCalls.Add(model);
+                response.StatusCode = modelStatus[model];
+                response.Content = new StringContent(response.StatusCode == HttpStatusCode.OK ? LyricsBody : """{"error":{"code":503}}""");
+            }
+            else if (path == "/upload/v1beta/files")
+                response.Headers.Add("X-Goog-Upload-URL", "https://gemini.test/upload-session");
+            else if (path == "/upload-session")
+                response.Content = new StringContent("""{"file":{"uri":"https://gemini.test/v1beta/files/abc","name":"files/abc"}}""");
+            return Task.FromResult(response);
+        }
+    }
+
+    private static Task<Result<string>> ExtractLyricsAsync(LyricsHandler handler, string fallbackModel)
+    {
+        var client = new HttpClient(handler) { BaseAddress = new Uri("https://gemini.test/") };
+        var options = Options.Create(new GeminiOptions { ApiKey = "secret-key", Model = "main", LyricsFallbackModel = fallbackModel });
+        return new GeminiLyricsExtractor(client, options, NullLogger<GeminiLyricsExtractor>.Instance)
+            .ExtractAsync("https://files.test/sheet.pdf", "harmonia/sheet.pdf", TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task GeminiLyrics_MainModelOverloaded_UsesFallbackModel_Async()
+    {
+        var handler = new LyricsHandler(new() { ["main"] = HttpStatusCode.ServiceUnavailable, ["backup"] = HttpStatusCode.OK });
+
+        var result = await ExtractLyricsAsync(handler, "backup");
+
+        Assert.Equal("ĐK: Alleluia", result.Value);
+        Assert.Equal(["main", "backup"], handler.GenerateCalls);
+    }
+
+    [Theory]
+    [InlineData("")] // no fallback configured
+    [InlineData("backup")] // fallback overloaded too
+    public async Task GeminiLyrics_NoModelAvailable_ReturnsExternalAiFailed_Async(string fallbackModel)
+    {
+        var handler = new LyricsHandler(new() { ["main"] = HttpStatusCode.ServiceUnavailable, ["backup"] = HttpStatusCode.ServiceUnavailable });
+
+        var result = await ExtractLyricsAsync(handler, fallbackModel);
+
+        Assert.Equal(ErrorCodes.ExternalAiFailed, result.Code);
+        Assert.Equal(fallbackModel == "" ? ["main"] : ["main", "backup"], handler.GenerateCalls);
+    }
+
+    [Fact]
+    public async Task GeminiLyrics_MainModelRejectsRequest_DoesNotTryFallback_Async()
+    {
+        // Only 503 means "overloaded"; a 400/404 would fail the same way on another model.
+        var handler = new LyricsHandler(new() { ["main"] = HttpStatusCode.BadRequest, ["backup"] = HttpStatusCode.OK });
+
+        var result = await ExtractLyricsAsync(handler, "backup");
+
+        Assert.Equal(ErrorCodes.ExternalAiFailed, result.Code);
+        Assert.Equal(["main"], handler.GenerateCalls);
+    }
+
     // ---- LiturgicalCalendarApiClient ----
 
     private static Task<Result<List<CalendarDayResult>>> GetYearAsync(

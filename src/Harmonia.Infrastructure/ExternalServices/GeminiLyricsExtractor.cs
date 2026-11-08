@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -69,13 +70,7 @@ public class GeminiLyricsExtractor(
                 generationConfig = new { responseMimeType = "application/json", responseSchema = ResponseSchema, temperature = 0 },
             };
 
-            using var request = new HttpRequestMessage(HttpMethod.Post, $"v1beta/models/{options.Value.Model}:generateContent")
-            {
-                Content = JsonContent.Create(body, options: Json),
-            };
-            request.Headers.Add("x-goog-api-key", options.Value.ApiKey);
-
-            using var response = await httpClient.SendAsync(request, cancellationToken);
+            using var response = await GenerateAsync(body, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 // Gemini's error body names the cause (retired model, quota); it never echoes the API key.
@@ -107,6 +102,33 @@ public class GeminiLyricsExtractor(
             // Gemini drops files after 48 hours anyway; deleting now keeps the sheet there no longer than needed.
             if (geminiFileName is not null) await DeleteAsync(geminiFileName);
         }
+    }
+
+    /// <summary>
+    /// Calls the configured model; on 503 (model overloaded, which lasted over 10 minutes on 2026-11-04)
+    /// tries the fallback model once. The uploaded file is not tied to a model, so it is reused.
+    /// </summary>
+    private async Task<HttpResponseMessage> GenerateAsync(object body, CancellationToken cancellationToken)
+    {
+        var response = await SendGenerateAsync(options.Value.Model, body, cancellationToken);
+        var fallbackModel = options.Value.LyricsFallbackModel;
+        if (response.StatusCode != HttpStatusCode.ServiceUnavailable || string.IsNullOrWhiteSpace(fallbackModel))
+            return response;
+
+        logger.LogWarning("Gemini model {Model} is overloaded, extracting lyrics with {FallbackModel}",
+            options.Value.Model, fallbackModel);
+        response.Dispose();
+        return await SendGenerateAsync(fallbackModel, body, cancellationToken);
+    }
+
+    private async Task<HttpResponseMessage> SendGenerateAsync(string model, object body, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"v1beta/models/{model}:generateContent")
+        {
+            Content = JsonContent.Create(body, options: Json),
+        };
+        request.Headers.Add("x-goog-api-key", options.Value.ApiKey);
+        return await httpClient.SendAsync(request, cancellationToken);
     }
 
     /// <summary>Resumable upload in one chunk: start returns an upload URL, then one "upload, finalize" sends the bytes.</summary>
