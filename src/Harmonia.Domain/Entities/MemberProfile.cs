@@ -28,4 +28,6 @@ public class MemberProfile : BaseAuditableEntity
     public ICollection<RehearsalAttendance> RehearsalAttendances { get; set; } = [];
 
     public ICollection<PracticeSubmission> PracticeSubmissions { get; set; } = [];
+
+    public ICollection<DirectorNomination> DirectorNominations { get; set; } = [];
 }

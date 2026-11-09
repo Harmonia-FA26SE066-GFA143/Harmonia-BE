@@ -431,4 +431,13 @@ public static class ErrorCodes
     public const string MassScheduleNotFound = "MASS_SCHEDULE_NOT_FOUND";
 
     public const string MassScheduleSlotTaken = "MASS_SCHEDULE_SLOT_TAKEN";
+
+    // 17. Director nomination.
+    public const string DirectorNominationNotFound = "DIRECTOR_NOMINATION_NOT_FOUND";
+
+    public const string DirectorNominationAlreadyOpen = "DIRECTOR_NOMINATION_ALREADY_OPEN";
+
+    public const string DirectorNominationInvalidStatus = "DIRECTOR_NOMINATION_INVALID_STATUS";
+
+    public const string DirectorNominationNoteRequired = "DIRECTOR_NOMINATION_NOTE_REQUIRED";
 }

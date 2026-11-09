@@ -30,7 +30,17 @@ public static class SystemSettingKeys
 
     public const string SongListLeadDays = "SongList.LeadDays";
 
+    public const string NominationMinTenureMonths = "Nomination.MinTenureMonths";
+
+    public const string NominationMinAttendancePercent = "Nomination.MinAttendancePercent";
+
+    public const string NominationMinServedEvents = "Nomination.MinServedEvents";
+
+    public const string NominationRequireConductingSkill = "Nomination.RequireConductingSkill";
+
     private const string GeneralGroup = "Thông tin chung";
+
+    private const string NominationGroup = "Đề cử ca trưởng";
 
     // In the order the settings page shows them; the index is SystemSettingDto.Order.
     public static readonly IReadOnlyList<SystemSettingDefinition> All =
@@ -59,6 +69,17 @@ public static class SystemSettingKeys
         new(SongListLeadDays, SettingDataType.Int, "7", "Hạn nộp danh sách bài hát (số ngày trước lễ)", "Danh sách bài hát",
             "Ca trưởng nên gửi danh sách bài hát trước ngày cử hành ít nhất số ngày này; chỉ để nhắc, không chặn gửi trễ.",
             MinValue: 0, MaxValue: 60),
+        new(NominationMinTenureMonths, SettingDataType.Int, "24", "Thâm niên tối thiểu (tháng)", NominationGroup,
+            "Số tháng tối thiểu từ khi ca viên gia nhập ca đoàn đầu tiên; chưa đủ thì đề cử hiện cảnh báo, không chặn.",
+            MinValue: 0, MaxValue: 240),
+        new(NominationMinAttendancePercent, SettingDataType.Int, "80", "Tỷ lệ đi tập tối thiểu (%)", NominationGroup,
+            "Tỷ lệ buổi tập có mặt hoặc đi trễ trong 12 tháng gần nhất; chưa đủ thì đề cử hiện cảnh báo, không chặn.",
+            MinValue: 0, MaxValue: 100),
+        new(NominationMinServedEvents, SettingDataType.Int, "20", "Số lễ đã phục vụ tối thiểu", NominationGroup,
+            "Số lễ ca viên đã được phân công phục vụ; chưa đủ thì đề cử hiện cảnh báo, không chặn.",
+            MinValue: 0, MaxValue: 500),
+        new(NominationRequireConductingSkill, SettingDataType.Bool, "true", "Cần kỹ năng hỗ trợ điều khiển",
+            NominationGroup, "Bật thì đề cử hiện cảnh báo khi ca viên chưa có kỹ năng hỗ trợ điều khiển được duyệt."),
     ];
 
     public static SystemSettingDefinition? Find(string key) => All.FirstOrDefault(x => x.Key == key);
