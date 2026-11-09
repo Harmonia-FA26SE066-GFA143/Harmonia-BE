@@ -278,6 +278,30 @@ hiển thị email thay tên. `phone`, `avatarUrl` có thể `null` (đổi ản
   tự động (`status = Active`, `joinedDate` = hôm nay). Đổi role khỏi `ChoirMember` thì hồ sơ vẫn giữ.
 - `deactivate` và đổi role thu hồi mọi phiên đăng nhập của user đó (xem refresh ở mục 2).
 
+### Đăng ký gia nhập — `api/member-registrations` · gửi: anonymous · xử lý: `Admin` (UC-45)
+
+`MemberRegistrationDto`:
+
+```json
+{ "id": "guid", "fullName": "Nguyễn Văn A", "email": "a@b.com", "phone": "0900000000", "note": "Muốn vào ca đoàn Cecilia", "createdAt": "2026-11-09T08:00:00Z" }
+```
+
+| Method | Route | Quyền | Body / Query | Thành công | Lỗi |
+|---|---|---|---|---|---|
+| POST | `/api/member-registrations` | anonymous | `{ "fullName", "email", "phone?", "note?" }` | 204 | 400 `VALIDATION_FAILED` · 429 `RATE_LIMIT_EXCEEDED` |
+| GET | `/api/member-registrations` | `Admin` | query `keyword`, `pageNumber`, `pageSize` | 200 `PagedList<MemberRegistrationDto>` | — |
+| POST | `/api/member-registrations/{id}/accept` | `Admin` | — | 200 `UserDto` | 404 `MEMBER_REGISTRATION_NOT_FOUND` · 409 `USER_EMAIL_ALREADY_EXISTS` |
+| DELETE | `/api/member-registrations/{id}` | `Admin` | — | 204 | 404 `MEMBER_REGISTRATION_NOT_FOUND` |
+
+- `POST` (form trang chủ): `fullName` ≤ 100, `email` ≤ 256, `phone` ≤ 20, `note` ≤ 500; cắt khoảng trắng, bỏ trống →
+  `null`. **Luôn trả 204** kể cả khi email đã có tài khoản (không lưu gì) — không tiết lộ email nào đã đăng ký. Email
+  đang có đăng ký chờ thì ghi đè đăng ký đó. Đăng ký mới → báo mọi Admin đang hoạt động (`MemberRegistrationSubmitted`).
+  Tối đa 5 lần / 10 phút / IP, quá thì 429.
+- `GET`: chỉ có đăng ký đang chờ (xử lý xong là xoá); `keyword` khớp một phần tên hoặc email; mới nhất trước.
+- `accept`: tạo tài khoản role `ChoirMember` giống `POST /api/users` (mật khẩu đầu tiên gửi qua email, hồ sơ ca viên
+  tự tạo) rồi xoá đăng ký. Email đã có tài khoản → 409, đăng ký được giữ lại để Admin xoá.
+- Đơn giấy nộp tại giáo xứ không qua đây: Admin tạo tài khoản thẳng bằng `POST /api/users`.
+
 ---
 
 ## 4. Member profiles — `api/member-profiles` · của tôi: `ChoirMember` · quản lý: `ChoirDirector` · tìm kiếm: `ChoirDirector`, `Admin`

@@ -117,6 +117,8 @@ public class HarmoniaDbContext(DbContextOptions<HarmoniaDbContext> options) : Db
 
     public DbSet<ReportExport> ReportExports => Set<ReportExport>();
 
+    public DbSet<MemberRegistration> MemberRegistrations => Set<MemberRegistration>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());

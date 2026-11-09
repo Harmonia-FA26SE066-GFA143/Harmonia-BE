@@ -21,6 +21,7 @@ public static class ErrorStatusMap
         [ErrorCodes.NotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.Conflict] = StatusCodes.Status409Conflict,
         [ErrorCodes.InternalError] = StatusCodes.Status500InternalServerError,
+        [ErrorCodes.RateLimitExceeded] = StatusCodes.Status429TooManyRequests,
         [ErrorCodes.LookupNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.LookupNameDuplicate] = StatusCodes.Status409Conflict,
         [ErrorCodes.LookupInUse] = StatusCodes.Status409Conflict,
@@ -50,6 +51,7 @@ public static class ErrorStatusMap
         [ErrorCodes.UserCannotModifySelf] = StatusCodes.Status409Conflict,
         [ErrorCodes.UserLastAdmin] = StatusCodes.Status409Conflict,
         [ErrorCodes.RoleNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.MemberRegistrationNotFound] = StatusCodes.Status404NotFound,
 
         // 3. MemberProfile.
         [ErrorCodes.MemberNotFound] = StatusCodes.Status404NotFound,

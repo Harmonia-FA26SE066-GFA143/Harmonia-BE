@@ -1,6 +1,6 @@
 # Từ điển nghiệp vụ — dùng đúng tên, không tự đặt từ đồng nghĩa
 
-Nguồn chuẩn: `docs/harmonia-domain-entity-list.md` (51 entity, 24 enum).
+Nguồn chuẩn: `docs/harmonia-domain-entity-list.md` (52 entity, 24 enum).
 Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 
 | Tiếng Việt | Tên trong code |
@@ -10,6 +10,7 @@ Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 | ca viên thuộc ca đoàn | `ChoirMembership` |
 | ca đoàn phục vụ sự kiện | `LiturgicalEventChoir` |
 | token đặt lại mật khẩu | `PasswordResetToken` |
+| đăng ký gia nhập (đơn online từ trang chính) | `MemberRegistration` |
 | vai trò | `Role` — 4 giá trị: Admin, ParishPriest, ChoirDirector, ChoirMember |
 | cha xứ / ban phụng vụ | `ParishPriest` |
 | ca trưởng | `ChoirDirector` — KHÔNG dùng `ChoirLeader` |

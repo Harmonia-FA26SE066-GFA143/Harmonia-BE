@@ -34,10 +34,15 @@
 
 ## Tài khoản & mật khẩu
 
-- Tài khoản do `Admin` tạo và gán role. **KHÔNG có đăng ký công khai** —
-  chỉ `login`, `google`, `refresh`, `forgot-password`, `reset-password` và `GET api/system-settings/public`
-  là `[AllowAnonymous]` (`reset-password`: người dùng đã quên mật khẩu, danh tính xác minh bằng token trong email;
-  `system-settings/public`: trang chủ và trang đăng nhập cần tên giáo xứ và email liên hệ, chốt 2026-10-25).
+- Tài khoản do `Admin` tạo và gán role. Người ngoài **không tự tạo được tài khoản** —
+  chỉ `login`, `google`, `refresh`, `forgot-password`, `reset-password`, `GET api/system-settings/public` và
+  `POST api/member-registrations` là `[AllowAnonymous]` (`reset-password`: người dùng đã quên mật khẩu, danh tính xác
+  minh bằng token trong email; `system-settings/public`: trang chủ và trang đăng nhập cần tên giáo xứ và email liên hệ,
+  chốt 2026-10-25).
+- Đăng ký gia nhập (`POST api/member-registrations`, chốt 2026-11-09) chỉ lưu một `MemberRegistration` để Admin xem;
+  Admin bấm tạo tài khoản thì mới có `User`. Luôn trả 204 kể cả khi email đã có tài khoản — không tiết lộ email nào
+  đã đăng ký. Giới hạn 5 lần / 10 phút / IP (policy `member-registration`, quá thì 429 `RATE_LIMIT_EXCEEDED`).
+  Endpoint ẩn danh mới phải có rate limit tương tự.
 - Đăng nhập Google (`api/auth/google`) chỉ khớp `User` có sẵn theo email đã xác minh —
   KHÔNG tự tạo tài khoản. Email chưa có tài khoản trả `AUTH_INVALID_CREDENTIALS`.
 - Mật khẩu lưu ở `User.passwordHash`, dùng `PasswordHasher<T>` hoặc BCrypt.

@@ -65,6 +65,7 @@ Thiếu dòng trong `ErrorStatusMap` là lỗi âm thầm: mã rơi về mặc �
 | `NOT_FOUND` | 404 | Không tìm thấy dữ liệu |
 | `CONFLICT` | 409 | Thao tác xung đột với trạng thái hiện tại |
 | `INTERNAL_ERROR` | 500 | Lỗi hệ thống, vui lòng thử lại |
+| `RATE_LIMIT_EXCEEDED` | 429 | Bạn gửi quá nhiều lần, vui lòng thử lại sau ít phút |
 
 Bốn mã lookup dùng chung cho 9 bảng danh mục (`Role`, `SkillCategory`,
 `LiturgicalSeason`, `MassType`, `CeremonyType`, `EventCategory`, `WorshipLocation`,
@@ -121,6 +122,7 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `USER_CANNOT_MODIFY_SELF` | 409 | Không thể tự đổi quyền hoặc vô hiệu hoá chính mình |
 | `USER_LAST_ADMIN` | 409 | Không thể xoá quyền của quản trị viên cuối cùng |
 | `ROLE_NOT_FOUND` | 404 | Không tìm thấy vai trò |
+| `MEMBER_REGISTRATION_NOT_FOUND` | 404 | Không tìm thấy đăng ký gia nhập |
 | `AVATAR_FILE_REQUIRED` | 400 | Vui lòng chọn ảnh đại diện |
 | `AVATAR_FILE_TYPE_NOT_ALLOWED` | 400 | Ảnh đại diện chỉ nhận JPG, PNG hoặc WEBP |
 | `AVATAR_FILE_TOO_LARGE` | 413 | Ảnh đại diện tối đa 2 MB |

@@ -22,6 +22,8 @@ public static class ErrorCodes
 
     public const string InternalError = "INTERNAL_ERROR";
 
+    public const string RateLimitExceeded = "RATE_LIMIT_EXCEEDED";
+
     // Shared by the nine Admin-configured lookup tables.
     public const string LookupNotFound = "LOOKUP_NOT_FOUND";
 
@@ -86,6 +88,8 @@ public static class ErrorCodes
     public const string RoleNotFound = "ROLE_NOT_FOUND";
 
     public const string UserAlreadyActive = "USER_ALREADY_ACTIVE";
+
+    public const string MemberRegistrationNotFound = "MEMBER_REGISTRATION_NOT_FOUND";
 
     // 3. MemberProfile.
     public const string MemberNotFound = "MEMBER_NOT_FOUND";

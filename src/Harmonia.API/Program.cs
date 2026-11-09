@@ -21,6 +21,7 @@ builder.Services.AddApiSwagger();
 builder.Services.AddApiJwtAuthentication(builder.Configuration);
 builder.Services.AddApiCors(builder.Configuration);
 builder.Services.AddApiSignalR(builder.Configuration, builder.Environment);
+builder.Services.AddApiRateLimiting();
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -37,6 +38,8 @@ app.UseApiSwagger();
 app.UseHttpsRedirection();
 
 app.UseApiCors();
+
+app.UseApiRateLimiting();
 
 app.UseAuthentication();
 app.UseAuthorization();

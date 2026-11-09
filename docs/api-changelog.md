@@ -11,6 +11,20 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
   huống trước đây chưa có. FE bỏ qua trường lạ, hiển thị câu chung cho mã lạ.
 - Mỗi PR đổi hợp đồng thêm một dòng vào mục ngày tương ứng ở đây, cùng PR cập nhật `api.md` / `error-codes.md`.
 
+## 2026-11-09
+
+Đăng ký gia nhập online từ trang chủ (UC-45). Cần migration tạo bảng `MemberRegistrations` trước khi deploy.
+
+### Không phá vỡ
+
+- Endpoint mới `POST api/member-registrations` · **anonymous** — form trang chủ `{ fullName, email, phone?, note? }`,
+  luôn 204; tối đa 5 lần / 10 phút / IP, quá thì 429 `RATE_LIMIT_EXCEEDED` (mã mới).
+- Endpoint mới cho `Admin`: `GET api/member-registrations` (`PagedList<MemberRegistrationDto>`),
+  `POST …/{id}/accept` (200 `UserDto`, tạo tài khoản `ChoirMember`), `DELETE …/{id}` (204). Mã mới 404
+  `MEMBER_REGISTRATION_NOT_FOUND`.
+- `NotificationType` thêm `MemberRegistrationSubmitted` (số 11): Admin nhận khi có đăng ký mới,
+  `referenceType = "MemberRegistration"`.
+
 ## 2026-11-07
 
 Ca trưởng thay thế cho một sự kiện, chấm điểm tự động bản thu tập hát, và bản nhạc tương tác MusicXML (Web tbd-backlog

@@ -13,5 +13,6 @@ public enum NotificationType
     EventCancelled,
     SongListSubmitted,
     RehearsalChanged,
-    EventChoirChanged
+    EventChoirChanged,
+    MemberRegistrationSubmitted
 }

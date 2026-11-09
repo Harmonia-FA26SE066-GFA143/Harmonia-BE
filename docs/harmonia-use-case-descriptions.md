@@ -83,6 +83,7 @@ Brief use case description table for Report 3 (SRS), in the form **ID / Use Case
 | UC-35 | View Activity History / Audit Log | Admin | The Admin reviews the log of important activities such as role changes, skill approvals, song list approvals, roster confirmations, attendance updates and deleted materials. (FE-54) |
 | UC-36 | Manage Mass Schedules | Admin | The Admin maintains the parish's fixed Mass schedules — day of week, time, Mass type and location — which the Parish Priest uses to generate draft events (UC-12E). |
 | UC-37 | Manage Choirs | Admin | The Admin creates, updates and deactivates the choirs of the parish and assigns one Choir Director to each choir. A Choir Director may direct several choirs. (D7, D8) |
+| UC-45 | Handle Join Registrations | Visitor (not signed in), Admin | A visitor sends a request to join from the public home page (full name, email, optional phone and note). The Admins are notified («include» S-05). The Admin lists the waiting requests, creates a Choir Member account from one (the system emails the first password) or deletes an invalid one. A paper form handed in at the parish skips this use case: the Admin creates the account directly (UC-31). |
 
 ## Old → canonical numbering map
 
