@@ -1,6 +1,6 @@
 # Harmonia – Domain Entity List & Attributes (for ERD, Report 3/4)
 
-53 entities derived from FE-01→FE-54 (`claude/functional-requirements-by-actor.md`), the canonical use cases (`claude/use-case-list.md`) and the daily liturgical program model (D6). Diagram: `harmonia-erd.mmd`.
+54 entities derived from FE-01→FE-54 (`claude/functional-requirements-by-actor.md`), the canonical use cases (`claude/use-case-list.md`) and the daily liturgical program model (D6). Diagram: `harmonia-erd.mmd`.
 
 Conceptual/logical level: attribute names, types and constraints. No indexes, no migration syntax.
 
@@ -58,6 +58,9 @@ Written once here instead of repeated 47 times:
 
 **53. `DirectorNomination`** — a member put forward to become a Choir Director: nominated by a Choir Director or the Parish Priest, decided by the Parish Priest, appointed by the Admin (UC-46) ***auditable***
 `memberId` Guid → MemberProfile · `nominatedById` Guid → User · `reason` string(1000) · `proposedChoirId` Guid? → Choir · `status` DirectorNominationStatus · `reviewedById` Guid? → User · `reviewedAt` DateTime? · `reviewNote` string(500)? · `trainingWaiverReason` string(500)? · `appointedChoirId` Guid? → Choir · `appointedAt` DateTime? · index `(memberId, status)` · every FK restrict
+
+**54. `DirectorTraining`** — one course a nominated member is sent to; several per nomination (retake, basic → advanced) ***auditable***
+`nominationId` Guid → DirectorNomination (cascade) · `courseName` string(200) · `organizer` string(200)? · `startDate` DateOnly · `endDate` DateOnly? · `result` DirectorTrainingResult · `resultNote` string(500)? · `resultRecordedAt` DateTime? · `certificatePublicId` string(255)? · `certificateFileName` string(255)? · `certificateSizeBytes` long?
 
 ⚪ `MemberProfile`: merge into `User` unless member records without a login are needed.
 
@@ -225,6 +228,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 |---|---|
 | `MemberStatus` | Active, Inactive, Left |
 | `DirectorNominationStatus` | Pending, Approved, InTraining, Trained, Appointed, Rejected, Cancelled |
+| `DirectorTrainingResult` | InProgress, Passed, Failed |
 | `DevicePlatform` | Android, iOS, Web |
 | `SkillLevel` | Beginner, Intermediate, Advanced |
 | `ApprovalStatus` | Pending, Approved, Rejected |
@@ -249,7 +253,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 | `ReportPeriod` | Week, Month, Year |
 | `LiturgicalNameKind` | Celebration, Rank, Season |
 
-25 enums. `PracticeFeedback.result` reuses `SubmissionStatus` rather than adding a near-duplicate enum.
+26 enums. `PracticeFeedback.result` reuses `SubmissionStatus` rather than adding a near-duplicate enum.
 
 ---
 
@@ -345,6 +349,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 - 2026-11-07: `DirectorNote` gains `readAt` — the same table now also carries chat messages Parish Priest ↔ Choir Director (no `noteDate`/`eventId`), pushed over `NotificationHub`. Count stays 51. Needs a migration.
 - 2026-11-09: `MemberRegistration` added — join request from the public home page, step 1 of the member → director process (`docs/harmonia-director-nomination-process.md`) (51 → 52). `NotificationType.MemberRegistrationSubmitted` appended last. Needs a migration.
 - 2026-11-09: `DirectorNomination` + enum `DirectorNominationStatus` added — UC-46, member → Choir Director nomination (52 → 53 entities, 24 → 25 enums). `NotificationType.DirectorNomination` appended last. Needs a migration.
+- 2026-11-09: `DirectorTraining` + enum `DirectorTrainingResult` added — step 9, courses of a nomination with a private certificate (53 → 54 entities, 25 → 26 enums). Needs migration `AddDirectorTraining`.
 
 **Bổ sung 2026-10-26 — phân công 3 tầng**
 

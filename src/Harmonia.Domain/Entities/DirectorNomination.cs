@@ -45,4 +45,6 @@ public class DirectorNomination : BaseAuditableEntity
     public Choir? ProposedChoir { get; set; }
 
     public Choir? AppointedChoir { get; set; }
+
+    public ICollection<DirectorTraining> Trainings { get; set; } = [];
 }

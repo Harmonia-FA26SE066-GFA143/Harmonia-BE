@@ -275,6 +275,70 @@ namespace Harmonia.Infrastructure.Migrations
                     b.ToTable("DirectorNotes");
                 });
 
+            modelBuilder.Entity("Harmonia.Domain.Entities.DirectorTraining", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CertificateFileName")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("CertificatePublicId")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<long?>("CertificateSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("CourseName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly?>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("NominationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Organizer")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Result")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ResultNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("ResultRecordedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NominationId");
+
+                    b.ToTable("DirectorTrainings");
+                });
+
             modelBuilder.Entity("Harmonia.Domain.Entities.EventCategory", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2210,6 +2274,17 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Navigation("ToUser");
                 });
 
+            modelBuilder.Entity("Harmonia.Domain.Entities.DirectorTraining", b =>
+                {
+                    b.HasOne("Harmonia.Domain.Entities.DirectorNomination", "Nomination")
+                        .WithMany("Trainings")
+                        .HasForeignKey("NominationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Nomination");
+                });
+
             modelBuilder.Entity("Harmonia.Domain.Entities.EventParticipation", b =>
                 {
                     b.HasOne("Harmonia.Domain.Entities.LiturgicalEvent", "LiturgicalEvent")
@@ -2936,6 +3011,11 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Navigation("Rehearsals");
 
                     b.Navigation("SongLists");
+                });
+
+            modelBuilder.Entity("Harmonia.Domain.Entities.DirectorNomination", b =>
+                {
+                    b.Navigation("Trainings");
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.EventCategory", b =>

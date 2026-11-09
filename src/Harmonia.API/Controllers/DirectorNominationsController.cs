@@ -9,11 +9,14 @@ namespace Harmonia.API.Controllers;
 
 /// <summary>
 /// Member → Choir Director nominations (UC-46). A Choir Director or Parish Priest nominates, the Parish Priest
-/// decides, the Admin appoints. Every role reads, filtered by the service to what the caller may see.
+/// decides and records the training courses, the Admin appoints. Every role reads, filtered by the service to
+/// what the caller may see.
 /// </summary>
 [Route("api/director-nominations")]
 [Authorize]
-public class DirectorNominationsController(IDirectorNominationService directorNominationService) : ApiControllerBase
+public class DirectorNominationsController(
+    IDirectorNominationService directorNominationService,
+    IDirectorTrainingService directorTrainingService) : ApiControllerBase
 {
     [HttpGet("eligibility")]
     [Authorize(Roles = $"{RoleNames.ParishPriest},{RoleNames.ChoirDirector}")]
@@ -78,4 +81,48 @@ public class DirectorNominationsController(IDirectorNominationService directorNo
     public async Task<IActionResult> AppointAsync(
         Guid id, [FromBody] AppointDirectorNominationRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await directorNominationService.AppointAsync(id, request, cancellationToken));
+
+    [HttpGet("{id:guid}/trainings")]
+    [ProducesResponseType<List<DirectorTrainingDto>>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetTrainingsAsync(Guid id, CancellationToken cancellationToken) =>
+        ToActionResult(await directorTrainingService.GetByNominationAsync(id, cancellationToken));
+
+    [HttpPost("{id:guid}/trainings")]
+    [Authorize(Roles = RoleNames.ParishPriest)]
+    [ProducesResponseType<DirectorTrainingDto>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> CreateTrainingAsync(
+        Guid id, [FromBody] CreateDirectorTrainingRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await directorTrainingService.CreateAsync(id, request, cancellationToken));
+
+    [HttpPut("{id:guid}/trainings/{trainingId:guid}/result")]
+    [Authorize(Roles = RoleNames.ParishPriest)]
+    [ProducesResponseType<DirectorTrainingDto>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> RecordTrainingResultAsync(
+        Guid id, Guid trainingId, [FromBody] RecordDirectorTrainingResultRequest request,
+        CancellationToken cancellationToken) =>
+        ToActionResult(await directorTrainingService.RecordResultAsync(id, trainingId, request, cancellationToken));
+
+    /// <summary>Certificate file (.pdf, .jpg, .png, max 20 MB), stored private; a new upload replaces the old one.</summary>
+    [HttpPut("{id:guid}/trainings/{trainingId:guid}/certificate")]
+    [Authorize(Roles = RoleNames.ParishPriest)]
+    [ProducesResponseType<DirectorTrainingDto>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> UploadTrainingCertificateAsync(
+        Guid id, Guid trainingId, IFormFile? file, CancellationToken cancellationToken)
+    {
+        if (file is null)
+        {
+            return ToActionResult(
+                await directorTrainingService.UploadCertificateAsync(id, trainingId, null, cancellationToken));
+        }
+
+        await using var content = file.OpenReadStream();
+        return ToActionResult(await directorTrainingService.UploadCertificateAsync(
+            id, trainingId, new FileContent(content, file.FileName, file.Length), cancellationToken));
+    }
+
+    [HttpDelete("{id:guid}/trainings/{trainingId:guid}")]
+    [Authorize(Roles = RoleNames.ParishPriest)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeleteTrainingAsync(Guid id, Guid trainingId, CancellationToken cancellationToken) =>
+        ToActionResult(await directorTrainingService.DeleteAsync(id, trainingId, cancellationToken));
 }

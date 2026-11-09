@@ -238,6 +238,12 @@ public static class ErrorStatusMap
         [ErrorCodes.DirectorNominationAlreadyOpen] = StatusCodes.Status409Conflict,
         [ErrorCodes.DirectorNominationInvalidStatus] = StatusCodes.Status409Conflict,
         [ErrorCodes.DirectorNominationNoteRequired] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.DirectorTrainingNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.DirectorTrainingInProgress] = StatusCodes.Status409Conflict,
+        [ErrorCodes.DirectorTrainingAlreadyRecorded] = StatusCodes.Status409Conflict,
+        [ErrorCodes.DirectorTrainingCertificateRequired] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.DirectorTrainingCertificateTypeNotAllowed] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.DirectorTrainingCertificateTooLarge] = StatusCodes.Status413PayloadTooLarge,
     };
 
     public static int StatusFor(string code, int fallback) => StatusByCode.GetValueOrDefault(code, fallback);

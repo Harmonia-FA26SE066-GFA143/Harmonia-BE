@@ -25,6 +25,11 @@ và `DirectorNominations` trước khi deploy.
   `DIRECTOR_NOMINATION_INVALID_STATUS` (409), `DIRECTOR_NOMINATION_NOTE_REQUIRED` (400).
 - `NotificationType` thêm `DirectorNomination` (số 12), `referenceType = "DirectorNomination"`.
 - `SystemSetting` thêm 4 key nhóm "Đề cử ca trưởng" (`Nomination.*`), tự thêm vào DB lúc khởi động.
+- Khoá học ca trưởng (`api.md` mục 4i, cuối mục): `GET`/`POST {id}/trainings`, `PUT …/{trainingId}/result`,
+  `PUT …/{trainingId}/certificate` (multipart), `DELETE …/{trainingId}`; trả `DirectorTrainingDto`. Mã mới
+  `DIRECTOR_TRAINING_NOT_FOUND` (404), `DIRECTOR_TRAINING_IN_PROGRESS` (409), `DIRECTOR_TRAINING_ALREADY_RECORDED` (409),
+  `DIRECTOR_TRAINING_CERTIFICATE_REQUIRED` (400), `DIRECTOR_TRAINING_CERTIFICATE_TYPE_NOT_ALLOWED` (400),
+  `DIRECTOR_TRAINING_CERTIFICATE_TOO_LARGE` (413). Cần thêm migration bảng `DirectorTrainings`.
 
 ### Không phá vỡ — đăng ký gia nhập (UC-45)
 

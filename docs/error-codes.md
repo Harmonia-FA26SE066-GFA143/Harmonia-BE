@@ -361,6 +361,12 @@ lọc theo cặp `(NotificationId, UserId)` nên "không tồn tại" và "của
 | `DIRECTOR_NOMINATION_ALREADY_OPEN` | 409 | Ca viên này đang có một đề cử chưa xử lý xong |
 | `DIRECTOR_NOMINATION_INVALID_STATUS` | 409 | Không thực hiện được thao tác này ở trạng thái hiện tại của đề cử |
 | `DIRECTOR_NOMINATION_NOTE_REQUIRED` | 400 | Vui lòng nhập lý do |
+| `DIRECTOR_TRAINING_NOT_FOUND` | 404 | Không tìm thấy khoá học |
+| `DIRECTOR_TRAINING_IN_PROGRESS` | 409 | Ca viên đang có một khoá học chưa có kết quả |
+| `DIRECTOR_TRAINING_ALREADY_RECORDED` | 409 | Khoá học này đã có kết quả, không sửa hoặc xoá được |
+| `DIRECTOR_TRAINING_CERTIFICATE_REQUIRED` | 400 | Vui lòng chọn file chứng chỉ |
+| `DIRECTOR_TRAINING_CERTIFICATE_TYPE_NOT_ALLOWED` | 400 | Chứng chỉ chỉ nhận PDF, JPG hoặc PNG |
+| `DIRECTOR_TRAINING_CERTIFICATE_TOO_LARGE` | 413 | Chứng chỉ tối đa 20 MB |
 
 ---
 

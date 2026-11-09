@@ -440,4 +440,16 @@ public static class ErrorCodes
     public const string DirectorNominationInvalidStatus = "DIRECTOR_NOMINATION_INVALID_STATUS";
 
     public const string DirectorNominationNoteRequired = "DIRECTOR_NOMINATION_NOTE_REQUIRED";
+
+    public const string DirectorTrainingNotFound = "DIRECTOR_TRAINING_NOT_FOUND";
+
+    public const string DirectorTrainingInProgress = "DIRECTOR_TRAINING_IN_PROGRESS";
+
+    public const string DirectorTrainingAlreadyRecorded = "DIRECTOR_TRAINING_ALREADY_RECORDED";
+
+    public const string DirectorTrainingCertificateRequired = "DIRECTOR_TRAINING_CERTIFICATE_REQUIRED";
+
+    public const string DirectorTrainingCertificateTypeNotAllowed = "DIRECTOR_TRAINING_CERTIFICATE_TYPE_NOT_ALLOWED";
+
+    public const string DirectorTrainingCertificateTooLarge = "DIRECTOR_TRAINING_CERTIFICATE_TOO_LARGE";
 }

@@ -24,7 +24,7 @@ public class AuditableEntityInterceptor(ICurrentUserService currentUser) : SaveC
         typeof(User), typeof(Role), typeof(SystemSetting),
         typeof(SongList), typeof(SongListReview),
         typeof(ServiceRoster), typeof(RosterAssignment),
-        typeof(MemberSkill), typeof(DirectorNomination),
+        typeof(MemberSkill), typeof(DirectorNomination), typeof(DirectorTraining),
         typeof(LiturgicalEvent), typeof(LiturgicalEventChoir),
         typeof(MusicMaterial),
         typeof(RehearsalAttendance),

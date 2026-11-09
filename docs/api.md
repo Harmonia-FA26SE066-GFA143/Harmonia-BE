@@ -1037,8 +1037,8 @@ Tên tiếng Việt cho các từ tiếng Anh của lịch phụng vụ. Mọi r
 ## 4i. Director nominations — `api/director-nominations` · đề cử: `ParishPriest`, `ChoirDirector` · duyệt: `ParishPriest` · bổ nhiệm: `Admin` · xem: mọi role (UC-46)
 
 Quy trình: `docs/harmonia-director-nomination-process.md`. Trạng thái `status`: `Pending` → `Approved` →
-(`InTraining` → ) `Trained` → `Appointed`; nhánh phụ `Rejected`, `Cancelled`. `InTraining` dành cho phần đào tạo,
-chưa có endpoint.
+(`InTraining` → ) `Trained` → `Appointed`; nhánh phụ `Rejected`, `Cancelled`. `InTraining` / `Trained` do các
+endpoint khoá học ở cuối mục này đổi.
 
 ### `DirectorNominationDto` / `DirectorNominationDetailDto`
 
@@ -1091,6 +1091,38 @@ chưa có endpoint.
   phiên đăng nhập, rời mọi ca đoàn với tư cách ca viên) rồi gán làm ca trưởng `choirId` (thay ca trưởng hiện tại nếu có).
   Ca đoàn phải đang hoạt động. Hai bước lưu riêng: nếu bước gán ca đoàn lỗi, tài khoản đã là ca trưởng nhưng chưa có
   ca đoàn — Admin gán ở `PUT /api/choirs/{id}`. Báo ca viên và người tạo.
+
+### Khoá học ca trưởng — `api/director-nominations/{id}/trainings` · ghi: `ParishPriest` · xem: ai xem được đề cử
+
+`DirectorTrainingDto`:
+
+```json
+{
+  "id": "guid", "nominationId": "guid", "courseName": "Lớp ca trưởng cơ bản", "organizer": "Ban Thánh nhạc giáo phận",
+  "startDate": "2026-12-01", "endDate": "2027-02-28", "result": "Passed", "resultNote": "Hoàn thành tốt",
+  "resultRecordedAt": "2027-03-01T08:00:00Z", "certificateFileName": "chung-chi.pdf", "certificateSizeBytes": 523000,
+  "certificateUrl": "https://... (link ký, hết hạn sau ít phút)", "createdAt": "2026-11-20T08:00:00Z"
+}
+```
+
+| Method | Route | Quyền | Body | Thành công | Lỗi |
+|---|---|---|---|---|---|
+| GET | `/api/director-nominations/{id}/trainings` | mọi role | — | 200 `DirectorTrainingDto[]` | 404 `DIRECTOR_NOMINATION_NOT_FOUND` |
+| POST | `/api/director-nominations/{id}/trainings` | `ParishPriest` | `{ "courseName", "organizer?", "startDate", "endDate?" }` | 200 `DirectorTrainingDto` | 400 `VALIDATION_FAILED` · 404 `DIRECTOR_NOMINATION_NOT_FOUND` · 409 `DIRECTOR_TRAINING_IN_PROGRESS`, `DIRECTOR_NOMINATION_INVALID_STATUS` |
+| PUT | `/api/director-nominations/{id}/trainings/{trainingId}/result` | `ParishPriest` | `{ "result": "Passed" hoặc "Failed", "note?" }` | 200 `DirectorTrainingDto` | 400 `VALIDATION_FAILED` · 404 `DIRECTOR_TRAINING_NOT_FOUND` · 409 `DIRECTOR_TRAINING_ALREADY_RECORDED` |
+| PUT | `/api/director-nominations/{id}/trainings/{trainingId}/certificate` | `ParishPriest` | multipart `file` | 200 `DirectorTrainingDto` | 400 `DIRECTOR_TRAINING_CERTIFICATE_REQUIRED`, `DIRECTOR_TRAINING_CERTIFICATE_TYPE_NOT_ALLOWED` · 404 `DIRECTOR_TRAINING_NOT_FOUND` · 413 `DIRECTOR_TRAINING_CERTIFICATE_TOO_LARGE` · 502 `EXTERNAL_STORAGE_FAILED` |
+| DELETE | `/api/director-nominations/{id}/trainings/{trainingId}` | `ParishPriest` | — | 204 | 404 `DIRECTOR_TRAINING_NOT_FOUND` · 409 `DIRECTOR_TRAINING_ALREADY_RECORDED` |
+
+- Xem: cùng phạm vi với đề cử (ca trưởng — đề cử mình tạo; ca viên — đề cử của mình đã được duyệt). Sắp theo `startDate`.
+- **Cử đi học** (`POST`): đề cử phải `Approved` hoặc `Trained` (đã đạt lớp cơ bản, học tiếp lớp nâng cao) → `InTraining`.
+  Mỗi đề cử chỉ một khoá đang học (`InProgress`). `courseName`, `organizer` ≤ 200; `endDate` ≥ `startDate`. Báo ca viên
+  và người đề cử.
+- **Ghi kết quả**: chỉ khoá `InProgress`. `Passed` → đề cử `Trained`. `Failed` → đề cử về `Trained` nếu ca viên đã đạt
+  khoá khác hoặc đã được miễn, còn lại về `Approved` (cha xứ cử học lại hoặc huỷ). `note` ≤ 500. Báo ca viên và người đề cử.
+- **Chứng chỉ**: `.pdf`, `.jpg`, `.png` ≤ 20 MB, lưu private, đọc qua `certificateUrl`; upload lại thay file cũ. Được
+  upload cả khi khoá đang học hoặc đã có kết quả.
+- **Xoá**: chỉ khoá `InProgress` (nhập nhầm); đề cử về `Trained` hoặc `Approved` theo quy tắc như `Failed`. Khoá đã có
+  kết quả là lịch sử, không xoá.
 
 ## 5. Notifications — `api/notifications` · mọi role đã đăng nhập
 
