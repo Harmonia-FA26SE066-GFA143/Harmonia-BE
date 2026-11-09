@@ -1034,6 +1034,64 @@ Tên tiếng Việt cho các từ tiếng Anh của lịch phụng vụ. Mọi r
 - Ngày thường và Chúa nhật theo mẫu (thứ trong tuần, tuần thứ mấy của mùa) được dịch bằng quy tắc, không cần dòng
   trong bảng; thêm dòng cùng tên thì dòng của Admin được ưu tiên.
 
+## 4i. Director nominations — `api/director-nominations` · đề cử: `ParishPriest`, `ChoirDirector` · duyệt: `ParishPriest` · bổ nhiệm: `Admin` · xem: mọi role (UC-46)
+
+Quy trình: `docs/harmonia-director-nomination-process.md`. Trạng thái `status`: `Pending` → `Approved` →
+(`InTraining` → ) `Trained` → `Appointed`; nhánh phụ `Rejected`, `Cancelled`. `InTraining` dành cho phần đào tạo,
+chưa có endpoint.
+
+### `DirectorNominationDto` / `DirectorNominationDetailDto`
+
+```json
+{
+  "id": "guid", "memberId": "guid", "memberUserId": "guid", "memberFullName": "Nguyễn Văn A",
+  "nominatedById": "guid", "nominatedByFullName": "Trần Thị B", "reason": "Bắt nhịp tốt, gắn bó lâu năm",
+  "proposedChoirId": "guid", "proposedChoirName": "Cecilia", "status": "Approved",
+  "reviewedById": "guid", "reviewedAt": "2026-11-09T08:00:00Z", "reviewNote": null, "trainingWaiverReason": null,
+  "appointedChoirId": null, "appointedChoirName": null, "appointedAt": null, "createdAt": "2026-11-08T08:00:00Z",
+  "stats": {
+    "firstJoinedDate": "2023-05-01", "tenureMonths": 42, "minTenureMonths": 24, "meetsTenure": true,
+    "attendanceRecorded": 40, "attendancePresent": 35, "attendancePercent": 87, "minAttendancePercent": 80, "meetsAttendance": true,
+    "servedEventCount": 31, "minServedEvents": 20, "meetsServedEvents": true,
+    "hasConductingSkill": true, "isConductingSkillRequired": true, "meetsConductingSkill": true, "meetsAll": true
+  }
+}
+```
+
+`stats` chỉ có ở `DetailDto` (chi tiết và kết quả mọi thao tác ghi), tính lúc đọc. `GET eligibility` trả riêng `stats`.
+
+| Method | Route | Quyền | Body / Query | Thành công | Lỗi |
+|---|---|---|---|---|---|
+| GET | `/api/director-nominations/eligibility` | `ParishPriest`, `ChoirDirector` | query `memberId` | 200 `DirectorNominationStatsDto` | 404 `MEMBER_NOT_FOUND` · 409 `MEMBER_NOT_ACTIVE` |
+| POST | `/api/director-nominations` | `ParishPriest`, `ChoirDirector` | `{ "memberId", "reason", "proposedChoirId?" }` | 200 `DirectorNominationDetailDto` | 400 `VALIDATION_FAILED` · 404 `MEMBER_NOT_FOUND`, `CHOIR_NOT_FOUND` · 409 `MEMBER_NOT_ACTIVE`, `DIRECTOR_NOMINATION_ALREADY_OPEN` |
+| GET | `/api/director-nominations` | mọi role | query `status?`, `pageNumber`, `pageSize` | 200 `PagedList<DirectorNominationDto>` | — |
+| GET | `/api/director-nominations/{id}` | mọi role | — | 200 `DirectorNominationDetailDto` | 404 `DIRECTOR_NOMINATION_NOT_FOUND` |
+| POST | `/api/director-nominations/{id}/withdraw` | người tạo | — | 200 `DirectorNominationDetailDto` | 403 `FORBIDDEN` · 404 `DIRECTOR_NOMINATION_NOT_FOUND` · 409 `DIRECTOR_NOMINATION_INVALID_STATUS` |
+| POST | `/api/director-nominations/{id}/approve` | `ParishPriest` | — | 200 `DirectorNominationDetailDto` | 404 `DIRECTOR_NOMINATION_NOT_FOUND` · 409 `DIRECTOR_NOMINATION_INVALID_STATUS` |
+| POST | `/api/director-nominations/{id}/reject` | `ParishPriest` | `{ "note" }` | 200 `DirectorNominationDetailDto` | 400 `DIRECTOR_NOMINATION_NOTE_REQUIRED` · 404 `DIRECTOR_NOMINATION_NOT_FOUND` · 409 `DIRECTOR_NOMINATION_INVALID_STATUS` |
+| POST | `/api/director-nominations/{id}/cancel` | `ParishPriest` | `{ "note" }` | 200 `DirectorNominationDetailDto` | như `reject` |
+| POST | `/api/director-nominations/{id}/waive-training` | `ParishPriest` | `{ "note" }` | 200 `DirectorNominationDetailDto` | như `reject` |
+| POST | `/api/director-nominations/{id}/appoint` | `Admin` | `{ "choirId" }` | 200 `DirectorNominationDetailDto` | 404 `DIRECTOR_NOMINATION_NOT_FOUND`, `CHOIR_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `DIRECTOR_NOMINATION_INVALID_STATUS`, `CHOIR_INACTIVE` + lỗi của `PUT /api/users/{id}/role` |
+
+- **Ai thấy gì**: `Admin`, `ParishPriest` thấy mọi đề cử; `ChoirDirector` chỉ đề cử mình tạo; `ChoirMember` chỉ đề
+  cử của chính mình **đã từng được cha xứ duyệt** (không thấy khi đang chờ, bị từ chối hoặc bị rút trước khi duyệt).
+  Ngoài phạm vi → 404.
+- **Tạo**: ca trưởng chỉ đề cử ca viên đang ở một ca đoàn mình phụ trách (khác → 404 `MEMBER_NOT_FOUND`); cha xứ đề
+  cử ca viên bất kỳ. Ca viên phải `Active` và tài khoản đang hoạt động. Mỗi ca viên chỉ một đề cử đang mở (`Pending`,
+  `Approved`, `InTraining`, `Trained`). `reason` ≤ 1000. Ca trưởng tạo → báo mọi cha xứ.
+- **Thành tích** (`stats`) chỉ để cảnh báo, không chặn. Ngưỡng ở `SystemSetting` nhóm "Đề cử ca trưởng":
+  `Nomination.MinTenureMonths` (24), `Nomination.MinAttendancePercent` (80), `Nomination.MinServedEvents` (20),
+  `Nomination.RequireConductingSkill` (true). Thâm niên tính từ `joinedDate` sớm nhất trong mọi ca đoàn (kể cả đã rời);
+  đi tập = Present + Late trên số lần điểm danh trong 12 tháng; số lễ = lễ đã qua, không huỷ, ca viên có dòng phân
+  công còn hiệu lực trong bảng đã chốt.
+- **withdraw**: chỉ người tạo, chỉ khi `Pending` → `Cancelled`. Cha xứ bấm rút đề cử của ca trưởng → 403 (dùng `reject`).
+- **approve** / **reject** (`Pending`): báo người tạo; duyệt còn báo ca viên. **cancel** (`Approved` → `Cancelled`): báo
+  người tạo và ca viên. **waive-training** (`Approved` → `Trained`): lưu lý do vào `trainingWaiverReason`. `note` ≤ 500.
+- **appoint** (`Trained` → `Appointed`): đổi role ca viên sang `ChoirDirector` (như `PUT /api/users/{id}/role`: thu hồi
+  phiên đăng nhập, rời mọi ca đoàn với tư cách ca viên) rồi gán làm ca trưởng `choirId` (thay ca trưởng hiện tại nếu có).
+  Ca đoàn phải đang hoạt động. Hai bước lưu riêng: nếu bước gán ca đoàn lỗi, tài khoản đã là ca trưởng nhưng chưa có
+  ca đoàn — Admin gán ở `PUT /api/choirs/{id}`. Báo ca viên và người tạo.
+
 ## 5. Notifications — `api/notifications` · mọi role đã đăng nhập
 
 Chỉ thao tác trên thông báo **của chính người gọi**.

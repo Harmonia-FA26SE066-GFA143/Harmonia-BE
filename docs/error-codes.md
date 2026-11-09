@@ -353,6 +353,15 @@ lọc theo cặp `(NotificationId, UserId)` nên "không tồn tại" và "của
 | `MASS_SCHEDULE_NOT_FOUND` | 404 | Không tìm thấy giờ lễ cố định |
 | `MASS_SCHEDULE_SLOT_TAKEN` | 409 | Đã có giờ lễ cố định khác vào thứ, giờ và nơi cử hành này |
 
+## 17. Đề cử ca trưởng
+
+| Mã | HTTP | Tiếng Việt |
+|---|---|---|
+| `DIRECTOR_NOMINATION_NOT_FOUND` | 404 | Không tìm thấy đề cử |
+| `DIRECTOR_NOMINATION_ALREADY_OPEN` | 409 | Ca viên này đang có một đề cử chưa xử lý xong |
+| `DIRECTOR_NOMINATION_INVALID_STATUS` | 409 | Không thực hiện được thao tác này ở trạng thái hiện tại của đề cử |
+| `DIRECTOR_NOMINATION_NOTE_REQUIRED` | 400 | Vui lòng nhập lý do |
+
 ---
 
 ## Quy ước chọn HTTP status

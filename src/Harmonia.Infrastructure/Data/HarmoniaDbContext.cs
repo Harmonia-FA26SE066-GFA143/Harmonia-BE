@@ -119,6 +119,8 @@ public class HarmoniaDbContext(DbContextOptions<HarmoniaDbContext> options) : Db
 
     public DbSet<MemberRegistration> MemberRegistrations => Set<MemberRegistration>();
 
+    public DbSet<DirectorNomination> DirectorNominations => Set<DirectorNomination>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());

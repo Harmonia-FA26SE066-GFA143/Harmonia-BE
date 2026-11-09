@@ -135,6 +135,7 @@ public static class DependencyInjection
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<IEventParticipationRepository, EventParticipationRepository>();
         services.AddScoped<IMemberRegistrationRepository, MemberRegistrationRepository>();
+        services.AddScoped<IDirectorNominationRepository, DirectorNominationRepository>();
 
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IPasswordHasherService, PasswordHasherService>();

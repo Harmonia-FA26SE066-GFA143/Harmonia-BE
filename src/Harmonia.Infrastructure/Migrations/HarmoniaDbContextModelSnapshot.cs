@@ -165,6 +165,76 @@ namespace Harmonia.Infrastructure.Migrations
                     b.ToTable("ChoirMemberships");
                 });
 
+            modelBuilder.Entity("Harmonia.Domain.Entities.DirectorNomination", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("AppointedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("AppointedChoirId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("NominatedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ProposedChoirId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("ReviewNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ReviewedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TrainingWaiverReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppointedChoirId");
+
+                    b.HasIndex("NominatedById");
+
+                    b.HasIndex("ProposedChoirId");
+
+                    b.HasIndex("ReviewedById");
+
+                    b.HasIndex("MemberId", "Status");
+
+                    b.ToTable("DirectorNominations");
+                });
+
             modelBuilder.Entity("Harmonia.Domain.Entities.DirectorNote", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2074,6 +2144,46 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Navigation("Member");
                 });
 
+            modelBuilder.Entity("Harmonia.Domain.Entities.DirectorNomination", b =>
+                {
+                    b.HasOne("Harmonia.Domain.Entities.Choir", "AppointedChoir")
+                        .WithMany()
+                        .HasForeignKey("AppointedChoirId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Harmonia.Domain.Entities.MemberProfile", "Member")
+                        .WithMany("DirectorNominations")
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Harmonia.Domain.Entities.User", "NominatedBy")
+                        .WithMany()
+                        .HasForeignKey("NominatedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Harmonia.Domain.Entities.Choir", "ProposedChoir")
+                        .WithMany()
+                        .HasForeignKey("ProposedChoirId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Harmonia.Domain.Entities.User", "ReviewedBy")
+                        .WithMany()
+                        .HasForeignKey("ReviewedById")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("AppointedChoir");
+
+                    b.Navigation("Member");
+
+                    b.Navigation("NominatedBy");
+
+                    b.Navigation("ProposedChoir");
+
+                    b.Navigation("ReviewedBy");
+                });
+
             modelBuilder.Entity("Harmonia.Domain.Entities.DirectorNote", b =>
                 {
                     b.HasOne("Harmonia.Domain.Entities.LiturgicalEvent", "LiturgicalEvent")
@@ -2874,6 +2984,8 @@ namespace Harmonia.Infrastructure.Migrations
             modelBuilder.Entity("Harmonia.Domain.Entities.MemberProfile", b =>
                 {
                     b.Navigation("ChoirMemberships");
+
+                    b.Navigation("DirectorNominations");
 
                     b.Navigation("EventParticipations");
 

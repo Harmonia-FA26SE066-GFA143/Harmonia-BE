@@ -23,6 +23,7 @@
 | cha xứ duyệt danh sách | `SongListReview` |
 | yêu cầu nhân sự cho bài | `SongPersonnelRequirement` |
 | phân công phục vụ | `ServiceRoster` (cả bảng) · `RosterAssignment` (một dòng phân công) |
+| đề cử ca trưởng | `DirectorNomination` |
 | xác nhận tham gia | `EventParticipation` |
 | buổi tập | `Rehearsal` |
 | điểm danh | `RehearsalAttendance` |
@@ -39,7 +40,7 @@
 `LiturgicalEvent` là entity trung tâm — lịch tập, danh sách bài hát, phân công phục vụ
 và xác nhận tham gia đều móc vào nó. Ba hub còn lại: `MemberProfile`, `Song`, `Skill`.
 
-Nguồn chuẩn đầy đủ 52 entity + 24 enum: `docs/harmonia-domain-entity-list.md`.
+Nguồn chuẩn đầy đủ 53 entity + 25 enum: `docs/harmonia-domain-entity-list.md`.
 Bảng trên chỉ là lối vào nhanh. Gặp thuật ngữ chưa có ở cả hai chỗ: hỏi, đừng tự dịch.
 
 ## Quy ước tên khác

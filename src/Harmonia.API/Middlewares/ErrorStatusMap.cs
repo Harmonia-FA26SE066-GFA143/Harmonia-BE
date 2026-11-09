@@ -232,6 +232,12 @@ public static class ErrorStatusMap
         // 16. Mass schedule.
         [ErrorCodes.MassScheduleNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.MassScheduleSlotTaken] = StatusCodes.Status409Conflict,
+
+        // 17. Director nomination.
+        [ErrorCodes.DirectorNominationNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.DirectorNominationAlreadyOpen] = StatusCodes.Status409Conflict,
+        [ErrorCodes.DirectorNominationInvalidStatus] = StatusCodes.Status409Conflict,
+        [ErrorCodes.DirectorNominationNoteRequired] = StatusCodes.Status400BadRequest,
     };
 
     public static int StatusFor(string code, int fallback) => StatusByCode.GetValueOrDefault(code, fallback);

@@ -1,6 +1,6 @@
 # Harmonia – Domain Entity List & Attributes (for ERD, Report 3/4)
 
-52 entities derived from FE-01→FE-54 (`claude/functional-requirements-by-actor.md`), the canonical use cases (`claude/use-case-list.md`) and the daily liturgical program model (D6). Diagram: `harmonia-erd.mmd`.
+53 entities derived from FE-01→FE-54 (`claude/functional-requirements-by-actor.md`), the canonical use cases (`claude/use-case-list.md`) and the daily liturgical program model (D6). Diagram: `harmonia-erd.mmd`.
 
 Conceptual/logical level: attribute names, types and constraints. No indexes, no migration syntax.
 
@@ -55,6 +55,9 @@ Written once here instead of repeated 47 times:
 
 **52. `MemberRegistration`** — request to join sent from the public home page without signing in; deleted once the Admin creates the account or rejects it ***auditable***
 `fullName` string(100) · `email` string(256) (indexed, not unique) · `phone` string(20)? · `note` string(500)?
+
+**53. `DirectorNomination`** — a member put forward to become a Choir Director: nominated by a Choir Director or the Parish Priest, decided by the Parish Priest, appointed by the Admin (UC-46) ***auditable***
+`memberId` Guid → MemberProfile · `nominatedById` Guid → User · `reason` string(1000) · `proposedChoirId` Guid? → Choir · `status` DirectorNominationStatus · `reviewedById` Guid? → User · `reviewedAt` DateTime? · `reviewNote` string(500)? · `trainingWaiverReason` string(500)? · `appointedChoirId` Guid? → Choir · `appointedAt` DateTime? · index `(memberId, status)` · every FK restrict
 
 ⚪ `MemberProfile`: merge into `User` unless member records without a login are needed.
 
@@ -221,6 +224,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 | Enum | Values |
 |---|---|
 | `MemberStatus` | Active, Inactive, Left |
+| `DirectorNominationStatus` | Pending, Approved, InTraining, Trained, Appointed, Rejected, Cancelled |
 | `DevicePlatform` | Android, iOS, Web |
 | `SkillLevel` | Beginner, Intermediate, Advanced |
 | `ApprovalStatus` | Pending, Approved, Rejected |
@@ -245,7 +249,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 | `ReportPeriod` | Week, Month, Year |
 | `LiturgicalNameKind` | Celebration, Rank, Season |
 
-24 enums. `PracticeFeedback.result` reuses `SubmissionStatus` rather than adding a near-duplicate enum.
+25 enums. `PracticeFeedback.result` reuses `SubmissionStatus` rather than adding a near-duplicate enum.
 
 ---
 
@@ -340,6 +344,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 - 2026-11-07: Web B47 — `MaterialType.InteractiveScore` (MusicXML/MXL, appended last, stored as int) and `MusicMaterial` gains `scoreRevision`, `scoreSha256`, `playbackAudioSha256`: the score and the WAV rendered from it form one revision. Count stays 51. Needs migration `AddInteractiveScore`.
 - 2026-11-07: `DirectorNote` gains `readAt` — the same table now also carries chat messages Parish Priest ↔ Choir Director (no `noteDate`/`eventId`), pushed over `NotificationHub`. Count stays 51. Needs a migration.
 - 2026-11-09: `MemberRegistration` added — join request from the public home page, step 1 of the member → director process (`docs/harmonia-director-nomination-process.md`) (51 → 52). `NotificationType.MemberRegistrationSubmitted` appended last. Needs a migration.
+- 2026-11-09: `DirectorNomination` + enum `DirectorNominationStatus` added — UC-46, member → Choir Director nomination (52 → 53 entities, 24 → 25 enums). `NotificationType.DirectorNomination` appended last. Needs a migration.
 
 **Bổ sung 2026-10-26 — phân công 3 tầng**
 

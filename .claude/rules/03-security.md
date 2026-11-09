@@ -96,6 +96,9 @@
   do `SystemSettingKeys` trong code quyết định, không phải dữ liệu trong bảng (chốt 2026-10-11).
   Người chưa đăng nhập chỉ đọc được key có `IsAnonymous` (tên giáo xứ, tên ca đoàn, email liên hệ) — không đặt
   `IsAnonymous` cho key chứa thông tin nội bộ như thông báo hệ thống (chốt 2026-10-25).
+- Đề cử ca trưởng (`DirectorNomination`, chốt 2026-11-09): `ChoirDirector` đề cử ca viên ở ca đoàn mình phụ trách
+  (khác → 404), `ParishPriest` đề cử ca viên bất kỳ; chỉ `ParishPriest` duyệt / từ chối / huỷ / miễn đào tạo; chỉ
+  `Admin` bổ nhiệm. Ca trưởng chỉ xem đề cử mình tạo, ca viên chỉ xem đề cử của mình đã được duyệt; ngoài phạm vi → 404.
 - Chỉ `Admin` tạo / sửa `Choir` và gán ca trưởng. `ChoirDirector` chỉ xem và quản lý ca viên của ca đoàn có
   `DirectorId` là mình; ca đoàn của ca trưởng khác trả **404** `CHOIR_NOT_FOUND` (D8, chốt 2026-10-25).
   Ca trưởng **quản lý** ca viên đang ở ca đoàn của mình hoặc chưa ở ca đoàn nào

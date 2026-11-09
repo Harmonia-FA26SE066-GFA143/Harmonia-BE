@@ -12,10 +12,10 @@ Bản đề xuất ngày 2026-11-09, chưa triển khai. Phần **Còn phải ch
 | 4 | Thêm vào ca đoàn (một người có thể ở nhiều ca đoàn) | Ca trưởng của ca đoàn đó | Đã có |
 | 5 | Khai báo kỹ năng, nộp minh chứng → ca trưởng duyệt | Ca viên, ca trưởng | Đã có |
 | 6 | Đi tập, làm bài tập, phục vụ lễ: tích lũy thành tích | Ca viên | Đã có |
-| 7 | **Tạo đề cử**, kèm bảng thành tích và cảnh báo nếu chưa đủ ngưỡng | Ca trưởng (ca viên của ca đoàn mình) hoặc cha xứ (ca viên bất kỳ) | Mới |
-| 8 | **Duyệt hoặc từ chối** | Cha xứ | Mới |
-| 9 | **Cử đi học** lớp ca trưởng, ghi kết quả; được học nhiều lần hoặc được miễn (bắt buộc ghi lý do) | Cha xứ | Mới |
-| 10 | **Bổ nhiệm**: chọn ca đoàn (theo gợi ý, ca đoàn khác hoặc ca đoàn mới), đổi role, gán `Choir.DirectorId` | Admin | Mới |
+| 7 | **Tạo đề cử**, kèm bảng thành tích và cảnh báo nếu chưa đủ ngưỡng | Ca trưởng (ca viên của ca đoàn mình) hoặc cha xứ (ca viên bất kỳ) | Đã làm BE (UC-46), chờ migration |
+| 8 | **Duyệt hoặc từ chối** | Cha xứ | Đã làm BE (UC-46), chờ migration |
+| 9 | **Cử đi học** lớp ca trưởng, ghi kết quả; được học nhiều lần hoặc được miễn (bắt buộc ghi lý do) | Cha xứ | Mới — miễn đào tạo đã làm, cử đi học chưa làm |
+| 10 | **Bổ nhiệm**: chọn ca đoàn (theo gợi ý, ca đoàn khác hoặc ca đoàn mới), đổi role, gán `Choir.DirectorId` | Admin | Đã làm BE (UC-46), chờ migration |
 | 11 | **Bàn giao tự động** (xem bên dưới) | Hệ thống | Mới |
 
 Đơn offline (điền giấy tại giáo xứ) được chuyển cho Admin. Admin tạo tài khoản trực tiếp như hiện nay, không cần qua bước 1. Ca trưởng của ca đoàn mà người đăng ký đã chọn được báo khi Admin duyệt, để thêm người đó vào ca đoàn ở bước 4.

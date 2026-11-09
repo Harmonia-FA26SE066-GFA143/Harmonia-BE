@@ -1,6 +1,6 @@
 # Từ điển nghiệp vụ — dùng đúng tên, không tự đặt từ đồng nghĩa
 
-Nguồn chuẩn: `docs/harmonia-domain-entity-list.md` (52 entity, 24 enum).
+Nguồn chuẩn: `docs/harmonia-domain-entity-list.md` (53 entity, 25 enum).
 Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 
 | Tiếng Việt | Tên trong code |
@@ -37,6 +37,7 @@ Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 | bài trong danh sách | `SongListItem` |
 | vị trí phụng vụ | `LiturgicalSlot` — Nhập lễ, Đáp ca, Dâng lễ, Hiệp lễ, Kết lễ |
 | quyết định duyệt | `SongListReview` |
+| đề cử ca trưởng | `DirectorNomination` + enum `DirectorNominationStatus` |
 | xác nhận tham gia | `EventParticipation` — KHÔNG dùng `ParticipationConfirmation` |
 | yêu cầu nhân sự cho bài | `SongPersonnelRequirement` |
 | yêu cầu nhân sự cả buổi lễ (organ, bắt nhịp) | `EventPersonnelRequirement` |

@@ -13,9 +13,20 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
 
 ## 2026-11-09
 
-Đăng ký gia nhập online từ trang chủ (UC-45). Cần migration tạo bảng `MemberRegistrations` trước khi deploy.
+Đăng ký gia nhập online từ trang chủ (UC-45) và đề cử ca trưởng (UC-46). Cần migration tạo bảng `MemberRegistrations`
+và `DirectorNominations` trước khi deploy.
 
-### Không phá vỡ
+### Không phá vỡ — đề cử ca trưởng (UC-46)
+
+- Nhóm endpoint mới `api/director-nominations` (`api.md` mục 4i): `GET eligibility`, `POST`, `GET`, `GET {id}`, và
+  `POST {id}/withdraw | approve | reject | cancel | waive-training | appoint`. Trả `DirectorNominationDto` /
+  `DirectorNominationDetailDto` (có `stats`).
+- Mã mới `DIRECTOR_NOMINATION_NOT_FOUND` (404), `DIRECTOR_NOMINATION_ALREADY_OPEN` (409),
+  `DIRECTOR_NOMINATION_INVALID_STATUS` (409), `DIRECTOR_NOMINATION_NOTE_REQUIRED` (400).
+- `NotificationType` thêm `DirectorNomination` (số 12), `referenceType = "DirectorNomination"`.
+- `SystemSetting` thêm 4 key nhóm "Đề cử ca trưởng" (`Nomination.*`), tự thêm vào DB lúc khởi động.
+
+### Không phá vỡ — đăng ký gia nhập (UC-45)
 
 - Endpoint mới `POST api/member-registrations` · **anonymous** — form trang chủ `{ fullName, email, phone?, note? }`,
   luôn 204; tối đa 5 lần / 10 phút / IP, quá thì 429 `RATE_LIMIT_EXCEEDED` (mã mới).
