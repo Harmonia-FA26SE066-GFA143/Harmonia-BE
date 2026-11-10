@@ -14,6 +14,8 @@ public class MemberRegistration : BaseAuditableEntity
 
     public string? Phone { get; set; }
 
+    public string? SaintName { get; set; }
+
     /// <summary>Free text from the applicant, such as the choir they would like to join.</summary>
     public string? Note { get; set; }
 }

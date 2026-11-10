@@ -11,6 +11,8 @@ public class User : BaseAuditableEntity
 
     public string? Phone { get; set; }
 
+    public string? SaintName { get; set; }
+
     public string PasswordHash { get; set; } = string.Empty;
 
     public Guid RoleId { get; set; }

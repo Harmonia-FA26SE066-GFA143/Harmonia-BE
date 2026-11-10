@@ -7,5 +7,7 @@ public class UpdateMyMemberProfileRequest
 
     public string? Phone { get; set; }
 
+    public string? SaintName { get; set; }
+
     public DateOnly? DateOfBirth { get; set; }
 }

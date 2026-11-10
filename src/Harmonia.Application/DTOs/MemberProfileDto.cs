@@ -12,6 +12,8 @@ public class MemberProfileDto
 
     public string? Phone { get; set; }
 
+    public string? SaintName { get; set; }
+
     public DateOnly? DateOfBirth { get; set; }
 
     public DateOnly JoinedDate { get; set; }

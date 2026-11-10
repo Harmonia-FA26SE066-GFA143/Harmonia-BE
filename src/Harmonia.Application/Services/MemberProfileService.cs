@@ -74,6 +74,7 @@ public class MemberProfileService(
 
         profile.User.FullName = request.FullName.Trim();
         profile.User.Phone = NormalizePhone(request.Phone);
+        profile.User.SaintName = TrimToNull(request.SaintName);
         profile.DateOfBirth = request.DateOfBirth;
         await memberProfileRepository.SaveChangesAsync(cancellationToken);
 
@@ -120,6 +121,7 @@ public class MemberProfileService(
         }
 
         profile.User.Phone = NormalizePhone(request.Phone);
+        profile.User.SaintName = TrimToNull(request.SaintName);
         profile.DateOfBirth = request.DateOfBirth;
         profile.JoinedDate = request.JoinedDate;
         profile.Status = request.Status;
@@ -129,4 +131,6 @@ public class MemberProfileService(
     }
 
     private static string? NormalizePhone(string? phone) => string.IsNullOrWhiteSpace(phone) ? null : phone.Trim();
+
+    private static string? TrimToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

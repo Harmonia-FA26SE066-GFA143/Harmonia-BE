@@ -33,7 +33,7 @@ Written once here instead of repeated 47 times:
 ## A. Identity & Access
 
 **1. `User`** — login account, exactly one role (D2) ***auditable***
-`email` string(256) unique · `fullName` string(100) · `phone` string(20)? · `passwordHash` string · `roleId` Guid → Role · `isActive` bool = true · `isPasswordChangeRequired` bool = false · `lastLoginAt` DateTime? · `avatarUrl` string(500)? · `avatarPublicId` string(255)?
+`email` string(256) unique · `fullName` string(100) · `phone` string(20)? · `saintName` string(50)? · `passwordHash` string · `roleId` Guid → Role · `isActive` bool = true · `isPasswordChangeRequired` bool = false · `lastLoginAt` DateTime? · `avatarUrl` string(500)? · `avatarPublicId` string(255)?
 
 **2. `Role`** — 4 seeded roles: Admin, ParishPriest, ChoirDirector, ChoirMember (D1)
 `name` string(50) unique · `description` string(300)?
@@ -54,7 +54,7 @@ Written once here instead of repeated 47 times:
 `memberId` Guid → MemberProfile · `choirId` Guid → Choir · `joinedDate` DateOnly · `isActive` bool (false = left the choir) · unique `(memberId, choirId)`
 
 **52. `MemberRegistration`** — request to join sent from the public home page without signing in; deleted once the Admin creates the account or rejects it ***auditable***
-`fullName` string(100) · `email` string(256) (indexed, not unique) · `phone` string(20)? · `note` string(500)?
+`fullName` string(100) · `email` string(256) (indexed, not unique) · `phone` string(20)? · `saintName` string(50)? · `note` string(500)?
 
 **53. `DirectorNomination`** — a member put forward to become a Choir Director: nominated by a Choir Director or the Parish Priest, decided by the Parish Priest, appointed by the Admin (UC-46) ***auditable***
 `memberId` Guid → MemberProfile · `nominatedById` Guid → User · `reason` string(1000) · `proposedChoirId` Guid? → Choir · `status` DirectorNominationStatus · `reviewedById` Guid? → User · `reviewedAt` DateTime? · `reviewNote` string(500)? · `trainingWaiverReason` string(500)? · `appointedChoirId` Guid? → Choir · `appointedAt` DateTime? · index `(memberId, status)` · every FK restrict
@@ -356,6 +356,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 - 2026-11-09: `DirectorNomination` + enum `DirectorNominationStatus` added — UC-46, member → Choir Director nomination (52 → 53 entities, 24 → 25 enums). `NotificationType.DirectorNomination` appended last. Needs a migration.
 - 2026-11-09: `DirectorTraining` + enum `DirectorTrainingResult` added — step 9, courses of a nomination with a private certificate (53 → 54 entities, 25 → 26 enums). Needs migration `AddDirectorTraining`.
 - 2026-11-10: Web karaoke + score timeline — `TimedLyrics` + enum `TimedLyricsGranularity` added (54 → 55 entities, 26 → 27 enums), lines kept as a JSON column; `MusicMaterial` gains `fileRevision`, `audioDurationSeconds`, `playbackNotesSha256`. Needs a migration.
+- 2026-11-10: `User` and `MemberRegistration` gain `saintName` string(50)? (Catholic baptismal name, e.g. "Giuse"); copied to `User` when the Admin accepts a registration. Count unchanged. Needs a migration.
 
 **Bổ sung 2026-10-26 — phân công 3 tầng**
 

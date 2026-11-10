@@ -63,6 +63,7 @@ public class UserService(
 			Email = request.Email,
 			FullName = request.FullName?.Trim() ?? string.Empty,
 			Phone = NormalizePhone(request.Phone),
+			SaintName = TrimToNull(request.SaintName),
 			RoleId = role.Id,
 			IsActive = true,
 			IsPasswordChangeRequired = true,
@@ -99,6 +100,7 @@ public class UserService(
 		user.Email = request.Email;
 		user.FullName = request.FullName?.Trim() ?? string.Empty;
 		user.Phone = NormalizePhone(request.Phone);
+		user.SaintName = TrimToNull(request.SaintName);
 		await userRepository.SaveChangesAsync(ct);
 		return Result<UserDto>.Success(mapper.Map<UserDto>(user));
 	}
@@ -112,6 +114,7 @@ public class UserService(
 
 		user.FullName = request.FullName?.Trim() ?? string.Empty;
 		user.Phone = NormalizePhone(request.Phone);
+		user.SaintName = TrimToNull(request.SaintName);
 		await userRepository.SaveChangesAsync(ct);
 		return Result<UserDto>.Success(mapper.Map<UserDto>(user));
 	}
@@ -300,6 +303,8 @@ public class UserService(
 	}
 
 	private static string? NormalizePhone(string? phone) => string.IsNullOrWhiteSpace(phone) ? null : phone.Trim();
+
+	private static string? TrimToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
 	private static MemberProfile NewMemberProfile(Guid userId) => new()
 	{

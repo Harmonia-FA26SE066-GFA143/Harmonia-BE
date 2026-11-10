@@ -13,7 +13,8 @@ public class MemberProfileProfile : Profile
             .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.User.Email))
             .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => src.User.FullName))
             .ForMember(dest => dest.AvatarUrl, opt => opt.MapFrom(src => src.User.AvatarUrl))
-            .ForMember(dest => dest.Phone, opt => opt.MapFrom(src => src.User.Phone));
+            .ForMember(dest => dest.Phone, opt => opt.MapFrom(src => src.User.Phone))
+            .ForMember(dest => dest.SaintName, opt => opt.MapFrom(src => src.User.SaintName));
 
         // MemberSkills must hold only the approved, active skills (see IMemberProfileRepository.SearchAsync).
         CreateMap<MemberProfile, MemberProfileSummaryDto>()
@@ -21,6 +22,7 @@ public class MemberProfileProfile : Profile
             .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => src.User.FullName))
             .ForMember(dest => dest.AvatarUrl, opt => opt.MapFrom(src => src.User.AvatarUrl))
             .ForMember(dest => dest.Phone, opt => opt.MapFrom(src => src.User.Phone))
+            .ForMember(dest => dest.SaintName, opt => opt.MapFrom(src => src.User.SaintName))
             .ForMember(dest => dest.RoleName, opt => opt.MapFrom(src => src.User.Role.Name))
             .ForMember(dest => dest.ApprovedSkills, opt => opt.MapFrom(src => src.MemberSkills));
 
@@ -30,6 +32,7 @@ public class MemberProfileProfile : Profile
             .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => src.User.FullName))
             .ForMember(dest => dest.AvatarUrl, opt => opt.MapFrom(src => src.User.AvatarUrl))
             .ForMember(dest => dest.Phone, opt => opt.MapFrom(src => src.User.Phone))
+            .ForMember(dest => dest.SaintName, opt => opt.MapFrom(src => src.User.SaintName))
             .ForMember(dest => dest.RoleName, opt => opt.MapFrom(src => src.User.Role.Name))
             .ForMember(dest => dest.ApprovedSkills, opt => opt.MapFrom(src => src.MemberSkills));
 

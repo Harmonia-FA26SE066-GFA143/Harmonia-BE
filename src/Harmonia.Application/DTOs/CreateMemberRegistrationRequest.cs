@@ -9,5 +9,7 @@ public class CreateMemberRegistrationRequest
 
     public string? Phone { get; set; }
 
+    public string? SaintName { get; set; }
+
     public string? Note { get; set; }
 }
