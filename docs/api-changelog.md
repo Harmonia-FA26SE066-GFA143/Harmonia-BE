@@ -16,6 +16,14 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
 Đăng ký gia nhập online từ trang chủ (UC-45) và đề cử ca trưởng (UC-46). Cần migration tạo bảng `MemberRegistrations`
 và `DirectorNominations` trước khi deploy.
 
+### [Phá vỡ] Bàn giao ca trưởng (bước 11 quy trình)
+
+- `PUT api/users/{id}/role` (đổi khỏi `ChoirDirector`) và `PATCH api/users/{id}/deactivate` trả thêm 409
+  `USER_STILL_DIRECTING` (mã mới) khi người đó còn phụ trách ca đoàn hoặc là ca trưởng thay thế ở sự kiện sắp tới.
+  Trước đây hai thao tác này luôn thành công. Web hiển thị câu của mã và hướng Admin gán ca trưởng khác trước.
+- `NotificationType` thêm `ChoirChanged` (số 13), `referenceType = "Choir"`: báo ca trưởng khi ca viên rời ca đoàn vì
+  đổi role, và báo ca trưởng cũ / mới khi `PUT api/choirs/{id}` đổi `directorId`.
+
 ### Không phá vỡ — đề cử ca trưởng (UC-46)
 
 - Nhóm endpoint mới `api/director-nominations` (`api.md` mục 4i): `GET eligibility`, `POST`, `GET`, `GET {id}`, và

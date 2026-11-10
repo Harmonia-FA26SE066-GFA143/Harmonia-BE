@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using AutoMapper;
 using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
@@ -21,6 +22,9 @@ public class UserServiceTests
     private readonly IEmailSender _email = Substitute.For<IEmailSender>();
     private readonly ICurrentUserService _currentUser = Substitute.For<ICurrentUserService>();
     private readonly IFileStorageService _storage = Substitute.For<IFileStorageService>();
+    private readonly IGenericRepository<Choir> _choirs = Substitute.For<IGenericRepository<Choir>>();
+    private readonly IGenericRepository<LiturgicalEventChoir> _eventChoirs = Substitute.For<IGenericRepository<LiturgicalEventChoir>>();
+    private readonly INotificationService _notifications = Substitute.For<INotificationService>();
     private readonly UserService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly List<User> _added = [];
@@ -33,7 +37,10 @@ public class UserServiceTests
     public UserServiceTests()
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<UserProfile>(), NullLoggerFactory.Instance).CreateMapper();
-        _sut = new UserService(_users, _memberProfiles, _hasher, _email, _currentUser, _storage, mapper);
+        _sut = new UserService(
+            _users, _memberProfiles, _hasher, _email, _currentUser, _storage, _choirs, _eventChoirs, _notifications, mapper);
+        _choirs.ListAsync(Arg.Any<Expression<Func<Choir, bool>>>(), _ct).Returns([]);
+        _eventChoirs.ListAsync(Arg.Any<Expression<Func<LiturgicalEventChoir, bool>>>(), _ct).Returns([]);
         _storage.UploadAsync(default!, default!, default!, default, default)
             .ReturnsForAnyArgs(Result<FileUploadResponse>.Success(new FileUploadResponse("harmonia/avatars/new.png", "https://cdn.test/new.png")));
         _storage.DeleteAsync(default!, default, default).ReturnsForAnyArgs(Result.Success());
@@ -592,5 +599,79 @@ public class UserServiceTests
 
         Assert.True(result.IsSuccess);
         await _users.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    // ---- Hand-over guards (step 11 of docs/harmonia-director-nomination-process.md) ----
+
+    [Fact]
+    public async Task AssignRole_DirectorStillLeadingAChoir_ReturnsStillDirecting_Async()
+    {
+        var user = Existing(_directorRole);
+        _choirs.ListAsync(Arg.Any<Expression<Func<Choir, bool>>>(), _ct)
+            .Returns([new Choir { Id = Guid.NewGuid(), DirectorId = user.Id }]);
+
+        var result = await _sut.AssignRoleAsync(user.Id, new AssignRoleRequest { RoleName = RoleNames.ChoirMember }, _ct);
+
+        Assert.Equal(ErrorCodes.UserStillDirecting, result.Code);
+        Assert.Equal(_directorRole.Id, user.RoleId);
+        await _users.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task AssignRole_DirectorStandingInAtUpcomingEvent_ReturnsStillDirecting_Async()
+    {
+        var user = Existing(_directorRole);
+        _eventChoirs.ListAsync(Arg.Any<Expression<Func<LiturgicalEventChoir, bool>>>(), _ct)
+            .Returns([new LiturgicalEventChoir { Id = Guid.NewGuid(), SubstituteDirectorId = user.Id }]);
+
+        var result = await _sut.AssignRoleAsync(user.Id, new AssignRoleRequest { RoleName = RoleNames.ChoirMember }, _ct);
+
+        Assert.Equal(ErrorCodes.UserStillDirecting, result.Code);
+    }
+
+    [Fact]
+    public async Task AssignRole_DirectorWithNothingToHandOver_Succeeds_Async()
+    {
+        var user = Existing(_directorRole);
+
+        var result = await _sut.AssignRoleAsync(user.Id, new AssignRoleRequest { RoleName = RoleNames.ChoirMember }, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(_memberRole.Id, user.RoleId);
+    }
+
+    [Fact]
+    public async Task Deactivate_DirectorStillLeadingAChoir_ReturnsStillDirecting_Async()
+    {
+        var user = Existing(_directorRole);
+        _choirs.ListAsync(Arg.Any<Expression<Func<Choir, bool>>>(), _ct)
+            .Returns([new Choir { Id = Guid.NewGuid(), DirectorId = user.Id }]);
+
+        var result = await _sut.DeactivateAsync(user.Id, _ct);
+
+        Assert.Equal(ErrorCodes.UserStillDirecting, result.Code);
+        Assert.True(user.IsActive);
+    }
+
+    [Fact]
+    public async Task AssignRole_MemberLeavingChoirs_NotifiesEachChoirsDirector_Async()
+    {
+        var user = Existing(_memberRole);
+        var choir = new Choir { Id = Guid.NewGuid(), Name = "Cecilia", DirectorId = Guid.NewGuid() };
+        var profile = new MemberProfile
+        {
+            Id = Guid.NewGuid(), UserId = user.Id, Status = MemberStatus.Active,
+            ChoirMemberships = [new ChoirMembership { Id = Guid.NewGuid(), ChoirId = choir.Id, IsActive = true }],
+        };
+        _memberProfiles.GetForRoleChangeAsync(user.Id, _ct).Returns(profile);
+        _choirs.ListAsync(Arg.Any<Expression<Func<Choir, bool>>>(), _ct).Returns([choir]);
+
+        var result = await _sut.AssignRoleAsync(user.Id, new AssignRoleRequest { RoleName = RoleNames.Admin }, _ct);
+
+        Assert.True(result.IsSuccess);
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(r => r.Type == NotificationType.ChoirChanged
+                && r.RecipientUserIds.SequenceEqual(new[] { choir.DirectorId!.Value }) && r.ReferenceId == choir.Id),
+            _ct);
     }
 }

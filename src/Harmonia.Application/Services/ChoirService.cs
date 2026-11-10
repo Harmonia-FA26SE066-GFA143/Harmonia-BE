@@ -81,10 +81,63 @@ public class ChoirService(
         choir.Name = name;
         choir.Description = TrimToNull(request.Description);
         choir.IsActive = request.IsActive;
+        var previousDirectorId = choir.DirectorId;
         choir.DirectorId = request.DirectorId;
+        if (request.DirectorId is { } newDirectorId && newDirectorId != previousDirectorId)
+        {
+            await DropOwnSubstituteRolesAsync(id, newDirectorId, cancellationToken);
+        }
+
         await choirRepository.SaveChangesAsync(cancellationToken);
 
+        if (previousDirectorId != request.DirectorId)
+        {
+            await NotifyDirectorChangeAsync(choir, previousDirectorId, request.DirectorId, cancellationToken);
+        }
+
         return Result<ChoirDto>.Success((await ToDtosAsync([choir], cancellationToken))[0]);
+    }
+
+    /// <summary>
+    /// The new director already holds every right on their own choir, and may not stand in for themselves, so their
+    /// substitute role on this choir's upcoming events goes. Saved with the caller's change.
+    /// </summary>
+    private async Task DropOwnSubstituteRolesAsync(Guid choirId, Guid directorId, CancellationToken cancellationToken)
+    {
+        var today = VietnamTime.Today;
+        var rows = await eventChoirRepository.ListAsync(
+            x => x.ChoirId == choirId && x.SubstituteDirectorId == directorId
+                && x.LiturgicalEvent.Status != EventStatus.Cancelled && x.LiturgicalEvent.EventDate >= today,
+            cancellationToken);
+        foreach (var row in rows)
+        {
+            var tracked = await eventChoirRepository.GetByIdAsync(row.Id, cancellationToken);
+            tracked!.SubstituteDirectorId = null;
+            tracked.Reason = null;
+        }
+    }
+
+    private async Task NotifyDirectorChangeAsync(
+        Choir choir, Guid? previousDirectorId, Guid? newDirectorId, CancellationToken cancellationToken)
+    {
+        // An Admin acting on their own account is impossible (only directors lead choirs), so nobody is skipped.
+        if (previousDirectorId is { } previousId)
+        {
+            await notificationService.SendAsync(
+                new SendNotificationRequest(
+                    NotificationType.ChoirChanged, "Thay đổi ca trưởng",
+                    $"Bạn không còn phụ trách ca đoàn {choir.Name}.", [previousId], nameof(Choir), choir.Id),
+                cancellationToken);
+        }
+
+        if (newDirectorId is { } newId)
+        {
+            await notificationService.SendAsync(
+                new SendNotificationRequest(
+                    NotificationType.ChoirChanged, "Thay đổi ca trưởng",
+                    $"Bạn được giao phụ trách ca đoàn {choir.Name}.", [newId], nameof(Choir), choir.Id),
+                cancellationToken);
+        }
     }
 
     public async Task<Result<List<ChoirMemberDto>>> GetMembersAsync(Guid choirId, CancellationToken cancellationToken)

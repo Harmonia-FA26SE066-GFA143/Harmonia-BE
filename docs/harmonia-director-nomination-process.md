@@ -16,7 +16,7 @@ Bản đề xuất ngày 2026-11-09, chưa triển khai. Phần **Còn phải ch
 | 8 | **Duyệt hoặc từ chối** | Cha xứ | Đã làm BE (UC-46), chờ migration |
 | 9 | **Cử đi học** lớp ca trưởng, ghi kết quả; được học nhiều lần hoặc được miễn (bắt buộc ghi lý do) | Cha xứ | Đã làm BE (UC-46), chờ migration |
 | 10 | **Bổ nhiệm**: chọn ca đoàn (theo gợi ý, ca đoàn khác hoặc ca đoàn mới), đổi role, gán `Choir.DirectorId` | Admin | Đã làm BE (UC-46), chờ migration |
-| 11 | **Bàn giao tự động** (xem bên dưới) | Hệ thống | Mới |
+| 11 | **Bàn giao tự động** (xem bên dưới) | Hệ thống | Đã làm BE |
 
 Đơn offline (điền giấy tại giáo xứ) được chuyển cho Admin. Admin tạo tài khoản trực tiếp như hiện nay, không cần qua bước 1. Ca trưởng của ca đoàn mà người đăng ký đã chọn được báo khi Admin duyệt, để thêm người đó vào ca đoàn ở bước 4.
 

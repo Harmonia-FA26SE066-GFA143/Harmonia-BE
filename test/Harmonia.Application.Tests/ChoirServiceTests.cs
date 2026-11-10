@@ -219,6 +219,51 @@ public class ChoirServiceTests
     }
 
     [Fact]
+    public async Task Update_ReplacingDirector_NotifiesOldAndNewDirector_Async()
+    {
+        var oldDirector = NewDirector("Anh Minh");
+        _choir.DirectorId = oldDirector.Id;
+        var newDirector = NewDirector("Chi Lan");
+
+        await _sut.UpdateAsync(
+            _choir.Id, new UpdateChoirRequest { Name = _choir.Name, IsActive = true, DirectorId = newDirector.Id }, _ct);
+
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(r => r.Type == NotificationType.ChoirChanged
+                && r.RecipientUserIds.SequenceEqual(new[] { oldDirector.Id })),
+            _ct);
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(r => r.Type == NotificationType.ChoirChanged
+                && r.RecipientUserIds.SequenceEqual(new[] { newDirector.Id })),
+            _ct);
+    }
+
+    [Fact]
+    public async Task Update_NewDirectorWasSubstituteForThisChoir_DropsUpcomingSubstituteRole_Async()
+    {
+        var newDirector = NewDirector("Chi Lan");
+        var upcoming = new LiturgicalEventChoir
+        {
+            Id = Guid.NewGuid(), ChoirId = _choir.Id, SubstituteDirectorId = newDirector.Id, Reason = "Sick",
+            LiturgicalEvent = new LiturgicalEvent { EventDate = VietnamTime.Today.AddDays(3), Status = EventStatus.Published },
+        };
+        var past = new LiturgicalEventChoir
+        {
+            Id = Guid.NewGuid(), ChoirId = _choir.Id, SubstituteDirectorId = newDirector.Id,
+            LiturgicalEvent = new LiturgicalEvent { EventDate = VietnamTime.Today.AddDays(-3), Status = EventStatus.Published },
+        };
+        _eventChoirRows.AddRange([upcoming, past]);
+
+        var result = await _sut.UpdateAsync(
+            _choir.Id, new UpdateChoirRequest { Name = _choir.Name, IsActive = true, DirectorId = newDirector.Id }, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(upcoming.SubstituteDirectorId);
+        Assert.Null(upcoming.Reason);
+        Assert.Equal(newDirector.Id, past.SubstituteDirectorId);
+    }
+
+    [Fact]
     public async Task Update_KeepingDeactivatedDirector_IsAllowed_Async()
     {
         var gone = NewDirector("Gone", isActive: false);

@@ -22,6 +22,9 @@ public class UserService(
 	IEmailSender emailSender,
 	ICurrentUserService currentUserService,
 	IFileStorageService fileStorageService,
+	IGenericRepository<Choir> choirRepository,
+	IGenericRepository<LiturgicalEventChoir> eventChoirRepository,
+	INotificationService notificationService,
 	IMapper mapper) : IUserService
 {
 	private const string AvatarFolder = "avatars";
@@ -175,6 +178,9 @@ public class UserService(
 			&& await userRepository.CountActiveAdminsAsync(ct) <= 1)
 			return Result.Failure(ErrorCodes.UserLastAdmin);
 
+		if (user.Role.Name == RoleNames.ChoirDirector && await IsStillDirectingAsync(id, ct))
+			return Result.Failure(ErrorCodes.UserStillDirecting);
+
 		user.IsActive = false;
 		await userRepository.RevokeAllRefreshTokensAsync(id, ct);
 		await userRepository.SaveChangesAsync(ct);
@@ -208,9 +214,15 @@ public class UserService(
 			&& await userRepository.CountActiveAdminsAsync(ct) <= 1)
 			return Result<UserDto>.Failure(ErrorCodes.UserLastAdmin);
 
+		// A director leaving the role would leave their choirs, or an upcoming event they stand in for, with nobody.
+		if (user.Role.Name == RoleNames.ChoirDirector && newRole.Name != RoleNames.ChoirDirector
+			&& await IsStillDirectingAsync(id, ct))
+			return Result<UserDto>.Failure(ErrorCodes.UserStillDirecting);
+
 		var wasChoirMember = user.Role.Name == RoleNames.ChoirMember;
 		user.RoleId = newRole.Id;
 		var profile = await memberProfileRepository.GetForRoleChangeAsync(id, ct);
+		List<Guid> leftChoirIds = [];
 		if (newRole.Name == RoleNames.ChoirMember)
 		{
 			if (profile is null)
@@ -222,12 +234,47 @@ public class UserService(
 		{
 			// Only Choir Members sing: the profile is kept for its history but leaves every choir and member flow.
 			if (profile.Status == MemberStatus.Active) profile.Status = MemberStatus.Inactive;
+			leftChoirIds = profile.ChoirMemberships.Where(m => m.IsActive).Select(m => m.ChoirId).ToList();
 			foreach (var membership in profile.ChoirMemberships) membership.IsActive = false;
 		}
 		// The old role lives on in every issued token; force a fresh sign-in.
 		await userRepository.RevokeAllRefreshTokensAsync(id, ct);
 		await userRepository.SaveChangesAsync(ct);
+
+		await NotifyDirectorsOfLeaveAsync(user, leftChoirIds, ct);
 		return Result<UserDto>.Success(mapper.Map<UserDto>(user));
+	}
+
+	/// <summary>True while the user leads a choir or stands in as director at an event that has not happened yet.</summary>
+	private async Task<bool> IsStillDirectingAsync(Guid userId, CancellationToken ct)
+	{
+		if ((await choirRepository.ListAsync(x => x.DirectorId == userId, ct)).Count > 0) return true;
+
+		var today = VietnamTime.Today;
+		return (await eventChoirRepository.ListAsync(
+				x => x.SubstituteDirectorId == userId
+					&& x.LiturgicalEvent.Status != EventStatus.Cancelled
+					&& x.LiturgicalEvent.EventDate >= today,
+				ct))
+			.Count > 0;
+	}
+
+	/// <summary>Tells each choir's director that a member left it because their role changed.</summary>
+	private async Task NotifyDirectorsOfLeaveAsync(User user, List<Guid> choirIds, CancellationToken ct)
+	{
+		if (choirIds.Count == 0) return;
+
+		var choirs = await choirRepository.ListAsync(x => choirIds.Contains(x.Id) && x.DirectorId != null, ct);
+		foreach (var choir in choirs)
+		{
+			var name = string.IsNullOrWhiteSpace(user.FullName) ? user.Email : user.FullName;
+			await notificationService.SendAsync(
+				new SendNotificationRequest(
+					NotificationType.ChoirChanged, "Ca viên rời ca đoàn",
+					$"{name} đã rời ca đoàn {choir.Name} vì được đổi sang vai trò khác.",
+					[choir.DirectorId!.Value], nameof(Choir), choir.Id),
+				ct);
+		}
 	}
 
 	// No look-alike characters (0/O, 1/l/I), since people retype it from an email.

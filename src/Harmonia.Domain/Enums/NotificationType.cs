@@ -15,5 +15,6 @@ public enum NotificationType
     RehearsalChanged,
     EventChoirChanged,
     MemberRegistrationSubmitted,
-    DirectorNomination
+    DirectorNomination,
+    ChoirChanged
 }

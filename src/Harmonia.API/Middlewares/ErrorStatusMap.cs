@@ -50,6 +50,7 @@ public static class ErrorStatusMap
         [ErrorCodes.UserAlreadyActive] = StatusCodes.Status409Conflict,
         [ErrorCodes.UserCannotModifySelf] = StatusCodes.Status409Conflict,
         [ErrorCodes.UserLastAdmin] = StatusCodes.Status409Conflict,
+        [ErrorCodes.UserStillDirecting] = StatusCodes.Status409Conflict,
         [ErrorCodes.RoleNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.MemberRegistrationNotFound] = StatusCodes.Status404NotFound,
 

@@ -263,8 +263,8 @@ hiển thị email thay tên. `phone`, `avatarUrl` có thể `null` (đổi ản
 | POST | `/api/users` | `{ "email", "fullName?", "phone?", "roleName" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `ROLE_NOT_FOUND` · 409 `USER_EMAIL_ALREADY_EXISTS` |
 | PUT | `/api/users/{id}` | `{ "email", "fullName?", "phone?" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `USER_NOT_FOUND` · 409 `USER_EMAIL_ALREADY_EXISTS` |
 | PATCH | `/api/users/{id}/activate` | — | 204 | 404 `USER_NOT_FOUND` · 409 `USER_ALREADY_ACTIVE` |
-| PATCH | `/api/users/{id}/deactivate` | — | 204 | 404 `USER_NOT_FOUND` · 409 `USER_CANNOT_MODIFY_SELF`, `USER_ALREADY_INACTIVE`, `USER_LAST_ADMIN` |
-| PUT | `/api/users/{id}/role` | `{ "roleName" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `USER_NOT_FOUND`, `ROLE_NOT_FOUND` · 409 `USER_CANNOT_MODIFY_SELF`, `USER_LAST_ADMIN` |
+| PATCH | `/api/users/{id}/deactivate` | — | 204 | 404 `USER_NOT_FOUND` · 409 `USER_CANNOT_MODIFY_SELF`, `USER_ALREADY_INACTIVE`, `USER_LAST_ADMIN`, `USER_STILL_DIRECTING` |
+| PUT | `/api/users/{id}/role` | `{ "roleName" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `USER_NOT_FOUND`, `ROLE_NOT_FOUND` · 409 `USER_CANNOT_MODIFY_SELF`, `USER_LAST_ADMIN`, `USER_STILL_DIRECTING` |
 
 - `GET /api/users`: `keyword` khớp một phần email; các bộ lọc kết hợp AND; sắp theo email.
 - Bắt buộc: `email`, `roleName`. Tuỳ chọn: `fullName` (≤ 100, bỏ trống → `""`),
@@ -277,6 +277,10 @@ hiển thị email thay tên. `phone`, `avatarUrl` có thể `null` (đổi ản
 - Tạo tài khoản role `ChoirMember` (hoặc đổi role sang `ChoirMember`) → hồ sơ ca viên được tạo
   tự động (`status = Active`, `joinedDate` = hôm nay). Đổi role khỏi `ChoirMember` thì hồ sơ vẫn giữ.
 - `deactivate` và đổi role thu hồi mọi phiên đăng nhập của user đó (xem refresh ở mục 2).
+- Ca trưởng còn là `directorId` của một ca đoàn (kể cả ca đoàn đã tắt) hoặc là ca trưởng thay thế ở một sự kiện chưa
+  qua, chưa huỷ → `deactivate` và đổi role khỏi `ChoirDirector` trả 409 `USER_STILL_DIRECTING`. Gán ca trưởng khác cho
+  ca đoàn (`PUT /api/choirs/{id}`) và nhờ cha xứ đổi ca trưởng thay thế trước.
+- Ca viên đổi sang role khác rời mọi ca đoàn; ca trưởng của từng ca đoàn đó nhận thông báo `ChoirChanged`.
 
 ### Đăng ký gia nhập — `api/member-registrations` · gửi: anonymous · xử lý: `Admin` (UC-45)
 
@@ -924,6 +928,8 @@ Admin thấy và quản lý mọi ca đoàn.
 
 - `name` bắt buộc, ≤ 100 ký tự, không trùng ca đoàn khác; `description` ≤ 500 ký tự.
 - `directorId` là id `User` (lấy từ `GET /api/users?roleName=ChoirDirector`); bỏ trống / `null` = chưa có ca trưởng.
+  Đổi `directorId` → ca trưởng cũ và ca trưởng mới nhận thông báo `ChoirChanged`; nếu ca trưởng mới đang là ca trưởng
+  thay thế của chính ca đoàn này ở sự kiện sắp tới thì vai thay thế đó bị gỡ (ca trưởng không thay chính mình).
   Không phải tài khoản `ChoirDirector` đang hoạt động → 400 `CHOIR_DIRECTOR_INVALID`. `PUT` giữ nguyên ca trưởng cũ
   thì không bị kiểm lại (kể cả khi tài khoản đó đã bị khoá). `PUT` gửi `directorId: null` là gỡ ca trưởng.
 - `isActive = false` là tắt ca đoàn: giữ ca viên và sự kiện đã gán, nhưng không nhận thêm ca viên

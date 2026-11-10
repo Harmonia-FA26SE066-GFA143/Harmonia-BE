@@ -89,6 +89,8 @@ public static class ErrorCodes
 
     public const string UserAlreadyActive = "USER_ALREADY_ACTIVE";
 
+    public const string UserStillDirecting = "USER_STILL_DIRECTING";
+
     public const string MemberRegistrationNotFound = "MEMBER_REGISTRATION_NOT_FOUND";
 
     // 3. MemberProfile.

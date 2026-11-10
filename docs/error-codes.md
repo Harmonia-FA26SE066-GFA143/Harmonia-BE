@@ -121,6 +121,7 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `USER_ALREADY_ACTIVE` | 409 | Tài khoản đang hoạt động |
 | `USER_CANNOT_MODIFY_SELF` | 409 | Không thể tự đổi quyền hoặc vô hiệu hoá chính mình |
 | `USER_LAST_ADMIN` | 409 | Không thể xoá quyền của quản trị viên cuối cùng |
+| `USER_STILL_DIRECTING` | 409 | Người này còn đang phụ trách ca đoàn hoặc là ca trưởng thay thế của sự kiện sắp tới, hãy giao cho người khác trước |
 | `ROLE_NOT_FOUND` | 404 | Không tìm thấy vai trò |
 | `MEMBER_REGISTRATION_NOT_FOUND` | 404 | Không tìm thấy đăng ký gia nhập |
 | `AVATAR_FILE_REQUIRED` | 400 | Vui lòng chọn ảnh đại diện |
