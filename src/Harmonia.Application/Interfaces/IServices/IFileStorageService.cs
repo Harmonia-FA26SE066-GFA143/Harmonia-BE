@@ -22,6 +22,15 @@ public interface IFileStorageService
     /// <summary>Builds a short-lived URL for a private file. Computed locally, no network call. Call it only after the ownership check passes.</summary>
     string GetSignedUrl(string publicId);
 
+    /// <summary>
+    /// Small preview of the first page of a private image or PDF (at most 160x220, low quality), too small to read
+    /// or print. Computed locally, no network call. Null when the file is not an image or PDF.
+    /// Product decision (2026-11-10): unlike <see cref="GetSignedUrl"/> this URL never expires, so anyone given the link
+    /// can keep viewing the preview; the original file stays behind short-lived URLs. Switch to a private stored
+    /// thumbnail if real copyrighted scores must be hidden even as previews.
+    /// </summary>
+    string? GetThumbnailUrl(string publicId);
+
     /// <summary>Returns EXTERNAL_STORAGE_FAILED instead of throwing when the provider fails.</summary>
     Task<Result> DeleteAsync(string publicId, bool isPrivate, CancellationToken cancellationToken);
 }

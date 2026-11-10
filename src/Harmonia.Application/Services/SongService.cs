@@ -9,7 +9,7 @@ using Harmonia.Domain.Enums;
 
 namespace Harmonia.Application.Services;
 
-public class SongService(ISongRepository songRepository, IMapper mapper) : ISongService
+public class SongService(ISongRepository songRepository, IFileStorageService fileStorageService, IMapper mapper) : ISongService
 {
     public async Task<Result<PagedList<SongDto>>> SearchAsync(SearchSongsRequest request, CancellationToken cancellationToken)
     {
@@ -212,6 +212,9 @@ public class SongService(ISongRepository songRepository, IMapper mapper) : ISong
             dto.IsClassified = songStats?.IsClassified ?? false;
             dto.TimesUsed = songStats?.TimesUsed ?? 0;
             dto.LastUsedDate = songStats?.LastUsedDate;
+            dto.SheetMusicThumbnailUrl = songStats?.SheetMusicPublicId is { } publicId
+                ? fileStorageService.GetThumbnailUrl(publicId)
+                : null;
         }
 
         return dtos;

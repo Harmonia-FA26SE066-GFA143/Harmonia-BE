@@ -29,4 +29,10 @@ public class SongDto
 
     /// <summary>Date of the latest of those events; null when <see cref="TimesUsed"/> is 0.</summary>
     public DateOnly? LastUsedDate { get; set; }
+
+    /// <summary>
+    /// Small long-lived preview of page 1 of the oldest active SheetMusic material; null when the song has none.
+    /// Open the full score through the music-materials list, whose URLs are short-lived.
+    /// </summary>
+    public string? SheetMusicThumbnailUrl { get; set; }
 }

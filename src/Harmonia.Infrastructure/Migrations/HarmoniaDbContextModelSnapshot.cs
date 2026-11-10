@@ -935,6 +935,9 @@ namespace Harmonia.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<double?>("AudioDurationSeconds")
+                        .HasColumnType("float");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -948,6 +951,11 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Property<string>("FilePublicId")
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
+
+                    b.Property<int>("FileRevision")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
 
                     b.Property<long?>("FileSizeBytes")
                         .HasColumnType("bigint");
@@ -978,6 +986,10 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Property<string>("PlaybackNotesPublicId")
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("PlaybackNotesSha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
 
                     b.Property<int?>("ScoreRevision")
                         .HasColumnType("int");
@@ -2076,6 +2088,46 @@ namespace Harmonia.Infrastructure.Migrations
                     b.ToTable("SystemSettings");
                 });
 
+            modelBuilder.Entity("Harmonia.Domain.Entities.TimedLyrics", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AudioMaterialId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("AudioRevision")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Granularity")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("LyricsMaterialId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AudioMaterialId")
+                        .IsUnique();
+
+                    b.HasIndex("LyricsMaterialId");
+
+                    b.ToTable("TimedLyrics");
+                });
+
             modelBuilder.Entity("Harmonia.Domain.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2984,6 +3036,60 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Navigation("Song");
                 });
 
+            modelBuilder.Entity("Harmonia.Domain.Entities.TimedLyrics", b =>
+                {
+                    b.HasOne("Harmonia.Domain.Entities.MusicMaterial", "AudioMaterial")
+                        .WithOne("TimedLyrics")
+                        .HasForeignKey("Harmonia.Domain.Entities.TimedLyrics", "AudioMaterialId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Harmonia.Domain.Entities.MusicMaterial", "LyricsMaterial")
+                        .WithMany()
+                        .HasForeignKey("LyricsMaterialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.OwnsMany("Harmonia.Domain.ValueObjects.TimedLyricLine", "Lines", b1 =>
+                        {
+                            b1.Property<Guid>("TimedLyricsId")
+                                .HasColumnType("uniqueidentifier");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("int");
+
+                            b1.Property<double>("EndSeconds")
+                                .HasColumnType("float");
+
+                            b1.Property<int>("Order")
+                                .HasColumnType("int");
+
+                            b1.Property<double>("StartSeconds")
+                                .HasColumnType("float");
+
+                            b1.Property<string>("Text")
+                                .IsRequired()
+                                .HasMaxLength(500)
+                                .HasColumnType("nvarchar(500)");
+
+                            b1.HasKey("TimedLyricsId", "__synthesizedOrdinal");
+
+                            b1.ToTable("TimedLyrics");
+
+                            b1.ToJson("Lines");
+
+                            b1.WithOwner()
+                                .HasForeignKey("TimedLyricsId");
+                        });
+
+                    b.Navigation("AudioMaterial");
+
+                    b.Navigation("Lines");
+
+                    b.Navigation("LyricsMaterial");
+                });
+
             modelBuilder.Entity("Harmonia.Domain.Entities.User", b =>
                 {
                     b.HasOne("Harmonia.Domain.Entities.Role", "Role")
@@ -3083,6 +3189,8 @@ namespace Harmonia.Infrastructure.Migrations
             modelBuilder.Entity("Harmonia.Domain.Entities.MusicMaterial", b =>
                 {
                     b.Navigation("LearningProgresses");
+
+                    b.Navigation("TimedLyrics");
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.Notification", b =>

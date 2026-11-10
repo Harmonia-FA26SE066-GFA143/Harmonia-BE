@@ -1234,7 +1234,8 @@ Thư viện bài hát và phân loại bài hát (UC-21 / FE-27, FE-29).
   "materialCounts": { "SheetMusic": 1, "Lyrics": 0, "SampleAudio": 2, "RehearsalMaterial": 0 },
   "isClassified": true,
   "timesUsed": 3,
-  "lastUsedDate": "2026-10-18"
+  "lastUsedDate": "2026-10-18",
+  "sheetMusicThumbnailUrl": "https://res.cloudinary.com/.../authenticated/s--sig--/pg_1,w_160,h_220,c_limit,q_auto:low,f_auto/....jpg"
 }
 ```
 
@@ -1242,6 +1243,9 @@ Thư viện bài hát và phân loại bài hát (UC-21 / FE-27, FE-29).
 - `isClassified`: bài đã có ít nhất một mùa phụng vụ, loại lễ, nghi thức, chủ đề hoặc vị trí trong lễ.
 - `timesUsed` / `lastUsedDate`: đếm như báo cáo `song-usage` — sự kiện `Published` đã qua có danh sách `Approved`
   chứa bài; `lastUsedDate` là `null` khi `timesUsed` = 0.
+- `sheetMusicThumbnailUrl`: ảnh xem trước trang 1 của bản nhạc (`SheetMusic`) đang hoạt động cũ nhất, tối đa 160×220,
+  WebP/AVIF/JPEG tuỳ trình duyệt; `null` khi bài chưa có bản nhạc. URL **không hết hạn** (quyết định 2026-11-10, chấp
+  nhận rủi ro chia sẻ link vì ảnh quá nhỏ để đọc/in) — xem bản đầy đủ qua `GET api/music-materials?songId=` (URL ngắn hạn).
 
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|

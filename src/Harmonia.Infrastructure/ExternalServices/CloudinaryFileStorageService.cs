@@ -93,6 +93,23 @@ public class CloudinaryFileStorageService : IFileStorageService
             resourceType: resourceType.ToString().ToLowerInvariant());
     }
 
+    public string? GetThumbnailUrl(string publicId)
+    {
+        var (cloudinaryId, _, resourceType) = Split(publicId);
+        if (resourceType != ResourceType.Image) return null;
+
+        // The signature covers the transformation, so a client cannot edit the URL to render a bigger image;
+        // authenticated assets reject unsigned URLs outright. f_auto serves WebP/AVIF where supported, JPEG otherwise.
+        var transformation = new Transformation()
+            .Page(1).Width(160).Height(220).Crop("limit").Quality("auto:low").FetchFormat("auto");
+
+        return _cloudinary.Api.UrlImgUp
+            .Type(PrivateDeliveryType)
+            .Signed(true)
+            .Transform(transformation)
+            .BuildUrl(cloudinaryId + ".jpg");
+    }
+
     public async Task<Result> DeleteAsync(string publicId, bool isPrivate, CancellationToken cancellationToken)
     {
         var (cloudinaryId, _, resourceType) = Split(publicId);
@@ -103,7 +120,9 @@ public class CloudinaryFileStorageService : IFileStorageService
             var result = await _cloudinary.DestroyAsync(new DeletionParams(cloudinaryId)
             {
                 ResourceType = resourceType,
-                Type = isPrivate ? PrivateDeliveryType : PublicDeliveryType
+                Type = isPrivate ? PrivateDeliveryType : PublicDeliveryType,
+                // Also purges CDN copies of derived images (thumbnails), which outlive the file otherwise.
+                Invalidate = true
             }).WaitAsync(cancellationToken);
 
             if (result.Error is not null)

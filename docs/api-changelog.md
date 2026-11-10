@@ -21,6 +21,8 @@ Karaoke và bản nhạc chạy theo nốt (yêu cầu Web). Cần migration th�
 - Endpoint mới `GET | PUT | DELETE api/music-materials/{id}/timed-lyrics` → `TimedLyricsDto` (`api.md` mục 7).
   Mã mới: `TIMED_LYRICS_NOT_FOUND`, `TIMED_LYRICS_EXCEEDS_DURATION`, `TIMED_LYRICS_LINES_INVALID`, `MATERIAL_NOT_AUDIO`,
   `MATERIAL_NOT_LYRICS`.
+- `SongDto` (`GET api/songs`, `GET api/songs/{id}`, POST/PUT) thêm `sheetMusicThumbnailUrl: string | null` — ảnh nhỏ
+  trang 1 bản nhạc cho danh sách bài hát, URL không hết hạn. Không cần migration.
 - `MusicMaterialDto` thêm `fileRevision` (1 khi upload, +1 mỗi lần thay file).
 - `InteractiveScoreDto` thêm `notesUrl`, `notesSha256`, `notesSchemaVersion` — một response đủ score + WAV + notes của
   cùng revision.

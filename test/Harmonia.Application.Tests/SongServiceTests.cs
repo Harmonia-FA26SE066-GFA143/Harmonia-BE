@@ -2,6 +2,7 @@ using AutoMapper;
 using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IRepositories;
+using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Application.Mappings;
 using Harmonia.Application.Services;
 using Harmonia.Domain.Common;
@@ -15,6 +16,7 @@ namespace Harmonia.Application.Tests;
 public class SongServiceTests
 {
     private readonly ISongRepository _repository = Substitute.For<ISongRepository>();
+    private readonly IFileStorageService _files = Substitute.For<IFileStorageService>();
     private readonly SongService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
 
@@ -28,7 +30,7 @@ public class SongServiceTests
                 cfg.AddProfile<SongInstrumentRequirementProfile>();
             }, NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new SongService(_repository, mapper);
+        _sut = new SongService(_repository, _files, mapper);
         _repository.GetStatsAsync(default!, default, default).ReturnsForAnyArgs(new Dictionary<Guid, SongStats>());
     }
 
@@ -48,6 +50,33 @@ public class SongServiceTests
         Assert.Equal((2, 0, true, 3, lastUsed), (dto.MaterialCounts[MaterialType.SheetMusic],
             dto.MaterialCounts[MaterialType.SampleAudio], dto.IsClassified, dto.TimesUsed, dto.LastUsedDate));
         Assert.Equal(Enum.GetValues<MaterialType>().Length, dto.MaterialCounts.Count);
+    }
+
+    [Fact]
+    public async Task GetById_SheetMusic_ReturnsThumbnailUrl_Async()
+    {
+        var song = StubSong();
+        _repository.GetStatsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<DateOnly>(), _ct)
+            .Returns(new Dictionary<Guid, SongStats>
+            {
+                [song.Id] = new(new Dictionary<MaterialType, int>(), false, 0, null, "harmonia/sheet/a.pdf"),
+            });
+        _files.GetThumbnailUrl("harmonia/sheet/a.pdf").Returns("https://thumb");
+
+        var dto = (await _sut.GetByIdAsync(song.Id, _ct)).Value!;
+
+        Assert.Equal("https://thumb", dto.SheetMusicThumbnailUrl);
+    }
+
+    [Fact]
+    public async Task GetById_NoSheetMusic_ThumbnailIsNull_Async()
+    {
+        var song = StubSong();
+
+        var dto = (await _sut.GetByIdAsync(song.Id, _ct)).Value!;
+
+        Assert.Null(dto.SheetMusicThumbnailUrl);
+        _files.DidNotReceiveWithAnyArgs().GetThumbnailUrl(default!);
     }
 
     private Song StubSong(bool isActive = true)

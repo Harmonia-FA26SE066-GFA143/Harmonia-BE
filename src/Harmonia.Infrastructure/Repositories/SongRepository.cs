@@ -130,6 +130,12 @@ public class SongRepository(HarmoniaDbContext dbContext)
                     .Where(e => e.SongLists.Any(
                         l => l.Status == SongListStatus.Approved && l.Items.Any(i => i.SongId == s.Id)))
                     .Max(e => (DateOnly?)e.EventDate),
+                // Oldest first, Id as tie-break, so the thumbnail stays the same across requests.
+                SheetMusicPublicId = s.MusicMaterials
+                    .Where(m => m.IsActive && m.MaterialType == MaterialType.SheetMusic && m.FilePublicId != null)
+                    .OrderBy(m => m.CreatedAt).ThenBy(m => m.Id)
+                    .Select(m => m.FilePublicId)
+                    .FirstOrDefault(),
             })
             .ToListAsync(cancellationToken);
 
@@ -137,7 +143,7 @@ public class SongRepository(HarmoniaDbContext dbContext)
             x => x.Id,
             x => new SongStats(
                 Enum.GetValues<MaterialType>().ToDictionary(t => t, t => x.MaterialTypes.Count(m => m == t)),
-                x.IsClassified, x.TimesUsed, x.LastUsedDate));
+                x.IsClassified, x.TimesUsed, x.LastUsedDate, x.SheetMusicPublicId));
     }
 
     public async Task<bool> IsInUseAsync(Guid id, CancellationToken cancellationToken) =>
