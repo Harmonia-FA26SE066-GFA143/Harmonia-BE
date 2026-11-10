@@ -99,6 +99,7 @@ public static class DependencyInjection
         services.AddScoped<ISongRepository, SongRepository>();
         services.AddScoped<IMusicMaterialRepository, MusicMaterialRepository>();
         services.AddScoped<IMaterialLearningProgressRepository, MaterialLearningProgressRepository>();
+        services.AddScoped<ITimedLyricsRepository, TimedLyricsRepository>();
         services.AddScoped<ISongListItemRepository, SongListItemRepository>();
         services.AddScoped<ISongListRepository, SongListRepository>();
         services.AddScoped<IServiceRosterRepository, ServiceRosterRepository>();
@@ -145,6 +146,7 @@ public static class DependencyInjection
         // Singleton so the SoundFont is loaded once.
         services.AddSingleton<IMidiRenderer, MidiRenderer>();
         services.AddSingleton<IScoreConverter, MusicXmlScoreConverter>();
+        services.AddSingleton<IAudioDurationReader, AudioDurationReader>();
         services.AddSingleton<IEmailSender, BrevoEmailSender>();
         services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
         services.AddScoped<DataSeeder>();

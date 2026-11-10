@@ -1331,6 +1331,7 @@ Tư liệu của bài hát: bản nhạc, lời, audio mẫu, tài liệu tập 
   "title": "Audio mẫu bè Tenor",
   "fileName": "kinh-hoa-binh-tenor.mp3",
   "fileSizeBytes": 2048000,
+  "fileRevision": 1,
   "targetSkillId": "guid",
   "targetSkillName": "Tenor",
   "fileUrl": "https://...signed...",
@@ -1392,6 +1393,9 @@ Tư liệu của bài hát: bản nhạc, lời, audio mẫu, tài liệu tập 
 | GET | `/api/music-materials/{id}/learning-progress?status=&pageNumber=1&pageSize=20` · chỉ `ChoirDirector` | — | 200 `PagedList<MaterialLearningProgressDetailDto>` | 404 `MATERIAL_NOT_FOUND` |
 | GET | `/api/music-materials/{id}/playback` | — | 200 `PlaybackDto` | 404 `MATERIAL_NOT_FOUND` · 409 `MATERIAL_PLAYBACK_UNAVAILABLE` |
 | GET | `/api/music-materials/{id}/score` | — | 200 `InteractiveScoreDto` | 404 `MATERIAL_NOT_FOUND` · 409 `MATERIAL_NOT_INTERACTIVE_SCORE`, `MATERIAL_PLAYBACK_UNAVAILABLE` |
+| GET | `/api/music-materials/{id}/timed-lyrics` | — | 200 `TimedLyricsDto` | 404 `MATERIAL_NOT_FOUND`, `TIMED_LYRICS_NOT_FOUND` |
+| PUT | `/api/music-materials/{id}/timed-lyrics` · chỉ `ChoirDirector` | `UpdateTimedLyricsRequest` | 200 `TimedLyricsDto` — tạo mới hoặc thay toàn bộ | 400 `VALIDATION_FAILED` (`errors.lines`: `TIMED_LYRICS_LINES_INVALID`), `MATERIAL_NOT_LYRICS`, `TIMED_LYRICS_EXCEEDS_DURATION` · 404 `MATERIAL_NOT_FOUND` · 409 `MATERIAL_NOT_AUDIO` |
+| DELETE | `/api/music-materials/{id}/timed-lyrics` · chỉ `ChoirDirector` | — | 204 | 404 `MATERIAL_NOT_FOUND`, `TIMED_LYRICS_NOT_FOUND` |
 | POST | `/api/music-materials/{id}/extract-lyrics` · chỉ `ChoirDirector` | — | 200 `{ "lyricsText": "..." }` — bản nháp, **không lưu** | 400 `MATERIAL_NOT_SHEET_MUSIC` · 404 `MATERIAL_NOT_FOUND` · 502 `EXTERNAL_AI_FAILED` |
 | PUT | `/api/music-materials/{id}` | `{ "title", "targetSkillId", "lyricsText" }` | 200 `MusicMaterialDto` | 400 `VALIDATION_FAILED`, `MATERIAL_LYRICS_SOURCE_INVALID` · 404 `MATERIAL_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE` |
 | PUT | `/api/music-materials/{id}/file` | `multipart/form-data`: `file`, `resetProgress?` (mặc định `false`), `instrument?` (chỉ file MIDI / MusicXML, mặc định `Piano`) | 200 `MusicMaterialDto` — giữ nguyên `id`, tiêu đề, loại, kỹ năng đích và bài luyện tập đang gắn; file cũ bị xoá khỏi kho. `resetProgress=true` xoá đánh dấu "đã học / cần luyện thêm" của ca viên với tài liệu này | 400 `VALIDATION_FAILED`, `MATERIAL_FILE_REQUIRED`, `MATERIAL_FILE_TYPE_NOT_ALLOWED` (theo loại hiện có của tài liệu), `MATERIAL_LYRICS_SOURCE_INVALID` (lời dạng text, không có file để thay) · 404 `MATERIAL_NOT_FOUND` · 413 `MATERIAL_FILE_TOO_LARGE` · 422 `MIDI_INVALID_FILE`, `MIDI_FORMAT_UNSUPPORTED`, `MIDI_NO_PLAYABLE_NOTES`, `MIDI_LIMIT_EXCEEDED`, `MATERIAL_SCORE_INVALID`, `MATERIAL_SCORE_UNSUPPORTED` · 502 `EXTERNAL_STORAGE_FAILED` |
@@ -1420,7 +1424,12 @@ Tư liệu của bài hát: bản nhạc, lời, audio mẫu, tài liệu tập 
 - `PUT` chỉ sửa `title` và `targetSkillId` (gửi `null` để bỏ gắn bè); `id`, file và `materialType` giữ nguyên,
   nên tiến độ học của ca viên không mất. Muốn thay file: `PUT {id}/file`; đổi loại: xoá rồi upload lại.
 - `502 EXTERNAL_STORAGE_FAILED`: Cloudinary lỗi hoặc không phản hồi, không có gì được lưu; thử lại sau.
-- `DELETE` là xoá mềm, không khôi phục: tư liệu biến khỏi danh sách, file vẫn giữ trên storage.
+- `DELETE` là xoá mềm, không khôi phục: tư liệu biến khỏi danh sách, file vẫn giữ trên storage. Lời có mốc thời gian
+  dùng tư liệu này (làm audio hoặc làm lời) bị xoá theo.
+- `fileRevision` = 1 khi upload, +1 mỗi lần `PUT {id}/file` thành công (mọi loại tư liệu). Dùng để so với
+  `audioRevision` của lời có mốc thời gian.
+- Upload / thay file `.mp3`, `.m4a`, `.wav`: server đọc độ dài file; không đọc được → 422 `MATERIAL_AUDIO_INVALID`,
+  không có gì được lưu.
 
 **Phát MIDI — `GET {id}/playback`.**
 
@@ -1445,9 +1454,42 @@ Tư liệu của bài hát: bản nhạc, lời, audio mẫu, tài liệu tập 
   "revision": 2, "scoreFormat": "mxl", "fileName": "kinh-hoa-binh.mxl",
   "scoreUrl": "https://...", "scoreSha256": "9f86d0…",
   "audioUrl": "https://...", "audioSha256": "2c26b4…",
+  "notesUrl": "https://...", "notesSha256": "fcde2b…", "notesSchemaVersion": 2,
   "durationSeconds": 182.4, "instrument": "Piano", "updatedAt": "2026-11-07T08:00:00Z"
 }
 ```
+
+- Một response đủ cả ba file của **cùng một** `revision`: score, WAV, `notes.json` — Web không cần gọi thêm `/playback`.
+  `notesSha256` là SHA-256 của `notes.json`.
+- `notesSchemaVersion` = 2: `notes.json` là timeline trỏ được về nốt trong MusicXML (xem bên dưới). Score lưu trước
+  2026-11-10 có `notesSha256 = null`, `notesSchemaVersion = 1` (chỉ pitch + thời gian) — thay lại file để có v2.
+  `GET {id}/playback` của score cũng trả `schemaVersion` này.
+- `notes.json` schema v2 là **tập cha** của v1 (cùng `pitch`, `start`, `duration`, `velocity`, `track`, cùng cách đánh số
+  track), thêm:
+
+  ```json
+  {
+    "schemaVersion": 2, "timeUnit": "seconds", "durationSeconds": 182.4, "notesEndSeconds": 180.4,
+    "minPitch": 48, "maxPitch": 79, "readingOrder": "written",
+    "tracks": [{ "id": 0, "name": "Soprano", "partId": "P1" }],
+    "measures": [{ "partId": "P1", "measureIndex": 11, "measureNumber": "12", "start": 34.0, "end": 38.0 }],
+    "notes": [{
+      "id": "P1:11:4", "partId": "P1", "partName": "Soprano", "measureIndex": 11, "measureNumber": "12",
+      "voice": "1", "staff": 1, "noteIndex": 4,
+      "pitch": 72, "start": 34.25, "duration": 0.75, "velocity": 80, "track": 0
+    }]
+  }
+  ```
+
+  - `measureIndex`: thứ tự `<measure>` trong `<part>`, đếm từ 0. `measureNumber`: thuộc tính `number` nguyên văn
+    (có thể trùng hoặc không phải số, nên đừng dùng làm khoá).
+  - `noteIndex`: thứ tự phần tử `<note>` trong ô nhịp, đếm từ 0 và đếm **mọi** `<note>` (cả nốt lặng, hoa mỹ, `chord`,
+    `cue`) — Web đếm `<note>` của ô nhịp đó là ra đúng phần tử. `id` = `partId:measureIndex:noteIndex`.
+  - `voice` mặc định `"1"`, `staff` mặc định `1` khi MusicXML không ghi.
+  - Nốt nối (tie) là **một** nốt, trỏ về `<note>` viết đầu tiên của chuỗi nối. Nốt lặng, hoa mỹ, `cue` không có trong
+    `notes`.
+  - `readingOrder = "written"`: mỗi ô nhịp đọc một lần theo thứ tự viết, **không** mở rộng nhắc lại, volta, D.C./D.S.
+  - `measures` có cho mỗi part có nốt; part không có nốt nào bị bỏ (khỏi cả `tracks`).
 
 - Upload hoặc thay file `.musicxml` / `.mxl` thì server, ngay trong request: chuyển score sang MIDI (không lưu MIDI này),
   render WAV + `notes.json` như MIDI ở trên, rồi lưu score và bản phát **cùng một phiên bản**. Bất kỳ bước nào lỗi →
@@ -1465,6 +1507,30 @@ Tư liệu của bài hát: bản nhạc, lời, audio mẫu, tài liệu tập 
 - Lỗi: XML / ZIP hỏng, dùng entity, vượt giới hạn giải nén → 422 `MATERIAL_SCORE_INVALID`; `score-timewise`, không có
   nốt nào phát được → 422 `MATERIAL_SCORE_UNSUPPORTED`; dài quá 10 phút / quá 100 000 nốt → 422 `MIDI_LIMIT_EXCEEDED`.
   Tư liệu loại khác → 409 `MATERIAL_NOT_INTERACTIVE_SCORE`.
+
+**Lời có mốc thời gian (Karaoke) — `{id}/timed-lyrics`.** `{id}` là tư liệu audio.
+
+```json
+{
+  "id": "guid", "songId": "guid", "lyricsMaterialId": "guid", "audioMaterialId": "guid",
+  "audioRevision": 3, "granularity": "Line",
+  "lines": [{ "order": 1, "text": "Lạy Chúa, xin thương con", "startSeconds": 0.0, "endSeconds": 5.8 }],
+  "updatedAt": "2026-11-10T10:00:00Z"
+}
+```
+
+- `UpdateTimedLyricsRequest`: `{ "lyricsMaterialId", "granularity": "Line", "lines": [{ "order", "text", "startSeconds", "endSeconds" }] }`.
+  Web tự đọc Enhanced LRC (nếu có) rồi gửi JSON này; server không lưu file LRC.
+- Audio phải là `SampleAudio` hoặc `InteractiveScore` có file, khác → 409 `MATERIAL_NOT_AUDIO`. `lyricsMaterialId` phải là
+  tư liệu `Lyrics` đang hoạt động **cùng bài hát**, khác → 400 `MATERIAL_NOT_LYRICS`. Mỗi audio có tối đa một bản.
+- Kiểm dòng: 1–500 dòng; `text` không rỗng, ≤ 500 ký tự; `startSeconds ≥ 0`; `endSeconds > startSeconds`; `order` tăng
+  dần và dòng sau bắt đầu không sớm hơn lúc dòng trước kết thúc → lỗi ở `errors.lines`. Dòng cuối không được kết thúc sau
+  audio → 400 `TIMED_LYRICS_EXCEEDS_DURATION`. Độ dài audio: độ dài file `.mp3`/`.m4a`/`.wav` đọc lúc upload; MIDI và
+  score dùng `durationSeconds` của WAV render; file tải lên trước 2026-11-10 chưa có độ dài thì trần 10 phút.
+- `audioRevision` = `fileRevision` của audio (score: = `revision`) lúc lưu. **Trước khi phát, so hai số này**; khác nhau
+  thì lấy lại. `PUT {id}/file` của audio xoá luôn bản mốc thời gian trong cùng lần lưu, nên sau khi thay file
+  `GET` trả 404 `TIMED_LYRICS_NOT_FOUND` cho tới khi ca trưởng làm lại.
+- `order` vừa là thứ tự vừa định danh dòng (dòng không có `id` riêng). Đọc: mọi role đăng nhập, như `/score`.
 
 **Trích lời từ bản nhạc — `POST {id}/extract-lyrics`.**
 

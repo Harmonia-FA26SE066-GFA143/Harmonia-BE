@@ -38,6 +38,18 @@ public class InteractiveScoreDto
     /// <summary>Lowercase hex SHA-256 of the WAV file.</summary>
     public string AudioSha256 { get; set; } = string.Empty;
 
+    /// <summary>Short-lived signed URL of the note timeline (notes.json) of this revision.</summary>
+    public string NotesUrl { get; set; } = string.Empty;
+
+    /// <summary>Lowercase hex SHA-256 of notes.json. Null for a score saved before hashes were kept: replace its file.</summary>
+    public string? NotesSha256 { get; set; }
+
+    /// <summary>
+    /// 2: every note carries its part/measure/voice/staff/note locator and there is a per-part measure timeline.
+    /// 1: a score saved before v2; the notes have pitch and timing only. Replace the file to get v2.
+    /// </summary>
+    public int NotesSchemaVersion { get; set; }
+
     /// <summary>Length of the WAV, including a short tail that lets the last notes ring out.</summary>
     public double DurationSeconds { get; set; }
 

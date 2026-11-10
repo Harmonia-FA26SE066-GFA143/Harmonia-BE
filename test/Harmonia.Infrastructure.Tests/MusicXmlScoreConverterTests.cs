@@ -1,5 +1,7 @@
 using System.IO.Compression;
 using System.Text;
+using System.Text.Json;
+using Harmonia.Application.Common.Models;
 using Harmonia.Domain.Common;
 using Harmonia.Infrastructure.ExternalServices;
 using Melanchall.DryWetMidi.Core;
@@ -32,9 +34,9 @@ public class MusicXmlScoreConverterTests
 
     private static MemoryStream Utf8(string text) => new(Encoding.UTF8.GetBytes(text));
 
-    private static List<(int Pitch, double Start, double Length)> Notes(byte[] midi)
+    private static List<(int Pitch, double Start, double Length)> Notes(ScoreConversion conversion)
     {
-        var file = MidiFile.Read(new MemoryStream(midi));
+        var file = MidiFile.Read(new MemoryStream(conversion.Midi));
         var tempoMap = file.GetTempoMap();
         double Seconds(long ticks) => TimeConverter.ConvertTo<MetricTimeSpan>(ticks, tempoMap).TotalMicroseconds / 1_000_000d;
         return file.GetNotes()
@@ -92,6 +94,40 @@ public class MusicXmlScoreConverterTests
         Assert.Equal(
             [(48, 0, 2), (60, 0, 0.5), (64, 0, 0.5), (67, 0.5, 1), (69, 2, 0.5)],
             Notes(result.Value!).OrderBy(n => n.Start).ThenBy(n => n.Pitch).ToList());
+    }
+
+    [Fact]
+    public void ToMidi_Timeline_LocatesEveryNoteInTheScoreAndTimesEachMeasure()
+    {
+        var voice1 = Note("C", 4, 1, "<grace/>") // index 0, no time, not listed
+            + Note("C", 4, 1, "<voice>1</voice>") + Note("E", 4, 1, "<chord/><voice>1</voice>")
+            + Note("G", 4, 1, "<tie type=\"start\"/><voice>1</voice>") + Note("G", 4, 1, "<tie type=\"stop\"/><voice>1</voice>")
+            + "<note><rest/><duration>1</duration></note>";
+        var voice2 = "<backup><duration>4</duration></backup>" + Note("C", 3, 4, "<voice>2</voice><staff>2</staff>");
+
+        var result = _sut.ToMidi(Utf8(Score(voice1 + voice2, Note("A", 4, 1))), isCompressed: false);
+
+        using var json = JsonDocument.Parse(result.Value!.TimelineJson);
+        var root = json.RootElement;
+        Assert.Equal((2, "written"), (root.GetProperty("schemaVersion").GetInt32(), root.GetProperty("readingOrder").GetString()));
+
+        var notes = root.GetProperty("notes").EnumerateArray()
+            .Select(n => (Id: n.GetProperty("id").GetString(), Voice: n.GetProperty("voice").GetString(),
+                Staff: n.GetProperty("staff").GetInt32(), Pitch: n.GetProperty("pitch").GetInt32(),
+                Start: n.GetProperty("start").GetDouble(), Duration: n.GetProperty("duration").GetDouble()))
+            .ToList();
+        // The tied G is one note at its first <note> (index 3); same order and times as the v1 renderer would give.
+        Assert.Equal(
+            [("P1:0:6", "2", 2, 48, 0, 2), ("P1:0:1", "1", 1, 60, 0, 0.5), ("P1:0:2", "1", 1, 64, 0, 0.5),
+             ("P1:0:3", "1", 1, 67, 0.5, 1), ("P1:1:0", "1", 1, 69, 2, 0.5)],
+            notes);
+
+        var measures = root.GetProperty("measures").EnumerateArray()
+            .Select(m => (m.GetProperty("measureIndex").GetInt32(), m.GetProperty("measureNumber").GetString(),
+                m.GetProperty("start").GetDouble(), m.GetProperty("end").GetDouble()))
+            .ToList();
+        Assert.Equal([(0, "1", 0, 2), (1, "2", 2, 2.5)], measures);
+        Assert.Equal("Soprano", root.GetProperty("tracks")[0].GetProperty("name").GetString());
     }
 
     [Fact]

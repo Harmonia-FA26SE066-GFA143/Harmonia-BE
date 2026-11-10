@@ -31,7 +31,7 @@ public class MusicMaterialProfile : Profile
             .ForMember(dest => dest.AudioUrl, opt => opt.Ignore())
             .ForMember(dest => dest.NotesUrl, opt => opt.Ignore())
             .ForMember(dest => dest.Status, opt => opt.Ignore())
-            .ForMember(dest => dest.SchemaVersion, opt => opt.Ignore());
+            .ForMember(dest => dest.SchemaVersion, opt => opt.MapFrom(src => NotesSchemaVersion(src)));
 
         // Signed URLs are built by MusicMaterialService; only called once the score and its playback are saved.
         CreateMap<MusicMaterial, InteractiveScoreDto>()
@@ -41,6 +41,9 @@ public class MusicMaterialProfile : Profile
             .ForMember(dest => dest.DurationSeconds, opt => opt.MapFrom(src => src.PlaybackDurationSeconds!.Value))
             .ForMember(dest => dest.Instrument, opt => opt.MapFrom(src => src.PlaybackInstrument ?? PlaybackInstrument.Piano))
             .ForMember(dest => dest.AudioSha256, opt => opt.MapFrom(src => src.PlaybackAudioSha256))
+            .ForMember(dest => dest.NotesSha256, opt => opt.MapFrom(src => src.PlaybackNotesSha256))
+            .ForMember(dest => dest.NotesSchemaVersion, opt => opt.MapFrom(src => NotesSchemaVersion(src)))
+            .ForMember(dest => dest.NotesUrl, opt => opt.Ignore())
             .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src => src.UpdatedAt ?? src.CreatedAt))
             .ForMember(dest => dest.ScoreUrl, opt => opt.Ignore())
             .ForMember(dest => dest.AudioUrl, opt => opt.Ignore())
@@ -49,4 +52,8 @@ public class MusicMaterialProfile : Profile
         CreateMap<UploadMusicMaterialRequest, MusicMaterial>();
         CreateMap<UpdateMusicMaterialRequest, MusicMaterial>();
     }
+
+    // A score's notes are the v2 timeline once its hash is kept (both arrived together); MIDI notes stay v1.
+    private static int NotesSchemaVersion(MusicMaterial material) =>
+        material.MaterialType == MaterialType.InteractiveScore && material.PlaybackNotesSha256 != null ? 2 : 1;
 }

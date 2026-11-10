@@ -40,6 +40,10 @@ public class MidiRenderer(IOptions<MidiRendererOptions> options) : IMidiRenderer
         () => new SoundFont(Path.Combine(AppContext.BaseDirectory, options.Value.SoundFontPath)),
         LazyThreadSafetyMode.PublicationOnly);
 
+    /// <summary>WAV length for notes ending at <paramref name="notesEndSeconds"/>; MusicXmlScoreConverter writes the same value.</summary>
+    public static double TotalDurationSeconds(double notesEndSeconds) =>
+        Math.Ceiling((notesEndSeconds + TailSeconds) * SampleRate) / SampleRate;
+
     public Result<PlaybackRender> Render(Stream midi, PlaybackInstrument instrument)
     {
         MidiFile file;
@@ -89,7 +93,7 @@ public class MidiRenderer(IOptions<MidiRendererOptions> options) : IMidiRenderer
             .Where(e => e.Event is ChannelEvent c && c.Channel != PercussionChannel)
             .Select(e => (Sample: (int)Math.Round(Seconds(e.Time) * SampleRate), Event: (ChannelEvent)e.Event))
             .ToList();
-        var durationSeconds = Math.Ceiling((notesEnd + TailSeconds) * SampleRate) / SampleRate;
+        var durationSeconds = TotalDurationSeconds(notesEnd);
         var audio = RenderWav(events, (int)(durationSeconds * SampleRate), GeneralMidiProgram(instrument));
 
         notes.Sort((a, b) => (a.Start, a.Track, a.Pitch).CompareTo((b.Start, b.Track, b.Pitch)));

@@ -1,6 +1,6 @@
 # Từ điển nghiệp vụ — dùng đúng tên, không tự đặt từ đồng nghĩa
 
-Nguồn chuẩn: `docs/harmonia-domain-entity-list.md` (54 entity, 26 enum).
+Nguồn chuẩn: `docs/harmonia-domain-entity-list.md` (55 entity, 27 enum).
 Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 
 | Tiếng Việt | Tên trong code |
@@ -33,6 +33,7 @@ Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 | phân loại bài hát | `SongClassification` |
 | tài liệu âm nhạc | `MusicMaterial` — bản nhạc là `MaterialType.SheetMusic`, KHÔNG có entity `SheetMusic` |
 | tiến độ học | `MaterialLearningProgress` |
+| lời có mốc thời gian (Karaoke) | `TimedLyrics` + enum `TimedLyricsGranularity` · dòng lời `TimedLyricLine` (value object, lưu JSON) |
 | danh sách bài hát | `SongList` (một dòng một phiên bản) |
 | bài trong danh sách | `SongListItem` |
 | vị trí phụng vụ | `LiturgicalSlot` — Nhập lễ, Đáp ca, Dâng lễ, Hiệp lễ, Kết lễ |

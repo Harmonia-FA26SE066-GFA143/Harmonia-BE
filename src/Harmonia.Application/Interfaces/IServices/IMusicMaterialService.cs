@@ -72,6 +72,26 @@ public interface IMusicMaterialService
     /// </summary>
     Task<Result<ExtractedLyricsResponse>> ExtractLyricsAsync(Guid id, CancellationToken cancellationToken);
 
-    /// <summary>Soft delete: sets IsActive to false and keeps the stored file, which learning progress still points at.</summary>
+    /// <summary>
+    /// Karaoke timing of an active audio material, for anyone who can read its materials.
+    /// MATERIAL_NOT_FOUND, TIMED_LYRICS_NOT_FOUND.
+    /// </summary>
+    Task<Result<TimedLyricsDto>> GetTimedLyricsAsync(Guid audioMaterialId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Creates or replaces the timing of a SampleAudio or InteractiveScore material against an active Lyrics material of
+    /// the same song, stamped with the audio's current FileRevision. No line may end after the audio does.
+    /// MATERIAL_NOT_FOUND, MATERIAL_NOT_AUDIO, MATERIAL_NOT_LYRICS, TIMED_LYRICS_EXCEEDS_DURATION.
+    /// </summary>
+    Task<Result<TimedLyricsDto>> UpdateTimedLyricsAsync(
+        Guid audioMaterialId, UpdateTimedLyricsRequest request, CancellationToken cancellationToken);
+
+    /// <summary>MATERIAL_NOT_FOUND, TIMED_LYRICS_NOT_FOUND.</summary>
+    Task<Result> DeleteTimedLyricsAsync(Guid audioMaterialId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Soft delete: sets IsActive to false and keeps the stored file, which learning progress still points at.
+    /// Removes every timing that uses the material as audio or as lyrics.
+    /// </summary>
     Task<Result> DeleteAsync(Guid id, CancellationToken cancellationToken);
 }

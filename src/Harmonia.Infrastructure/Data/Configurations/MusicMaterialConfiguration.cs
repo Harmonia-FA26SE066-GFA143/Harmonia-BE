@@ -15,6 +15,9 @@ public class MusicMaterialConfiguration : IEntityTypeConfiguration<MusicMaterial
         builder.Property(x => x.PlaybackNotesPublicId).HasMaxLength(255);
         builder.Property(x => x.ScoreSha256).HasMaxLength(64);
         builder.Property(x => x.PlaybackAudioSha256).HasMaxLength(64);
+        builder.Property(x => x.PlaybackNotesSha256).HasMaxLength(64);
+        // Existing rows become revision 1 when the column is added.
+        builder.Property(x => x.FileRevision).HasDefaultValue(1);
 
         builder.HasOne(x => x.Song)
             .WithMany(x => x.MusicMaterials)

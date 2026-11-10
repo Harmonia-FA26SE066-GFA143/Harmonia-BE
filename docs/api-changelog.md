@@ -11,6 +11,29 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
   huống trước đây chưa có. FE bỏ qua trường lạ, hiển thị câu chung cho mã lạ.
 - Mỗi PR đổi hợp đồng thêm một dòng vào mục ngày tương ứng ở đây, cùng PR cập nhật `api.md` / `error-codes.md`.
 
+## 2026-11-10
+
+Karaoke và bản nhạc chạy theo nốt (yêu cầu Web). Cần migration thêm bảng `TimedLyrics` và cột `FileRevision`,
+`AudioDurationSeconds`, `PlaybackNotesSha256` vào `MusicMaterials` trước khi deploy.
+
+### Không phá vỡ
+
+- Endpoint mới `GET | PUT | DELETE api/music-materials/{id}/timed-lyrics` → `TimedLyricsDto` (`api.md` mục 7).
+  Mã mới: `TIMED_LYRICS_NOT_FOUND`, `TIMED_LYRICS_EXCEEDS_DURATION`, `TIMED_LYRICS_LINES_INVALID`, `MATERIAL_NOT_AUDIO`,
+  `MATERIAL_NOT_LYRICS`.
+- `MusicMaterialDto` thêm `fileRevision` (1 khi upload, +1 mỗi lần thay file).
+- `InteractiveScoreDto` thêm `notesUrl`, `notesSha256`, `notesSchemaVersion` — một response đủ score + WAV + notes của
+  cùng revision.
+- `notes.json` của score mới upload / thay file là schema v2: mỗi nốt có `id`, `partId`, `measureIndex`, `voice`,
+  `staff`, `noteIndex`, thêm `measures[]` và `readingOrder`. Vẫn đủ trường v1. `PlaybackDto.schemaVersion` = 2 cho
+  các score này. File MIDI vẫn v1.
+
+### [Phá vỡ] Upload audio hỏng
+
+- `POST api/music-materials` và `PUT {id}/file` với `.mp3` / `.m4a` / `.wav` mà server không đọc được độ dài → 422
+  `MATERIAL_AUDIO_INVALID` (mã mới). Trước đây mọi file đúng đuôi đều được nhận.
+- `PUT {id}/file` của audio xoá lời có mốc thời gian của audio đó.
+
 ## 2026-11-09
 
 Đăng ký gia nhập online từ trang chủ (UC-45) và đề cử ca trưởng (UC-46). Cần migration tạo bảng `MemberRegistrations`

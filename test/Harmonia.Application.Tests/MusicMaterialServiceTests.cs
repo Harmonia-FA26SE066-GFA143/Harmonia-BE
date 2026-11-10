@@ -25,6 +25,8 @@ public class MusicMaterialServiceTests
     private readonly IMidiRenderer _midi = Substitute.For<IMidiRenderer>();
     private readonly IScoreConverter _scores = Substitute.For<IScoreConverter>();
     private readonly ILyricsExtractor _lyrics = Substitute.For<ILyricsExtractor>();
+    private readonly ITimedLyricsRepository _timings = Substitute.For<ITimedLyricsRepository>();
+    private readonly IAudioDurationReader _durations = Substitute.For<IAudioDurationReader>();
     private readonly MusicMaterialService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly Guid _directorUserId = Guid.NewGuid();
@@ -37,9 +39,10 @@ public class MusicMaterialServiceTests
                 cfg.AddProfile<MusicMaterialProfile>();
                 cfg.AddProfile<MaterialLearningProgressProfile>();
                 cfg.AddProfile<MemberProfileProfile>();
+                cfg.AddProfile<TimedLyricsProfile>();
             }, NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new MusicMaterialService(_materials, _songs, _skills, _members, _progresses, _storage, _midi, _scores, _lyrics, mapper);
+        _sut = new MusicMaterialService(_materials, _songs, _skills, _members, _progresses, _storage, _midi, _scores, _lyrics, _timings, _durations, mapper);
 
         _songs.GetByIdAsync(_song.Id, _ct).Returns(_song);
         _storage.UploadAsync(default!, default!, default!, default, default)
@@ -48,7 +51,9 @@ public class MusicMaterialServiceTests
         _storage.DeleteAsync(default!, default, default).ReturnsForAnyArgs(Result.Success());
         _storage.GetSignedUrl(Arg.Any<string>()).Returns(call => $"signed:{call.Arg<string>()}");
         _midi.Render(default!, default).ReturnsForAnyArgs(Result<PlaybackRender>.Success(new PlaybackRender([1], [2], 12.5)));
-        _scores.ToMidi(default!, default).ReturnsForAnyArgs(Result<byte[]>.Success([9]));
+        _scores.ToMidi(default!, default).ReturnsForAnyArgs(Result<ScoreConversion>.Success(new ScoreConversion([9], [7])));
+        _durations.ReadSeconds(default!, default!).ReturnsForAnyArgs(Result<double>.Success(95.5));
+        _timings.ListAsync(default!, default).ReturnsForAnyArgs(new List<TimedLyrics>());
     }
 
     private static string Sha256(params byte[] bytes) => Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes));
@@ -760,13 +765,15 @@ public class MusicMaterialServiceTests
             Arg.Is<MusicMaterial>(m => m.ScoreRevision == 1
                 && m.ScoreSha256 == Sha256(1, 2, 3) // NewFile content
                 && m.PlaybackAudioSha256 == Sha256(2) // stubbed WAV
-                && m.PlaybackAudioPublicId == "harmonia/music-materials/playback/stored.wav"), _ct);
+                && m.PlaybackAudioPublicId == "harmonia/music-materials/playback/stored.wav"
+                // notes.json is the converter's v2 timeline, not the renderer's v1 notes.
+                && m.PlaybackNotesSha256 == Sha256(7)), _ct);
     }
 
     [Fact]
     public async Task Upload_ScoreRejectedByConverter_ReturnsItsCodeAndStoresNothing_Async()
     {
-        _scores.ToMidi(default!, default).ReturnsForAnyArgs(Result<byte[]>.Failure(ErrorCodes.MaterialScoreInvalid));
+        _scores.ToMidi(default!, default).ReturnsForAnyArgs(Result<ScoreConversion>.Failure(ErrorCodes.MaterialScoreInvalid));
 
         var result = await _sut.UploadAsync(NewRequest(MaterialType.InteractiveScore), NewFile("hong.mxl"), _ct);
 
@@ -835,7 +842,7 @@ public class MusicMaterialServiceTests
     public async Task ReplaceFile_ScoreRejected_KeepsTheRevisionAndFiles_Async()
     {
         var material = StubScoreMaterial();
-        _scores.ToMidi(default!, default).ReturnsForAnyArgs(Result<byte[]>.Failure(ErrorCodes.MaterialScoreUnsupported));
+        _scores.ToMidi(default!, default).ReturnsForAnyArgs(Result<ScoreConversion>.Failure(ErrorCodes.MaterialScoreUnsupported));
 
         var result = await _sut.ReplaceFileAsync(material.Id, new ReplaceMusicMaterialFileRequest(), NewFile("new.mxl"), _ct);
 
@@ -859,6 +866,192 @@ public class MusicMaterialServiceTests
         Assert.Equal(("signed:harmonia/old.wav", "old-audio"), (dto.AudioUrl, dto.AudioSha256));
         Assert.Equal(30, dto.DurationSeconds);
         Assert.Equal(material.CreatedAt, dto.UpdatedAt);
+        // Saved before notes hashes were kept: still served, flagged as v1.
+        Assert.Equal(("signed:harmonia/old.json", null, 1), (dto.NotesUrl, dto.NotesSha256, dto.NotesSchemaVersion));
+    }
+
+    [Fact]
+    public async Task GetScore_WithNotesHash_ReportsSchemaTwo_Async()
+    {
+        var material = StubScoreMaterial();
+        material.PlaybackNotesSha256 = "notes-hash";
+
+        var dto = (await _sut.GetScoreAsync(material.Id, _ct)).Value!;
+
+        Assert.Equal(("notes-hash", 2), (dto.NotesSha256, dto.NotesSchemaVersion));
+    }
+
+    [Fact]
+    public async Task Upload_Mp3_StoresItsLength_Async()
+    {
+        await _sut.UploadAsync(NewRequest(MaterialType.SampleAudio), NewFile("mau.mp3"), _ct);
+
+        await _materials.Received(1).AddAsync(
+            Arg.Is<MusicMaterial>(m => m.AudioDurationSeconds == 95.5 && m.FileRevision == 1), _ct);
+    }
+
+    [Fact]
+    public async Task Upload_UnreadableAudio_ReturnsAudioInvalidAndStoresNothing_Async()
+    {
+        _durations.ReadSeconds(default!, default!).ReturnsForAnyArgs(Result<double>.Failure(ErrorCodes.MaterialAudioInvalid));
+
+        var result = await _sut.UploadAsync(NewRequest(MaterialType.SampleAudio), NewFile("hong.wav"), _ct);
+
+        Assert.Equal(ErrorCodes.MaterialAudioInvalid, result.Code);
+        await _storage.DidNotReceiveWithAnyArgs().UploadAsync(default!, default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task ReplaceFile_Audio_BumpsFileRevisionAndRemovesItsTiming_Async()
+    {
+        var material = StubAudioMaterial();
+        var timing = new TimedLyrics { Id = Guid.NewGuid(), AudioMaterialId = material.Id };
+        _timings.ListAsync(default!, default).ReturnsForAnyArgs([timing]);
+
+        var result = await _sut.ReplaceFileAsync(material.Id, new ReplaceMusicMaterialFileRequest(), NewFile("moi.mp3"), _ct);
+
+        Assert.Equal((2, 95.5), (result.Value!.FileRevision, material.AudioDurationSeconds));
+        _timings.Received(1).Remove(timing);
+        await _materials.Received(1).SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Delete_RemovesTimingsUsingTheMaterial_Async()
+    {
+        var material = StubAudioMaterial();
+        var timing = new TimedLyrics { Id = Guid.NewGuid(), AudioMaterialId = material.Id };
+        _timings.ListAsync(default!, default).ReturnsForAnyArgs([timing]);
+
+        await _sut.DeleteAsync(material.Id, _ct);
+
+        _timings.Received(1).Remove(timing);
+    }
+
+    private MusicMaterial StubLyricsMaterial(Guid? songId = null)
+    {
+        var lyrics = new MusicMaterial
+        {
+            Id = Guid.NewGuid(), SongId = songId ?? _song.Id, Title = "Loi", MaterialType = MaterialType.Lyrics,
+            LyricsText = "Lay Chua", IsActive = true,
+        };
+        _materials.GetByIdAsync(lyrics.Id, _ct).Returns(lyrics);
+        return lyrics;
+    }
+
+    private static UpdateTimedLyricsRequest TimingRequest(Guid lyricsId, double lastEnd = 5.8) => new()
+    {
+        LyricsMaterialId = lyricsId,
+        Lines = [new() { Order = 1, Text = "Lay Chua", StartSeconds = 0, EndSeconds = 2 },
+            new() { Order = 2, Text = "xin thuong con", StartSeconds = 2, EndSeconds = lastEnd }],
+    };
+
+    [Fact]
+    public async Task UpdateTimedLyrics_NewTiming_AddsItStampedWithTheAudioRevision_Async()
+    {
+        var audio = StubAudioMaterial();
+        audio.FileRevision = 3;
+        audio.AudioDurationSeconds = 60;
+        var lyrics = StubLyricsMaterial();
+
+        var result = await _sut.UpdateTimedLyricsAsync(audio.Id, TimingRequest(lyrics.Id), _ct);
+
+        Assert.True(result.IsSuccess);
+        var dto = result.Value!;
+        Assert.Equal((_song.Id, lyrics.Id, audio.Id, 3), (dto.SongId, dto.LyricsMaterialId, dto.AudioMaterialId, dto.AudioRevision));
+        Assert.Equal(["Lay Chua", "xin thuong con"], dto.Lines.Select(x => x.Text));
+        await _timings.Received(1).AddAsync(Arg.Is<TimedLyrics>(t => t.AudioMaterialId == audio.Id && t.Lines.Count == 2), _ct);
+        await _timings.Received(1).SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task UpdateTimedLyrics_ExistingTiming_ReplacesItsLines_Async()
+    {
+        var audio = StubAudioMaterial();
+        var lyrics = StubLyricsMaterial();
+        var existing = new TimedLyrics
+        {
+            Id = Guid.NewGuid(), AudioMaterialId = audio.Id, AudioRevision = 1,
+            Lines = [new() { Order = 1, Text = "cu", StartSeconds = 0, EndSeconds = 1 }],
+        };
+        _timings.GetByAudioMaterialIdAsync(audio.Id, _ct).Returns(existing);
+
+        var result = await _sut.UpdateTimedLyricsAsync(audio.Id, TimingRequest(lyrics.Id), _ct);
+
+        Assert.Equal(existing.Id, result.Value!.Id);
+        Assert.Equal(2, existing.Lines.Count);
+        await _timings.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task UpdateTimedLyrics_LyricsOfAnotherSong_ReturnsNotLyrics_Async()
+    {
+        var audio = StubAudioMaterial();
+        var lyrics = StubLyricsMaterial(Guid.NewGuid());
+
+        var result = await _sut.UpdateTimedLyricsAsync(audio.Id, TimingRequest(lyrics.Id), _ct);
+
+        Assert.Equal(ErrorCodes.MaterialNotLyrics, result.Code);
+        await _timings.DidNotReceiveWithAnyArgs().SaveChangesAsync(default);
+    }
+
+    [Fact]
+    public async Task UpdateTimedLyrics_LineAfterTheAudioEnds_ReturnsExceedsDuration_Async()
+    {
+        var audio = StubAudioMaterial();
+        audio.AudioDurationSeconds = 5;
+        var lyrics = StubLyricsMaterial();
+
+        var result = await _sut.UpdateTimedLyricsAsync(audio.Id, TimingRequest(lyrics.Id, lastEnd: 5.8), _ct);
+
+        Assert.Equal(ErrorCodes.TimedLyricsExceedsDuration, result.Code);
+    }
+
+    [Fact]
+    public async Task UpdateTimedLyrics_ScoreUsesItsRenderedLength_Async()
+    {
+        var score = StubScoreMaterial(); // PlaybackDurationSeconds = 30
+        var lyrics = StubLyricsMaterial();
+
+        Assert.True((await _sut.UpdateTimedLyricsAsync(score.Id, TimingRequest(lyrics.Id, 29), _ct)).IsSuccess);
+        Assert.Equal(ErrorCodes.TimedLyricsExceedsDuration,
+            (await _sut.UpdateTimedLyricsAsync(score.Id, TimingRequest(lyrics.Id, 31), _ct)).Code);
+    }
+
+    [Fact]
+    public async Task UpdateTimedLyrics_SheetMusic_ReturnsNotAudio_Async()
+    {
+        var sheet = StubAudioMaterial();
+        sheet.MaterialType = MaterialType.SheetMusic;
+
+        var result = await _sut.UpdateTimedLyricsAsync(sheet.Id, TimingRequest(Guid.NewGuid()), _ct);
+
+        Assert.Equal(ErrorCodes.MaterialNotAudio, result.Code);
+    }
+
+    [Fact]
+    public async Task GetTimedLyrics_NoTiming_ReturnsTimedLyricsNotFound_Async()
+    {
+        var audio = StubAudioMaterial();
+
+        Assert.Equal(ErrorCodes.TimedLyricsNotFound, (await _sut.GetTimedLyricsAsync(audio.Id, _ct)).Code);
+    }
+
+    [Fact]
+    public async Task GetTimedLyrics_MissingMaterial_ReturnsMaterialNotFound_Async()
+    {
+        Assert.Equal(ErrorCodes.MaterialNotFound, (await _sut.GetTimedLyricsAsync(Guid.NewGuid(), _ct)).Code);
+    }
+
+    [Fact]
+    public async Task DeleteTimedLyrics_Existing_RemovesAndSaves_Async()
+    {
+        var audio = StubAudioMaterial();
+        var timing = new TimedLyrics { Id = Guid.NewGuid(), AudioMaterialId = audio.Id };
+        _timings.GetByAudioMaterialIdAsync(audio.Id, _ct).Returns(timing);
+
+        Assert.True((await _sut.DeleteTimedLyricsAsync(audio.Id, _ct)).IsSuccess);
+        _timings.Received(1).Remove(timing);
+        await _timings.Received(1).SaveChangesAsync(_ct);
     }
 
     [Fact]

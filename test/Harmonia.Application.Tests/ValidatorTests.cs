@@ -910,4 +910,40 @@ public class ValidatorTests
 
         Assert.Equal(isValid ? [] : [ErrorCodes.LiturgicalEventGenerationRangeInvalid], codes);
     }
+
+    // ---- Timed lyrics ----
+
+    [Theory]
+    [InlineData(1, 0, 2, 2, 2, 4, true)]   // back to back
+    [InlineData(1, 0, 2, 2, 1.5, 4, false)] // second starts before the first ends
+    [InlineData(1, 0, 2, 1, 2, 4, false)]   // orders not increasing
+    [InlineData(1, 0, 0, 2, 2, 4, false)]   // first ends where it starts
+    public void UpdateTimedLyrics_LinesInOrderWithoutOverlap(
+        int order1, double start1, double end1, int order2, double start2, double end2, bool isValid)
+    {
+        var codes = ErrorCodesOf(new UpdateTimedLyricsRequestValidator(), new UpdateTimedLyricsRequest
+        {
+            LyricsMaterialId = Guid.NewGuid(),
+            Lines = [new() { Order = order1, Text = "a", StartSeconds = start1, EndSeconds = end1 },
+                new() { Order = order2, Text = "b", StartSeconds = start2, EndSeconds = end2 }],
+        });
+
+        if (isValid) Assert.Empty(codes);
+        else Assert.Contains(ErrorCodes.TimedLyricsLinesInvalid, codes);
+    }
+
+    [Fact]
+    public void UpdateTimedLyrics_TooManyLinesOrBlankText_HasErrors()
+    {
+        var lines = Enumerable.Range(0, UpdateTimedLyricsRequestValidator.MaxLines + 1)
+            .Select(i => new TimedLyricLineRequest { Order = i, Text = i == 0 ? " " : "x", StartSeconds = i, EndSeconds = i + 1 })
+            .ToList();
+
+        var codes = ErrorCodesOf(new UpdateTimedLyricsRequestValidator(), new UpdateTimedLyricsRequest
+        {
+            LyricsMaterialId = Guid.NewGuid(), Lines = lines,
+        });
+
+        Assert.Equal(2, codes.Length);
+    }
 }

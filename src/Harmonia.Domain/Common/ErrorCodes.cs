@@ -221,6 +221,23 @@ public static class ErrorCodes
     // GET .../score on a material that is not an interactive score.
     public const string MaterialNotInteractiveScore = "MATERIAL_NOT_INTERACTIVE_SCORE";
 
+    // An .mp3/.m4a/.wav whose length cannot be read: broken or not really that format.
+    public const string MaterialAudioInvalid = "MATERIAL_AUDIO_INVALID";
+
+    // Timed lyrics hang on a SampleAudio or InteractiveScore material only.
+    public const string MaterialNotAudio = "MATERIAL_NOT_AUDIO";
+
+    // The lyrics side of timed lyrics must be an active Lyrics material of the same song.
+    public const string MaterialNotLyrics = "MATERIAL_NOT_LYRICS";
+
+    public const string TimedLyricsNotFound = "TIMED_LYRICS_NOT_FOUND";
+
+    // The last line ends after the audio does.
+    public const string TimedLyricsExceedsDuration = "TIMED_LYRICS_EXCEEDS_DURATION";
+
+    // Field-level: a line ends before it starts, overlaps the next one, or the orders are not strictly increasing.
+    public const string TimedLyricsLinesInvalid = "TIMED_LYRICS_LINES_INVALID";
+
     public const string MidiInvalidFile = "MIDI_INVALID_FILE";
 
     // Format 2 or SMPTE time division.

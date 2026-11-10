@@ -84,6 +84,29 @@ public class MusicMaterialsController(IMusicMaterialService musicMaterialService
     public async Task<IActionResult> GetScoreAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await musicMaterialService.GetScoreAsync(id, cancellationToken));
 
+    /// <summary>
+    /// Karaoke timing of an audio material (SampleAudio or InteractiveScore). Check its audioRevision against the
+    /// audio's revision before playing; TIMED_LYRICS_NOT_FOUND when none is saved.
+    /// </summary>
+    [HttpGet("{id:guid}/timed-lyrics")]
+    [ProducesResponseType<TimedLyricsDto>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetTimedLyricsAsync(Guid id, CancellationToken cancellationToken) =>
+        ToActionResult(await musicMaterialService.GetTimedLyricsAsync(id, cancellationToken));
+
+    /// <summary>Creates or replaces the whole timing; removed automatically when the audio file is replaced.</summary>
+    [HttpPut("{id:guid}/timed-lyrics")]
+    [Authorize(Roles = RoleNames.ChoirDirector)]
+    [ProducesResponseType<TimedLyricsDto>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdateTimedLyricsAsync(
+        Guid id, [FromBody] UpdateTimedLyricsRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await musicMaterialService.UpdateTimedLyricsAsync(id, request, cancellationToken));
+
+    [HttpDelete("{id:guid}/timed-lyrics")]
+    [Authorize(Roles = RoleNames.ChoirDirector)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeleteTimedLyricsAsync(Guid id, CancellationToken cancellationToken) =>
+        ToActionResult(await musicMaterialService.DeleteTimedLyricsAsync(id, cancellationToken));
+
     /// <summary>Draft lyrics read by AI from a sheet music file; nothing is saved. Save the edited text as a Lyrics material.</summary>
     [HttpPost("{id:guid}/extract-lyrics")]
     [Authorize(Roles = RoleNames.ChoirDirector)]

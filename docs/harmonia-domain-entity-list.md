@@ -1,6 +1,6 @@
 # Harmonia – Domain Entity List & Attributes (for ERD, Report 3/4)
 
-54 entities derived from FE-01→FE-54 (`claude/functional-requirements-by-actor.md`), the canonical use cases (`claude/use-case-list.md`) and the daily liturgical program model (D6). Diagram: `harmonia-erd.mmd`.
+55 entities derived from FE-01→FE-54 (`claude/functional-requirements-by-actor.md`), the canonical use cases (`claude/use-case-list.md`) and the daily liturgical program model (D6). Diagram: `harmonia-erd.mmd`.
 
 Conceptual/logical level: attribute names, types and constraints. No indexes, no migration syntax.
 
@@ -116,10 +116,13 @@ Written once here instead of repeated 47 times:
 `songId` Guid → Song · `skillId` Guid → Skill · `isMandatory` bool · unique `(songId, skillId)`
 
 **20. `MusicMaterial`** — sheet music / lyrics / sample audio / rehearsal material (FE-08/28) ***auditable***
-`songId` Guid → Song · `materialType` MaterialType · `title` string(200) · `filePublicId` string(255)? (private, signed URL on read) · `fileName` string(200)? · `lyricsText` string(max)? (Lyrics typed as text — exactly one of file or text) · `fileSizeBytes` long? · `scoreRevision` int? · `scoreSha256` string(64)? · `playbackAudioSha256` string(64)? (the last three for InteractiveScore only) · `targetSkillId` Guid? → Skill · `isActive` bool
+`songId` Guid → Song · `materialType` MaterialType · `title` string(200) · `filePublicId` string(255)? (private, signed URL on read) · `fileName` string(200)? · `lyricsText` string(max)? (Lyrics typed as text — exactly one of file or text) · `fileSizeBytes` long? · `fileRevision` int (1, +1 per file replacement) · `audioDurationSeconds` double? (.mp3/.m4a/.wav) · `playbackNotesSha256` string(64)? · `scoreRevision` int? · `scoreSha256` string(64)? · `playbackAudioSha256` string(64)? (the last three for InteractiveScore only) · `targetSkillId` Guid? → Skill · `isActive` bool
 
 **21. `MaterialLearningProgress`** — Learned / Needs practice (FE-09)
 `memberId` Guid → MemberProfile · `materialId` Guid → MusicMaterial · `status` LearningStatus · `updatedAt` DateTime · unique `(memberId, materialId)`
+
+**`TimedLyrics`** — karaoke timing of a Lyrics material against one revision of an audio material ***auditable***
+`audioMaterialId` Guid → MusicMaterial (cascade, unique) · `lyricsMaterialId` Guid → MusicMaterial (restrict) · `audioRevision` int · `granularity` TimedLyricsGranularity · `lines` JSON list of value object `TimedLyricLine` (`order` int · `text` string(500) · `startSeconds` double · `endSeconds` double)
 
 `SongVocalRequirement` + `SongInstrumentRequirement` can be one `SongSkillRequirement` — `SkillCategory` already separates vocal from instrument.
 
@@ -227,6 +230,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 | Enum | Values |
 |---|---|
 | `MemberStatus` | Active, Inactive, Left |
+| `TimedLyricsGranularity` | Line |
 | `DirectorNominationStatus` | Pending, Approved, InTraining, Trained, Appointed, Rejected, Cancelled |
 | `DirectorTrainingResult` | InProgress, Passed, Failed |
 | `DevicePlatform` | Android, iOS, Web |
@@ -287,6 +291,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 - `Song` 1 — n `SongVocalRequirement` n — 1 `Skill`
 - `Song` 1 — n `SongInstrumentRequirement` n — 1 `Skill`
 - `Song` 1 — n `MusicMaterial` 1 — n `MaterialLearningProgress` n — 1 `MemberProfile`
+- `MusicMaterial` (audio) 1 — 0..1 `TimedLyrics` n — 1 `MusicMaterial` (lyrics)
 
 **Song list**
 - `LiturgicalEvent` 1 — n `SongList` *(D4: one row per version)*, `SongList` 0..1 — 1 `SongList` *(previousVersionId)*
@@ -350,6 +355,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 - 2026-11-09: `MemberRegistration` added — join request from the public home page, step 1 of the member → director process (`docs/harmonia-director-nomination-process.md`) (51 → 52). `NotificationType.MemberRegistrationSubmitted` appended last. Needs a migration.
 - 2026-11-09: `DirectorNomination` + enum `DirectorNominationStatus` added — UC-46, member → Choir Director nomination (52 → 53 entities, 24 → 25 enums). `NotificationType.DirectorNomination` appended last. Needs a migration.
 - 2026-11-09: `DirectorTraining` + enum `DirectorTrainingResult` added — step 9, courses of a nomination with a private certificate (53 → 54 entities, 25 → 26 enums). Needs migration `AddDirectorTraining`.
+- 2026-11-10: Web karaoke + score timeline — `TimedLyrics` + enum `TimedLyricsGranularity` added (54 → 55 entities, 26 → 27 enums), lines kept as a JSON column; `MusicMaterial` gains `fileRevision`, `audioDurationSeconds`, `playbackNotesSha256`. Needs a migration.
 
 **Bổ sung 2026-10-26 — phân công 3 tầng**
 

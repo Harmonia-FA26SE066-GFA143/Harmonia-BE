@@ -17,6 +17,9 @@ public class MusicMaterialDto
 
     public long? FileSizeBytes { get; set; }
 
+    /// <summary>1 on upload, +1 on every file replacement; compare with TimedLyricsDto.AudioRevision.</summary>
+    public int FileRevision { get; set; }
+
     public Guid? TargetSkillId { get; set; }
 
     public string? TargetSkillName { get; set; }

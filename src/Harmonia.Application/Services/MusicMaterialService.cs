@@ -7,6 +7,7 @@ using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Domain.Common;
 using Harmonia.Domain.Entities;
 using Harmonia.Domain.Enums;
+using Harmonia.Domain.ValueObjects;
 
 namespace Harmonia.Application.Services;
 
@@ -20,6 +21,8 @@ public class MusicMaterialService(
     IMidiRenderer midiRenderer,
     IScoreConverter scoreConverter,
     ILyricsExtractor lyricsExtractor,
+    ITimedLyricsRepository timedLyricsRepository,
+    IAudioDurationReader audioDurationReader,
     IMapper mapper) : IMusicMaterialService
 {
     private const string PlaybackFolder = "music-materials/playback";
@@ -38,6 +41,12 @@ public class MusicMaterialService(
     private static readonly string[] AudioExtensions = [".mp3", ".m4a", ".wav", ".mid", ".midi"];
 
     private static readonly string[] LyricsExtensions = [".docx"];
+
+    // Recorded audio whose length is read on upload; MIDI and scores get theirs from the renderer.
+    private static readonly string[] RecordedAudioExtensions = [".mp3", ".m4a", ".wav"];
+
+    // Timing cap for audio of unknown length (rows uploaded before lengths were read); matches MidiRenderer.MaxTimelineSeconds.
+    private const double MaxUnknownAudioSeconds = 10 * 60;
 
     public async Task<Result<MusicMaterialDto>> UploadAsync(
         UploadMusicMaterialRequest request, FileContent? file, CancellationToken cancellationToken)
@@ -58,6 +67,9 @@ public class MusicMaterialService(
         if (CheckFile(request.MaterialType, file) is { } fileError)
             return Result<MusicMaterialDto>.Failure(fileError);
 
+        var audioDuration = ReadAudioDuration(file!);
+        if (!audioDuration.IsSuccess) return Result<MusicMaterialDto>.Failure(audioDuration.Code!);
+
         var playback = await StorePlaybackAsync(file!, request.Instrument, cancellationToken);
         if (!playback.IsSuccess) return Result<MusicMaterialDto>.Failure(playback.Code!);
 
@@ -77,6 +89,7 @@ public class MusicMaterialService(
         // Keep the tail so the extension survives truncation.
         material.FileName = fileName.Length > MaxFileNameLength ? fileName[^MaxFileNameLength..] : fileName;
         material.FileSizeBytes = file.Length;
+        material.AudioDurationSeconds = audioDuration.Value;
         SetPlayback(material, playback.Value);
 
         try
@@ -185,6 +198,9 @@ public class MusicMaterialService(
         if (CheckFile(material.MaterialType, file) is { } fileError)
             return Result<MusicMaterialDto>.Failure(fileError);
 
+        var audioDuration = ReadAudioDuration(file!);
+        if (!audioDuration.IsSuccess) return Result<MusicMaterialDto>.Failure(audioDuration.Code!);
+
         var playback = await StorePlaybackAsync(file!, request.Instrument, cancellationToken);
         if (!playback.IsSuccess) return Result<MusicMaterialDto>.Failure(playback.Code!);
 
@@ -203,8 +219,14 @@ public class MusicMaterialService(
         material.FilePublicId = newPublicId;
         material.FileName = fileName.Length > MaxFileNameLength ? fileName[^MaxFileNameLength..] : fileName;
         material.FileSizeBytes = file.Length;
+        material.FileRevision++;
+        material.AudioDurationSeconds = audioDuration.Value;
         // A non-MIDI replacement clears the playback files, so the old rendering is never served for the new file.
         SetPlayback(material, playback.Value);
+
+        // A timing made for the old audio would run out of sync with the new one; removed in the same save.
+        foreach (var timing in await timedLyricsRepository.ListAsync(x => x.AudioMaterialId == id, cancellationToken))
+            timedLyricsRepository.Remove(timing);
 
         if (request.ResetProgress)
         {
@@ -239,7 +261,71 @@ public class MusicMaterialService(
         if (material is not { IsActive: true }) return Result.Failure(ErrorCodes.MaterialNotFound);
 
         material.IsActive = false;
+        // A timing is meaningless without either side; the material row itself stays (soft delete).
+        foreach (var timing in await timedLyricsRepository.ListAsync(
+                     x => x.AudioMaterialId == id || x.LyricsMaterialId == id, cancellationToken))
+            timedLyricsRepository.Remove(timing);
+
         await musicMaterialRepository.SaveChangesAsync(cancellationToken);
+        return Result.Success();
+    }
+
+    public async Task<Result<TimedLyricsDto>> GetTimedLyricsAsync(Guid audioMaterialId, CancellationToken cancellationToken)
+    {
+        var material = await musicMaterialRepository.GetByIdAsync(audioMaterialId, cancellationToken);
+        if (material is not { IsActive: true }) return Result<TimedLyricsDto>.Failure(ErrorCodes.MaterialNotFound);
+
+        var timing = await timedLyricsRepository.GetByAudioMaterialIdAsync(audioMaterialId, cancellationToken);
+        if (timing is null) return Result<TimedLyricsDto>.Failure(ErrorCodes.TimedLyricsNotFound);
+
+        timing.AudioMaterial = material;
+        return Result<TimedLyricsDto>.Success(mapper.Map<TimedLyricsDto>(timing));
+    }
+
+    public async Task<Result<TimedLyricsDto>> UpdateTimedLyricsAsync(
+        Guid audioMaterialId, UpdateTimedLyricsRequest request, CancellationToken cancellationToken)
+    {
+        var material = await musicMaterialRepository.GetByIdAsync(audioMaterialId, cancellationToken);
+        if (material is not { IsActive: true }) return Result<TimedLyricsDto>.Failure(ErrorCodes.MaterialNotFound);
+        if (material.MaterialType is not (MaterialType.SampleAudio or MaterialType.InteractiveScore) || material.FilePublicId is null)
+            return Result<TimedLyricsDto>.Failure(ErrorCodes.MaterialNotAudio);
+
+        var lyrics = await musicMaterialRepository.GetByIdAsync(request.LyricsMaterialId, cancellationToken);
+        if (lyrics is not { IsActive: true, MaterialType: MaterialType.Lyrics } || lyrics.SongId != material.SongId)
+            return Result<TimedLyricsDto>.Failure(ErrorCodes.MaterialNotLyrics);
+
+        // MIDI and scores are timed against their rendered WAV; recorded audio against its own length.
+        var duration = material.AudioDurationSeconds ?? material.PlaybackDurationSeconds ?? MaxUnknownAudioSeconds;
+        if (request.Lines.Max(x => x.EndSeconds) > duration)
+            return Result<TimedLyricsDto>.Failure(ErrorCodes.TimedLyricsExceedsDuration);
+
+        var timing = await timedLyricsRepository.GetByAudioMaterialIdAsync(audioMaterialId, cancellationToken);
+        if (timing is null)
+        {
+            timing = new TimedLyrics { Id = Guid.NewGuid(), AudioMaterialId = audioMaterialId };
+            await timedLyricsRepository.AddAsync(timing, cancellationToken);
+        }
+
+        timing.LyricsMaterialId = lyrics.Id;
+        timing.AudioRevision = material.FileRevision;
+        timing.Granularity = request.Granularity;
+        timing.Lines = mapper.Map<List<TimedLyricLine>>(request.Lines);
+        await timedLyricsRepository.SaveChangesAsync(cancellationToken);
+
+        timing.AudioMaterial = material;
+        return Result<TimedLyricsDto>.Success(mapper.Map<TimedLyricsDto>(timing));
+    }
+
+    public async Task<Result> DeleteTimedLyricsAsync(Guid audioMaterialId, CancellationToken cancellationToken)
+    {
+        var material = await musicMaterialRepository.GetByIdAsync(audioMaterialId, cancellationToken);
+        if (material is not { IsActive: true }) return Result.Failure(ErrorCodes.MaterialNotFound);
+
+        var timing = await timedLyricsRepository.GetByAudioMaterialIdAsync(audioMaterialId, cancellationToken);
+        if (timing is null) return Result.Failure(ErrorCodes.TimedLyricsNotFound);
+
+        timedLyricsRepository.Remove(timing);
+        await timedLyricsRepository.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 
@@ -263,12 +349,14 @@ public class MusicMaterialService(
         if (material.MaterialType != MaterialType.InteractiveScore)
             return Result<InteractiveScoreDto>.Failure(ErrorCodes.MaterialNotInteractiveScore);
         // Upload and replacement save the score and its playback together, so this only guards a hand-edited row.
-        if (material.FilePublicId is null || material.PlaybackAudioPublicId is null || material.PlaybackDurationSeconds is null)
+        if (material.FilePublicId is null || material.PlaybackAudioPublicId is null || material.PlaybackNotesPublicId is null
+            || material.PlaybackDurationSeconds is null)
             return Result<InteractiveScoreDto>.Failure(ErrorCodes.MaterialPlaybackUnavailable);
 
         var dto = mapper.Map<InteractiveScoreDto>(material);
         dto.ScoreUrl = fileStorageService.GetSignedUrl(material.FilePublicId);
         dto.AudioUrl = fileStorageService.GetSignedUrl(material.PlaybackAudioPublicId);
+        dto.NotesUrl = fileStorageService.GetSignedUrl(material.PlaybackNotesPublicId);
         return Result<InteractiveScoreDto>.Success(dto);
     }
 
@@ -289,7 +377,8 @@ public class MusicMaterialService(
     /// <summary>
     /// Renders a MIDI or MusicXML/MXL upload and stores its playback files before the file itself, so a file the
     /// converter or renderer rejects never reaches storage. Any other file returns success with no playback files.
-    /// A score is first converted to MIDI in memory; that MIDI is not stored.
+    /// A score is first converted to MIDI in memory; that MIDI is not stored, and its notes.json is the converter's
+    /// schema v2 timeline in place of the renderer's v1 notes.
     /// </summary>
     private async Task<Result<PlaybackFiles?>> StorePlaybackAsync(
         FileContent file, PlaybackInstrument instrument, CancellationToken cancellationToken)
@@ -301,6 +390,7 @@ public class MusicMaterialService(
         // The file itself is uploaded next from the same stream, so every read rewinds; IFormFile streams are seekable.
         string? scoreSha256 = null;
         MemoryStream? convertedMidi = null;
+        byte[]? timeline = null;
         if (isScore)
         {
             scoreSha256 = Convert.ToHexStringLower(SHA256.HashData(file.Content));
@@ -308,7 +398,8 @@ public class MusicMaterialService(
             var converted = scoreConverter.ToMidi(file.Content, isCompressed: extension == ".mxl");
             file.Content.Position = 0;
             if (!converted.IsSuccess) return Result<PlaybackFiles?>.Failure(converted.Code!);
-            convertedMidi = new MemoryStream(converted.Value!);
+            convertedMidi = new MemoryStream(converted.Value!.Midi);
+            timeline = converted.Value.TimelineJson;
         }
 
         Result<PlaybackRender> render;
@@ -320,7 +411,8 @@ public class MusicMaterialService(
         var audio = await fileStorageService.UploadAsync(audioContent, "audio.wav", PlaybackFolder, isPrivate: true, cancellationToken);
         if (!audio.IsSuccess) return Result<PlaybackFiles?>.Failure(audio.Code!);
 
-        using var notesContent = new MemoryStream(render.Value.NotesJson);
+        var notesJson = timeline ?? render.Value.NotesJson;
+        using var notesContent = new MemoryStream(notesJson);
         var notes = await fileStorageService.UploadAsync(notesContent, "notes.json", PlaybackFolder, isPrivate: true, cancellationToken);
         if (!notes.IsSuccess)
         {
@@ -330,7 +422,8 @@ public class MusicMaterialService(
 
         return Result<PlaybackFiles?>.Success(new PlaybackFiles(
             audio.Value!.PublicId, notes.Value!.PublicId, render.Value.DurationSeconds, instrument,
-            scoreSha256, isScore ? Convert.ToHexStringLower(SHA256.HashData(render.Value.AudioWav)) : null));
+            scoreSha256, isScore ? Convert.ToHexStringLower(SHA256.HashData(render.Value.AudioWav)) : null,
+            Convert.ToHexStringLower(SHA256.HashData(notesJson))));
     }
 
     private static void SetPlayback(MusicMaterial material, PlaybackFiles? playback)
@@ -341,6 +434,7 @@ public class MusicMaterialService(
         material.PlaybackInstrument = playback?.Instrument;
         material.ScoreSha256 = playback?.ScoreSha256;
         material.PlaybackAudioSha256 = playback?.AudioSha256;
+        material.PlaybackNotesSha256 = playback?.NotesSha256;
         // Only an interactive score has a revision: 1 on upload, +1 on each replacement that saves.
         material.ScoreRevision = playback?.ScoreSha256 is null ? null : (material.ScoreRevision ?? 0) + 1;
     }
@@ -354,7 +448,18 @@ public class MusicMaterialService(
 
     private sealed record PlaybackFiles(
         string AudioPublicId, string NotesPublicId, double DurationSeconds, PlaybackInstrument Instrument,
-        string? ScoreSha256, string? AudioSha256);
+        string? ScoreSha256, string? AudioSha256, string NotesSha256);
+
+    /// <summary>Length of a recorded .mp3/.m4a/.wav; success with null for every other file. Rewinds the stream.</summary>
+    private Result<double?> ReadAudioDuration(FileContent file)
+    {
+        if (!RecordedAudioExtensions.Contains(Path.GetExtension(file.FileName).ToLowerInvariant()))
+            return Result<double?>.Success(null);
+
+        var seconds = audioDurationReader.ReadSeconds(file.Content, file.FileName);
+        file.Content.Position = 0;
+        return seconds.IsSuccess ? Result<double?>.Success(seconds.Value) : Result<double?>.Failure(seconds.Code!);
+    }
 
     private TDto ToDto<TDto>(MusicMaterial material) where TDto : MusicMaterialDto
     {

@@ -18,6 +18,7 @@
 | ca đoàn | `Choir` · thành viên ca đoàn `ChoirMembership` · ca đoàn phục vụ sự kiện `LiturgicalEventChoir` |
 | bài hát | `Song` |
 | tư liệu bài hát (bản nhạc, lời, audio mẫu) | `MusicMaterial` + enum `MaterialType` |
+| lời có mốc thời gian (Karaoke) | `TimedLyrics` · một dòng `TimedLyricLine` (value object) |
 | danh sách bài hát | `SongList` — mỗi phiên bản một dòng |
 | bài trong danh sách | `SongListItem` |
 | cha xứ duyệt danh sách | `SongListReview` |
@@ -40,7 +41,7 @@
 `LiturgicalEvent` là entity trung tâm — lịch tập, danh sách bài hát, phân công phục vụ
 và xác nhận tham gia đều móc vào nó. Ba hub còn lại: `MemberProfile`, `Song`, `Skill`.
 
-Nguồn chuẩn đầy đủ 54 entity + 26 enum: `docs/harmonia-domain-entity-list.md`.
+Nguồn chuẩn đầy đủ 55 entity + 27 enum: `docs/harmonia-domain-entity-list.md`.
 Bảng trên chỉ là lối vào nhanh. Gặp thuật ngữ chưa có ở cả hai chỗ: hỏi, đừng tự dịch.
 
 ## Quy ước tên khác

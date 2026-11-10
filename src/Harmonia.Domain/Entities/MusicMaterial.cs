@@ -24,11 +24,23 @@ public class MusicMaterial : BaseAuditableEntity
 
     public long? FileSizeBytes { get; set; }
 
+    /// <summary>1 on upload, +1 on every file replacement; lets a client tell files of different revisions apart.</summary>
+    public int FileRevision { get; set; } = 1;
+
+    /// <summary>Length of an uploaded .mp3/.m4a/.wav file, read on upload. Null for any other file and for older rows.</summary>
+    public double? AudioDurationSeconds { get; set; }
+
     /// <summary>Audio rendering of a MIDI file, for the mobile piano roll. Null for every non-MIDI material.</summary>
     public string? PlaybackAudioPublicId { get; set; }
 
     /// <summary>notes.json (schema v1) built on the same timeline as <see cref="PlaybackAudioPublicId"/>.</summary>
     public string? PlaybackNotesPublicId { get; set; }
+
+    /// <summary>
+    /// Lowercase hex SHA-256 of the file at <see cref="PlaybackNotesPublicId"/>. Null for rows saved before it existed;
+    /// for an interactive score that also means its notes file is schema v1, not the v2 timeline.
+    /// </summary>
+    public string? PlaybackNotesSha256 { get; set; }
 
     public double? PlaybackDurationSeconds { get; set; }
 
@@ -53,6 +65,9 @@ public class MusicMaterial : BaseAuditableEntity
     public Song Song { get; set; } = null!;
 
     public Skill? TargetSkill { get; set; }
+
+    /// <summary>Karaoke timing against this material as the audio side; the lyrics side has no navigation back.</summary>
+    public TimedLyrics? TimedLyrics { get; set; }
 
     public ICollection<MaterialLearningProgress> LearningProgresses { get; set; } = [];
 }

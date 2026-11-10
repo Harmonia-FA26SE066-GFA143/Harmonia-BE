@@ -201,6 +201,12 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `MATERIAL_SCORE_INVALID` | 422 | Tệp MusicXML / MXL bị hỏng hoặc quá lớn khi giải nén |
 | `MATERIAL_SCORE_UNSUPPORTED` | 422 | Bản nhạc không có nốt nào phát được hoặc định dạng chưa hỗ trợ |
 | `MATERIAL_NOT_INTERACTIVE_SCORE` | 409 | Tài liệu này không phải bản nhạc tương tác |
+| `MATERIAL_AUDIO_INVALID` | 422 | Không đọc được độ dài tệp âm thanh. Tệp bị hỏng hoặc không đúng định dạng |
+| `MATERIAL_NOT_AUDIO` | 409 | Chỉ gắn lời có mốc thời gian vào audio mẫu hoặc bản nhạc tương tác |
+| `MATERIAL_NOT_LYRICS` | 400 | Tài liệu lời không tồn tại, không phải lời bài hát hoặc thuộc bài hát khác |
+| `TIMED_LYRICS_NOT_FOUND` | 404 | Audio này chưa có lời theo mốc thời gian |
+| `TIMED_LYRICS_EXCEEDS_DURATION` | 400 | Mốc thời gian vượt quá độ dài của audio |
+| `TIMED_LYRICS_LINES_INVALID` | 400 | Các dòng lời phải theo thứ tự, kết thúc sau khi bắt đầu và không chồng nhau |
 | `MIDI_INVALID_FILE` | 422 | Tệp MIDI không hợp lệ |
 | `MIDI_FORMAT_UNSUPPORTED` | 422 | Định dạng MIDI chưa được hỗ trợ |
 | `MIDI_NO_PLAYABLE_NOTES` | 422 | Tệp MIDI không có nốt nào để phát |
