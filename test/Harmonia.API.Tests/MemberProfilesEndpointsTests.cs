@@ -151,6 +151,17 @@ public class MemberProfilesEndpointsTests(HarmoniaApiFactory factory) : IClassFi
     }
 
     [Fact]
+    public async Task Priest_CanSearchParishWide_ToPickNominee_Async()
+    {
+        await CreateUserAsync("mp-nominee@test.com", "mp-nominee Joseph", cancellationToken: _ct);
+        var priest = await factory.CreateClientAsAsync("priest@test.com", _ct);
+
+        var page = (await priest.GetFromJsonAsync<Page>("api/member-profiles?keyword=mp-nominee", TestJson.Options, _ct))!;
+
+        Assert.Equal("mp-nominee@test.com", Assert.Single(page.Items).Email);
+    }
+
+    [Fact]
     public async Task Member_CannotListOrReadOthers_Async()
     {
         await CreateUserAsync("mp-nosy@test.com", "Nosy Member", cancellationToken: _ct);

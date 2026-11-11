@@ -354,7 +354,7 @@ Chưa có kỹ năng nào → `[]`.
 |---|---|---|---|---|---|
 | GET | `/api/member-profiles/me` | `ChoirMember` | — | 200 `MemberProfileDetailDto` | 404 `MEMBER_NOT_FOUND` |
 | PUT | `/api/member-profiles/me` | `ChoirMember` | `{ "fullName", "phone", "saintName", "dateOfBirth" }` | 200 `MemberProfileDto` | 400 `VALIDATION_FAILED` · 404 `MEMBER_NOT_FOUND` |
-| GET | `/api/member-profiles` | `ChoirDirector`, `Admin` | query `keyword`, `status`, `skillId`, `pageNumber`, `pageSize` | 200 `PagedList<MemberProfileSummaryDto>` | — |
+| GET | `/api/member-profiles` | `ChoirDirector`, `Admin`, `ParishPriest` | query `keyword`, `status`, `skillId`, `pageNumber`, `pageSize` | 200 `PagedList<MemberProfileSummaryDto>` | — |
 | GET | `/api/member-profiles/{id}` | `ChoirDirector` | — | 200 `MemberProfileDto` | 404 `MEMBER_NOT_FOUND` |
 | PUT | `/api/member-profiles/{id}` | `ChoirDirector` | `{ "phone", "saintName", "dateOfBirth", "joinedDate", "status" }` | 200 `MemberProfileDto` | 400 `VALIDATION_FAILED`, `MEMBER_JOINED_DATE_IN_FUTURE` · 404 `MEMBER_NOT_FOUND` · 409 `MEMBER_NOT_ACTIVE` (tài khoản không còn là `ChoirMember`) |
 | GET | `/api/member-profiles/me/history` | `ChoirMember` | query `liturgicalSeasonId`, `fromDate`, `toDate`, `pageNumber`, `pageSize` | 200 `PagedList<ParticipationHistoryDto>` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`) · 404 `MEMBER_NOT_FOUND` |

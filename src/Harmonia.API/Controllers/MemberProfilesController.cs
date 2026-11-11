@@ -10,7 +10,8 @@ namespace Harmonia.API.Controllers;
 
 /// <summary>
 /// Choir member records: a member reads and edits their own, the Choir Director manages those of their choirs
-/// and of members in no choir yet (D8).
+/// and of members in no choir yet (D8). The parish-wide search is also open to the Admin and to the Parish Priest,
+/// who picks a member to nominate as director.
 /// </summary>
 [Route("api/member-profiles")]
 [Authorize]
@@ -37,7 +38,7 @@ public class MemberProfilesController(IMemberProfileService memberProfileService
         ToActionResult(await memberProfileService.GetMyHistoryAsync(User.GetUserId(), request, cancellationToken));
 
     [HttpGet]
-    [Authorize(Roles = $"{RoleNames.ChoirDirector},{RoleNames.Admin}")]
+    [Authorize(Roles = $"{RoleNames.ChoirDirector},{RoleNames.Admin},{RoleNames.ParishPriest}")]
     [ProducesResponseType<PagedList<MemberProfileSummaryDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> SearchAsync(
         [FromQuery] SearchMemberProfilesRequest request, CancellationToken cancellationToken) =>

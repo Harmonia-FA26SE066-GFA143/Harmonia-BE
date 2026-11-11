@@ -11,6 +11,13 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
   huống trước đây chưa có. FE bỏ qua trường lạ, hiển thị câu chung cho mã lạ.
 - Mỗi PR đổi hợp đồng thêm một dòng vào mục ngày tương ứng ở đây, cùng PR cập nhật `api.md` / `error-codes.md`.
 
+## 2026-11-11
+
+### Không phá vỡ
+
+- `GET api/member-profiles` mở thêm cho `ParishPriest` (Web tbd-backlog B50) — cha xứ tìm ca viên toàn giáo xứ để
+  tạo đề cử ca trưởng (`POST api/director-nominations`). Response không đổi.
+
 ## 2026-11-10
 
 Karaoke và bản nhạc chạy theo nốt (yêu cầu Web). Cần migration thêm bảng `TimedLyrics` và cột `FileRevision`,
