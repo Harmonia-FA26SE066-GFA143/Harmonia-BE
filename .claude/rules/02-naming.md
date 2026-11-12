@@ -1,6 +1,6 @@
 # Từ điển nghiệp vụ — dùng đúng tên, không tự đặt từ đồng nghĩa
 
-Nguồn chuẩn: `docs/harmonia-domain-entity-list.md` (55 entity, 27 enum).
+Nguồn chuẩn: `docs/harmonia-domain-entity-list.md` (56 entity, 28 enum).
 Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 
 | Tiếng Việt | Tên trong code |

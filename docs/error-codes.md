@@ -207,6 +207,8 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `TIMED_LYRICS_NOT_FOUND` | 404 | Audio này chưa có lời theo mốc thời gian |
 | `TIMED_LYRICS_EXCEEDS_DURATION` | 400 | Mốc thời gian vượt quá độ dài của audio |
 | `TIMED_LYRICS_LINES_INVALID` | 400 | Các dòng lời phải theo thứ tự, kết thúc sau khi bắt đầu và không chồng nhau |
+| `LYRICS_EXTRACTION_NOT_FOUND` | 404 | Không tìm thấy lượt trích lời hoặc kết quả đã hết hạn |
+| `LYRICS_EXTRACTION_INTERRUPTED` | — | Máy chủ khởi động lại khi đang trích lời, vui lòng thử lại (chỉ có trong `errorCode` của lượt trích lời) |
 | `MIDI_INVALID_FILE` | 422 | Tệp MIDI không hợp lệ |
 | `MIDI_FORMAT_UNSUPPORTED` | 422 | Định dạng MIDI chưa được hỗ trợ |
 | `MIDI_NO_PLAYABLE_NOTES` | 422 | Tệp MIDI không có nốt nào để phát |

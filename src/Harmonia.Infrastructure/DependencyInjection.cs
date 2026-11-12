@@ -3,6 +3,7 @@ using Harmonia.Application.Common.Models;
 using Harmonia.Application.Interfaces.IRepositories;
 using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Application.Services;
+using Harmonia.Infrastructure.BackgroundJobs;
 using Harmonia.Infrastructure.Data;
 using Harmonia.Infrastructure.Data.Interceptors;
 using Harmonia.Infrastructure.ExternalServices;
@@ -100,6 +101,11 @@ public static class DependencyInjection
         services.AddScoped<IMusicMaterialRepository, MusicMaterialRepository>();
         services.AddScoped<IMaterialLearningProgressRepository, MaterialLearningProgressRepository>();
         services.AddScoped<ITimedLyricsRepository, TimedLyricsRepository>();
+        services.AddScoped<ILyricsExtractionJobRepository, LyricsExtractionJobRepository>();
+        // One instance is both the queue services write to and the hosted worker that reads it.
+        services.AddSingleton<LyricsExtractionWorker>();
+        services.AddSingleton<ILyricsExtractionQueue>(sp => sp.GetRequiredService<LyricsExtractionWorker>());
+        services.AddHostedService(sp => sp.GetRequiredService<LyricsExtractionWorker>());
         services.AddScoped<ISongListItemRepository, SongListItemRepository>();
         services.AddScoped<ISongListRepository, SongListRepository>();
         services.AddScoped<IServiceRosterRepository, ServiceRosterRepository>();

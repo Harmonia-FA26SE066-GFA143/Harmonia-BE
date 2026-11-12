@@ -238,6 +238,12 @@ public static class ErrorCodes
     // Field-level: a line ends before it starts, overlaps the next one, or the orders are not strictly increasing.
     public const string TimedLyricsLinesInvalid = "TIMED_LYRICS_LINES_INVALID";
 
+    // Unknown job, a job of another material, or one past its retention.
+    public const string LyricsExtractionNotFound = "LYRICS_EXTRACTION_NOT_FOUND";
+
+    // Stored on a job only, never returned as a response: the server restarted while the job was running.
+    public const string LyricsExtractionInterrupted = "LYRICS_EXTRACTION_INTERRUPTED";
+
     public const string MidiInvalidFile = "MIDI_INVALID_FILE";
 
     // Format 2 or SMPTE time division.

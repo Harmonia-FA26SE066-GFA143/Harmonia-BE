@@ -1,6 +1,6 @@
 # Harmonia – Domain Entity List & Attributes (for ERD, Report 3/4)
 
-55 entities derived from FE-01→FE-54 (`claude/functional-requirements-by-actor.md`), the canonical use cases (`claude/use-case-list.md`) and the daily liturgical program model (D6). Diagram: `harmonia-erd.mmd`.
+56 entities derived from FE-01→FE-54 (`claude/functional-requirements-by-actor.md`), the canonical use cases (`claude/use-case-list.md`) and the daily liturgical program model (D6). Diagram: `harmonia-erd.mmd`.
 
 Conceptual/logical level: attribute names, types and constraints. No indexes, no migration syntax.
 
@@ -124,6 +124,9 @@ Written once here instead of repeated 47 times:
 **`TimedLyrics`** — karaoke timing of a Lyrics material against one revision of an audio material ***auditable***
 `audioMaterialId` Guid → MusicMaterial (cascade, unique) · `lyricsMaterialId` Guid → MusicMaterial (restrict) · `audioRevision` int · `granularity` TimedLyricsGranularity · `lines` JSON list of value object `TimedLyricLine` (`order` int · `text` string(500) · `startSeconds` double · `endSeconds` double)
 
+**`LyricsExtractionJob`** — one background AI lyrics extraction from a sheet music material; the draft is kept 24 h after it finishes ***auditable***
+`musicMaterialId` Guid → MusicMaterial (cascade) · `status` LyricsExtractionStatus · `lyricsText` string(max)? · `errorCode` string(100)? · `completedAt` DateTime? · `expiresAt` DateTime?
+
 `SongVocalRequirement` + `SongInstrumentRequirement` can be one `SongSkillRequirement` — `SkillCategory` already separates vocal from instrument.
 
 ## E. Song list & approval
@@ -231,6 +234,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 |---|---|
 | `MemberStatus` | Active, Inactive, Left |
 | `TimedLyricsGranularity` | Line |
+| `LyricsExtractionStatus` | Queued, Running, Succeeded, Failed |
 | `DirectorNominationStatus` | Pending, Approved, InTraining, Trained, Appointed, Rejected, Cancelled |
 | `DirectorTrainingResult` | InProgress, Passed, Failed |
 | `DevicePlatform` | Android, iOS, Web |
@@ -257,7 +261,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 | `ReportPeriod` | Week, Month, Year |
 | `LiturgicalNameKind` | Celebration, Rank, Season |
 
-26 enums. `PracticeFeedback.result` reuses `SubmissionStatus` rather than adding a near-duplicate enum.
+28 enums. `PracticeFeedback.result` reuses `SubmissionStatus` rather than adding a near-duplicate enum.
 
 ---
 
@@ -292,6 +296,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 - `Song` 1 — n `SongInstrumentRequirement` n — 1 `Skill`
 - `Song` 1 — n `MusicMaterial` 1 — n `MaterialLearningProgress` n — 1 `MemberProfile`
 - `MusicMaterial` (audio) 1 — 0..1 `TimedLyrics` n — 1 `MusicMaterial` (lyrics)
+- `MusicMaterial` 1 — n `LyricsExtractionJob`
 
 **Song list**
 - `LiturgicalEvent` 1 — n `SongList` *(D4: one row per version)*, `SongList` 0..1 — 1 `SongList` *(previousVersionId)*
@@ -357,6 +362,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 - 2026-11-09: `DirectorTraining` + enum `DirectorTrainingResult` added — step 9, courses of a nomination with a private certificate (53 → 54 entities, 25 → 26 enums). Needs migration `AddDirectorTraining`.
 - 2026-11-10: Web karaoke + score timeline — `TimedLyrics` + enum `TimedLyricsGranularity` added (54 → 55 entities, 26 → 27 enums), lines kept as a JSON column; `MusicMaterial` gains `fileRevision`, `audioDurationSeconds`, `playbackNotesSha256`. Needs a migration.
 - 2026-11-10: `User` and `MemberRegistration` gain `saintName` string(50)? (Catholic baptismal name, e.g. "Giuse"); copied to `User` when the Admin accepts a registration. Count unchanged. Needs a migration.
+- 2026-11-12: `LyricsExtractionJob` + enum `LyricsExtractionStatus` added (55 → 56 entities, 27 → 28 enums) — AI lyrics extraction runs as a background job that survives a reload or restart. Needs a migration.
 
 **Bổ sung 2026-10-26 — phân công 3 tầng**
 

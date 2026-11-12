@@ -69,6 +69,8 @@ public class HarmoniaDbContext(DbContextOptions<HarmoniaDbContext> options) : Db
 
     public DbSet<TimedLyrics> TimedLyrics => Set<TimedLyrics>();
 
+    public DbSet<LyricsExtractionJob> LyricsExtractionJobs => Set<LyricsExtractionJob>();
+
     public DbSet<SongList> SongLists => Set<SongList>();
 
     public DbSet<SongListItem> SongListItems => Set<SongListItem>();

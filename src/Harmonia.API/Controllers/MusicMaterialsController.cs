@@ -15,7 +15,8 @@ namespace Harmonia.API.Controllers;
 /// </summary>
 [Route("api/music-materials")]
 [Authorize]
-public class MusicMaterialsController(IMusicMaterialService musicMaterialService) : ApiControllerBase
+public class MusicMaterialsController(
+    IMusicMaterialService musicMaterialService, ILyricsExtractionService lyricsExtractionService) : ApiControllerBase
 {
     [HttpPost]
     [Authorize(Roles = RoleNames.ChoirDirector)]
@@ -113,6 +114,29 @@ public class MusicMaterialsController(IMusicMaterialService musicMaterialService
     [ProducesResponseType<ExtractedLyricsResponse>(StatusCodes.Status200OK)]
     public async Task<IActionResult> ExtractLyricsAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await musicMaterialService.ExtractLyricsAsync(id, cancellationToken));
+
+    /// <summary>
+    /// Starts AI lyrics extraction in the background and returns the job, or the material's job already
+    /// Queued/Running. Poll the job until it is Succeeded or Failed; the result is kept 24 hours after it finishes.
+    /// </summary>
+    [HttpPost("{id:guid}/lyrics-extractions")]
+    [Authorize(Roles = RoleNames.ChoirDirector)]
+    [ProducesResponseType<LyricsExtractionJobDto>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> StartLyricsExtractionAsync(Guid id, CancellationToken cancellationToken) =>
+        ToActionResult(await lyricsExtractionService.StartAsync(id, cancellationToken));
+
+    /// <summary>Newest unexpired lyrics extraction of the material, for a page reloaded without the job id.</summary>
+    [HttpGet("{id:guid}/lyrics-extractions/latest")]
+    [Authorize(Roles = RoleNames.ChoirDirector)]
+    [ProducesResponseType<LyricsExtractionJobDto>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetLatestLyricsExtractionAsync(Guid id, CancellationToken cancellationToken) =>
+        ToActionResult(await lyricsExtractionService.GetLatestAsync(id, cancellationToken));
+
+    [HttpGet("{id:guid}/lyrics-extractions/{jobId:guid}")]
+    [Authorize(Roles = RoleNames.ChoirDirector)]
+    [ProducesResponseType<LyricsExtractionJobDto>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetLyricsExtractionAsync(Guid id, Guid jobId, CancellationToken cancellationToken) =>
+        ToActionResult(await lyricsExtractionService.GetAsync(id, jobId, cancellationToken));
 
     [HttpPut("{id:guid}")]
     [Authorize(Roles = RoleNames.ChoirDirector)]

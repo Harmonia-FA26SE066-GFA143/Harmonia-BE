@@ -36,6 +36,7 @@
   | `Data/Interceptors/` | EF interceptor (audit, …) | Logic nghiệp vụ |
   | `Migrations/` | Migration EF sinh ra | Bất cứ file nào viết tay — không tạo, không sửa |
   | `Repositories/` | Implementation của `IRepositories` | Logic nghiệp vụ |
+  | `BackgroundJobs/` | `BackgroundService` chạy ngầm (`LyricsExtractionWorker`), tự tạo scope rồi gọi service Application. Đánh thức bằng tín hiệu trong process, KHÔNG quét DB định kỳ — DB Azure serverless miễn phí phải được tự pause (chốt 2026-11-12) | Logic nghiệp vụ (→ `Services/`) |
   | `ExternalServices/` | Implementation chạm công nghệ ngoài: email, **phát** JWT, file storage, Gemini — **kèm class Options của chính nó** (`JwtOptions` nằm cạnh `JwtTokenService`) | Logic nghiệp vụ |
 
   **Role KHÔNG seed bằng `HasData()`** (chốt 2026-10-03): DB Azure đã có 4 role với Id ngẫu nhiên,
@@ -69,5 +70,5 @@
 
   ## Chưa có chỗ — hỏi trước khi làm
 
-  - Tác vụ chạy ngầm (chuyển `PracticeSubmission` sang `Overdue`, nhắc xác nhận tham gia).
-    Khi cần sẽ thêm thư mục riêng; chưa có thì dừng lại hỏi, đừng nhét vào `Services/`.
+  - Tác vụ chạy ngầm **theo lịch** (chuyển `PracticeSubmission` sang `Overdue`, nhắc xác nhận tham gia): cần quét DB
+    định kỳ, mâu thuẫn với luật không quét của `BackgroundJobs/` — hỏi trước khi làm.

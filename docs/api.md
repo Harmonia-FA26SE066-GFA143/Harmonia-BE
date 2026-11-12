@@ -1402,6 +1402,9 @@ Tư liệu của bài hát: bản nhạc, lời, audio mẫu, tài liệu tập 
 | PUT | `/api/music-materials/{id}/timed-lyrics` · chỉ `ChoirDirector` | `UpdateTimedLyricsRequest` | 200 `TimedLyricsDto` — tạo mới hoặc thay toàn bộ | 400 `VALIDATION_FAILED` (`errors.lines`: `TIMED_LYRICS_LINES_INVALID`), `MATERIAL_NOT_LYRICS`, `TIMED_LYRICS_EXCEEDS_DURATION` · 404 `MATERIAL_NOT_FOUND` · 409 `MATERIAL_NOT_AUDIO` |
 | DELETE | `/api/music-materials/{id}/timed-lyrics` · chỉ `ChoirDirector` | — | 204 | 404 `MATERIAL_NOT_FOUND`, `TIMED_LYRICS_NOT_FOUND` |
 | POST | `/api/music-materials/{id}/extract-lyrics` · chỉ `ChoirDirector` | — | 200 `{ "lyricsText": "..." }` — bản nháp, **không lưu** | 400 `MATERIAL_NOT_SHEET_MUSIC` · 404 `MATERIAL_NOT_FOUND` · 502 `EXTERNAL_AI_FAILED` |
+| POST | `/api/music-materials/{id}/lyrics-extractions` · chỉ `ChoirDirector` | — | 200 `LyricsExtractionJobDto` — job chạy nền; đang có job `Queued`/`Running` thì trả job đó | 400 `MATERIAL_NOT_SHEET_MUSIC` · 404 `MATERIAL_NOT_FOUND` |
+| GET | `/api/music-materials/{id}/lyrics-extractions/latest` · chỉ `ChoirDirector` | — | 200 `LyricsExtractionJobDto` — job mới nhất chưa hết hạn | 404 `LYRICS_EXTRACTION_NOT_FOUND` |
+| GET | `/api/music-materials/{id}/lyrics-extractions/{jobId}` · chỉ `ChoirDirector` | — | 200 `LyricsExtractionJobDto` | 404 `LYRICS_EXTRACTION_NOT_FOUND` |
 | PUT | `/api/music-materials/{id}` | `{ "title", "targetSkillId", "lyricsText" }` | 200 `MusicMaterialDto` | 400 `VALIDATION_FAILED`, `MATERIAL_LYRICS_SOURCE_INVALID` · 404 `MATERIAL_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `SKILL_INACTIVE` |
 | PUT | `/api/music-materials/{id}/file` | `multipart/form-data`: `file`, `resetProgress?` (mặc định `false`), `instrument?` (chỉ file MIDI / MusicXML, mặc định `Piano`) | 200 `MusicMaterialDto` — giữ nguyên `id`, tiêu đề, loại, kỹ năng đích và bài luyện tập đang gắn; file cũ bị xoá khỏi kho. `resetProgress=true` xoá đánh dấu "đã học / cần luyện thêm" của ca viên với tài liệu này | 400 `VALIDATION_FAILED`, `MATERIAL_FILE_REQUIRED`, `MATERIAL_FILE_TYPE_NOT_ALLOWED` (theo loại hiện có của tài liệu), `MATERIAL_LYRICS_SOURCE_INVALID` (lời dạng text, không có file để thay) · 404 `MATERIAL_NOT_FOUND` · 413 `MATERIAL_FILE_TOO_LARGE` · 422 `MIDI_INVALID_FILE`, `MIDI_FORMAT_UNSUPPORTED`, `MIDI_NO_PLAYABLE_NOTES`, `MIDI_LIMIT_EXCEEDED`, `MATERIAL_SCORE_INVALID`, `MATERIAL_SCORE_UNSUPPORTED`, `MATERIAL_AUDIO_INVALID` · 502 `EXTERNAL_STORAGE_FAILED` |
 | DELETE | `/api/music-materials/{id}` | — | 204 | 404 `MATERIAL_NOT_FOUND` |
@@ -1543,6 +1546,22 @@ Tư liệu của bài hát: bản nhạc, lời, audio mẫu, tài liệu tập 
 - AI (Gemini) đọc lời in trên bản nhạc và trả bản nháp, **không lưu gì**. Ca trưởng sửa rồi lưu thành tư liệu
   `Lyrics` qua `POST /api/music-materials` với `lyricsText`. Bản nhạc không có lời → `lyricsText` là chuỗi rỗng.
 - AI lỗi hoặc không phản hồi → 502 `EXTERNAL_AI_FAILED`; thử lại sau.
+
+**Trích lời chạy nền — `{id}/lyrics-extractions`.** Cùng xử lý như `extract-lyrics`, nhưng không giữ request mở, nên
+reload trang, đóng tab hay restart server đều không mất kết quả.
+
+- `POST` kiểm tư liệu ngay (lỗi trả về luôn như trên), rồi trả job ở `Queued`. Đang có job `Queued`/`Running` cho tư
+  liệu này thì trả job đó — bấm lại không tốn thêm một lượt AI.
+- Poll `GET {id}/lyrics-extractions/{jobId}` (hoặc `/latest` khi trang mới mở lại, không còn `jobId`) vài giây một lần
+  tới khi `status` là `Succeeded` hoặc `Failed`. Không có SignalR cho việc này.
+- `LyricsExtractionJobDto`: `id`, `musicMaterialId`, `status` (`Queued` | `Running` | `Succeeded` | `Failed`),
+  `lyricsText` (khi `Succeeded`; chuỗi rỗng nếu bản nhạc không có lời), `errorCode` (khi `Failed`: `EXTERNAL_AI_FAILED`,
+  `MATERIAL_NOT_FOUND` / `MATERIAL_NOT_SHEET_MUSIC` nếu tư liệu bị xoá hay thay trong lúc chờ,
+  `LYRICS_EXTRACTION_INTERRUPTED` nếu server restart giữa chừng, `INTERNAL_ERROR`), `createdAt`, `completedAt`,
+  `expiresAt`.
+- Kết quả giữ **24 giờ** sau khi xong; quá hạn → 404 `LYRICS_EXTRACTION_NOT_FOUND`. Mọi ca trưởng xem được job của mọi
+  tư liệu (tư liệu thuộc bài hát, không thuộc ca đoàn).
+- Server chạy một job một lúc. Azure gói Free tắt app khi rảnh; job đang chờ chạy tiếp khi app được đánh thức.
 
 **`/mine` — tìm và lọc (UC-07E).** Mọi tham số tuỳ chọn, kết hợp theo AND:
 

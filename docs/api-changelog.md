@@ -11,6 +11,18 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
   huống trước đây chưa có. FE bỏ qua trường lạ, hiển thị câu chung cho mã lạ.
 - Mỗi PR đổi hợp đồng thêm một dòng vào mục ngày tương ứng ở đây, cùng PR cập nhật `api.md` / `error-codes.md`.
 
+## 2026-11-12
+
+### Không phá vỡ
+
+- Trích lời bằng AI chạy nền, sống qua reload / đóng tab / restart server (Web: "persistent AI lyrics extraction job"):
+  - `POST api/music-materials/{id}/lyrics-extractions` · chỉ `ChoirDirector` — 200 `LyricsExtractionJobDto` ở
+    `Queued`; material đang có job `Queued`/`Running` thì trả lại job đó, không tạo mới.
+  - `GET api/music-materials/{id}/lyrics-extractions/{jobId}` và `.../latest` · chỉ `ChoirDirector` — poll tới khi
+    `Succeeded` (đọc `lyricsText`) hoặc `Failed` (đọc `errorCode`). Kết quả giữ 24 giờ sau khi xong.
+  - Mã mới: 404 `LYRICS_EXTRACTION_NOT_FOUND`; `LYRICS_EXTRACTION_INTERRUPTED` chỉ nằm trong `errorCode` của job.
+- `POST api/music-materials/{id}/extract-lyrics` (đồng bộ) **giữ nguyên**.
+
 ## 2026-11-11
 
 ### Không phá vỡ

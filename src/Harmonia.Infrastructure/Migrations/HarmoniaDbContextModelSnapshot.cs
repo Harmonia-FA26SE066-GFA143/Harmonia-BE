@@ -686,6 +686,50 @@ namespace Harmonia.Infrastructure.Migrations
                     b.ToTable("LiturgicalSlotRequirements");
                 });
 
+            modelBuilder.Entity("Harmonia.Domain.Entities.LyricsExtractionJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LyricsText")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("MusicMaterialId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MusicMaterialId", "Status");
+
+                    b.ToTable("LyricsExtractionJobs");
+                });
+
             modelBuilder.Entity("Harmonia.Domain.Entities.MassSchedule", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2465,6 +2509,17 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Navigation("Skill");
 
                     b.Navigation("Slot");
+                });
+
+            modelBuilder.Entity("Harmonia.Domain.Entities.LyricsExtractionJob", b =>
+                {
+                    b.HasOne("Harmonia.Domain.Entities.MusicMaterial", "MusicMaterial")
+                        .WithMany()
+                        .HasForeignKey("MusicMaterialId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("MusicMaterial");
                 });
 
             modelBuilder.Entity("Harmonia.Domain.Entities.MassSchedule", b =>

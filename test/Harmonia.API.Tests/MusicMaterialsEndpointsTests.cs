@@ -152,6 +152,42 @@ public class MusicMaterialsEndpointsTests(HarmoniaApiFactory factory) : IClassFi
     }
 
     [Fact]
+    public async Task StartLyricsExtraction_AsChoirMember_Returns403_Async()
+    {
+        var client = await factory.CreateClientAsAsync("member@test.com", _ct);
+
+        var response = await client.PostAsync($"api/music-materials/{Guid.NewGuid()}/lyrics-extractions", null, _ct);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task StartLyricsExtraction_UnknownMaterial_Returns404MaterialNotFound_Async()
+    {
+        var client = await factory.CreateClientAsAsync("director@test.com", _ct);
+
+        var response = await client.PostAsync($"api/music-materials/{Guid.NewGuid()}/lyrics-extractions", null, _ct);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>(TestJson.Options, _ct);
+        Assert.Equal(ErrorCodes.MaterialNotFound, error!.Code);
+    }
+
+    [Theory]
+    [InlineData("latest")]
+    [InlineData("3f2504e0-4f89-11d3-9a0c-0305e82c3301")]
+    public async Task GetLyricsExtraction_NoJob_Returns404_Async(string segment)
+    {
+        var client = await factory.CreateClientAsAsync("director@test.com", _ct);
+
+        var response = await client.GetAsync($"api/music-materials/{Guid.NewGuid()}/lyrics-extractions/{segment}", _ct);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>(TestJson.Options, _ct);
+        Assert.Equal(ErrorCodes.LyricsExtractionNotFound, error!.Code);
+    }
+
+    [Fact]
     public async Task Swagger_DescribesUploadAsMultipartWithFile_Async()
     {
         var json = await factory.CreateClient().GetStringAsync("swagger/v1/swagger.json", _ct);
