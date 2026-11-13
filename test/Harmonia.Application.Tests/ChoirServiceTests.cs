@@ -618,6 +618,20 @@ public class ChoirServiceTests
     }
 
     [Fact]
+    public async Task UpdateEventChoirs_DraftEvent_SavesWithoutNotifying_Async()
+    {
+        _event.Status = EventStatus.Draft;
+        _choir.DirectorId = Guid.NewGuid();
+
+        var result = await _sut.UpdateEventChoirsAsync(
+            _event.Id, new UpdateEventChoirsRequest { ChoirIds = [_choir.Id], LeadChoirId = _choir.Id }, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(_choir.Id, Assert.Single(_addedEventChoirs).ChoirId);
+        Assert.Empty(_sent);
+    }
+
+    [Fact]
     public async Task UpdateEventChoirs_CancelledEvent_IsLocked_Async()
     {
         _event.Status = EventStatus.Cancelled;

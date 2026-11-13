@@ -185,6 +185,7 @@ public class LiturgicalEventService(
             "Sự kiện mới được công bố",
             $"Sự kiện ngày {liturgicalEvent.EventDate:dd/MM/yyyy} lúc {liturgicalEvent.Time:HH:mm} đã được công bố.",
             cancellationToken);
+        await NotifyAssignedDirectorsAsync(liturgicalEvent, cancellationToken);
 
         return Result<LiturgicalEventDto>.Success(mapper.Map<LiturgicalEventDto>(liturgicalEvent));
     }
@@ -256,6 +257,31 @@ public class LiturgicalEventService(
                 cancellationToken)
             ? ErrorCodes.LiturgicalEventSlotTaken
             : null;
+    }
+
+    /// <summary>
+    /// Tells each serving choir's director whether the choir leads or serves. Sent on publish, not when choirs are
+    /// picked: a Draft's choirs may still change.
+    /// </summary>
+    private async Task NotifyAssignedDirectorsAsync(LiturgicalEvent liturgicalEvent, CancellationToken cancellationToken)
+    {
+        var leadId = await choirScope.GetLeadChoirIdAsync(liturgicalEvent.Id, cancellationToken);
+        var choirs = await choirRepository.ListAsync(
+            x => x.EventChoirs.Any(e => e.EventId == liturgicalEvent.Id), cancellationToken);
+
+        foreach (var choir in choirs.Where(x => x.DirectorId is not null))
+        {
+            var role = choir.Id == leadId ? "phụ trách" : "phục vụ";
+            await notificationService.SendAsync(
+                new SendNotificationRequest(
+                    Type: NotificationType.EventChoirChanged,
+                    Title: $"Ca đoàn được giao {role} sự kiện",
+                    Content: $"Ca đoàn {choir.Name} được giao {role} sự kiện ngày {liturgicalEvent.EventDate:dd/MM/yyyy} lúc {liturgicalEvent.Time:HH:mm}.",
+                    RecipientUserIds: [choir.DirectorId!.Value],
+                    ReferenceType: nameof(LiturgicalEvent),
+                    ReferenceId: liturgicalEvent.Id),
+                cancellationToken);
+        }
     }
 
     private async Task NotifyDirectorsAndMembersAsync(

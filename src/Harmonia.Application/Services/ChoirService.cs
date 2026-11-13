@@ -326,9 +326,13 @@ public class ChoirService(
 
         await eventChoirRepository.SaveChangesAsync(cancellationToken);
 
-        await NotifyChoirChangeAsync(
-            liturgicalEvent!, removed.Select(x => x.ChoirId).ToList(), addedIds,
-            leadChanged ? request.LeadChoirId : null, droppedMemberIds, reason, cancellationToken);
+        // A Draft is not shown yet; directors hear their choir's role when it is published (LiturgicalEventService).
+        if (liturgicalEvent!.Status == EventStatus.Published)
+        {
+            await NotifyChoirChangeAsync(
+                liturgicalEvent, removed.Select(x => x.ChoirId).ToList(), addedIds,
+                leadChanged ? request.LeadChoirId : null, droppedMemberIds, reason, cancellationToken);
+        }
 
         return Result<List<LiturgicalEventChoirDto>>.Success(await LoadEventChoirsAsync(eventId, cancellationToken));
     }

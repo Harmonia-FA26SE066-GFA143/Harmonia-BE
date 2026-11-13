@@ -949,7 +949,8 @@ Admin thấy và quản lý mọi ca đoàn.
   bị **xoá lời mời** (`EventParticipation`) và **dòng phân công**; phân công đã chốt mở lại `Draft` (chốt sớm cả buổi lễ
   cũng mở lại nếu mất dòng cả buổi). Đổi ca đoàn phụ trách thì mọi phiên bản `SongList` của sự kiện chuyển sang ca đoàn
   mới, giữ nguyên trạng thái. Gửi thông báo `EventChoirChanged` (kèm lý do) cho ca trưởng ca đoàn bị gỡ, ca đoàn mới /
-  ca đoàn phụ trách mới, và ca viên bị huỷ.
+  ca đoàn phụ trách mới, và ca viên bị huỷ — **chỉ khi sự kiện đã `Published`**. Sự kiện `Draft` không gửi gì; lúc
+  `publish` mỗi ca trưởng nhận `EventChoirChanged` "Ca đoàn được giao phụ trách / phục vụ sự kiện" (2026-11-13).
 
 - Ca trưởng thay thế khi ca trưởng vắng đột xuất (2026-11-07): `directorId` là một `ChoirDirector` đang hoạt động khác
   ca trưởng chính của ca đoàn (sai → 400 `CHOIR_DIRECTOR_INVALID`); đặt người thay thì `reason` bắt buộc. Người thay có
@@ -2264,7 +2265,7 @@ sẽ trả (`LITURGICAL_EVENT_CANCELLED`, `MEMBER_NOT_ACTIVE`, `EVENT_PARTICIPAT
 
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
-| POST | `/api/event-participations` · `ChoirDirector` | `{ "eventId", "memberIds?": ["guid"] }` | 200 `EventParticipationDto[]` | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_NOT_PUBLISHED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `MEMBER_NOT_ACTIVE`, `EVENT_PARTICIPATION_ALREADY_REQUESTED` |
+| POST | `/api/event-participations` · `ParishPriest`, `ChoirDirector` (ca đoàn phụ trách) — cha xứ gọi ngay sau `publish`, bỏ `memberIds` để mời mọi ca viên `Active` của các ca đoàn phục vụ chưa được mời | `{ "eventId", "memberIds?": ["guid"] }` | 200 `EventParticipationDto[]` | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_NOT_PUBLISHED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `MEMBER_NOT_ACTIVE`, `EVENT_PARTICIPATION_ALREADY_REQUESTED` |
 | GET | `/api/event-participations?eventId=` · `ChoirDirector` | — | 200 `EventParticipationSummaryDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
 | POST | `/api/event-participations/confirm-all?eventId=` · `ChoirDirector` (ca đoàn phụ trách) — xác nhận hộ mọi lời mời `Invited` của ca viên `Active` (giữ `Declined`/`Unsure`), phục vụ demo; không chặn sự kiện đã qua, không gửi thông báo | — | 200 `EventParticipationSummaryDto` | 403 `CHOIR_NOT_LEAD` · 404 `LITURGICAL_EVENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED` |
 | GET | `/api/event-participations/mine` · `ChoirMember` | — | 200 `MyParticipationDto[]` | 404 `MEMBER_NOT_FOUND` |

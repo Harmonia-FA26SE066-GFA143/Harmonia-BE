@@ -14,8 +14,9 @@ namespace Harmonia.API.Controllers;
 [Authorize]
 public class EventParticipationsController(IEventParticipationService eventParticipationService) : ApiControllerBase
 {
+    // The Parish Priest calls it right after publishing, without memberIds, to invite every member of the event's choirs.
     [HttpPost]
-    [Authorize(Roles = RoleNames.ChoirDirector)]
+    [Authorize(Roles = $"{RoleNames.ParishPriest},{RoleNames.ChoirDirector}")]
     [ProducesResponseType<List<EventParticipationDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> SendRequestsAsync(
         [FromBody] SendParticipationRequestsRequest request, CancellationToken cancellationToken) =>

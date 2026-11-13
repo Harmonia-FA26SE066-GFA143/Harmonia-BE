@@ -296,6 +296,26 @@ public class LiturgicalEventServiceTests
     }
 
     [Fact]
+    public async Task Publish_NotifiesEachChoirDirectorOfTheirRole_Async()
+    {
+        DraftReadyToPublish();
+        _choir.DirectorId = Guid.NewGuid();
+        var serving = new Choir { Id = Guid.NewGuid(), Name = "Gioan", IsActive = true, DirectorId = Guid.NewGuid() };
+        _choirs.ListAsync(default!, default).ReturnsForAnyArgs([_choir, serving]);
+
+        await _sut.PublishAsync(_event.Id, _ct);
+
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(x => x.Type == NotificationType.EventChoirChanged
+                && x.Title == "Ca đoàn được giao phụ trách sự kiện" && x.RecipientUserIds.Single() == _choir.DirectorId),
+            _ct);
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(x => x.Type == NotificationType.EventChoirChanged
+                && x.Title == "Ca đoàn được giao phục vụ sự kiện" && x.RecipientUserIds.Single() == serving.DirectorId),
+            _ct);
+    }
+
+    [Fact]
     public async Task Publish_WithoutSeason_ReturnsSeasonRequired_AndStaysDraft_Async()
     {
         DraftReadyToPublish();

@@ -11,6 +11,16 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
   huống trước đây chưa có. FE bỏ qua trường lạ, hiển thị câu chung cho mã lạ.
 - Mỗi PR đổi hợp đồng thêm một dòng vào mục ngày tương ứng ở đây, cùng PR cập nhật `api.md` / `error-codes.md`.
 
+## 2026-11-13
+
+### Không phá vỡ
+
+- `POST api/event-participations` mở thêm cho `ParishPriest`. Web gọi `{ "eventId" }` (không `memberIds`) ngay sau
+  `PATCH api/liturgical-events/{id}/publish` để mời mọi ca viên của các ca đoàn phục vụ; gọi lại an toàn, chỉ mời người
+  chưa được mời.
+- Thông báo `EventChoirChanged` cho ca trưởng: tạo sự kiện hoặc `PUT .../choirs` lúc còn `Draft` không gửi nữa; khi
+  `publish`, ca trưởng mỗi ca đoàn nhận "Ca đoàn được giao phụ trách / phục vụ sự kiện". Sự kiện `Published` giữ như cũ.
+
 ## 2026-11-12
 
 ### Không phá vỡ
