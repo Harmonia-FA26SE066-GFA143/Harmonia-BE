@@ -10,6 +10,7 @@ public class UpdateMemberProfileRequestValidator : AbstractValidator<UpdateMembe
     {
         RuleFor(x => x.Phone).MaximumLength(20);
         RuleFor(x => x.SaintName).MaximumLength(50);
+        RuleFor(x => x.Gender).IsInEnum();
         RuleFor(x => x.DateOfBirth).LessThanOrEqualTo(_ => VietnamTime.Today);
         RuleFor(x => x.JoinedDate)
             .NotEmpty()

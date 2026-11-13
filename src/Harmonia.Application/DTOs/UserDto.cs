@@ -1,3 +1,5 @@
+using Harmonia.Domain.Enums;
+
 namespace Harmonia.Application.DTOs;
 
 public class UserDto
@@ -7,6 +9,7 @@ public class UserDto
     public string FullName { get; set; } = string.Empty;
     public string? Phone { get; set; }
     public string? SaintName { get; set; }
+    public Gender? Gender { get; set; }
     public string? AvatarUrl { get; set; }
     public string RoleName { get; set; } = string.Empty;
     public bool IsActive { get; set; }

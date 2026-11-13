@@ -10,5 +10,6 @@ public class UpdateMyUserRequestValidator : AbstractValidator<UpdateMyUserReques
         RuleFor(x => x.FullName).MaximumLength(100);
         RuleFor(x => x.Phone).MaximumLength(20);
         RuleFor(x => x.SaintName).MaximumLength(50);
+        RuleFor(x => x.Gender).IsInEnum();
     }
 }

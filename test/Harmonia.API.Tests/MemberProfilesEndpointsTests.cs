@@ -20,7 +20,7 @@ public class MemberProfilesEndpointsTests(HarmoniaApiFactory factory) : IClassFi
     {
         var admin = await factory.CreateClientAsAsync("admin@test.com", cancellationToken);
         var response = await admin.PostAsJsonAsync(
-            "api/users", new { email, fullName, roleName }, cancellationToken);
+            "api/users", new { email, fullName, gender = "Male", roleName }, cancellationToken);
         response.EnsureSuccessStatusCode();
         await factory.CompleteFirstSignInAsync(email, cancellationToken);
         return (await response.Content.ReadFromJsonAsync<UserDto>(TestJson.Options, cancellationToken))!;

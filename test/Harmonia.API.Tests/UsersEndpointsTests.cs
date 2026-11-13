@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Harmonia.Application.DTOs;
 using Harmonia.Domain.Common;
+using Harmonia.Domain.Enums;
 using NSubstitute;
 
 namespace Harmonia.API.Tests;
@@ -66,7 +67,7 @@ public class UsersEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<Har
 
         var created = await admin.PostAsJsonAsync(
             "api/users",
-            new { email = "users-named@test.com", fullName = " Maria Nguyen ", roleName = RoleNames.ChoirDirector },
+            new { email = "users-named@test.com", fullName = " Maria Nguyen ", gender = "Female", roleName = RoleNames.ChoirDirector },
             _ct);
         var id = (await created.Content.ReadFromJsonAsync<UserDto>(TestJson.Options, _ct))!.Id;
         await factory.CompleteFirstSignInAsync("users-named@test.com", _ct);
@@ -76,6 +77,18 @@ public class UsersEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<Har
         Assert.True(created.IsSuccessStatusCode);
         Assert.Equal("Maria Nguyen", fetched.FullName);
         Assert.Equal("Maria Nguyen", login.User.FullName);
+        Assert.Equal(Gender.Female, fetched.Gender);
+    }
+
+    [Fact]
+    public async Task Create_WithoutGender_ReturnsValidationFailed_Async()
+    {
+        var admin = await factory.CreateClientAsAsync("admin@test.com", _ct);
+
+        var response = await admin.PostAsJsonAsync(
+            "api/users", new { email = "users-nogender@test.com", roleName = RoleNames.ChoirMember }, _ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -85,7 +98,7 @@ public class UsersEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<Har
 
         var response = await admin.PostAsJsonAsync(
             "api/users",
-            new { email = "users-noname@test.com", phone = " 0901234567 ", roleName = RoleNames.ChoirMember },
+            new { email = "users-noname@test.com", phone = " 0901234567 ", gender = "Male", roleName = RoleNames.ChoirMember },
             _ct);
         var created = (await response.Content.ReadFromJsonAsync<UserDto>(TestJson.Options, _ct))!;
 
@@ -102,7 +115,7 @@ public class UsersEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<Har
         var admin = await factory.CreateClientAsAsync("admin@test.com", _ct);
         await admin.PostAsJsonAsync(
             "api/users",
-            new { email = "users-firstlogin@test.com", roleName = RoleNames.ParishPriest },
+            new { email = "users-firstlogin@test.com", gender = "Male", roleName = RoleNames.ParishPriest },
             _ct);
 
         var emailed = EmailedPassword("users-firstlogin@test.com");

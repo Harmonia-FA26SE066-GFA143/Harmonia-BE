@@ -1,3 +1,5 @@
+using Harmonia.Domain.Enums;
+
 namespace Harmonia.Application.DTOs;
 
 public class MemberRegistrationDto
@@ -11,6 +13,8 @@ public class MemberRegistrationDto
     public string? Phone { get; set; }
 
     public string? SaintName { get; set; }
+
+    public Gender? Gender { get; set; }
 
     public string? Note { get; set; }
 

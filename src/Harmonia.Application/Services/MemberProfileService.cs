@@ -75,6 +75,7 @@ public class MemberProfileService(
         profile.User.FullName = request.FullName.Trim();
         profile.User.Phone = NormalizePhone(request.Phone);
         profile.User.SaintName = TrimToNull(request.SaintName);
+        profile.User.Gender = request.Gender ?? profile.User.Gender;
         profile.DateOfBirth = request.DateOfBirth;
         await memberProfileRepository.SaveChangesAsync(cancellationToken);
 
@@ -122,6 +123,7 @@ public class MemberProfileService(
 
         profile.User.Phone = NormalizePhone(request.Phone);
         profile.User.SaintName = TrimToNull(request.SaintName);
+        profile.User.Gender = request.Gender ?? profile.User.Gender;
         profile.DateOfBirth = request.DateOfBirth;
         profile.JoinedDate = request.JoinedDate;
         profile.Status = request.Status;

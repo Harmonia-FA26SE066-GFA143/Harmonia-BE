@@ -37,6 +37,7 @@ public class MemberRegistrationService(
         registration.FullName = request.FullName.Trim();
         registration.Phone = TrimToNull(request.Phone);
         registration.SaintName = TrimToNull(request.SaintName);
+        registration.Gender = request.Gender;
         registration.Note = TrimToNull(request.Note);
         await registrationRepository.SaveChangesAsync(cancellationToken);
 
@@ -82,6 +83,7 @@ public class MemberRegistrationService(
                 FullName = registration.FullName,
                 Phone = registration.Phone,
                 SaintName = registration.SaintName,
+                Gender = registration.Gender,
                 RoleName = RoleNames.ChoirMember,
             },
             cancellationToken);

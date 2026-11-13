@@ -15,6 +15,8 @@ public class MemberProfileSummaryDto
 
     public string? SaintName { get; set; }
 
+    public Gender? Gender { get; set; }
+
     public DateOnly? DateOfBirth { get; set; }
 
     public DateOnly JoinedDate { get; set; }

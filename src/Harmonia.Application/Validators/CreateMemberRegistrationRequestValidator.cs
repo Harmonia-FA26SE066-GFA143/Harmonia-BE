@@ -12,6 +12,7 @@ public class CreateMemberRegistrationRequestValidator : AbstractValidator<Create
         RuleFor(x => x.Email).NotEmpty().EmailAddress().MaximumLength(256);
         RuleFor(x => x.Phone).MaximumLength(20);
         RuleFor(x => x.SaintName).MaximumLength(50);
+        RuleFor(x => x.Gender).NotNull().IsInEnum();
         RuleFor(x => x.Note).MaximumLength(500);
     }
 }

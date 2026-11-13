@@ -92,7 +92,7 @@ public class MemberRegistrationServiceTests
     {
         var registration = new MemberRegistration
         {
-            Id = Guid.NewGuid(), Email = "a@example.com", FullName = "Nguyen Van A", Phone = "0900000000",
+            Id = Guid.NewGuid(), Email = "a@example.com", FullName = "Nguyen Van A", Phone = "0900000000", Gender = Gender.Male,
         };
         _registrations.GetByIdAsync(registration.Id, _ct).Returns(registration);
         var user = new UserDto { Email = registration.Email };
@@ -104,7 +104,7 @@ public class MemberRegistrationServiceTests
         Assert.Same(user, result.Value);
         await _userService.Received(1).CreateAsync(
             Arg.Is<CreateUserRequest>(r => r.Email == "a@example.com" && r.FullName == "Nguyen Van A"
-                && r.Phone == "0900000000" && r.RoleName == RoleNames.ChoirMember),
+                && r.Phone == "0900000000" && r.Gender == Gender.Male && r.RoleName == RoleNames.ChoirMember),
             _ct);
         _registrations.Received(1).Remove(registration);
         await _registrations.Received(1).SaveChangesAsync(_ct);

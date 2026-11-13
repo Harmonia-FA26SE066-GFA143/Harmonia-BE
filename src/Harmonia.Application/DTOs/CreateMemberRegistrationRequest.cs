@@ -1,3 +1,5 @@
+using Harmonia.Domain.Enums;
+
 namespace Harmonia.Application.DTOs;
 
 /// <summary>Body of the anonymous POST api/member-registrations sent from the public home page.</summary>
@@ -10,6 +12,8 @@ public class CreateMemberRegistrationRequest
     public string? Phone { get; set; }
 
     public string? SaintName { get; set; }
+
+    public Gender? Gender { get; set; }
 
     public string? Note { get; set; }
 }

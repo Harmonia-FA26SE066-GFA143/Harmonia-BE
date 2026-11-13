@@ -193,8 +193,9 @@ Thành công thì mọi thiết bị bị đăng xuất — client phải đăng
 
 ### `GET /api/auth/me` · `PUT /api/auth/me` — đã đăng nhập, mọi role
 
-Tài khoản của chính người gọi. `GET` trả `UserDto` (mục 3). `PUT` nhận `{ "fullName", "phone", "saintName" }`, đều tuỳ chọn
+Tài khoản của chính người gọi. `GET` trả `UserDto` (mục 3). `PUT` nhận `{ "fullName", "phone", "saintName", "gender" }`, đều tuỳ chọn
 (`fullName` ≤ 100, `phone` ≤ 20, `saintName` ≤ 50 ký tự, cắt khoảng trắng; gửi rỗng / `null` là xoá) và trả `UserDto`.
+`gender`: `Male` | `Female`; bỏ trống / `null` thì **giữ nguyên** (không xoá).
 Gửi đủ cả hai trường — trường bỏ trống bị xoá. Email và role không đổi được ở đây.
 
 | HTTP | Kết quả |
@@ -250,24 +251,24 @@ Thành công thì mọi thiết bị bị đăng xuất.
 ### `UserDto`
 
 ```json
-{ "id": "guid", "email": "a@b.com", "fullName": "Nguyễn Văn A", "phone": "0900000000", "saintName": "Giuse", "avatarUrl": null, "roleName": "ChoirDirector", "isActive": true, "isPasswordChangeRequired": false }
+{ "id": "guid", "email": "a@b.com", "fullName": "Nguyễn Văn A", "phone": "0900000000", "saintName": "Giuse", "gender": "Male", "avatarUrl": null, "roleName": "ChoirDirector", "isActive": true, "isPasswordChangeRequired": false }
 ```
 
 `fullName` và `phone` có ở **mọi role** (lưu trên `User`). `fullName` có thể là `""` (Admin bỏ trống) — client
-hiển thị email thay tên. `phone`, `saintName` (tên thánh), `avatarUrl` có thể `null` (đổi ảnh: `PUT /api/auth/me/avatar`, mục 2).
+hiển thị email thay tên. `phone`, `saintName` (tên thánh), `gender` (`Male` | `Female`; tài khoản tạo trước 2026-11-13 có thể `null`), `avatarUrl` có thể `null` (đổi ảnh: `PUT /api/auth/me/avatar`, mục 2).
 
 | Method | Route | Body / Query | Thành công | Lỗi |
 |---|---|---|---|---|
 | GET | `/api/users` | query `keyword`, `roleName`, `isActive`, `pageNumber`, `pageSize` | 200 `PagedList<UserDto>` | — |
 | GET | `/api/users/{id}` | — | 200 `UserDto` | 404 `USER_NOT_FOUND` |
-| POST | `/api/users` | `{ "email", "fullName?", "phone?", "roleName" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `ROLE_NOT_FOUND` · 409 `USER_EMAIL_ALREADY_EXISTS` |
-| PUT | `/api/users/{id}` | `{ "email", "fullName?", "phone?" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `USER_NOT_FOUND` · 409 `USER_EMAIL_ALREADY_EXISTS` |
+| POST | `/api/users` | `{ "email", "fullName?", "phone?", "saintName?", "gender", "roleName" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `ROLE_NOT_FOUND` · 409 `USER_EMAIL_ALREADY_EXISTS` |
+| PUT | `/api/users/{id}` | `{ "email", "fullName?", "phone?", "saintName?", "gender?" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `USER_NOT_FOUND` · 409 `USER_EMAIL_ALREADY_EXISTS` |
 | PATCH | `/api/users/{id}/activate` | — | 204 | 404 `USER_NOT_FOUND` · 409 `USER_ALREADY_ACTIVE` |
 | PATCH | `/api/users/{id}/deactivate` | — | 204 | 404 `USER_NOT_FOUND` · 409 `USER_CANNOT_MODIFY_SELF`, `USER_ALREADY_INACTIVE`, `USER_LAST_ADMIN`, `USER_STILL_DIRECTING` |
 | PUT | `/api/users/{id}/role` | `{ "roleName" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `USER_NOT_FOUND`, `ROLE_NOT_FOUND` · 409 `USER_CANNOT_MODIFY_SELF`, `USER_LAST_ADMIN`, `USER_STILL_DIRECTING` |
 
 - `GET /api/users`: `keyword` khớp một phần email; các bộ lọc kết hợp AND; sắp theo email.
-- Bắt buộc: `email`, `roleName`. Tuỳ chọn: `fullName` (≤ 100, bỏ trống → `""`),
+- Bắt buộc: `email`, `roleName`, `gender` (`Male` | `Female`; khi `PUT` thì tuỳ chọn, bỏ trống là giữ nguyên). Tuỳ chọn: `fullName` (≤ 100, bỏ trống → `""`),
   `phone` (≤ 20), `saintName` (≤ 50) — bỏ trống → `null`; khoảng trắng đầu/cuối bị cắt. `PUT` thay toàn bộ: trường bỏ trống bị xoá.
 - Admin **không** nhập mật khẩu: server tự sinh mật khẩu đầu tiên (12 ký tự ngẫu nhiên), gửi email chứa email đăng
   nhập + mật khẩu tới người dùng và đặt `isPasswordChangeRequired = true`. Mật khẩu không bao giờ có trong response.
@@ -287,7 +288,7 @@ hiển thị email thay tên. `phone`, `saintName` (tên thánh), `avatarUrl` c�
 `MemberRegistrationDto`:
 
 ```json
-{ "id": "guid", "fullName": "Nguyễn Văn A", "email": "a@b.com", "phone": "0900000000", "saintName": "Giuse", "note": "Muốn vào ca đoàn Cecilia", "createdAt": "2026-11-09T08:00:00Z" }
+{ "id": "guid", "fullName": "Nguyễn Văn A", "email": "a@b.com", "phone": "0900000000", "saintName": "Giuse", "gender": "Male", "note": "Muốn vào ca đoàn Cecilia", "createdAt": "2026-11-09T08:00:00Z" }
 ```
 
 | Method | Route | Quyền | Body / Query | Thành công | Lỗi |
@@ -297,7 +298,7 @@ hiển thị email thay tên. `phone`, `saintName` (tên thánh), `avatarUrl` c�
 | POST | `/api/member-registrations/{id}/accept` | `Admin` | — | 200 `UserDto` | 404 `MEMBER_REGISTRATION_NOT_FOUND` · 409 `USER_EMAIL_ALREADY_EXISTS` |
 | DELETE | `/api/member-registrations/{id}` | `Admin` | — | 204 | 404 `MEMBER_REGISTRATION_NOT_FOUND` |
 
-- `POST` (form trang chủ): `fullName` ≤ 100, `email` ≤ 256, `phone` ≤ 20, `saintName` ≤ 50, `note` ≤ 500; cắt khoảng trắng, bỏ trống →
+- `POST` (form trang chủ): `fullName` ≤ 100, `email` ≤ 256, `gender` bắt buộc (`Male` | `Female`), `phone` ≤ 20, `saintName` ≤ 50, `note` ≤ 500; cắt khoảng trắng, bỏ trống →
   `null`. **Luôn trả 204** kể cả khi email đã có tài khoản (không lưu gì) — không tiết lộ email nào đã đăng ký. Email
   đang có đăng ký chờ thì ghi đè đăng ký đó. Đăng ký mới → báo mọi Admin đang hoạt động (`MemberRegistrationSubmitted`).
   Tối đa 5 lần / 10 phút / IP, quá thì 429.
@@ -319,6 +320,7 @@ hiển thị email thay tên. `phone`, `saintName` (tên thánh), `avatarUrl` c�
   "email": "a@b.com",
   "phone": "0900000000",
   "saintName": "Giuse",
+  "gender": "Male",
   "dateOfBirth": "2000-01-31",
   "joinedDate": "2024-09-01",
   "status": "Active",
@@ -327,7 +329,7 @@ hiển thị email thay tên. `phone`, `saintName` (tên thánh), `avatarUrl` c�
 ```
 
 `status`: `Active` | `Inactive` | `Left`. `phone`, `saintName`, `dateOfBirth`, `avatarUrl` có thể `null`.
-`fullName`, `email`, `phone`, `saintName`, `avatarUrl` lấy từ tài khoản (`User`).
+`fullName`, `email`, `phone`, `saintName`, `gender`, `avatarUrl` lấy từ tài khoản (`User`). `gender` có thể `null`.
 
 ### `MemberProfileSummaryDto` / `MemberProfileDetailDto`
 
@@ -353,14 +355,14 @@ Chưa có kỹ năng nào → `[]`.
 | Method | Route | Role | Body / Query | Thành công | Lỗi |
 |---|---|---|---|---|---|
 | GET | `/api/member-profiles/me` | `ChoirMember` | — | 200 `MemberProfileDetailDto` | 404 `MEMBER_NOT_FOUND` |
-| PUT | `/api/member-profiles/me` | `ChoirMember` | `{ "fullName", "phone", "saintName", "dateOfBirth" }` | 200 `MemberProfileDto` | 400 `VALIDATION_FAILED` · 404 `MEMBER_NOT_FOUND` |
+| PUT | `/api/member-profiles/me` | `ChoirMember` | `{ "fullName", "phone", "saintName", "gender", "dateOfBirth" }` | 200 `MemberProfileDto` | 400 `VALIDATION_FAILED` · 404 `MEMBER_NOT_FOUND` |
 | GET | `/api/member-profiles` | `ChoirDirector`, `Admin`, `ParishPriest` | query `keyword`, `status`, `skillId`, `pageNumber`, `pageSize` | 200 `PagedList<MemberProfileSummaryDto>` | — |
 | GET | `/api/member-profiles/{id}` | `ChoirDirector` | — | 200 `MemberProfileDto` | 404 `MEMBER_NOT_FOUND` |
-| PUT | `/api/member-profiles/{id}` | `ChoirDirector` | `{ "phone", "saintName", "dateOfBirth", "joinedDate", "status" }` | 200 `MemberProfileDto` | 400 `VALIDATION_FAILED`, `MEMBER_JOINED_DATE_IN_FUTURE` · 404 `MEMBER_NOT_FOUND` · 409 `MEMBER_NOT_ACTIVE` (tài khoản không còn là `ChoirMember`) |
+| PUT | `/api/member-profiles/{id}` | `ChoirDirector` | `{ "phone", "saintName", "gender", "dateOfBirth", "joinedDate", "status" }` | 200 `MemberProfileDto` | 400 `VALIDATION_FAILED`, `MEMBER_JOINED_DATE_IN_FUTURE` · 404 `MEMBER_NOT_FOUND` · 409 `MEMBER_NOT_ACTIVE` (tài khoản không còn là `ChoirMember`) |
 | GET | `/api/member-profiles/me/history` | `ChoirMember` | query `liturgicalSeasonId`, `fromDate`, `toDate`, `pageNumber`, `pageSize` | 200 `PagedList<ParticipationHistoryDto>` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`) · 404 `MEMBER_NOT_FOUND` |
 
 - `PUT` thay **toàn bộ** các field trong body: field bỏ trống / `null` sẽ bị xoá giá trị
-  (`phone`, `saintName`, `dateOfBirth`). Gửi lại giá trị cũ nếu không muốn đổi.
+  (`phone`, `saintName`, `dateOfBirth`). Gửi lại giá trị cũ nếu không muốn đổi. Riêng `gender` bỏ trống thì giữ nguyên.
 - `PUT .../me`: `fullName` bắt buộc (≤ 100 ký tự), đổi tên hiển thị của chính tài khoản đó.
   `phone` ≤ 20, `saintName` ≤ 50 ký tự. `dateOfBirth` không được ở tương lai.
 - `PUT .../{id}`: `joinedDate` bắt buộc, không ở tương lai. Ca trưởng **không** sửa tên ca viên

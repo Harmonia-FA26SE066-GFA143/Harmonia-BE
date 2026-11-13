@@ -1,4 +1,5 @@
 using Harmonia.Domain.Common;
+using Harmonia.Domain.Enums;
 
 namespace Harmonia.Domain.Entities;
 
@@ -12,6 +13,8 @@ public class User : BaseAuditableEntity
     public string? Phone { get; set; }
 
     public string? SaintName { get; set; }
+
+    public Gender? Gender { get; set; }
 
     public string PasswordHash { get; set; } = string.Empty;
 

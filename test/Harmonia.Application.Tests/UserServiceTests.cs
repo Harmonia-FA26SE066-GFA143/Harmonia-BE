@@ -250,6 +250,19 @@ public class UserServiceTests
     }
 
     [Fact]
+    public async Task UpdateMe_NullGender_KeepsCurrent_GivenGender_Replaces_Async()
+    {
+        var user = Existing(_memberRole);
+        user.Gender = Gender.Female;
+
+        await _sut.UpdateMeAsync(user.Id, new UpdateMyUserRequest { FullName = "Me" }, _ct);
+        Assert.Equal(Gender.Female, user.Gender);
+
+        await _sut.UpdateMeAsync(user.Id, new UpdateMyUserRequest { FullName = "Me", Gender = Gender.Male }, _ct);
+        Assert.Equal(Gender.Male, user.Gender);
+    }
+
+    [Fact]
     public async Task UpdateMe_Unknown_ReturnsUserNotFound_Async()
     {
         var result = await _sut.UpdateMeAsync(Guid.NewGuid(), new UpdateMyUserRequest(), _ct);
