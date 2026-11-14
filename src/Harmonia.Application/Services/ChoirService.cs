@@ -237,6 +237,30 @@ public class ChoirService(
 
         var tracked = await membershipRepository.GetByIdAsync(row.Id, cancellationToken);
         tracked!.IsActive = false;
+
+        // Upcoming events the member now serves through no choir lose their invitation and roster lines.
+        var today = VietnamTime.Today;
+        var upcoming = await eventChoirRepository.ListAsync(
+            x => x.ChoirId == choirId
+                && x.LiturgicalEvent.Status != EventStatus.Cancelled && x.LiturgicalEvent.EventDate >= today,
+            cancellationToken);
+        var upcomingEventIds = upcoming.Select(x => x.EventId).Distinct().ToList();
+        var otherChoirIds = (await membershipRepository.ListAsync(
+                x => x.MemberId == memberId && x.IsActive && x.ChoirId != choirId, cancellationToken))
+            .Select(x => x.ChoirId)
+            .ToList();
+        HashSet<Guid> stillServing = otherChoirIds.Count == 0 || upcomingEventIds.Count == 0
+            ? []
+            : (await eventChoirRepository.ListAsync(
+                    x => otherChoirIds.Contains(x.ChoirId) && upcomingEventIds.Contains(x.EventId), cancellationToken))
+                .Select(x => x.EventId)
+                .ToHashSet();
+        var droppedEventIds = upcomingEventIds.Where(x => !stillServing.Contains(x)).ToList();
+        foreach (var eventId in droppedEventIds)
+        {
+            await DropMembersFromEventAsync(eventId, [memberId], cancellationToken);
+        }
+
         await membershipRepository.SaveChangesAsync(cancellationToken);
 
         return Result.Success();

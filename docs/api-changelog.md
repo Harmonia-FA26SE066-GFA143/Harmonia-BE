@@ -11,6 +11,27 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
   huống trước đây chưa có. FE bỏ qua trường lạ, hiển thị câu chung cho mã lạ.
 - Mỗi PR đổi hợp đồng thêm một dòng vào mục ngày tương ứng ở đây, cùng PR cập nhật `api.md` / `error-codes.md`.
 
+## 2026-11-14
+
+### Phá vỡ
+
+- **[Phá vỡ]** `PUT api/event-participations/mine/{eventId}`: câu trả lời đã gửi **đổi được** đến trước giờ lễ
+  `Participation.ChangeCutoffHours` giờ (setting mới, mặc định 24); quá hạn → 409 `EVENT_PARTICIPATION_CHANGE_CLOSED` (mã
+  mới). `EVENT_PARTICIPATION_ALREADY_RESPONDED` không còn được trả. `MyParticipationDto.canRespond` của lời mời đã trả lời
+  giờ là `true` khi còn trong hạn. Mobile bật lại nút trả lời theo `canRespond`.
+
+### Không phá vỡ
+
+- `PUT api/liturgical-events/{id}` với sự kiện `Published` đổi ngày / giờ / địa điểm: gửi thông báo `EventRescheduled`
+  (`NotificationType` số 14); đổi ngày thì mọi câu trả lời về `Invited` và bảng phân công đã chốt mở lại `Draft`; ca viên
+  đang được phân công bị trùng giờ ở thời điểm mới → 409 `ROSTER_MEMBER_TIME_CONFLICT`.
+- Ca viên đổi sang `Declined` sau khi đã `Confirmed` / `Unsure`: dòng phân công ở sự kiện bị gỡ, bảng đã chốt mở lại,
+  ca trưởng ca đoàn phụ trách nhận `AssignmentNotice`.
+- `DELETE api/choirs/{id}/members/{memberId}`: xoá lời mời và dòng phân công của ca viên ở sự kiện sắp tới mà họ không
+  còn phục vụ qua ca đoàn khác; bảng đã chốt mở lại `Draft`.
+- `POST api/service-rosters/{id}/finalization` (và `whole-service-finalization`) trả 404 `MEMBER_NOT_FOUND` nếu một dòng thuộc ca viên đã rời mọi ca đoàn phục vụ
+  sự kiện.
+
 ## 2026-11-13
 
 ### Không phá vỡ

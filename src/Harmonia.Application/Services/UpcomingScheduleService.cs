@@ -16,6 +16,7 @@ public class UpcomingScheduleService(
     IRehearsalRepository rehearsalRepository,
     IMemberProfileRepository memberProfileRepository,
     IChoirScopeService choirScope,
+    ISystemSettingService systemSettingService,
     IMapper mapper) : IUpcomingScheduleService
 {
     public async Task<Result<List<MyAssignedEventDto>>> GetMyAssignmentsAsync(
@@ -48,8 +49,9 @@ public class UpcomingScheduleService(
         // A participation row comes back only for the caller's own profile, so profile is set here.
         if (liturgicalEvent.EventParticipations.FirstOrDefault() is { } participation)
         {
+            var cutoffHours = await EventParticipationService.GetChangeCutoffHoursAsync(systemSettingService, cancellationToken);
             dto.Participation = EventParticipationService.ToMyParticipationDto(
-                participation, liturgicalEvent, profile!.Status, mapper);
+                participation, liturgicalEvent, profile!.Status, cutoffHours, mapper);
         }
 
         return Result<MemberEventDetailDto>.Success(dto);

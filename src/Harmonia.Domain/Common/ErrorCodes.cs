@@ -291,6 +291,8 @@ public static class ErrorCodes
 
     public const string EventParticipationClosed = "EVENT_PARTICIPATION_CLOSED";
 
+    public const string EventParticipationChangeClosed = "EVENT_PARTICIPATION_CHANGE_CLOSED";
+
     public const string EventParticipationNotInvited = "EVENT_PARTICIPATION_NOT_INVITED";
 
     // 9. Service roster.

@@ -66,6 +66,12 @@ public interface IRosterService
     Task<Result<ServiceRosterDto>> FinalizeAsync(Guid rosterId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Whether a member with an active line on this event's roster serves another event near the given date and time;
+    /// used before an event is moved.
+    /// </summary>
+    Task<bool> HasAssignedMemberTimeConflictAsync(Guid eventId, DateOnly date, TimeOnly time, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Sends each selected member one notification listing their lines on the finalized roster and stamps
     /// those lines' NotifiedAt (UC-27 / FE-40).
     /// </summary>

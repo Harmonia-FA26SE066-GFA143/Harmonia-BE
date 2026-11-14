@@ -49,6 +49,11 @@ public class EventParticipationRepository(HarmoniaDbContext dbContext)
                 && x.Member.Status == MemberStatus.Active)
             .ToListAsync(cancellationToken);
 
+    public Task<List<EventParticipation>> GetRespondedForUpdateAsync(Guid eventId, CancellationToken cancellationToken) =>
+        DbContext.EventParticipations
+            .Where(x => x.EventId == eventId && x.Status != ParticipationStatus.Invited)
+            .ToListAsync(cancellationToken);
+
     public Task<List<Guid>> GetRequestedMemberIdsAsync(
         Guid eventId, IReadOnlyCollection<Guid> memberIds, CancellationToken cancellationToken) =>
         DbContext.EventParticipations

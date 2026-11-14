@@ -15,6 +15,7 @@ namespace Harmonia.Application.Tests;
 
 public class RosterServiceTests
 {
+    private readonly IChoirScopeService _scope = ChoirScopeFakes.Unrestricted();
     private readonly IServiceRosterRepository _repository = Substitute.For<IServiceRosterRepository>();
     private readonly IRosterSuggestionGenerator _generator = Substitute.For<IRosterSuggestionGenerator>();
     private readonly ICurrentUserService _currentUser = Substitute.For<ICurrentUserService>();
@@ -41,7 +42,7 @@ public class RosterServiceTests
             cfg.AddProfile<ServiceRosterProfile>();
         }, NullLoggerFactory.Instance).CreateMapper();
         _currentUser.UserId.Returns(_directorId);
-        _sut = new RosterService(_repository, _generator, _currentUser, _notifications, _settings, ChoirScopeFakes.Unrestricted(), mapper);
+        _sut = new RosterService(_repository, _generator, _currentUser, _notifications, _settings, _scope, mapper);
         _settings.GetIntAsync(SystemSettingKeys.RosterRecentServiceDays, _ct).Returns(60);
         _settings.GetBoolAsync(SystemSettingKeys.RosterAiSuggestionEnabled, _ct).Returns(true);
 
@@ -733,6 +734,20 @@ public class RosterServiceTests
         Assert.Contains(invalid.Id.ToString(), result.Message);
         Assert.Equal(RosterStatus.Suggested, roster.Status);
         await _repository.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Finalize_MemberLeftTheServingChoirs_ReturnsMemberNotFoundAndKeepsRosterOpen_Async()
+    {
+        var leaver = SopranoLineFor(_binh);
+        var roster = FinalizableRoster(RosterStatus.Suggested, SopranoLineFor(_an), leaver);
+        _scope.GetEventMemberIdsAsync(_event.Id, _ct).Returns(new[] { _an });
+
+        var result = await _sut.FinalizeAsync(roster.Id, _ct);
+
+        Assert.Equal(ErrorCodes.MemberNotFound, result.Code);
+        Assert.Contains(leaver.Id.ToString(), result.Message);
+        Assert.Equal(RosterStatus.Suggested, roster.Status);
     }
 
     // --- Assignment notifications (UC-27) ---

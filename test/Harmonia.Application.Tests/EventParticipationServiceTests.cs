@@ -18,6 +18,10 @@ public class EventParticipationServiceTests
     private readonly ILiturgicalEventRepository _events = Substitute.For<ILiturgicalEventRepository>();
     private readonly IMemberProfileRepository _members = Substitute.For<IMemberProfileRepository>();
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
+    private readonly ISystemSettingService _settings = Substitute.For<ISystemSettingService>();
+    private readonly IServiceRosterRepository _rosters = Substitute.For<IServiceRosterRepository>();
+    private readonly IGenericRepository<Choir> _choirs = Substitute.For<IGenericRepository<Choir>>();
+    private readonly IChoirScopeService _scope = ChoirScopeFakes.Unrestricted();
     private readonly EventParticipationService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly List<EventParticipation> _added = [];
@@ -37,7 +41,9 @@ public class EventParticipationServiceTests
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<EventParticipationProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new EventParticipationService(_participations, _events, _members, _notifications, ChoirScopeFakes.Unrestricted(), mapper);
+        _sut = new EventParticipationService(
+            _participations, _events, _members, _notifications, _scope, _settings, _rosters, _choirs, mapper);
+        _settings.GetIntAsync(SystemSettingKeys.ParticipationChangeCutoffHours, _ct).Returns(24);
 
         _events.GetByIdAsync(_event.Id, _ct).Returns(_event);
         _members.GetAllActiveWithUserAsync(_ct).Returns([_anna, _ben]);
@@ -300,15 +306,61 @@ public class EventParticipationServiceTests
     }
 
     [Fact]
-    public async Task Respond_SecondAnswer_ReturnsAlreadyResponded_AndKeepsTheFirst_Async()
+    public async Task Respond_ChangeBeforeCutoff_StoresTheNewAnswer_Async()
     {
         var participation = Invitation(_anna, ParticipationStatus.Declined);
 
         var result = await _sut.RespondAsync(_anna.UserId, _event.Id, Confirm(), _ct);
 
-        Assert.Equal(ErrorCodes.EventParticipationAlreadyResponded, result.Code);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ParticipationStatus.Confirmed, participation.Status);
+        await _participations.Received(1).SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Respond_ChangeWithinCutoff_ReturnsChangeClosed_AndKeepsTheFirst_Async()
+    {
+        var participation = Invitation(_anna, ParticipationStatus.Declined);
+        SetEventStart(VietnamTime.Now.AddHours(23));
+
+        var result = await _sut.RespondAsync(_anna.UserId, _event.Id, Confirm(), _ct);
+
+        Assert.Equal(ErrorCodes.EventParticipationChangeClosed, result.Code);
         Assert.Equal(ParticipationStatus.Declined, participation.Status);
         await _participations.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Respond_ConfirmedThenDeclined_DropsRosterLines_ReopensRoster_AndTellsLeadDirector_Async()
+    {
+        Invitation(_anna, ParticipationStatus.Confirmed);
+        _anna.User.FullName = "Anna";
+        var directorId = Guid.NewGuid();
+        var choir = new Choir { Id = Guid.NewGuid(), DirectorId = directorId };
+        _scope.GetLeadChoirIdAsync(_event.Id, _ct).Returns(choir.Id);
+        _choirs.GetByIdAsync(choir.Id, _ct).Returns(choir);
+        var roster = new ServiceRoster
+        {
+            Id = Guid.NewGuid(), EventId = _event.Id, Status = RosterStatus.Finalized, FinalizedAt = DateTime.UtcNow,
+            WholeServiceFinalizedAt = DateTime.UtcNow,
+        };
+        var annaLine = new RosterAssignment { Id = Guid.NewGuid(), MemberId = _anna.Id, Status = RosterAssignmentStatus.Active };
+        var benLine = new RosterAssignment
+        {
+            Id = Guid.NewGuid(), MemberId = _ben.Id, SongListItemId = Guid.NewGuid(), Status = RosterAssignmentStatus.Active,
+        };
+        roster.Assignments = [annaLine, benLine];
+        _rosters.GetEventWithRosterAsync(_event.Id, _ct).Returns(new LiturgicalEvent { Id = _event.Id, ServiceRoster = roster });
+
+        var result = await _sut.RespondAsync(
+            _anna.UserId, _event.Id, new RespondParticipationRequest { Status = ParticipationStatus.Declined }, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal([benLine], roster.Assignments);
+        Assert.Equal((RosterStatus.Draft, null, null), (roster.Status, roster.FinalizedAt, roster.WholeServiceFinalizedAt));
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(r => r.Type == NotificationType.AssignmentNotice && r.RecipientUserIds.SequenceEqual(new[] { directorId })),
+            _ct);
     }
 
     [Fact]
@@ -387,7 +439,7 @@ public class EventParticipationServiceTests
         Assert.True(result.IsSuccess);
         Assert.Equal([open.Id, answered.Id, closed.Id], result.Value!.Select(p => p.ParticipationId));
         Assert.Equal(
-            [(true, null), (false, ErrorCodes.EventParticipationAlreadyResponded), (false, ErrorCodes.EventParticipationClosed)],
+            [(true, null), (true, null), (false, ErrorCodes.EventParticipationClosed)],
             result.Value!.Select(p => (p.CanRespond, p.CannotRespondReason)));
         Assert.Equal((ParticipationStatus.Unsure, "Maybe"), (result.Value![1].Status, result.Value[1].Note));
     }

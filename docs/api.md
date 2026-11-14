@@ -518,7 +518,7 @@ Chưa có kỹ năng nào → `[]`.
 | GET | `/api/liturgical-events?fromDate=&toDate=&status=&pageNumber=&pageSize=` · `ParishPriest`, `ChoirDirector` | — | 200 `PagedList<LiturgicalEventListItemDto>` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`) |
 | GET | `/api/liturgical-events/{id}` | — | 200 `LiturgicalEventDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
 | POST | `/api/liturgical-events` | `{ "eventDate", "time", "liturgicalSeasonId?", "massTypeId?", "ceremonyTypeId?", "categoryId?", "locationId", "title?", "specialRequirements?", "choirIds": ["guid"], "leadChoirId" }` | 200 `LiturgicalEventDto` | 400 `VALIDATION_FAILED` (`LITURGICAL_EVENT_TYPE_REQUIRED`, `LITURGICAL_EVENT_CHOIR_REQUIRED`, `CHOIR_LEAD_INVALID`), `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` · 404 `LOOKUP_NOT_FOUND`, `CHOIR_NOT_FOUND` · 409 `LITURGICAL_EVENT_SLOT_TAKEN`, `LOOKUP_INACTIVE`, `CHOIR_INACTIVE` |
-| PUT | `/api/liturgical-events/{id}` | như `POST`, trừ `choirIds`, `leadChoirId` (sửa qua `PUT .../choirs`) | 200 `LiturgicalEventDto` | 400 `VALIDATION_FAILED` (`LITURGICAL_EVENT_TYPE_REQUIRED`), `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_SLOT_TAKEN`, `LOOKUP_INACTIVE` |
+| PUT | `/api/liturgical-events/{id}` | như `POST`, trừ `choirIds`, `leadChoirId` (sửa qua `PUT .../choirs`) | 200 `LiturgicalEventDto` | 400 `VALIDATION_FAILED` (`LITURGICAL_EVENT_TYPE_REQUIRED`), `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_SLOT_TAKEN`, `LOOKUP_INACTIVE`, `ROSTER_MEMBER_TIME_CONFLICT` |
 | POST | `/api/liturgical-events/generation` | `{ "fromDate", "toDate" }` | 200 `LiturgicalEventDto[]` (các sự kiện vừa tạo) | 400 `VALIDATION_FAILED` (`LITURGICAL_EVENT_GENERATION_RANGE_INVALID`) |
 | PATCH | `/api/liturgical-events/{id}/publish` | — | 200 `LiturgicalEventDto` | 400 `LITURGICAL_EVENT_TYPE_REQUIRED`, `LITURGICAL_EVENT_SEASON_REQUIRED`, `LITURGICAL_EVENT_CHOIR_REQUIRED`, `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND` · 409 `LITURGICAL_EVENT_ALREADY_PUBLISHED`, `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `LITURGICAL_EVENT_SLOT_TAKEN`, `LOOKUP_INACTIVE` |
 | PATCH | `/api/liturgical-events/{id}/cancel` | — | 200 `LiturgicalEventDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED` |
@@ -555,6 +555,11 @@ Chưa có kỹ năng nào → `[]`.
   notification `type = EventPublished` cho mọi ca trưởng và ca viên đang hoạt động,
   `referenceType = "LiturgicalEvent"`, `referenceId` = id sự kiện (S-05).
 - Mỗi sự kiện công bố riêng (D6). Ca viên chỉ thấy sự kiện `Published`.
+- `PUT` sự kiện `Published` mà đổi ngày, giờ hoặc địa điểm: nếu một ca viên đang có dòng phân công sẽ trùng giờ với lễ
+  khác ở ngày giờ mới → 409 `ROSTER_MEMBER_TIME_CONFLICT`, không lưu. Lưu được thì ca trưởng và ca viên các ca đoàn phục vụ
+  nhận thông báo `EventRescheduled` ("từ … sang …"). Riêng khi **đổi ngày**: mọi câu trả lời về lại `Invited` (ca viên xác
+  nhận lại), bảng phân công đã chốt mở lại `Draft` (dòng phân công giữ nguyên, chốt lại cần ca viên xác nhận ngày mới).
+  Sự kiện `Draft` sửa như cũ, không thông báo.
 - **Kiểm trước khi công bố** — sự kiện phải đủ và còn hợp lệ, kiểm theo thứ tự, gặp lỗi đầu tiên thì dừng:
   chưa qua ngày (409 `LITURGICAL_EVENT_ALREADY_PASSED`) · có `massTypeId` hoặc `ceremonyTypeId` (400
   `LITURGICAL_EVENT_TYPE_REQUIRED`) · có `liturgicalSeasonId` (400 `LITURGICAL_EVENT_SEASON_REQUIRED`) · có ca đoàn phụ
@@ -891,6 +896,7 @@ dữ liệu trong khoảng lọc vẫn hiện với các số bằng 0.
 | `System.Announcement` | String | rỗng | có | Thông báo chung cho mọi người dùng; rỗng thì không hiện |
 | `Roster.RecentServiceDays` | Int 1–365 | 60 | không | Số ngày tính "phục vụ gần đây" khi gợi ý phân công |
 | `Roster.AiSuggestionEnabled` | Bool | true | không | Tắt thì gợi ý phân công không gọi AI, chỉ xếp theo luật (`isAiGenerated` = `false`) |
+| `Participation.ChangeCutoffHours` | Int 0–168 | 24 | không | Ca viên đổi được câu trả lời lời mời đến trước giờ lễ N giờ (`EVENT_PARTICIPATION_CHANGE_CLOSED`). 0 = đổi được đến giờ lễ |
 | `Roster.EventOverlapMinutes` | Int 0–720 | 120 | không | Không phân công một ca viên vào hai lễ cùng ngày bắt đầu cách nhau ít hơn N phút (`ROSTER_MEMBER_TIME_CONFLICT`; gợi ý bỏ qua người đó). 0 = chỉ chặn hai lễ cùng giờ |
 | `Practice.AllowLateSubmission` | Bool | false | không | Bật thì nộp bản thu sau hạn không còn bị `PRACTICE_SUBMISSION_PAST_DUE`; bài vẫn tính là quá hạn |
 | `Rehearsal.AttendanceOpensMinutesBefore` | Int 0–120 | 0 | không | Cho điểm danh sớm N phút trước giờ bắt đầu; sớm hơn nữa vẫn `REHEARSAL_NOT_STARTED` |
@@ -940,7 +946,9 @@ Admin thấy và quản lý mọi ca đoàn.
 - `memberIds` là id `MemberProfile` (lấy từ `GET /api/member-profiles`); id trùng tự loại. Có id nào không tồn tại
   hoặc ca viên không ở trạng thái `Active` → 400 `CHOIR_MEMBER_INVALID`, không lưu gì.
   Ca viên đã ở trong ca đoàn thì bỏ qua; ca viên từng rời ca đoàn thì vào lại, `joinedDate` = hôm nay.
-- `DELETE .../members/{memberId}`: ca viên rời ca đoàn, lịch sử vẫn giữ; thêm lại bằng `POST .../members`.
+- `DELETE .../members/{memberId}`: ca viên rời ca đoàn, lịch sử vẫn giữ; thêm lại bằng `POST .../members`. Ở các sự kiện
+  sắp tới của ca đoàn mà ca viên không còn phục vụ qua ca đoàn nào khác: lời mời và dòng phân công bị xoá, bảng đã chốt mở
+  lại `Draft`.
 - `PUT /api/liturgical-events/{id}/choirs` **thay toàn bộ** danh sách ca đoàn của sự kiện; không nhận `[]`
   (400 `LITURGICAL_EVENT_CHOIR_REQUIRED`).
   Sự kiện đã huỷ hoặc đã qua ngày thì không sửa được. Ca đoàn đã tắt vẫn được giữ lại nếu đã gán từ trước,
@@ -1155,7 +1163,8 @@ Chỉ thao tác trên thông báo **của chính người gọi**.
 ```
 
 `type`: `EventPublished` | `SongListDecision` | `ParticipationRequest` | `AssignmentNotice` |
-`PracticeFeedback` | `DirectorNote` | `SkillReview` | `EventCancelled` | `SongListSubmitted` | `RehearsalChanged`. `referenceType` + `referenceId` (nullable) cho biết bấm vào
+`PracticeFeedback` | `DirectorNote` | `SkillReview` | `EventCancelled` | `SongListSubmitted` | `RehearsalChanged` |
+`EventChoirChanged` | `MemberRegistrationSubmitted` | `DirectorNomination` | `ChoirChanged` | `EventRescheduled`. `referenceType` + `referenceId` (nullable) cho biết bấm vào
 thì mở màn nào.
 
 | Method | Route | Thành công | Lỗi |
@@ -1740,7 +1749,7 @@ Ca trưởng vẫn sửa được bằng `PUT /api/song-list-items/{id}/personne
 | POST | `/api/service-rosters/assignments/{id}/replacement` | `{ "memberId", "note?" }` | 200 `RosterAssignmentDto` (dòng mới) | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `ROSTER_ASSIGNMENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ROSTER_ASSIGNMENT_DUPLICATE`, `MEMBER_NOT_ACTIVE`, `ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED`, `ROSTER_MEMBER_TIME_CONFLICT` |
 | PUT | `/api/service-rosters/assignments/{id}/note` | `{ "note" }` | 200 `RosterAssignmentDto` | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `ROSTER_ASSIGNMENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED` |
 | DELETE | `/api/service-rosters/assignments/{id}` | — | 204 | 403 `CHOIR_NOT_LEAD` · 404 `ROSTER_ASSIGNMENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED` |
-| POST | `/api/service-rosters/{id}/finalization` | — | 200 `ServiceRosterDto` | 403 `CHOIR_NOT_LEAD` · 404 `ROSTER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ROSTER_SONG_LIST_NOT_APPROVED`, `MEMBER_NOT_ACTIVE`, `ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED` |
+| POST | `/api/service-rosters/{id}/finalization` | — | 200 `ServiceRosterDto` | 403 `CHOIR_NOT_LEAD` · 404 `ROSTER_NOT_FOUND`, `MEMBER_NOT_FOUND` (ca viên đã rời mọi ca đoàn phục vụ sự kiện) · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_ALREADY_FINALIZED`, `ROSTER_SONG_LIST_NOT_APPROVED`, `MEMBER_NOT_ACTIVE`, `ROSTER_ASSIGNMENT_MEMBER_SKILL_NOT_APPROVED`, `ROSTER_ASSIGNMENT_MEMBER_NOT_CONFIRMED` |
 | POST | `/api/service-rosters/{id}/notifications` | `{ "memberIds": ["guid"] }` | 204 | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `ROSTER_NOT_FOUND`, `ROSTER_ASSIGNMENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `ROSTER_NOT_FINALIZED` |
 
 `ServiceRosterDto` có thêm `wholeServiceFinalizedAt` (null khi chưa chốt sớm vai cả buổi lễ).
@@ -2262,8 +2271,10 @@ Ca trưởng ghi âm ở phòng tập; ca viên của ca đoàn buổi tập ngh
 
 `MyParticipationDto` = `{ participationId, eventId, status, requestedAt, respondedAt, note, canRespond, cannotRespondReason }`.
 `canRespond = true` khi `PUT mine/{eventId}` sẽ nhận câu trả lời lúc này; ngược lại `cannotRespondReason` là mã lỗi `PUT`
-sẽ trả (`LITURGICAL_EVENT_CANCELLED`, `MEMBER_NOT_ACTIVE`, `EVENT_PARTICIPATION_ALREADY_RESPONDED`,
-`EVENT_PARTICIPATION_CLOSED`). Ca viên `Inactive` / `Left` vẫn thấy lời mời nhưng `canRespond = false`.
+sẽ trả (`LITURGICAL_EVENT_CANCELLED`, `MEMBER_NOT_ACTIVE`, `EVENT_PARTICIPATION_CLOSED`,
+`EVENT_PARTICIPATION_CHANGE_CLOSED`). Lời mời `Invited` trả lời được đến giờ lễ; câu trả lời đã gửi đổi được đến trước giờ lễ
+`Participation.ChangeCutoffHours` giờ. Đổi từ `Confirmed` / `Unsure` sang `Declined` thì dòng phân công của ca viên ở sự
+kiện bị gỡ, bảng đã chốt mở lại `Draft`, ca trưởng ca đoàn phụ trách nhận thông báo `AssignmentNotice`. Ca viên `Inactive` / `Left` vẫn thấy lời mời nhưng `canRespond = false`.
 
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
@@ -2271,7 +2282,7 @@ sẽ trả (`LITURGICAL_EVENT_CANCELLED`, `MEMBER_NOT_ACTIVE`, `EVENT_PARTICIPAT
 | GET | `/api/event-participations?eventId=` · `ChoirDirector` | — | 200 `EventParticipationSummaryDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
 | POST | `/api/event-participations/confirm-all?eventId=` · `ChoirDirector` (ca đoàn phụ trách) — xác nhận hộ mọi lời mời `Invited` của ca viên `Active` (giữ `Declined`/`Unsure`), phục vụ demo; không chặn sự kiện đã qua, không gửi thông báo | — | 200 `EventParticipationSummaryDto` | 403 `CHOIR_NOT_LEAD` · 404 `LITURGICAL_EVENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED` |
 | GET | `/api/event-participations/mine` · `ChoirMember` | — | 200 `MyParticipationDto[]` | 404 `MEMBER_NOT_FOUND` |
-| PUT | `/api/event-participations/mine/{eventId}` · `ChoirMember` | `{ "status", "note?" }` | 200 `EventParticipationDto` | 400 `VALIDATION_FAILED` · 404 `MEMBER_NOT_FOUND` · 409 `MEMBER_NOT_ACTIVE`, `EVENT_PARTICIPATION_NOT_INVITED`, `LITURGICAL_EVENT_CANCELLED`, `EVENT_PARTICIPATION_ALREADY_RESPONDED`, `EVENT_PARTICIPATION_CLOSED` |
+| PUT | `/api/event-participations/mine/{eventId}` · `ChoirMember` | `{ "status", "note?" }` | 200 `EventParticipationDto` | 400 `VALIDATION_FAILED` · 404 `MEMBER_NOT_FOUND` · 409 `MEMBER_NOT_ACTIVE`, `EVENT_PARTICIPATION_NOT_INVITED`, `LITURGICAL_EVENT_CANCELLED`, `EVENT_PARTICIPATION_CLOSED`, `EVENT_PARTICIPATION_CHANGE_CLOSED` |
 
 - `POST` chỉ gửi được cho sự kiện `Published` và chưa diễn ra. Mỗi ca viên được mời nhận một thông báo
   `ParticipationRequest`.

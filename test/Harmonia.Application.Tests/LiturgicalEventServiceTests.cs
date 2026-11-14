@@ -22,6 +22,9 @@ public class LiturgicalEventServiceTests
     private readonly ISystemSettingService _settings = Substitute.For<ISystemSettingService>();
     private readonly IGenericRepository<Choir> _choirs = Substitute.For<IGenericRepository<Choir>>();
     private readonly IChoirScopeService _scope = ChoirScopeFakes.Unrestricted();
+    private readonly IRosterService _roster = Substitute.For<IRosterService>();
+    private readonly IEventParticipationRepository _participations = Substitute.For<IEventParticipationRepository>();
+    private readonly IServiceRosterRepository _rosters = Substitute.For<IServiceRosterRepository>();
     private readonly Choir _choir = new() { Id = Guid.NewGuid(), Name = "Cecilia", IsActive = true };
     private readonly LiturgicalEventService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
@@ -41,11 +44,14 @@ public class LiturgicalEventServiceTests
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<LiturgicalEventProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new LiturgicalEventService(_repository, _users, _choirs, _notifications, _lookups, _scope, _settings, Substitute.For<ICurrentUserService>(), mapper);
+        _sut = new LiturgicalEventService(
+            _repository, _users, _choirs, _notifications, _lookups, _scope, _settings, Substitute.For<ICurrentUserService>(),
+            _roster, _participations, _rosters, mapper);
         _lookups.CheckEventCatalogsAsync(default, default, default, default, default, default, default, default)
             .ReturnsForAnyArgs(Result.Success());
         _choirs.ListAsync(default!, default).ReturnsForAnyArgs([_choir]);
         _repository.GetWithLocationAsync(_event.Id, _ct).Returns(_event);
+        _participations.GetRespondedForUpdateAsync(Arg.Any<Guid>(), _ct).Returns([]);
     }
 
     [Fact]
@@ -82,6 +88,64 @@ public class LiturgicalEventServiceTests
         Assert.Equal(EventStatus.Published, _event.Status);
         await _repository.Received(1).ExistsBySlotAsync(request.EventDate, request.Time, request.LocationId, _event.Id, _ct);
         await _repository.Received(1).SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Update_PublishedEventMovedToAnotherDate_ResetsAnswers_ReopensRoster_AndNotifies_Async()
+    {
+        var confirmed = new EventParticipation { Id = Guid.NewGuid(), Status = ParticipationStatus.Confirmed, RespondedAt = DateTime.UtcNow };
+        _participations.GetRespondedForUpdateAsync(_event.Id, _ct).Returns([confirmed]);
+        var roster = new ServiceRoster
+        {
+            Id = Guid.NewGuid(), Status = RosterStatus.Finalized, FinalizedAt = DateTime.UtcNow, WholeServiceFinalizedAt = DateTime.UtcNow,
+        };
+        _rosters.GetEventWithRosterAsync(_event.Id, _ct).Returns(new LiturgicalEvent { Id = _event.Id, ServiceRoster = roster });
+
+        var result = await _sut.UpdateAsync(_event.Id, UpdateRequest(), _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal((ParticipationStatus.Invited, null), (confirmed.Status, confirmed.RespondedAt));
+        Assert.Equal((RosterStatus.Draft, null, null), (roster.Status, roster.FinalizedAt, roster.WholeServiceFinalizedAt));
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(r => r.Type == NotificationType.EventRescheduled), _ct);
+    }
+
+    [Fact]
+    public async Task Update_PublishedEventMovedToAnotherTimeSameDay_KeepsAnswers_AndNotifies_Async()
+    {
+        var request = UpdateRequest();
+        request.EventDate = _event.EventDate;
+
+        var result = await _sut.UpdateAsync(_event.Id, request, _ct);
+
+        Assert.True(result.IsSuccess);
+        await _participations.DidNotReceive().GetRespondedForUpdateAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(r => r.Type == NotificationType.EventRescheduled), _ct);
+    }
+
+    [Fact]
+    public async Task Update_PublishedEventMovedOntoAssignedMembersOtherEvent_ReturnsTimeConflict_AndSavesNothing_Async()
+    {
+        var request = UpdateRequest();
+        _roster.HasAssignedMemberTimeConflictAsync(_event.Id, request.EventDate, request.Time, _ct).Returns(true);
+
+        var result = await _sut.UpdateAsync(_event.Id, request, _ct);
+
+        Assert.Equal(ErrorCodes.RosterMemberTimeConflict, result.Code);
+        await _repository.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Update_DraftEventMoved_SendsNothing_Async()
+    {
+        _event.Status = EventStatus.Draft;
+
+        var result = await _sut.UpdateAsync(_event.Id, UpdateRequest(), _ct);
+
+        Assert.True(result.IsSuccess);
+        await _roster.DidNotReceiveWithAnyArgs().HasAssignedMemberTimeConflictAsync(default, default, default, default);
+        await _notifications.DidNotReceiveWithAnyArgs().SendAsync(default!, default);
     }
 
     [Fact]

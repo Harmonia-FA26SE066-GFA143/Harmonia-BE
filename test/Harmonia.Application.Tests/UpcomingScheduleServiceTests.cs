@@ -1,3 +1,4 @@
+using Harmonia.Application.Interfaces.IServices;
 using AutoMapper;
 using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IRepositories;
@@ -33,7 +34,8 @@ public class UpcomingScheduleServiceTests
                 },
                 NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new UpcomingScheduleService(_events, _rehearsals, _members, ChoirScopeFakes.Unrestricted(), mapper);
+        _sut = new UpcomingScheduleService(
+            _events, _rehearsals, _members, ChoirScopeFakes.Unrestricted(), Substitute.For<ISystemSettingService>(), mapper);
     }
 
     [Fact]

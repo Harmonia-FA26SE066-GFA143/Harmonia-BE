@@ -373,6 +373,40 @@ public class ChoirServiceTests
     }
 
     [Fact]
+    public async Task RemoveMember_DropsUpcomingInvitesAndLines_UnlessAnotherServingChoirKeepsThem_Async()
+    {
+        var other = NewChoir("Agnes Choir");
+        var member = NewMember();
+        var row = NewMembership(member);
+        AssignToEvent(_choir).LiturgicalEvent = _event;
+        // A second upcoming event that the member still serves through the Agnes choir.
+        var shared = new LiturgicalEvent { Id = Guid.NewGuid(), EventDate = _event.EventDate, Status = EventStatus.Published };
+        _eventChoirRows.AddRange(
+        [
+            new LiturgicalEventChoir { Id = Guid.NewGuid(), EventId = shared.Id, ChoirId = _choir.Id, LiturgicalEvent = shared },
+            new LiturgicalEventChoir { Id = Guid.NewGuid(), EventId = shared.Id, ChoirId = other.Id, LiturgicalEvent = shared },
+        ]);
+        _membershipRows.Add(new ChoirMembership { Id = Guid.NewGuid(), ChoirId = other.Id, MemberId = member.Id, IsActive = true });
+        var dropped = new EventParticipation { Id = Guid.NewGuid(), EventId = _event.Id, MemberId = member.Id };
+        _participationRows.AddRange([dropped, new EventParticipation { Id = Guid.NewGuid(), EventId = shared.Id, MemberId = member.Id }]);
+        var roster = new ServiceRoster
+        {
+            Id = Guid.NewGuid(), EventId = _event.Id, Status = RosterStatus.Finalized, FinalizedAt = DateTime.UtcNow,
+            Assignments = [new RosterAssignment { Id = Guid.NewGuid(), MemberId = member.Id, SongListItemId = Guid.NewGuid() }],
+        };
+        _rosters.GetEventWithRosterAsync(_event.Id, _ct).Returns(new LiturgicalEvent { Id = _event.Id, ServiceRoster = roster });
+
+        var result = await _sut.RemoveMemberAsync(_choir.Id, member.Id, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(row.IsActive);
+        Assert.Same(dropped, Assert.Single(_removedParticipations));
+        Assert.Empty(roster.Assignments);
+        Assert.Equal(RosterStatus.Draft, roster.Status);
+        await _rosters.DidNotReceive().GetEventWithRosterAsync(shared.Id, _ct);
+    }
+
+    [Fact]
     public async Task Update_KeepingOwnName_RenamesDescriptionAndDeactivates_Async()
     {
         var result = await _sut.UpdateAsync(

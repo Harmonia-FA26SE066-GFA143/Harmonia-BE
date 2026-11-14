@@ -20,6 +20,9 @@ public class EventParticipationService(
     IMemberProfileRepository memberProfileRepository,
     INotificationService notificationService,
     IChoirScopeService choirScope,
+    ISystemSettingService systemSettingService,
+    IServiceRosterRepository rosterRepository,
+    IGenericRepository<Choir> choirRepository,
     IMapper mapper) : IEventParticipationService
 {
     public async Task<Result<List<EventParticipationDto>>> SendRequestsAsync(
@@ -181,15 +184,26 @@ public class EventParticipationService(
             return Result<EventParticipationDto>.Failure(ErrorCodes.EventParticipationNotInvited);
         }
 
-        if (CannotRespondCode(participation, participation.LiturgicalEvent, profile.Status) is { } closedCode)
+        var cutoffHours = await GetChangeCutoffHoursAsync(cancellationToken);
+        if (CannotRespondCode(participation, participation.LiturgicalEvent, profile.Status, cutoffHours) is { } closedCode)
         {
             return Result<EventParticipationDto>.Failure(closedCode);
         }
 
+        var withdrew = participation.Status != ParticipationStatus.Invited
+            && participation.Status != ParticipationStatus.Declined
+            && request.Status == ParticipationStatus.Declined;
         participation.Status = request.Status;
         participation.Note = request.Note;
         participation.RespondedAt = DateTime.UtcNow;
+        var droppedLines = withdrew ? await DropRosterLinesAsync(eventId, profile.Id, cancellationToken) : 0;
         await participationRepository.SaveChangesAsync(cancellationToken);
+
+        if (droppedLines > 0)
+        {
+            await NotifyLeadDirectorOfWithdrawalAsync(
+                participation.LiturgicalEvent, participation.Member.User.FullName, cancellationToken);
+        }
 
         var dto = mapper.Map<EventParticipationDto>(participation);
         dto.MemberFullName = participation.Member.User.FullName;
@@ -207,29 +221,97 @@ public class EventParticipationService(
 
         var participations = await participationRepository.GetUpcomingForMemberAsync(
             profile.Id, VietnamTime.Today, cancellationToken);
+        var cutoffHours = await GetChangeCutoffHoursAsync(cancellationToken);
 
-        return Result<List<MyParticipationDto>>.Success(
-            participations.Select(p => ToMyParticipationDto(p, p.LiturgicalEvent, profile.Status, mapper)).ToList());
+        return Result<List<MyParticipationDto>>.Success(participations
+            .Select(p => ToMyParticipationDto(p, p.LiturgicalEvent, profile.Status, cutoffHours, mapper))
+            .ToList());
     }
 
     /// <summary>Maps the member's own request and fills in whether <see cref="RespondAsync"/> would accept an answer now.</summary>
     internal static MyParticipationDto ToMyParticipationDto(
-        EventParticipation participation, LiturgicalEvent liturgicalEvent, MemberStatus memberStatus, IMapper mapper)
+        EventParticipation participation, LiturgicalEvent liturgicalEvent, MemberStatus memberStatus, int changeCutoffHours,
+        IMapper mapper)
     {
         var dto = mapper.Map<MyParticipationDto>(participation);
-        dto.CannotRespondReason = CannotRespondCode(participation, liturgicalEvent, memberStatus);
+        dto.CannotRespondReason = CannotRespondCode(participation, liturgicalEvent, memberStatus, changeCutoffHours);
         dto.CanRespond = dto.CannotRespondReason is null;
         return dto;
     }
 
-    // A member answers once; the answer is final, so only an active member's Invited request before the event can be answered.
+    // An Invited request can be answered until the event starts; an answer can be changed until changeCutoffHours before it.
     private static string? CannotRespondCode(
-        EventParticipation participation, LiturgicalEvent liturgicalEvent, MemberStatus memberStatus)
+        EventParticipation participation, LiturgicalEvent liturgicalEvent, MemberStatus memberStatus, int changeCutoffHours)
     {
         if (liturgicalEvent.Status == EventStatus.Cancelled) return ErrorCodes.LiturgicalEventCancelled;
         if (memberStatus != MemberStatus.Active) return ErrorCodes.MemberNotActive;
-        if (participation.Status != ParticipationStatus.Invited) return ErrorCodes.EventParticipationAlreadyResponded;
-        return HasPassed(liturgicalEvent) ? ErrorCodes.EventParticipationClosed : null;
+        if (HasPassed(liturgicalEvent)) return ErrorCodes.EventParticipationClosed;
+        var changeDeadline = liturgicalEvent.EventDate.ToDateTime(liturgicalEvent.Time).AddHours(-changeCutoffHours);
+        return participation.Status != ParticipationStatus.Invited && changeDeadline <= VietnamTime.Now
+            ? ErrorCodes.EventParticipationChangeClosed
+            : null;
+    }
+
+    internal static Task<int> GetChangeCutoffHoursAsync(
+        ISystemSettingService systemSettingService, CancellationToken cancellationToken) =>
+        systemSettingService.GetIntAsync(SystemSettingKeys.ParticipationChangeCutoffHours, cancellationToken);
+
+    private Task<int> GetChangeCutoffHoursAsync(CancellationToken cancellationToken) =>
+        GetChangeCutoffHoursAsync(systemSettingService, cancellationToken);
+
+    /// <summary>
+    /// Removes the member's active lines on the event's roster and reopens it when finalized, so the lead director
+    /// fills the gap. Saved with the caller's change; returns how many lines went.
+    /// </summary>
+    private async Task<int> DropRosterLinesAsync(Guid eventId, Guid memberId, CancellationToken cancellationToken)
+    {
+        var roster = (await rosterRepository.GetEventWithRosterAsync(eventId, cancellationToken))?.ServiceRoster;
+        var lines = roster?.Assignments
+            .Where(x => x.MemberId == memberId && x.Status == RosterAssignmentStatus.Active)
+            .ToList() ?? [];
+        if (roster is null || lines.Count == 0)
+        {
+            return 0;
+        }
+
+        foreach (var line in lines)
+        {
+            roster.Assignments.Remove(line);
+        }
+
+        if (roster.Status == RosterStatus.Finalized)
+        {
+            roster.Status = RosterStatus.Draft;
+            roster.FinalizedAt = null;
+            roster.FinalizedBy = null;
+        }
+
+        if (lines.Any(x => x.SongListItemId is null))
+        {
+            roster.WholeServiceFinalizedAt = null;
+        }
+
+        return lines.Count;
+    }
+
+    private async Task NotifyLeadDirectorOfWithdrawalAsync(
+        LiturgicalEvent liturgicalEvent, string memberName, CancellationToken cancellationToken)
+    {
+        if (await choirScope.GetLeadChoirIdAsync(liturgicalEvent.Id, cancellationToken) is not { } leadChoirId
+            || await choirRepository.GetByIdAsync(leadChoirId, cancellationToken) is not { DirectorId: { } directorId })
+        {
+            return;
+        }
+
+        await notificationService.SendAsync(
+            new SendNotificationRequest(
+                Type: NotificationType.AssignmentNotice,
+                Title: "Ca viên rút khỏi sự kiện",
+                Content: $"{memberName} đã từ chối tham gia sự kiện ngày {liturgicalEvent.EventDate:dd/MM/yyyy} lúc {liturgicalEvent.Time:HH:mm}; phân công của ca viên đã được gỡ, vui lòng xếp người thay.",
+                RecipientUserIds: [directorId],
+                ReferenceType: nameof(LiturgicalEvent),
+                ReferenceId: liturgicalEvent.Id),
+            cancellationToken);
     }
 
     // Event date and time are parish wall-clock values stored without a zone.

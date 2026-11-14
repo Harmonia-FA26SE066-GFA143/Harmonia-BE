@@ -23,6 +23,9 @@ public class LiturgicalEventService(
     IChoirScopeService choirScope,
     ISystemSettingService systemSettingService,
     ICurrentUserService currentUser,
+    IRosterService rosterService,
+    IEventParticipationRepository participationRepository,
+    IServiceRosterRepository rosterRepository,
     IMapper mapper) : ILiturgicalEventService
 {
     public async Task<Result<PagedList<LiturgicalEventListItemDto>>> SearchAsync(
@@ -135,6 +138,22 @@ public class LiturgicalEventService(
             return Result<LiturgicalEventDto>.Failure(ErrorCodes.LiturgicalEventSlotTaken);
         }
 
+        var isPublished = liturgicalEvent.Status == EventStatus.Published;
+        var dateChanged = liturgicalEvent.EventDate != request.EventDate;
+        var rescheduled = isPublished
+            && (dateChanged || liturgicalEvent.Time != request.Time || liturgicalEvent.LocationId != request.LocationId);
+        if (rescheduled && await rosterService.HasAssignedMemberTimeConflictAsync(
+                id, request.EventDate, request.Time, cancellationToken))
+        {
+            return Result<LiturgicalEventDto>.Failure(ErrorCodes.RosterMemberTimeConflict);
+        }
+
+        var previousLabel = $"{liturgicalEvent.EventDate:dd/MM/yyyy} lúc {liturgicalEvent.Time:HH:mm} tại {liturgicalEvent.Location?.Name}";
+        if (isPublished && dateChanged)
+        {
+            await ResetForNewDateAsync(id, cancellationToken);
+        }
+
         liturgicalEvent.EventDate = request.EventDate;
         liturgicalEvent.Time = request.Time;
         liturgicalEvent.LiturgicalSeasonId = request.LiturgicalSeasonId;
@@ -148,7 +167,44 @@ public class LiturgicalEventService(
 
         // Reload so LocationName follows a changed LocationId.
         var updated = await liturgicalEventRepository.GetWithLocationAsync(id, cancellationToken);
+        if (rescheduled)
+        {
+            var reconfirm = dateChanged ? " Vui lòng xác nhận tham gia lại." : string.Empty;
+            await NotifyDirectorsAndMembersAsync(
+                updated!,
+                NotificationType.EventRescheduled,
+                "Sự kiện đã đổi thời gian hoặc địa điểm",
+                $"Sự kiện ngày {previousLabel} chuyển sang ngày {updated!.EventDate:dd/MM/yyyy} lúc {updated.Time:HH:mm} tại {updated.Location?.Name}.{reconfirm}",
+                cancellationToken);
+        }
+
         return Result<LiturgicalEventDto>.Success(mapper.Map<LiturgicalEventDto>(updated));
+    }
+
+    /// <summary>
+    /// A new date voids every answer, so members are asked again and a finalized roster reopens; its lines stay, and
+    /// finalizing again needs the members to confirm the new date. Saved with the caller's change.
+    /// </summary>
+    private async Task ResetForNewDateAsync(Guid eventId, CancellationToken cancellationToken)
+    {
+        foreach (var participation in await participationRepository.GetRespondedForUpdateAsync(eventId, cancellationToken))
+        {
+            participation.Status = ParticipationStatus.Invited;
+            participation.RespondedAt = null;
+        }
+
+        var roster = (await rosterRepository.GetEventWithRosterAsync(eventId, cancellationToken))?.ServiceRoster;
+        if (roster is { Status: RosterStatus.Finalized })
+        {
+            roster.Status = RosterStatus.Draft;
+            roster.FinalizedAt = null;
+            roster.FinalizedBy = null;
+        }
+
+        if (roster is not null)
+        {
+            roster.WholeServiceFinalizedAt = null;
+        }
     }
 
     public async Task<Result<LiturgicalEventDto>> PublishAsync(Guid id, CancellationToken cancellationToken)

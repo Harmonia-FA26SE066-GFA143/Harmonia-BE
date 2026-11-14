@@ -22,5 +22,8 @@ public interface IEventParticipationRepository : IGenericRepository<EventPartici
     /// <summary>Tracked Invited requests of the event whose member is still Active.</summary>
     Task<List<EventParticipation>> GetInvitedForUpdateAsync(Guid eventId, CancellationToken cancellationToken);
 
+    /// <summary>Tracked participations of the event that are no longer Invited (Confirmed, Declined or Unsure).</summary>
+    Task<List<EventParticipation>> GetRespondedForUpdateAsync(Guid eventId, CancellationToken cancellationToken);
+
     Task<List<Guid>> GetRequestedMemberIdsAsync(Guid eventId, IReadOnlyCollection<Guid> memberIds, CancellationToken cancellationToken);
 }

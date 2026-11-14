@@ -140,6 +140,21 @@ public class RosterService(
         return Result<ServiceRosterDto>.Success(dto);
     }
 
+    public async Task<bool> HasAssignedMemberTimeConflictAsync(
+        Guid eventId, DateOnly date, TimeOnly time, CancellationToken cancellationToken)
+    {
+        var roster = (await rosterRepository.GetEventWithRosterAsync(eventId, cancellationToken))?.ServiceRoster;
+        var memberIds = roster?.Assignments
+            .Where(x => x.Status == RosterAssignmentStatus.Active)
+            .Select(x => x.MemberId)
+            .Distinct()
+            .ToList() ?? [];
+        if (memberIds.Count == 0) return false;
+
+        var (from, to) = await OverlapWindowAsync(time, cancellationToken);
+        return (await rosterRepository.GetMembersServingNearAsync(memberIds, eventId, date, from, to, cancellationToken)).Count > 0;
+    }
+
     public async Task<Result<ServiceRosterDto>> FinalizeAsync(Guid rosterId, CancellationToken cancellationToken)
     {
         var roster = await rosterRepository.GetRosterWithEventAsync(rosterId, cancellationToken);
@@ -153,7 +168,8 @@ public class RosterService(
         if (songList is null) return Result<ServiceRosterDto>.Failure(ErrorCodes.RosterSongListNotApproved);
 
         var assignments = await rosterRepository.GetAssignmentsWithEligibilityAsync(roster.Id, roster.EventId, cancellationToken);
-        if (FirstIneligible(assignments) is { } ineligible)
+        var eventMemberIds = await choirScope.GetEventMemberIdsAsync(roster.EventId, cancellationToken);
+        if (FirstIneligible(assignments, eventMemberIds) is { } ineligible)
             return Result<ServiceRosterDto>.Failure(ineligible.Code, $"Assignment {ineligible.AssignmentId} is no longer valid.");
 
         roster.Status = RosterStatus.Finalized;
@@ -180,7 +196,8 @@ public class RosterService(
             return Result<ServiceRosterDto>.Failure(ErrorCodes.RosterNoPersonnelRequirement);
 
         var assignments = await rosterRepository.GetAssignmentsWithEligibilityAsync(roster.Id, roster.EventId, cancellationToken);
-        if (FirstIneligible(assignments.Where(x => x.SongListItemId is null)) is { } ineligible)
+        var eventMemberIds = await choirScope.GetEventMemberIdsAsync(roster.EventId, cancellationToken);
+        if (FirstIneligible(assignments.Where(x => x.SongListItemId is null), eventMemberIds) is { } ineligible)
             return Result<ServiceRosterDto>.Failure(ineligible.Code, $"Assignment {ineligible.AssignmentId} is no longer valid.");
 
         roster.WholeServiceFinalizedAt = DateTime.UtcNow;
@@ -194,15 +211,18 @@ public class RosterService(
     }
 
     /// <summary>
-    /// First line whose member has since left, lost the skill or withdrawn from the event, with the code to report;
-    /// null when every line is still valid. Lines must come from GetAssignmentsWithEligibilityAsync.
+    /// First line whose member has since left the parish or the serving choirs, lost the skill or withdrawn from the
+    /// event, with the code to report; null when every line is still valid. Lines must come from
+    /// GetAssignmentsWithEligibilityAsync; eventMemberIds is null for an event with no choirs.
     /// </summary>
-    private static (string Code, Guid AssignmentId)? FirstIneligible(IEnumerable<RosterAssignment> assignments)
+    private static (string Code, Guid AssignmentId)? FirstIneligible(
+        IEnumerable<RosterAssignment> assignments, IReadOnlyCollection<Guid>? eventMemberIds)
     {
         foreach (var assignment in assignments)
         {
             var code = assignment switch
             {
+                _ when eventMemberIds is not null && !eventMemberIds.Contains(assignment.MemberId) => ErrorCodes.MemberNotFound,
                 { Member.Status: not MemberStatus.Active } => ErrorCodes.MemberNotActive,
                 _ when !assignment.Member.MemberSkills.Any(s => s.SkillId == assignment.SkillId) => ErrorCodes.RosterAssignmentMemberSkillNotApproved,
                 { Member.EventParticipations.Count: 0 } => ErrorCodes.RosterAssignmentMemberNotConfirmed,
@@ -457,7 +477,7 @@ public class RosterService(
         if (member.MemberSkills.Count == 0) return ErrorCodes.RosterAssignmentMemberSkillNotApproved;
         if (member.EventParticipations.Count == 0) return ErrorCodes.RosterAssignmentMemberNotConfirmed;
 
-        var (from, to) = await OverlapWindowAsync(liturgicalEvent, cancellationToken);
+        var (from, to) = await OverlapWindowAsync(liturgicalEvent.Time, cancellationToken);
         var busy = await rosterRepository.GetMembersServingNearAsync(
             [memberId], eventId, liturgicalEvent.EventDate, from, to, cancellationToken);
         return busy.Count > 0 ? ErrorCodes.RosterMemberTimeConflict : null;
@@ -467,13 +487,12 @@ public class RosterService(
     /// Start times, both ends included, at which another event clashes with this one. Events have a start time only, so
     /// two events clash when they start less than Roster.EventOverlapMinutes apart; 0 means the same start only.
     /// </summary>
-    private async Task<(TimeOnly From, TimeOnly To)> OverlapWindowAsync(
-        LiturgicalEvent liturgicalEvent, CancellationToken cancellationToken)
+    private async Task<(TimeOnly From, TimeOnly To)> OverlapWindowAsync(TimeOnly time, CancellationToken cancellationToken)
     {
         var minutes = await systemSettingService.GetIntAsync(SystemSettingKeys.RosterEventOverlapMinutes, cancellationToken);
         // "Less than N minutes apart" with inclusive bounds: one tick short of N.
         var margin = minutes == 0 ? TimeSpan.Zero : TimeSpan.FromMinutes(minutes) - TimeSpan.FromTicks(1);
-        var start = liturgicalEvent.Time.ToTimeSpan();
+        var start = time.ToTimeSpan();
 
         // shortcut: only events of the same date are compared, so 23:30 and 00:30 the next day never clash; compare full date-times if night events appear.
         return (start <= margin ? TimeOnly.MinValue : TimeOnly.FromTimeSpan(start - margin),
@@ -512,7 +531,7 @@ public class RosterService(
         // Members already serving another event near the same time are not suggested.
         if (candidateSkills.Count > 0)
         {
-            var (from, to) = await OverlapWindowAsync(liturgicalEvent, cancellationToken);
+            var (from, to) = await OverlapWindowAsync(liturgicalEvent.Time, cancellationToken);
             var busy = await rosterRepository.GetMembersServingNearAsync(
                 candidateSkills.Select(x => x.MemberId).Distinct().ToList(), liturgicalEvent.Id, liturgicalEvent.EventDate,
                 from, to, cancellationToken);
