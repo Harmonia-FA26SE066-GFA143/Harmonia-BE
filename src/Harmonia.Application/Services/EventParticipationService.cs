@@ -23,6 +23,7 @@ public class EventParticipationService(
     ISystemSettingService systemSettingService,
     IServiceRosterRepository rosterRepository,
     IGenericRepository<Choir> choirRepository,
+    IRosterService rosterService,
     IMapper mapper) : IEventParticipationService
 {
     public async Task<Result<List<EventParticipationDto>>> SendRequestsAsync(
@@ -106,6 +107,7 @@ public class EventParticipationService(
             dto.MemberFullName = names[dto.MemberId];
         }
 
+        await FlagTimeConflictsAsync(liturgicalEvent, dtos, cancellationToken);
         return Result<List<EventParticipationDto>>.Success(dtos);
     }
 
@@ -120,6 +122,7 @@ public class EventParticipationService(
 
         var participations = await participationRepository.GetByEventAsync(eventId, cancellationToken);
         var items = mapper.Map<List<EventParticipationDto>>(participations);
+        await FlagTimeConflictsAsync(liturgicalEvent, items, cancellationToken);
 
         return Result<EventParticipationSummaryDto>.Success(new EventParticipationSummaryDto
         {
@@ -250,6 +253,18 @@ public class EventParticipationService(
         return participation.Status != ParticipationStatus.Invited && changeDeadline <= VietnamTime.Now
             ? ErrorCodes.EventParticipationChangeClosed
             : null;
+    }
+
+    /// <summary>Marks invitees already serving another event near this one; inviting them is allowed, assigning is not.</summary>
+    private async Task FlagTimeConflictsAsync(
+        LiturgicalEvent liturgicalEvent, List<EventParticipationDto> dtos, CancellationToken cancellationToken)
+    {
+        var busy = await rosterService.GetMembersServingNearAsync(
+            liturgicalEvent, dtos.Select(x => x.MemberId).Distinct().ToList(), cancellationToken);
+        foreach (var dto in dtos)
+        {
+            dto.HasTimeConflict = busy.Contains(dto.MemberId);
+        }
     }
 
     internal static Task<int> GetChangeCutoffHoursAsync(

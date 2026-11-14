@@ -66,6 +66,24 @@ public class LiturgicalEventServiceTests
         Assert.Equal(_event.EventDate.AddDays(-7), Assert.Single(result.Value!.Items).SongListDueDate);
     }
 
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData(SongListStatus.Submitted, true)]
+    [InlineData(SongListStatus.Approved, false)]
+    public async Task Search_PastSongListDueDate_FlagsOverdueUntilApproved_Async(SongListStatus? latest, bool expected)
+    {
+        // The event is 3 days away and lists are due 7 days before, so the due date has passed.
+        _settings.GetIntAsync(SystemSettingKeys.SongListLeadDays, _ct).Returns(7);
+        _event.SongLists = latest is { } status ? [new SongList { Id = Guid.NewGuid(), Version = 1, Status = status }] : [];
+        _repository.SearchAsync(Arg.Any<SearchLiturgicalEventsRequest>(), true, null, Arg.Any<Guid?>(), _ct)
+            .Returns(new PagedList<LiturgicalEvent>([_event], 1, 20, 1));
+
+        var result = await _sut.SearchAsync(new SearchLiturgicalEventsRequest(), includeDrafts: true, _ct);
+
+        var item = Assert.Single(result.Value!.Items);
+        Assert.Equal((latest, expected), (item.LatestSongListStatus, item.IsSongListOverdue));
+    }
+
     private UpdateLiturgicalEventRequest UpdateRequest(Guid? locationId = null) => new()
     {
         EventDate = _event.EventDate.AddDays(1),

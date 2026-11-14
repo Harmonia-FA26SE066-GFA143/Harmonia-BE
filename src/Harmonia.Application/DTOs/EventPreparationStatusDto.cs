@@ -16,6 +16,11 @@ public class EventPreparationStatusDto
     /// <summary>Status of the newest song list version; null when none was proposed.</summary>
     public SongListStatus? SongListStatus { get; set; }
 
+    public DateOnly SongListDueDate { get; set; }
+
+    /// <summary>See <c>LiturgicalEvent.IsSongListOverdue</c>.</summary>
+    public bool IsSongListOverdue { get; set; }
+
     public int ParticipationInvited { get; set; }
 
     public int ParticipationConfirmed { get; set; }

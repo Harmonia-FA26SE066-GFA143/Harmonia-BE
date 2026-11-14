@@ -27,7 +27,7 @@ public class LiturgicalDaysController(ILiturgicalDayService liturgicalDayService
     /// <summary>Fetches a civil year from the Liturgical Calendar API and overwrites the cached days of that year.</summary>
     [Authorize(Roles = RoleNames.ParishPriest)]
     [HttpPost("sync")]
-    [ProducesResponseType<int>(StatusCodes.Status200OK)]
+    [ProducesResponseType<SyncLiturgicalDaysResponse>(StatusCodes.Status200OK)]
     public async Task<IActionResult> SyncAsync(
         [FromBody] SyncLiturgicalDaysRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await liturgicalDayService.SyncAsync(request, cancellationToken));

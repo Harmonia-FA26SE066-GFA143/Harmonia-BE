@@ -15,6 +15,8 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
 
 ### Phá vỡ
 
+- **[Phá vỡ]** `POST api/liturgical-days/sync` trả object `{ syncedCount, affectedEvents[] }` thay vì `int`. Web đọc
+  `syncedCount` thay cho số cũ; `affectedEvents` liệt kê sự kiện sắp tới nằm ở ngày vừa đổi tên / bậc lễ.
 - **[Phá vỡ]** `PUT api/event-participations/mine/{eventId}`: câu trả lời đã gửi **đổi được** đến trước giờ lễ
   `Participation.ChangeCutoffHours` giờ (setting mới, mặc định 24); quá hạn → 409 `EVENT_PARTICIPATION_CHANGE_CLOSED` (mã
   mới). `EVENT_PARTICIPATION_ALREADY_RESPONDED` không còn được trả. `MyParticipationDto.canRespond` của lời mời đã trả lời
@@ -22,6 +24,10 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
 
 ### Không phá vỡ
 
+- `LiturgicalEventListItemDto` thêm `isSongListOverdue`; `EventPreparationStatusDto` thêm `songListDueDate`,
+  `isSongListOverdue`. Gửi duyệt danh sách sau hạn: thông báo cho cha xứ có tiêu đề "(gấp)" và số ngày còn lại.
+- `EventParticipationDto` thêm `hasTimeConflict` (ở `POST api/event-participations` và `GET ?eventId=`).
+- `NotificationType` thêm `LiturgicalCalendarChanged` (số 15): báo cha xứ khi đồng bộ lịch đổi tên lễ ở ngày đã có sự kiện.
 - `PUT api/liturgical-events/{id}` với sự kiện `Published` đổi ngày / giờ / địa điểm: gửi thông báo `EventRescheduled`
   (`NotificationType` số 14); đổi ngày thì mọi câu trả lời về `Invited` và bảng phân công đã chốt mở lại `Draft`; ca viên
   đang được phân công bị trùng giờ ở thời điểm mới → 409 `ROSTER_MEMBER_TIME_CONFLICT`.

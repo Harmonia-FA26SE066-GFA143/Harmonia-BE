@@ -15,6 +15,9 @@ namespace Harmonia.Application.Tests;
 
 public class LiturgicalDayServiceTests
 {
+    private readonly ILiturgicalEventRepository _events = Substitute.For<ILiturgicalEventRepository>();
+    private readonly IUserRepository _users = Substitute.For<IUserRepository>();
+    private readonly INotificationService _notifications = Substitute.For<INotificationService>();
     private readonly ILiturgicalDayRepository _days = Substitute.For<ILiturgicalDayRepository>();
     private readonly ILiturgicalCalendarClient _calendar = Substitute.For<ILiturgicalCalendarClient>();
     private readonly ILiturgicalNameTranslationRepository _translations = Substitute.For<ILiturgicalNameTranslationRepository>();
@@ -22,12 +25,16 @@ public class LiturgicalDayServiceTests
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly List<LiturgicalDay> _cached = [];
     private readonly List<LiturgicalDay> _added = [];
+    private readonly List<LiturgicalEvent> _eventRows = [];
 
     public LiturgicalDayServiceTests()
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<LiturgicalDayProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new LiturgicalDayService(_days, _calendar, _translations, mapper);
+        _sut = new LiturgicalDayService(_days, _calendar, _translations, _events, _users, _notifications, mapper);
+        _events.ListAsync(Arg.Any<System.Linq.Expressions.Expression<Func<LiturgicalEvent, bool>>>(), _ct)
+            .Returns(call => _eventRows
+                .Where(call.Arg<System.Linq.Expressions.Expression<Func<LiturgicalEvent, bool>>>().Compile()).ToList());
 
         _translations.GetAllAsync(_ct).Returns(new Dictionary<(LiturgicalNameKind, string), string>
         {
@@ -116,7 +123,7 @@ public class LiturgicalDayServiceTests
 
         var result = await _sut.SyncAsync(new SyncLiturgicalDaysRequest { Year = 2026 }, _ct);
 
-        Assert.Equal(2, result.Value);
+        Assert.Equal(2, result.Value!.SyncedCount);
         Assert.Equal(
             ("Christmas", "Solemnity", "Christmas", "white"),
             (cachedRow.CelebrationName, cachedRow.Rank, cachedRow.SeasonName, cachedRow.Color));
@@ -127,5 +134,41 @@ public class LiturgicalDayServiceTests
             (newDate, "Saint Stephen, The First Martyr", "Feast", "Christmas"),
             (added.Date, added.CelebrationName, added.Rank, added.SeasonName));
         await _days.Received(1).SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Sync_ChangedCelebrationOnPlannedDay_ReturnsAffectedEvents_AndTellsPriests_Async()
+    {
+        var changed = VietnamTime.Today.AddDays(10);
+        var unchanged = changed.AddDays(1);
+        _cached.AddRange(
+        [
+            new LiturgicalDay { Id = Guid.NewGuid(), Date = changed, CelebrationName = "Old feast" },
+            new LiturgicalDay { Id = Guid.NewGuid(), Date = unchanged, CelebrationName = "Same" },
+        ]);
+        var planned = new LiturgicalEvent { Id = Guid.NewGuid(), EventDate = changed, Status = EventStatus.Draft, Title = "Mass" };
+        _eventRows.AddRange(
+        [
+            planned,
+            new LiturgicalEvent { Id = Guid.NewGuid(), EventDate = changed, Status = EventStatus.Cancelled },
+            new LiturgicalEvent { Id = Guid.NewGuid(), EventDate = unchanged, Status = EventStatus.Published },
+        ]);
+        _days.GetYearForUpdateAsync(changed.Year, _ct).Returns(_ => _cached.ToList());
+        _calendar.GetYearAsync(changed.Year, _ct).Returns(Result<List<CalendarDayResult>>.Success(
+        [
+            new CalendarDayResult(changed, "New feast", "Feast", "OrdinaryTime"),
+            new CalendarDayResult(unchanged, "Same", null, "OrdinaryTime"),
+        ]));
+        var priestId = Guid.NewGuid();
+        _users.GetActiveUserIdsByRolesAsync(Arg.Any<IReadOnlyCollection<string>>(), _ct).Returns([priestId]);
+
+        var result = await _sut.SyncAsync(new SyncLiturgicalDaysRequest { Year = changed.Year }, _ct);
+
+        var affected = Assert.Single(result.Value!.AffectedEvents);
+        Assert.Equal((planned.Id, "Old feast", "New feast"), (affected.EventId, affected.PreviousCelebrationName, affected.CelebrationName));
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(r => r.Type == NotificationType.LiturgicalCalendarChanged
+                && r.RecipientUserIds.SequenceEqual(new[] { priestId })),
+            _ct);
     }
 }

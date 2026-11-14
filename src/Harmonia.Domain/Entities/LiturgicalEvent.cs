@@ -38,6 +38,15 @@ public class LiturgicalEvent : BaseAuditableEntity
 
     public WorshipLocation Location { get; set; } = null!;
 
+    /// <summary>
+    /// The song list is late: its due date (event date minus SongList.LeadDays) has passed, the event is still ahead and
+    /// not cancelled, and no version is approved yet. Only shown and used to flag a late submission; nothing is blocked.
+    /// </summary>
+    public static bool IsSongListOverdue(
+        DateOnly eventDate, EventStatus status, int leadDays, SongListStatus? latestSongListStatus, DateOnly today) =>
+        status != EventStatus.Cancelled && eventDate >= today && eventDate.AddDays(-leadDays) < today
+        && latestSongListStatus != SongListStatus.Approved;
+
     public ICollection<LiturgicalEventChoir> EventChoirs { get; set; } = [];
 
     public ICollection<SongList> SongLists { get; set; } = [];

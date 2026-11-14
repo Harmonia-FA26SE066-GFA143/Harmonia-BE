@@ -1,5 +1,6 @@
 using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
+using Harmonia.Domain.Entities;
 
 namespace Harmonia.Application.Interfaces.IServices;
 
@@ -70,6 +71,10 @@ public interface IRosterService
     /// used before an event is moved.
     /// </summary>
     Task<bool> HasAssignedMemberTimeConflictAsync(Guid eventId, DateOnly date, TimeOnly time, CancellationToken cancellationToken);
+
+    /// <summary>The given members who serve another event near this event's date and time.</summary>
+    Task<IReadOnlyCollection<Guid>> GetMembersServingNearAsync(
+        LiturgicalEvent liturgicalEvent, IReadOnlyCollection<Guid> memberIds, CancellationToken cancellationToken);
 
     /// <summary>
     /// Sends each selected member one notification listing their lines on the finalized roster and stamps

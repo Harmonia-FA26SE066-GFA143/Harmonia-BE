@@ -16,4 +16,7 @@ public class LiturgicalEventListItemDto : LiturgicalEventDto
 
     /// <summary>EventDate minus the SongList.LeadDays setting; a reminder for the Choir Director, not enforced.</summary>
     public DateOnly SongListDueDate { get; set; }
+
+    /// <summary>See <c>LiturgicalEvent.IsSongListOverdue</c>.</summary>
+    public bool IsSongListOverdue { get; set; }
 }

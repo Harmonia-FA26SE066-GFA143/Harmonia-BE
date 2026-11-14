@@ -514,7 +514,7 @@ Chưa có kỹ năng nào → `[]`.
 |---|---|---|---|---|
 | GET | `/api/liturgical-days?fromDate=&toDate=` · mọi role | — | 200 `LiturgicalDayDto[]` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`, `REPORT_DATE_RANGE_TOO_LARGE`) |
 | GET | `/api/liturgical-days/{date}` (`date` dạng `yyyy-MM-dd`) · mọi role | — | 200 `LiturgicalDayDto` | 404 `CALENDAR_DAY_NOT_FOUND` |
-| POST | `/api/liturgical-days/sync` | `{ "year": 2027 }` | 200 số ngày đã lưu (`int`) | 400 `VALIDATION_FAILED` · 502 `EXTERNAL_CALENDAR_FAILED` |
+| POST | `/api/liturgical-days/sync` | `{ "year": 2027 }` | 200 `{ "syncedCount": 365, "affectedEvents": [{ "eventId", "title", "eventDate", "time", "previousCelebrationName", "celebrationName" }] }` | 400 `VALIDATION_FAILED` · 502 `EXTERNAL_CALENDAR_FAILED` |
 | GET | `/api/liturgical-events?fromDate=&toDate=&status=&pageNumber=&pageSize=` · `ParishPriest`, `ChoirDirector` | — | 200 `PagedList<LiturgicalEventListItemDto>` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`) |
 | GET | `/api/liturgical-events/{id}` | — | 200 `LiturgicalEventDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
 | POST | `/api/liturgical-events` | `{ "eventDate", "time", "liturgicalSeasonId?", "massTypeId?", "ceremonyTypeId?", "categoryId?", "locationId", "title?", "specialRequirements?", "choirIds": ["guid"], "leadChoirId" }` | 200 `LiturgicalEventDto` | 400 `VALIDATION_FAILED` (`LITURGICAL_EVENT_TYPE_REQUIRED`, `LITURGICAL_EVENT_CHOIR_REQUIRED`, `CHOIR_LEAD_INVALID`), `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` · 404 `LOOKUP_NOT_FOUND`, `CHOIR_NOT_FOUND` · 409 `LITURGICAL_EVENT_SLOT_TAKEN`, `LOOKUP_INACTIVE`, `CHOIR_INACTIVE` |
@@ -536,8 +536,9 @@ Chưa có kỹ năng nào → `[]`.
   sắp theo ngày; ngày chưa đồng bộ thì **không có trong mảng** (không báo lỗi). Dùng để hiện tên ngày trên lịch tháng.
 
 - Ngày phụng vụ là bản cache của [Liturgical Calendar API](https://litcal.johnromanodorazio.com/) (lịch Rôma chung).
-  `POST /sync` với `year` (năm dương lịch, 1970–9999) gọi API rồi **ghi đè** mọi ngày đã cache của năm đó; kết quả là
-  số ngày đã lưu (365 / 366). API lỗi hoặc quá 30 giây → 502 `EXTERNAL_CALENDAR_FAILED`, cache giữ nguyên.
+  `POST /sync` với `year` (năm dương lịch, 1970–9999) gọi API rồi **ghi đè** mọi ngày đã cache của năm đó; `syncedCount`
+  là số ngày đã lưu (365 / 366). `affectedEvents`: sự kiện chưa huỷ, từ hôm nay trở đi, nằm ở ngày đã cache mà tên lễ hoặc
+  bậc lễ vừa đổi; có thì mọi cha xứ nhận thông báo `LiturgicalCalendarChanged` (không có `referenceId`). API lỗi hoặc quá 30 giây → 502 `EXTERNAL_CALENDAR_FAILED`, cache giữ nguyên.
 - API **không có tiếng Việt**: `celebrationName` là tên tiếng Anh. Hiển Linh, Thăng Thiên, Mình Máu Thánh Chúa đã dời
   sang Chúa nhật như ở Việt Nam. Mỗi ngày chỉ giữ lễ có bậc cao nhất, bỏ thánh lễ vọng.
 - `rank`: `Solemnity` | `Feast` | `Obligatory Memorial` | `Optional Memorial`, `null` với ngày thường.
@@ -596,7 +597,8 @@ Chưa có kỹ năng nào → `[]`.
 
 Gồm mọi trường của `LiturgicalEventDto`, thêm `liturgicalSeasonName`, `massTypeName`, `ceremonyTypeName` (tên danh mục,
 `null` khi không chọn), `latestSongListStatus` (trạng thái phiên bản danh sách bài hát mới nhất, `null` khi chưa có) và
-`songListDueDate` (= `eventDate` − setting `SongList.LeadDays`; chỉ để nhắc, gửi trễ vẫn được).
+`songListDueDate` (= `eventDate` − setting `SongList.LeadDays`; chỉ để nhắc, gửi trễ vẫn được) và `isSongListOverdue`
+(`true` khi đã qua `songListDueDate`, sự kiện chưa diễn ra, chưa huỷ và chưa có phiên bản `Approved`).
 
 - Có cả sự kiện đã qua lẫn sắp tới; lọc bằng `fromDate` / `toDate` / `status`. Sắp theo ngày rồi giờ.
 - `ChoirDirector` **không thấy sự kiện `Draft`** (lọc `status=Draft` → trang rỗng); `ParishPriest` thấy mọi trạng thái.
@@ -644,6 +646,8 @@ Gồm mọi trường của `LiturgicalEventDto`, thêm `liturgicalSeasonName`, 
 {
   "eventId": "guid", "title": "Thánh lễ Giáng Sinh", "eventDate": "2026-12-24", "eventStatus": "Published",
   "songListStatus": "Approved",
+  "songListDueDate": "2026-12-18",
+  "isSongListOverdue": false,
   "participationInvited": 3, "participationConfirmed": 25, "participationDeclined": 2, "participationUnsure": 1,
   "rosterStatus": "Finalized", "rosterActiveAssignments": 18,
   "rosterShortages": [{ "songListItemId": "guid", "songTitle": "...", "skillId": "guid", "skillName": "Tenor", "requiredCount": 3, "assignedCount": 2 }],
@@ -655,6 +659,7 @@ Gồm mọi trường của `LiturgicalEventDto`, thêm `liturgicalSeasonName`, 
 
 - Xem được mọi sự kiện, kể cả đã qua. Chỉ trả số tổng của cả ca đoàn; bảng từng ca viên là `preparation-progress` của ca trưởng.
 - `songListStatus`: trạng thái phiên bản danh sách bài hát **mới nhất**; `null` nếu chưa đề xuất.
+- `songListDueDate`, `isSongListOverdue`: như ở danh sách sự kiện.
 - `participation*`: đếm `EventParticipation` theo trạng thái; `participationInvited` = đã mời nhưng chưa trả lời.
 - `rosterStatus`: `Draft` | `Suggested` | `Finalized`, `null` nếu chưa có phân công; `rosterActiveAssignments` không tính dòng đã bị thay.
 - `rosterShortages`: giống `GET /api/service-rosters/shortages?eventId=`; `[]` khi đủ người, hoặc khi chưa có gì để phân công (chưa có danh sách bài hát được duyệt và cũng không có yêu cầu cả buổi lễ).
@@ -1164,7 +1169,8 @@ Chỉ thao tác trên thông báo **của chính người gọi**.
 
 `type`: `EventPublished` | `SongListDecision` | `ParticipationRequest` | `AssignmentNotice` |
 `PracticeFeedback` | `DirectorNote` | `SkillReview` | `EventCancelled` | `SongListSubmitted` | `RehearsalChanged` |
-`EventChoirChanged` | `MemberRegistrationSubmitted` | `DirectorNomination` | `ChoirChanged` | `EventRescheduled`. `referenceType` + `referenceId` (nullable) cho biết bấm vào
+`EventChoirChanged` | `MemberRegistrationSubmitted` | `DirectorNomination` | `ChoirChanged` | `EventRescheduled` |
+`LiturgicalCalendarChanged`. `referenceType` + `referenceId` (nullable) cho biết bấm vào
 thì mở màn nào.
 
 | Method | Route | Thành công | Lỗi |
@@ -2260,11 +2266,14 @@ Ca trưởng ghi âm ở phòng tập; ca viên của ca đoàn buổi tập ngh
 ```json
 {
   "id": "guid", "eventId": "guid", "memberId": "guid", "memberFullName": "Nguyễn Văn A",
-  "status": "Invited", "requestedAt": "2026-10-09T12:00:00Z", "respondedAt": null, "note": null
+  "status": "Invited", "requestedAt": "2026-10-09T12:00:00Z", "respondedAt": null, "note": null,
+  "hasTimeConflict": false
 }
 ```
 
 `status`: `Invited` | `Confirmed` | `Declined` | `Unsure`. `respondedAt`, `note` là `null` khi ca viên chưa phản hồi.
+`hasTimeConflict = true` khi ca viên đang được phân công ở một lễ khác bắt đầu gần giờ này (`Roster.EventOverlapMinutes`):
+chỉ là cảnh báo, mời vẫn được, nhưng phân công vào lễ này sẽ bị 409 `ROSTER_MEMBER_TIME_CONFLICT`.
 
 `EventParticipationSummaryDto` = `{ eventId, totalCount, invitedCount, confirmedCount, declinedCount, unsureCount, items }`,
 `items` là `EventParticipationDto[]`.

@@ -17,5 +17,5 @@ public interface ILiturgicalDayService
     /// Fetches the year from the liturgical calendar and replaces the cached days of that year.
     /// Returns the number of days stored.
     /// </summary>
-    Task<Result<int>> SyncAsync(SyncLiturgicalDaysRequest request, CancellationToken cancellationToken);
+    Task<Result<SyncLiturgicalDaysResponse>> SyncAsync(SyncLiturgicalDaysRequest request, CancellationToken cancellationToken);
 }

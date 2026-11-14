@@ -12,6 +12,7 @@ namespace Harmonia.Application.Tests;
 
 public class EventPreparationServiceTests
 {
+    private readonly ISystemSettingService _settings = Substitute.For<ISystemSettingService>();
     private readonly ILiturgicalEventRepository _events = Substitute.For<ILiturgicalEventRepository>();
     private readonly IMemberProfileRepository _members = Substitute.For<IMemberProfileRepository>();
     private readonly IRehearsalRepository _rehearsals = Substitute.For<IRehearsalRepository>();
@@ -26,7 +27,7 @@ public class EventPreparationServiceTests
 
     public EventPreparationServiceTests()
     {
-        _sut = new EventPreparationService(_events, _members, _rehearsals, _assignments, _roster, ChoirScopeFakes.Unrestricted());
+        _sut = new EventPreparationService(_events, _members, _rehearsals, _assignments, _roster, ChoirScopeFakes.Unrestricted(), _settings);
 
         _alice = new MemberProfile { Id = Guid.NewGuid(), User = new User { FullName = "Alice" } };
         _bob = new MemberProfile

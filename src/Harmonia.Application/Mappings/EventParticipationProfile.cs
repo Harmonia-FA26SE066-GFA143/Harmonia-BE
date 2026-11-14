@@ -8,7 +8,10 @@ public class EventParticipationProfile : Profile
 {
     public EventParticipationProfile()
     {
-        CreateMap<EventParticipation, EventParticipationDto>().ForMember(dest => dest.MemberFullName, opt => opt.MapFrom(src => src.Member.User.FullName));
+        // HasTimeConflict needs the other events' rosters, so the service sets it.
+        CreateMap<EventParticipation, EventParticipationDto>()
+            .ForMember(dest => dest.MemberFullName, opt => opt.MapFrom(src => src.Member.User.FullName))
+            .ForMember(dest => dest.HasTimeConflict, opt => opt.Ignore());
 
         // CanRespond and its reason depend on the clock, so the service sets them.
         CreateMap<EventParticipation, MyParticipationDto>()

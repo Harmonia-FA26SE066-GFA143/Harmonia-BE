@@ -22,6 +22,7 @@ public class SongListService(
     IUserRepository userRepository,
     INotificationService notificationService,
     IChoirScopeService choirScope,
+    ISystemSettingService systemSettingService,
     IMapper mapper) : ISongListService
 {
     public async Task<Result<SongListDto>> GetApprovedForEventAsync(Guid eventId, CancellationToken cancellationToken)
@@ -261,11 +262,19 @@ public class SongListService(
 
         if (parishPriestIds.Count > 0)
         {
+            // Submitted after the due date: the priest is told how close the event is, since nothing else reminds them.
+            var liturgicalEvent = await liturgicalEventRepository.GetByIdAsync(songList.EventId, cancellationToken);
+            var leadDays = await systemSettingService.GetIntAsync(SystemSettingKeys.SongListLeadDays, cancellationToken);
+            var today = VietnamTime.Today;
+            var isLate = liturgicalEvent is not null && LiturgicalEvent.IsSongListOverdue(
+                liturgicalEvent.EventDate, liturgicalEvent.Status, leadDays, songList.Status, today);
             await notificationService.SendAsync(
                 new SendNotificationRequest(
                     Type: NotificationType.SongListSubmitted,
-                    Title: "Danh sách bài hát chờ duyệt",
-                    Content: $"Danh sách bài hát phiên bản {songList.Version} đã được gửi duyệt.",
+                    Title: isLate ? "Danh sách bài hát chờ duyệt (gấp)" : "Danh sách bài hát chờ duyệt",
+                    Content: isLate
+                        ? $"Danh sách bài hát phiên bản {songList.Version} đã được gửi duyệt; lễ ngày {liturgicalEvent!.EventDate:dd/MM/yyyy} chỉ còn {liturgicalEvent.EventDate.DayNumber - today.DayNumber} ngày."
+                        : $"Danh sách bài hát phiên bản {songList.Version} đã được gửi duyệt.",
                     RecipientUserIds: parishPriestIds,
                     ReferenceType: nameof(SongList),
                     ReferenceId: songList.Id),

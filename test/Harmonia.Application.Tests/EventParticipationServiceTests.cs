@@ -22,6 +22,7 @@ public class EventParticipationServiceTests
     private readonly IServiceRosterRepository _rosters = Substitute.For<IServiceRosterRepository>();
     private readonly IGenericRepository<Choir> _choirs = Substitute.For<IGenericRepository<Choir>>();
     private readonly IChoirScopeService _scope = ChoirScopeFakes.Unrestricted();
+    private readonly IRosterService _roster = Substitute.For<IRosterService>();
     private readonly EventParticipationService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly List<EventParticipation> _added = [];
@@ -42,8 +43,10 @@ public class EventParticipationServiceTests
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<EventParticipationProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
         _sut = new EventParticipationService(
-            _participations, _events, _members, _notifications, _scope, _settings, _rosters, _choirs, mapper);
+            _participations, _events, _members, _notifications, _scope, _settings, _rosters, _choirs, _roster, mapper);
         _settings.GetIntAsync(SystemSettingKeys.ParticipationChangeCutoffHours, _ct).Returns(24);
+        _roster.GetMembersServingNearAsync(Arg.Any<LiturgicalEvent>(), Arg.Any<IReadOnlyCollection<Guid>>(), _ct)
+            .Returns(Array.Empty<Guid>());
 
         _events.GetByIdAsync(_event.Id, _ct).Returns(_event);
         _members.GetAllActiveWithUserAsync(_ct).Returns([_anna, _ben]);
@@ -213,6 +216,18 @@ public class EventParticipationServiceTests
             (5, 1, 2, 1, 1),
             (summary.TotalCount, summary.InvitedCount, summary.ConfirmedCount, summary.DeclinedCount, summary.UnsureCount));
         Assert.Equal(["Anna", "Ben", "Cara", "Dan", "Eve"], summary.Items.Select(x => x.MemberFullName));
+    }
+
+    [Fact]
+    public async Task GetByEvent_FlagsMembersServingAnotherEventNearby_Async()
+    {
+        List<EventParticipation> participations = [Invitation(_anna), Invitation(_ben)];
+        _participations.GetByEventAsync(_event.Id, _ct).Returns(participations);
+        _roster.GetMembersServingNearAsync(_event, Arg.Any<IReadOnlyCollection<Guid>>(), _ct).Returns([_ben.Id]);
+
+        var summary = (await _sut.GetByEventAsync(_event.Id, _ct)).Value!;
+
+        Assert.Equal([("Anna", false), ("Ben", true)], summary.Items.Select(x => (x.MemberFullName, x.HasTimeConflict)));
     }
 
     [Fact]

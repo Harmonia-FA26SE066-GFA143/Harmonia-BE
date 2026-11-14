@@ -37,7 +37,13 @@ public class LiturgicalEventService(
         var leadDays = await systemSettingService.GetIntAsync(SystemSettingKeys.SongListLeadDays, cancellationToken);
 
         var items = mapper.Map<List<LiturgicalEventListItemDto>>(page.Items);
-        foreach (var item in items) item.SongListDueDate = item.EventDate.AddDays(-leadDays);
+        var today = VietnamTime.Today;
+        foreach (var item in items)
+        {
+            item.SongListDueDate = item.EventDate.AddDays(-leadDays);
+            item.IsSongListOverdue = LiturgicalEvent.IsSongListOverdue(
+                item.EventDate, item.Status, leadDays, item.LatestSongListStatus, today);
+        }
 
         return Result<PagedList<LiturgicalEventListItemDto>>.Success(new PagedList<LiturgicalEventListItemDto>(
             items, page.PageNumber, page.PageSize, page.TotalCount));

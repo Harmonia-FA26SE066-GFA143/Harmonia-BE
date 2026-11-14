@@ -14,7 +14,8 @@ public class EventPreparationService(
     IRehearsalRepository rehearsalRepository,
     IPracticeAssignmentRepository practiceAssignmentRepository,
     IRosterService rosterService,
-    IChoirScopeService choirScope) : IEventPreparationService
+    IChoirScopeService choirScope,
+    ISystemSettingService systemSettingService) : IEventPreparationService
 {
     public async Task<Result<EventPreparationStatusDto>> GetStatusAsync(Guid eventId, CancellationToken cancellationToken)
     {
@@ -31,6 +32,9 @@ public class EventPreparationService(
         var participations = liturgicalEvent.EventParticipations;
         var roster = liturgicalEvent.ServiceRoster;
         var rehearsalsHeld = liturgicalEvent.Rehearsals.Count(r => r.StartTime <= DateTime.UtcNow);
+        var songListStatus = liturgicalEvent.SongLists
+            .OrderByDescending(s => s.Version).Select(s => (SongListStatus?)s.Status).FirstOrDefault();
+        var leadDays = await systemSettingService.GetIntAsync(SystemSettingKeys.SongListLeadDays, cancellationToken);
 
         return Result<EventPreparationStatusDto>.Success(new EventPreparationStatusDto
         {
@@ -38,8 +42,10 @@ public class EventPreparationService(
             Title = liturgicalEvent.Title,
             EventDate = liturgicalEvent.EventDate,
             EventStatus = liturgicalEvent.Status,
-            SongListStatus = liturgicalEvent.SongLists
-                .OrderByDescending(s => s.Version).Select(s => (SongListStatus?)s.Status).FirstOrDefault(),
+            SongListStatus = songListStatus,
+            SongListDueDate = liturgicalEvent.EventDate.AddDays(-leadDays),
+            IsSongListOverdue = LiturgicalEvent.IsSongListOverdue(
+                liturgicalEvent.EventDate, liturgicalEvent.Status, leadDays, songListStatus, VietnamTime.Today),
             ParticipationInvited = participations.Count(p => p.Status == ParticipationStatus.Invited),
             ParticipationConfirmed = participations.Count(p => p.Status == ParticipationStatus.Confirmed),
             ParticipationDeclined = participations.Count(p => p.Status == ParticipationStatus.Declined),

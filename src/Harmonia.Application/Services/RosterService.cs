@@ -155,6 +155,16 @@ public class RosterService(
         return (await rosterRepository.GetMembersServingNearAsync(memberIds, eventId, date, from, to, cancellationToken)).Count > 0;
     }
 
+    public async Task<IReadOnlyCollection<Guid>> GetMembersServingNearAsync(
+        LiturgicalEvent liturgicalEvent, IReadOnlyCollection<Guid> memberIds, CancellationToken cancellationToken)
+    {
+        if (memberIds.Count == 0) return [];
+
+        var (from, to) = await OverlapWindowAsync(liturgicalEvent.Time, cancellationToken);
+        return await rosterRepository.GetMembersServingNearAsync(
+            memberIds, liturgicalEvent.Id, liturgicalEvent.EventDate, from, to, cancellationToken);
+    }
+
     public async Task<Result<ServiceRosterDto>> FinalizeAsync(Guid rosterId, CancellationToken cancellationToken)
     {
         var roster = await rosterRepository.GetRosterWithEventAsync(rosterId, cancellationToken);

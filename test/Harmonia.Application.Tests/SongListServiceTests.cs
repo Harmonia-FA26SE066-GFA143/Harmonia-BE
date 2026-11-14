@@ -15,6 +15,7 @@ namespace Harmonia.Application.Tests;
 
 public class SongListServiceTests
 {
+    private readonly ISystemSettingService _settings = Substitute.For<ISystemSettingService>();
     private readonly ISongListRepository _songLists = Substitute.For<ISongListRepository>();
     private readonly ILiturgicalEventRepository _events = Substitute.For<ILiturgicalEventRepository>();
     private readonly IGenericRepository<Song> _songs = Substitute.For<IGenericRepository<Song>>();
@@ -44,7 +45,7 @@ public class SongListServiceTests
                 },
                 NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new SongListService(_songLists, _events, _songs, _slots, _users, _notifications, ChoirScopeFakes.Unrestricted(), mapper);
+        _sut = new SongListService(_songLists, _events, _songs, _slots, _users, _notifications, ChoirScopeFakes.Unrestricted(), _settings, mapper);
 
         _event = new LiturgicalEvent { Id = _eventId, Status = EventStatus.Published };
         _events.GetByIdAsync(_eventId, _ct).Returns(_event);
@@ -193,7 +194,7 @@ public class SongListServiceTests
         var scope = ChoirScopeFakes.Unrestricted();
         scope.CanViewEventAsync(_eventId, _ct).Returns(false);
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<SongListProfile>(), NullLoggerFactory.Instance).CreateMapper();
-        var sut = new SongListService(_songLists, _events, _songs, _slots, _users, _notifications, scope, mapper);
+        var sut = new SongListService(_songLists, _events, _songs, _slots, _users, _notifications, scope, _settings, mapper);
 
         var result = await sut.GetVersionsForEventAsync(_eventId, includeDraft: true, _ct);
 
@@ -220,7 +221,7 @@ public class SongListServiceTests
         var scope = ChoirScopeFakes.Unrestricted();
         scope.CheckCanLeadEventAsync(_eventId, Arg.Any<string>(), _ct).Returns(ErrorCodes.ChoirNotLead);
         var sut = new SongListService(
-            _songLists, _events, _songs, _slots, _users, _notifications, scope, Substitute.For<AutoMapper.IMapper>());
+            _songLists, _events, _songs, _slots, _users, _notifications, scope, _settings, Substitute.For<AutoMapper.IMapper>());
 
         var result = await sut.CreateAsync(NewCreateRequest(), _directorId, _ct);
 
@@ -235,7 +236,7 @@ public class SongListServiceTests
         var scope = ChoirScopeFakes.Unrestricted();
         scope.GetLeadChoirIdAsync(_eventId, _ct).Returns(leadChoirId);
         var sut = new SongListService(
-            _songLists, _events, _songs, _slots, _users, _notifications, scope, Substitute.For<AutoMapper.IMapper>());
+            _songLists, _events, _songs, _slots, _users, _notifications, scope, _settings, Substitute.For<AutoMapper.IMapper>());
         SongList? added = null;
         _songLists.AddAsync(Arg.Do<SongList>(s => added = s), _ct).Returns(Task.CompletedTask);
 
@@ -428,6 +429,19 @@ public class SongListServiceTests
                 && r.Content.Contains("phiên bản 2")
                 && r.ReferenceType == nameof(SongList) && r.ReferenceId == songList.Id),
             _ct);
+    }
+
+    [Fact]
+    public async Task Submit_AfterDueDate_MarksTheNoticeUrgent_Async()
+    {
+        _settings.GetIntAsync(SystemSettingKeys.SongListLeadDays, _ct).Returns(7);
+        _event.EventDate = VietnamTime.Today.AddDays(3);
+        var songList = Existing(SongListStatus.Draft);
+
+        await _sut.SubmitAsync(songList.Id, _ct);
+
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(r => r.Title.Contains("gấp") && r.Content.Contains("còn 3 ngày")), _ct);
     }
 
     [Fact]
