@@ -14,6 +14,9 @@ public class MemberSkillService(
     IMemberProfileRepository memberProfileRepository,
     INotificationService notificationService,
     IFileStorageService fileStorageService,
+    IServiceRosterRepository rosterRepository,
+    IChoirScopeService choirScope,
+    IGenericRepository<Choir> choirRepository,
     IMapper mapper) : IMemberSkillService
 {
     public const long MaxVoiceSizeBytes = 20 * 1024 * 1024;
@@ -166,6 +169,96 @@ public class MemberSkillService(
     public Task<Result<MemberSkillDetailDto>> RejectAsync(
         Guid directorUserId, Guid id, RejectMemberSkillRequest request, CancellationToken cancellationToken) =>
         ReviewAsync(directorUserId, id, ApprovalStatus.Rejected, request.Reason.Trim(), cancellationToken);
+
+    public async Task<Result<MemberSkillDetailDto>> RevokeAsync(
+        Guid directorUserId, Guid id, RevokeMemberSkillRequest request, CancellationToken cancellationToken)
+    {
+        var memberSkill = await memberSkillRepository.GetForReviewAsync(id, cancellationToken);
+        if (memberSkill is null
+            || !await memberProfileRepository.IsManagedByDirectorAsync(memberSkill.MemberId, directorUserId, cancellationToken))
+        {
+            return Result<MemberSkillDetailDto>.Failure(ErrorCodes.MemberSkillNotFound);
+        }
+
+        if (memberSkill.Status != ApprovalStatus.Approved)
+        {
+            return Result<MemberSkillDetailDto>.Failure(ErrorCodes.MemberSkillNotApproved);
+        }
+
+        var reason = request.Reason.Trim();
+        memberSkill.Status = ApprovalStatus.Revoked;
+        memberSkill.RevokedBy = directorUserId;
+        memberSkill.RevokedAt = DateTime.UtcNow;
+        memberSkill.RevokeReason = reason;
+        var affectedEvents = await DropUpcomingLinesAsync(memberSkill.MemberId, memberSkill.SkillId, cancellationToken);
+
+        // Saved together with the dropped lines; another director changed the row first, so nothing is written.
+        if (!await memberSkillRepository.TrySaveReviewAsync(memberSkill, cancellationToken))
+        {
+            return Result<MemberSkillDetailDto>.Failure(ErrorCodes.MemberSkillNotApproved);
+        }
+
+        var skillName = memberSkill.Skill.Name;
+        await notificationService.SendAsync(
+            new SendNotificationRequest(
+                NotificationType.SkillReview, "Kỹ năng bị thu hồi",
+                $"Kỹ năng {skillName} của bạn đã bị thu hồi: {reason}",
+                [memberSkill.Member.UserId], nameof(MemberSkill), memberSkill.Id),
+            cancellationToken);
+        await NotifyLeadDirectorsAsync(affectedEvents, directorUserId, skillName, cancellationToken);
+
+        return Result<MemberSkillDetailDto>.Success(ToDto<MemberSkillDetailDto>(memberSkill));
+    }
+
+    /// <summary>
+    /// Removes the member's lines for the skill on upcoming rosters, reopening each finalized one so its lead director can
+    /// staff the gap. Saved with the caller's change; returns the events touched.
+    /// </summary>
+    private async Task<List<LiturgicalEvent>> DropUpcomingLinesAsync(
+        Guid memberId, Guid skillId, CancellationToken cancellationToken)
+    {
+        var lines = await rosterRepository.GetUpcomingAssignmentsForUpdateAsync(
+            memberId, skillId, VietnamTime.Today, cancellationToken);
+        foreach (var line in lines)
+        {
+            var roster = line.Roster;
+            roster.Assignments.Remove(line);
+            if (roster.Status == RosterStatus.Finalized)
+            {
+                roster.Status = RosterStatus.Draft;
+                roster.FinalizedAt = null;
+                roster.FinalizedBy = null;
+            }
+
+            if (line.SongListItemId is null)
+            {
+                roster.WholeServiceFinalizedAt = null;
+            }
+        }
+
+        return lines.Select(x => x.Roster.LiturgicalEvent).DistinctBy(x => x.Id).ToList();
+    }
+
+    private async Task NotifyLeadDirectorsAsync(
+        List<LiturgicalEvent> events, Guid revokerUserId, string skillName, CancellationToken cancellationToken)
+    {
+        foreach (var liturgicalEvent in events)
+        {
+            if (await choirScope.GetLeadChoirIdAsync(liturgicalEvent.Id, cancellationToken) is not { } leadChoirId
+                || await choirRepository.GetByIdAsync(leadChoirId, cancellationToken) is not { DirectorId: { } directorId }
+                || directorId == revokerUserId)
+            {
+                continue;
+            }
+
+            await notificationService.SendAsync(
+                new SendNotificationRequest(
+                    NotificationType.AssignmentNotice, "Phân công bị gỡ do thu hồi kỹ năng",
+                    $"Một ca viên bị thu hồi kỹ năng {skillName} nên đã bị gỡ khỏi phân công sự kiện ngày {liturgicalEvent.EventDate:dd/MM/yyyy} lúc {liturgicalEvent.Time:HH:mm}; vui lòng xếp người thay.",
+                    [directorId], nameof(LiturgicalEvent), liturgicalEvent.Id),
+                cancellationToken);
+        }
+    }
 
     private async Task<Result<MemberSkillDetailDto>> ReviewAsync(
         Guid directorUserId, Guid id, ApprovalStatus decision, string? rejectReason, CancellationToken cancellationToken)

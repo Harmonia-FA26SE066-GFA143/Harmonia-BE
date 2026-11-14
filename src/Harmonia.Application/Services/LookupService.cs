@@ -22,6 +22,7 @@ public class LookupService(
     IGenericRepository<SongVocalRequirement> songVocalRequirements,
     IGenericRepository<SongInstrumentRequirement> songInstrumentRequirements,
     IGenericRepository<LiturgicalSlotRequirement> slotRequirements,
+    IServiceRosterRepository rosterRepository,
     IMapper mapper) : ILookupService
 {
     public async Task<Result<List<MassTypeDto>>> GetMassTypesAsync(bool includeInactive, CancellationToken cancellationToken)
@@ -140,6 +141,14 @@ public class LookupService(
         if (id is not null && existing is null)
         {
             return Result<SkillDto>.Failure(ErrorCodes.SkillNotFound);
+        }
+
+        // Switching a skill off would leave members serving upcoming events with a skill nobody can hold any more.
+        if (existing is { IsActive: true } && !request.IsActive
+            && (await rosterRepository.GetUpcomingAssignmentsForUpdateAsync(
+                null, existing.Id, VietnamTime.Today, cancellationToken)).Count > 0)
+        {
+            return Result<SkillDto>.Failure(ErrorCodes.LookupInUse);
         }
 
         if (existing?.CategoryId != request.CategoryId)

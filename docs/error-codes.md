@@ -150,6 +150,7 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `MEMBER_SKILL_ALREADY_DECLARED` | 409 | Bạn đã khai báo kỹ năng này rồi |
 | `MEMBER_SKILL_ALREADY_REVIEWED` | 409 | Kỹ năng này đã được duyệt hoặc từ chối |
 | `MEMBER_SKILL_REJECT_REASON_REQUIRED` | 400 | Vui lòng nhập lý do từ chối |
+| `MEMBER_SKILL_REVOKE_REASON_REQUIRED` | 400 | Vui lòng nhập lý do thu hồi |
 | `MEMBER_SKILL_NOT_APPROVED` | 409 | Kỹ năng chưa được duyệt |
 | `MEMBER_SKILL_EVIDENCE_REQUIRED` | 400 | Vui lòng chọn tệp minh chứng |
 | `MEMBER_SKILL_EVIDENCE_TYPE_NOT_ALLOWED` | 400 | Minh chứng chỉ nhận ghi âm .mp3, .m4a, .wav hoặc clip .mp4, .mov |

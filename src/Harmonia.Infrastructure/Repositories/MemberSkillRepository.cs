@@ -18,7 +18,8 @@ public class MemberSkillRepository(HarmoniaDbContext dbContext)
 
     public Task<bool> HasActiveDeclarationAsync(Guid memberId, Guid skillId, CancellationToken cancellationToken) =>
         DbContext.MemberSkills.AnyAsync(
-            x => x.MemberId == memberId && x.SkillId == skillId && x.Status != ApprovalStatus.Rejected,
+            x => x.MemberId == memberId && x.SkillId == skillId
+                && (x.Status == ApprovalStatus.Pending || x.Status == ApprovalStatus.Approved),
             cancellationToken);
 
     public async Task<bool> TryAddAsync(MemberSkill memberSkill, CancellationToken cancellationToken)

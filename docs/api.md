@@ -418,6 +418,8 @@ Chưa có kỹ năng nào → `[]`.
   "declaredAt": "2026-10-05T08:00:00Z",
   "approvedAt": null,
   "rejectReason": null,
+  "revokedAt": null,
+  "revokeReason": null,
   "evidence": {
     "type": "Clip",
     "fileName": "organ.mp4",
@@ -428,7 +430,8 @@ Chưa có kỹ năng nào → `[]`.
 }
 ```
 
-`level`: `Beginner` | `Intermediate` | `Advanced` | `null`. `status`: `Pending` | `Approved` | `Rejected`.
+`level`: `Beginner` | `Intermediate` | `Advanced` | `null`. `status`: `Pending` | `Approved` | `Rejected` | `Revoked` (đã duyệt rồi bị ca trưởng thu hồi; `revokedAt`, `revokeReason` có
+giá trị). Bản `Rejected` hoặc `Revoked` là lịch sử: ca viên khai báo lại cùng kỹ năng được.
 `approvedAt` là lúc ca trưởng duyệt **hoặc** từ chối; `rejectReason` chỉ có khi `Rejected`.
 `evidence` là `null` khi chưa gửi minh chứng; `type`: `Voice` | `Clip`. `url` là link ký có hạn, hết hạn thì gọi lại API để lấy link mới.
 
@@ -444,7 +447,7 @@ Chưa có kỹ năng nào → `[]`.
 - `skillId` bắt buộc, lấy từ `GET /api/lookups/skills`. `level` tuỳ chọn.
 - Skill bị tắt, hoặc thuộc nhóm kỹ năng bị tắt → 409 `SKILL_INACTIVE`. Ca viên `Inactive` / `Left` → 409 `MEMBER_NOT_ACTIVE`.
 - Đã có bản khai `Pending` hoặc `Approved` cho skill đó → 409 `MEMBER_SKILL_ALREADY_DECLARED`.
-- `status` (tuỳ chọn): `Pending` | `Approved` | `Rejected` — bỏ trống thì trả mọi trạng thái.
+- `status` (tuỳ chọn): `Pending` | `Approved` | `Rejected` | `Revoked` — bỏ trống thì trả mọi trạng thái.
 - `GET /{id}` chỉ trả bản khai của chính người gọi; bản khai của ca viên khác → 404 `MEMBER_SKILL_NOT_FOUND`.
 - Bị **từ chối** thì được khai lại: bản `Rejected` giữ nguyên làm lịch sử, hệ thống thêm bản mới `Pending`.
 - `GET .../mine` trả **mọi** bản khai kể cả lịch sử bị từ chối, mới nhất trước.
@@ -459,7 +462,11 @@ Chưa có kỹ năng nào → `[]`.
 | GET | `/api/member-skills/pending` | `ChoirDirector` | query `pageNumber`, `pageSize` | 200 `PagedList<MemberSkillDetailDto>` | — |
 | PATCH | `/api/member-skills/{id}/approve` | `ChoirDirector` | — | 200 `MemberSkillDetailDto` | 404 `MEMBER_SKILL_NOT_FOUND` · 409 `MEMBER_SKILL_ALREADY_REVIEWED` |
 | PATCH | `/api/member-skills/{id}/reject` | `ChoirDirector` | `{ "reason" }` | 200 `MemberSkillDetailDto` | 400 `MEMBER_SKILL_REJECT_REASON_REQUIRED`, `VALIDATION_FAILED` · 404 `MEMBER_SKILL_NOT_FOUND` · 409 `MEMBER_SKILL_ALREADY_REVIEWED` |
+| PATCH | `/api/member-skills/{id}/revoke` | `ChoirDirector` | `{ "reason" }` | 200 `MemberSkillDetailDto` | 400 `MEMBER_SKILL_REVOKE_REASON_REQUIRED`, `VALIDATION_FAILED` · 404 `MEMBER_SKILL_NOT_FOUND` · 409 `MEMBER_SKILL_NOT_APPROVED` |
 
+- `revoke`: chỉ thu hồi được bản `Approved` của ca viên ca trưởng quản lý. Dòng phân công của ca viên dùng kỹ năng đó ở
+  sự kiện sắp tới (chưa huỷ) bị gỡ, bảng đã chốt mở lại `Draft`. Ca viên nhận `SkillReview` "Kỹ năng bị thu hồi"; ca
+  trưởng ca đoàn phụ trách của từng sự kiện bị gỡ (nếu không phải người thu hồi) nhận `AssignmentNotice`.
 - `pending` trả bản khai `Pending` của ca viên ca trưởng **quản lý** (D8 — cùng luật với `GET /api/member-profiles/{id}`),
   cũ nhất trước. Duyệt / từ chối bản khai của ca viên khác → 404 `MEMBER_SKILL_NOT_FOUND`.
 - `reason` bắt buộc, tối đa 500 ký tự.
@@ -2363,7 +2370,7 @@ danh sách (dữ liệu cũ vẫn trỏ tới nó). Không phân trang — trả
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
 | POST · PUT `{id}` | `/api/lookups/mass-types` · `ceremony-types` · `event-categories` · `skill-categories` | `{ "name", "description?", "isActive" }` | 200 phần tử như bảng trên | 400 `VALIDATION_FAILED` · 404 `LOOKUP_NOT_FOUND` (PUT) · 409 `LOOKUP_NAME_DUPLICATE`, `LOOKUP_IN_USE` (chỉ `skill-categories`) |
-| POST · PUT `{id}` | `/api/lookups/skills` | `{ "categoryId", "name", "description?", "isActive" }` | 200 `SkillDto` | 400 `VALIDATION_FAILED` · 404 `SKILL_CATEGORY_NOT_FOUND`, `SKILL_NOT_FOUND` (PUT) · 409 `SKILL_NAME_DUPLICATE`, `LOOKUP_INACTIVE`, `SKILL_IN_USE` |
+| POST · PUT `{id}` | `/api/lookups/skills` | `{ "categoryId", "name", "description?", "isActive" }` | 200 `SkillDto` | 400 `VALIDATION_FAILED` · 404 `SKILL_CATEGORY_NOT_FOUND`, `SKILL_NOT_FOUND` (PUT) · 409 `SKILL_NAME_DUPLICATE`, `LOOKUP_INACTIVE`, `SKILL_IN_USE`, `LOOKUP_IN_USE` (tắt kỹ năng đang có dòng phân công ở sự kiện sắp tới) |
 | POST · PUT `{id}` | `/api/lookups/song-themes` | `{ "name", "description?", "isActive", "parentId?" }` | 200 `SongThemeDto` | 400 `VALIDATION_FAILED`, `SONG_THEME_PARENT_INVALID` · 404 `LOOKUP_NOT_FOUND` (PUT) · 409 `LOOKUP_NAME_DUPLICATE` |
 | POST · PUT `{id}` | `/api/lookups/liturgical-slots` · `Admin`, `ChoirDirector` | `{ "name", "defaultOrder", "isActive" }` | 200 `LiturgicalSlotDto` | như trên |
 | POST · PUT `{id}` | `/api/lookups/worship-locations` | `{ "name", "address?", "isActive" }` | 200 `WorshipLocationDto` | như trên |

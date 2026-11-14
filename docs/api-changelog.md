@@ -24,6 +24,10 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
 
 ### Không phá vỡ
 
+- Endpoint mới `PATCH api/member-skills/{id}/revoke` · `ChoirDirector`, body `{ "reason" }`: thu hồi kỹ năng đã duyệt.
+  `ApprovalStatus` thêm `Revoked` (số 3); `MemberSkillDto` thêm `revokedAt`, `revokeReason`. Mã mới
+  `MEMBER_SKILL_REVOKE_REASON_REQUIRED`. Cần migration (3 cột mới + đổi filter unique index của `MemberSkills`).
+- Admin tắt một `Skill` đang có dòng phân công ở sự kiện sắp tới → 409 `LOOKUP_IN_USE`.
 - `LiturgicalEventListItemDto` thêm `isSongListOverdue`; `EventPreparationStatusDto` thêm `songListDueDate`,
   `isSongListOverdue`. Gửi duyệt danh sách sau hạn: thông báo cho cha xứ có tiêu đề "(gấp)" và số ngày còn lại.
 - `EventParticipationDto` thêm `hasTimeConflict` (ở `POST api/event-participations` và `GET ?eventId=`).

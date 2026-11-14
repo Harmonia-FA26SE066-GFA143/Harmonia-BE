@@ -115,4 +115,15 @@ public class ServiceRosterRepository(HarmoniaDbContext dbContext)
             .Include(x => x.Assignments).ThenInclude(x => x.Skill)
             .Include(x => x.Assignments).ThenInclude(x => x.SongListItem!.Song)
             .FirstOrDefaultAsync(x => x.Id == rosterId, cancellationToken);
+
+    public Task<List<RosterAssignment>> GetUpcomingAssignmentsForUpdateAsync(
+        Guid? memberId, Guid skillId, DateOnly fromDate, CancellationToken cancellationToken) =>
+        DbContext.RosterAssignments
+            .Include(x => x.Roster.LiturgicalEvent)
+            .Where(x => x.SkillId == skillId
+                && (memberId == null || x.MemberId == memberId)
+                && x.Status == RosterAssignmentStatus.Active
+                && x.Roster.LiturgicalEvent.Status != EventStatus.Cancelled
+                && x.Roster.LiturgicalEvent.EventDate >= fromDate)
+            .ToListAsync(cancellationToken);
 }

@@ -21,6 +21,12 @@ public class MemberSkill : BaseEntity
 
     public string? RejectReason { get; set; }
 
+    public Guid? RevokedBy { get; set; }
+
+    public DateTime? RevokedAt { get; set; }
+
+    public string? RevokeReason { get; set; }
+
     public string? EvidencePublicId { get; set; }
 
     public string? EvidenceFileName { get; set; }

@@ -121,6 +121,8 @@ public static class ErrorCodes
 
     public const string MemberSkillRejectReasonRequired = "MEMBER_SKILL_REJECT_REASON_REQUIRED";
 
+    public const string MemberSkillRevokeReasonRequired = "MEMBER_SKILL_REVOKE_REASON_REQUIRED";
+
     public const string MemberSkillNotApproved = "MEMBER_SKILL_NOT_APPROVED";
 
     public const string MemberSkillEvidenceRequired = "MEMBER_SKILL_EVIDENCE_REQUIRED";

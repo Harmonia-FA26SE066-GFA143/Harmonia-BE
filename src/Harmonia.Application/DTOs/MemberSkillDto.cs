@@ -25,5 +25,9 @@ public class MemberSkillDto
 
     public string? RejectReason { get; set; }
 
+    public DateTime? RevokedAt { get; set; }
+
+    public string? RevokeReason { get; set; }
+
     public MemberSkillEvidenceDto? Evidence { get; set; }
 }

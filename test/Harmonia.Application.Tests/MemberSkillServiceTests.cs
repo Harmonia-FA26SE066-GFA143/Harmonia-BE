@@ -19,6 +19,9 @@ public class MemberSkillServiceTests
     private readonly IMemberProfileRepository _members = Substitute.For<IMemberProfileRepository>();
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
     private readonly IFileStorageService _files = Substitute.For<IFileStorageService>();
+    private readonly IServiceRosterRepository _rosters = Substitute.For<IServiceRosterRepository>();
+    private readonly IChoirScopeService _scope = ChoirScopeFakes.Unrestricted();
+    private readonly IGenericRepository<Choir> _choirs = Substitute.For<IGenericRepository<Choir>>();
     private readonly MemberSkillService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly Guid _userId = Guid.NewGuid();
@@ -29,7 +32,8 @@ public class MemberSkillServiceTests
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<MemberSkillProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new MemberSkillService(_memberSkills, _members, _notifications, _files, mapper);
+        _sut = new MemberSkillService(_memberSkills, _members, _notifications, _files, _rosters, _scope, _choirs, mapper);
+        _rosters.GetUpcomingAssignmentsForUpdateAsync(default, default, default, default).ReturnsForAnyArgs([]);
         _files.UploadAsync(default!, default!, default!, default, default).ReturnsForAnyArgs(call =>
             Result<FileUploadResponse>.Success(new FileUploadResponse(
                 $"harmonia/{call.ArgAt<string>(2)}/new{Path.GetExtension(call.ArgAt<string>(1))}", string.Empty)));
@@ -287,6 +291,67 @@ public class MemberSkillServiceTests
         Assert.Equal(ErrorCodes.MemberSkillAlreadyReviewed, result.Code);
         await _memberSkills.DidNotReceive().TrySaveReviewAsync(Arg.Any<MemberSkill>(), _ct);
         await _notifications.DidNotReceive().SendAsync(Arg.Any<SendNotificationRequest>(), _ct);
+    }
+
+    [Fact]
+    public async Task Revoke_Approved_DropsUpcomingLines_ReopensRoster_AndNotifiesMemberAndLeadDirector_Async()
+    {
+        var row = StubForReview(ApprovalStatus.Approved);
+        var revokerId = Guid.NewGuid();
+        var leadDirectorId = Guid.NewGuid();
+        var liturgicalEvent = new LiturgicalEvent { Id = Guid.NewGuid(), EventDate = VietnamTime.Today.AddDays(5) };
+        var roster = new ServiceRoster
+        {
+            Id = Guid.NewGuid(), Status = RosterStatus.Finalized, FinalizedAt = DateTime.UtcNow,
+            WholeServiceFinalizedAt = DateTime.UtcNow, LiturgicalEvent = liturgicalEvent,
+        };
+        var line = new RosterAssignment { Id = Guid.NewGuid(), MemberId = row.MemberId, SkillId = row.SkillId, Roster = roster };
+        roster.Assignments.Add(line);
+        _rosters.GetUpcomingAssignmentsForUpdateAsync(row.MemberId, row.SkillId, Arg.Any<DateOnly>(), _ct).Returns([line]);
+        var leadChoir = new Choir { Id = Guid.NewGuid(), DirectorId = leadDirectorId };
+        _scope.GetLeadChoirIdAsync(liturgicalEvent.Id, _ct).Returns(leadChoir.Id);
+        _choirs.GetByIdAsync(leadChoir.Id, _ct).Returns(leadChoir);
+
+        var result = await _sut.RevokeAsync(revokerId, row.Id, new RevokeMemberSkillRequest { Reason = " Lost voice " }, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ApprovalStatus.Revoked, result.Value!.Status);
+        Assert.Equal((revokerId, "Lost voice"), (row.RevokedBy, row.RevokeReason));
+        Assert.NotNull(row.RevokedAt);
+        Assert.Empty(roster.Assignments);
+        Assert.Equal((RosterStatus.Draft, null, null), (roster.Status, roster.FinalizedAt, roster.WholeServiceFinalizedAt));
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(x => x.Type == NotificationType.SkillReview && x.RecipientUserIds.Single() == _userId), _ct);
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(x => x.Type == NotificationType.AssignmentNotice
+                && x.RecipientUserIds.Single() == leadDirectorId), _ct);
+    }
+
+    [Theory]
+    [InlineData(ApprovalStatus.Pending)]
+    [InlineData(ApprovalStatus.Rejected)]
+    [InlineData(ApprovalStatus.Revoked)]
+    public async Task Revoke_NotApproved_ReturnsNotApproved_AndSavesNothing_Async(ApprovalStatus status)
+    {
+        var row = StubForReview(status);
+
+        var result = await _sut.RevokeAsync(Guid.NewGuid(), row.Id, new RevokeMemberSkillRequest { Reason = "x" }, _ct);
+
+        Assert.Equal(ErrorCodes.MemberSkillNotApproved, result.Code);
+        await _memberSkills.DidNotReceive().TrySaveReviewAsync(Arg.Any<MemberSkill>(), _ct);
+    }
+
+    [Fact]
+    public async Task Revoke_MemberOfAnotherDirectorsChoir_ReturnsNotFound_Async()
+    {
+        var row = StubForReview(ApprovalStatus.Approved);
+        var directorId = Guid.NewGuid();
+        _members.IsManagedByDirectorAsync(row.MemberId, directorId, _ct).Returns(false);
+
+        var result = await _sut.RevokeAsync(directorId, row.Id, new RevokeMemberSkillRequest { Reason = "x" }, _ct);
+
+        Assert.Equal(ErrorCodes.MemberSkillNotFound, result.Code);
+        Assert.Equal(ApprovalStatus.Approved, row.Status);
     }
 
     [Fact]

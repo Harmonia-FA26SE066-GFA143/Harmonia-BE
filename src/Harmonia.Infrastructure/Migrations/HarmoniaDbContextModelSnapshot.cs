@@ -960,6 +960,16 @@ namespace Harmonia.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<string>("RevokeReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("RevokedBy")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("SkillId")
                         .HasColumnType("uniqueidentifier");
 
@@ -971,11 +981,13 @@ namespace Harmonia.Infrastructure.Migrations
 
                     b.HasIndex("ApprovedBy");
 
+                    b.HasIndex("RevokedBy");
+
                     b.HasIndex("SkillId");
 
                     b.HasIndex("MemberId", "SkillId")
                         .IsUnique()
-                        .HasFilter("[Status] <> 2");
+                        .HasFilter("[Status] IN (0, 1)");
 
                     b.ToTable("MemberSkills");
                 });
@@ -2589,6 +2601,11 @@ namespace Harmonia.Infrastructure.Migrations
                         .HasForeignKey("MemberId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("Harmonia.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("RevokedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Harmonia.Domain.Entities.Skill", "Skill")
                         .WithMany("MemberSkills")

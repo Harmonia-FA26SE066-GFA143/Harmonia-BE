@@ -75,4 +75,11 @@ public class MemberSkillsController(IMemberSkillService memberSkillService) : Ap
     public async Task<IActionResult> RejectAsync(
         Guid id, [FromBody] RejectMemberSkillRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await memberSkillService.RejectAsync(User.GetUserId(), id, request, cancellationToken));
+
+    [HttpPatch("{id:guid}/revoke")]
+    [Authorize(Roles = RoleNames.ChoirDirector)]
+    [ProducesResponseType<MemberSkillDetailDto>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> RevokeAsync(
+        Guid id, [FromBody] RevokeMemberSkillRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await memberSkillService.RevokeAsync(User.GetUserId(), id, request, cancellationToken));
 }

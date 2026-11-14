@@ -57,4 +57,11 @@ public interface IMemberSkillService
     /// </summary>
     Task<Result<MemberSkillDetailDto>> RejectAsync(
         Guid directorUserId, Guid id, RejectMemberSkillRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Withdraws an Approved skill: the row becomes Revoked, the member's lines for it on upcoming rosters go and
+    /// finalized rosters reopen. Not Approved → MEMBER_SKILL_NOT_APPROVED; outside the director's members → not found.
+    /// </summary>
+    Task<Result<MemberSkillDetailDto>> RevokeAsync(
+        Guid directorUserId, Guid id, RevokeMemberSkillRequest request, CancellationToken cancellationToken);
 }

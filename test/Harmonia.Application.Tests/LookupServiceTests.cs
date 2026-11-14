@@ -14,6 +14,7 @@ namespace Harmonia.Application.Tests;
 
 public class LookupServiceTests
 {
+    private readonly IServiceRosterRepository _rosters = Substitute.For<IServiceRosterRepository>();
     private readonly IGenericRepository<MassType> _massTypes = Substitute.For<IGenericRepository<MassType>>();
     private readonly IGenericRepository<SkillCategory> _skillCategories = Substitute.For<IGenericRepository<SkillCategory>>();
     private readonly IGenericRepository<Skill> _skills = Substitute.For<IGenericRepository<Skill>>();
@@ -53,10 +54,12 @@ public class LookupServiceTests
             _vocalRequirements,
             _instrumentRequirements,
             _slotRequirements,
+            _rosters,
             mapper);
 
         Rows(_vocalRequirements);
         Rows(_instrumentRequirements);
+        _rosters.GetUpcomingAssignmentsForUpdateAsync(default, default, default, default).ReturnsForAnyArgs([]);
     }
 
     /// <summary>Runs the service's conflict predicate against the given rows, like the database would.</summary>
@@ -158,6 +161,20 @@ public class LookupServiceTests
 
         Assert.Equal(ErrorCodes.LookupInactive, created.Code);
         Assert.Equal(ErrorCodes.LookupInactive, movedIn.Code);
+    }
+
+    [Fact]
+    public async Task SaveSkill_SwitchedOffWhileUpcomingRostersUseIt_ReturnsLookupInUse_Async()
+    {
+        var category = Guid.NewGuid();
+        var skill = ExistingSkill(category, category);
+        skill.IsActive = true;
+        _rosters.GetUpcomingAssignmentsForUpdateAsync(null, skill.Id, Arg.Any<DateOnly>(), _ct).Returns([new RosterAssignment()]);
+
+        var result = await _sut.SaveSkillAsync(
+            skill.Id, new SaveSkillRequest { CategoryId = category, Name = skill.Name, IsActive = false }, _ct);
+
+        Assert.Equal(ErrorCodes.LookupInUse, result.Code);
     }
 
     [Fact]

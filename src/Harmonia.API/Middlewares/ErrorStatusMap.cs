@@ -70,6 +70,7 @@ public static class ErrorStatusMap
         [ErrorCodes.MemberSkillAlreadyDeclared] = StatusCodes.Status409Conflict,
         [ErrorCodes.MemberSkillAlreadyReviewed] = StatusCodes.Status409Conflict,
         [ErrorCodes.MemberSkillRejectReasonRequired] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.MemberSkillRevokeReasonRequired] = StatusCodes.Status400BadRequest,
         [ErrorCodes.MemberSkillNotApproved] = StatusCodes.Status409Conflict,
         [ErrorCodes.MemberSkillEvidenceRequired] = StatusCodes.Status400BadRequest,
         [ErrorCodes.MemberSkillEvidenceTypeNotAllowed] = StatusCodes.Status400BadRequest,
