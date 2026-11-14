@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Harmonia.Application.Interfaces.IRepositories;
 using Harmonia.Domain.Common;
 using Harmonia.Infrastructure.Data;
@@ -11,6 +12,9 @@ public class GenericRepository<T>(HarmoniaDbContext dbContext) : IGenericReposit
 
     public virtual Task<T?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
         DbContext.Set<T>().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+    public Task<List<T>> ListAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken) =>
+        DbContext.Set<T>().AsNoTracking().Where(predicate).ToListAsync(cancellationToken);
 
     public virtual async Task AddAsync(T entity, CancellationToken cancellationToken) =>
         await DbContext.Set<T>().AddAsync(entity, cancellationToken);

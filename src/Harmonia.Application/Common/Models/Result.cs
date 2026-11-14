@@ -3,7 +3,7 @@ namespace Harmonia.Application.Common.Models;
 /// <summary>
 /// Outcome of a service operation that has no return value. A failure carries an
 /// <c>ErrorCodes</c> value; the controller maps it to an HTTP status.
-/// See doc/error-codes.md for which errors go through <see cref="Result"/> vs. exceptions.
+/// See docs/error-codes.md for which errors go through <see cref="Result"/> vs. exceptions.
 /// </summary>
 public class Result
 {

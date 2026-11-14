@@ -18,7 +18,7 @@
   | Thư mục | Chứa | KHÔNG chứa |
   |---|---|---|
   | `Common/` (gốc) | — | Mọi file |
-  | `Common/Models/` | `Result`, `Result<T>`, `PagedList<T>`, `PagingRequest` | DTO nghiệp vụ, interface, code EF Core |
+  | `Common/Models/` | `Result`, `Result<T>`, `PagedList<T>`, `PagingRequest`, `FileContent` (file upload chuyển từ controller xuống service, không phụ thuộc `IFormFile`), class Options mà service Application đọc (`PasswordResetOptions`) — bind và validate ở `Infrastructure/DependencyInjection.cs` | DTO nghiệp vụ, interface, code EF Core |
   | `DTOs/` | `Dto`, `Request`, `Response` | Entity |
   | `Exceptions/` | Exception ứng dụng: NotFound, Validation, Unauthorized | Exception nghiệp vụ (→ Domain) |
   | `Interfaces/IRepositories/` | Interface truy cập dữ liệu | Code EF Core |
@@ -31,12 +31,18 @@
 
   | Thư mục | Chứa | KHÔNG chứa |
   |---|---|---|
-  | `Data/` | `HarmoniaDbContext`, `DataSeeder` (dữ liệu demo), extension truy vấn EF (`ToPagedListAsync`) | Repository |
-  | `Data/Configurations/` | `IEntityTypeConfiguration<T>`, seed cố định qua `HasData()` (role, lookup) | Dữ liệu demo |
+  | `Data/` | `HarmoniaDbContext`, `DataSeeder` (role + Admin đầu tiên, dữ liệu demo), extension truy vấn EF (`ToPagedListAsync`), file JSON nhúng mà `DataSeeder` nạp (`LiturgicalNameTranslations.json`) | Repository |
+  | `Data/Configurations/` | `IEntityTypeConfiguration<T>`, seed cố định qua `HasData()` (lookup) | Dữ liệu demo, role |
   | `Data/Interceptors/` | EF interceptor (audit, …) | Logic nghiệp vụ |
   | `Migrations/` | Migration EF sinh ra | Bất cứ file nào viết tay — không tạo, không sửa |
   | `Repositories/` | Implementation của `IRepositories` | Logic nghiệp vụ |
+  | `BackgroundJobs/` | `BackgroundService` chạy ngầm (`LyricsExtractionWorker`), tự tạo scope rồi gọi service Application. Đánh thức bằng tín hiệu trong process, KHÔNG quét DB định kỳ — DB Azure serverless miễn phí phải được tự pause (chốt 2026-11-12) | Logic nghiệp vụ (→ `Services/`) |
   | `ExternalServices/` | Implementation chạm công nghệ ngoài: email, **phát** JWT, file storage, Gemini — **kèm class Options của chính nó** (`JwtOptions` nằm cạnh `JwtTokenService`) | Logic nghiệp vụ |
+
+  **Role KHÔNG seed bằng `HasData()`** (chốt 2026-10-03): DB Azure đã có 4 role với Id ngẫu nhiên,
+  migration `InsertData` sẽ vấp unique index `Name`. `DataSeeder` chèn role theo **tên** lúc khởi
+  động, chỉ thêm, không sửa/xoá. Admin đầu tiên tạo từ `Seed__AdminEmail` / `Seed__AdminPassword`
+  khi DB chưa có Admin nào đang hoạt động.
 
   ## Harmonia.API — trình diễn và composition root
 
@@ -64,5 +70,5 @@
 
   ## Chưa có chỗ — hỏi trước khi làm
 
-  - Tác vụ chạy ngầm (chuyển `PracticeSubmission` sang `Overdue`, nhắc xác nhận tham gia).
-    Khi cần sẽ thêm thư mục riêng; chưa có thì dừng lại hỏi, đừng nhét vào `Services/`.
+  - Tác vụ chạy ngầm **theo lịch** (chuyển `PracticeSubmission` sang `Overdue`, nhắc xác nhận tham gia): cần quét DB
+    định kỳ, mâu thuẫn với luật không quét của `BackgroundJobs/` — hỏi trước khi làm.

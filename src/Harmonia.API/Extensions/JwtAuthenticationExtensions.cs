@@ -51,7 +51,7 @@ public static class JwtAuthenticationExtensions
                         return Task.CompletedTask;
                     },
 
-                    // Default JwtBearer challenge doesn't match doc/error-codes.md's {code,message} contract.
+                    // Default JwtBearer challenge doesn't match docs/error-codes.md's {code,message} contract.
                     OnChallenge = async context =>
                     {
                         context.HandleResponse();

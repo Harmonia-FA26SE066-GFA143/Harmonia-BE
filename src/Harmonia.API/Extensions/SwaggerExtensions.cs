@@ -29,12 +29,6 @@ public static class SwaggerExtensions
 
     public static WebApplication UseApiSwagger(this WebApplication app)
     {
-        //if (app.Environment.IsDevelopment())
-        //{
-        //    app.UseSwagger();
-        //    app.UseSwaggerUI();
-        //}
-
         app.UseSwagger();
         app.UseSwaggerUI();
 

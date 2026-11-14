@@ -10,12 +10,12 @@ public class NotificationRepository(HarmoniaDbContext dbContext)
     : GenericRepository<Notification>(dbContext), INotificationRepository
 {
     public async Task<PagedList<NotificationRecipient>> GetForUserAsync(
-        Guid userId, PagingRequest paging, CancellationToken cancellationToken)
+        Guid userId, bool? isRead, PagingRequest paging, CancellationToken cancellationToken)
     {
         var query = DbContext.NotificationRecipients
             .AsNoTracking()
             .Include(x => x.Notification)
-            .Where(x => x.UserId == userId)
+            .Where(x => x.UserId == userId && (isRead == null || x.IsRead == isRead))
             .OrderByDescending(x => x.Notification.CreatedAt);
 
         var totalCount = await query.CountAsync(cancellationToken);
@@ -36,4 +36,9 @@ public class NotificationRepository(HarmoniaDbContext dbContext)
     public Task<int> CountUnreadAsync(Guid userId, CancellationToken cancellationToken) =>
         DbContext.NotificationRecipients
             .CountAsync(x => x.UserId == userId && !x.IsRead, cancellationToken);
+
+    public Task MarkAllAsReadAsync(Guid userId, DateTime readAt, CancellationToken cancellationToken) =>
+        DbContext.NotificationRecipients
+            .Where(x => x.UserId == userId && !x.IsRead)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.IsRead, true).SetProperty(x => x.ReadAt, readAt), cancellationToken);
 }
