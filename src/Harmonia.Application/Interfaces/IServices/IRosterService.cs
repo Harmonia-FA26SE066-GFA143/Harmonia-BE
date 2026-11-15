@@ -78,6 +78,16 @@ public interface IRosterService
         LiturgicalEvent liturgicalEvent, IReadOnlyCollection<Guid> memberIds, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Members of <paramref name="choirId"/> (every member when null) with an Active roster line on an event, other than
+    /// <paramref name="eventId"/>, whose time clashes with a rehearsal at [startUtc, endUtc) and
+    /// <paramref name="locationId"/>. An event is taken to last Roster.EventOverlapMinutes, widened on both sides by
+    /// Roster.DifferentLocationExtraMinutes when held elsewhere.
+    /// </summary>
+    Task<List<RehearsalMemberConflictDto>> GetRehearsalConflictsAsync(
+        Guid? choirId, Guid? eventId, Guid? locationId, DateTime startUtc, DateTime endUtc,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Sends each selected member one notification listing their lines on the finalized roster and stamps
     /// those lines' NotifiedAt (UC-27 / FE-40).
     /// </summary>

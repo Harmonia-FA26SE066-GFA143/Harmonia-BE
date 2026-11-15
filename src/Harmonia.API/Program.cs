@@ -42,6 +42,7 @@ app.UseApiCors();
 app.UseApiRateLimiting();
 
 app.UseAuthentication();
+app.UseMiddleware<DailyReminderMiddleware>();
 app.UseAuthorization();
 
 app.MapControllers();

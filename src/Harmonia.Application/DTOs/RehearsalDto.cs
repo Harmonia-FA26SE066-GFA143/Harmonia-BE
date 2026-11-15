@@ -23,4 +23,10 @@ public class RehearsalDto
     public string? Note { get; set; }
 
     public List<RehearsalSongDto> Songs { get; set; } = [];
+
+    /// <summary>
+    /// Members of the rehearsal's choir serving an event that clashes with it; filled only by create and update, a
+    /// warning that does not block the save.
+    /// </summary>
+    public List<RehearsalMemberConflictDto> MemberConflicts { get; set; } = [];
 }

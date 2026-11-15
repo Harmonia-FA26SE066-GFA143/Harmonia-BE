@@ -67,4 +67,7 @@ public interface IRehearsalRepository : IGenericRepository<Rehearsal>
     /// </summary>
     Task<bool> HasConflictAsync(
         Guid locationId, DateTime start, DateTime end, Guid? excludeId, CancellationToken cancellationToken);
+
+    /// <summary>Read-only rehearsals overlapping [fromUtc, toUtc); touching ends do not overlap.</summary>
+    Task<List<Rehearsal>> GetOverlappingAsync(DateTime fromUtc, DateTime toUtc, CancellationToken cancellationToken);
 }

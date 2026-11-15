@@ -73,6 +73,13 @@ public interface IServiceRosterRepository : IGenericRepository<ServiceRoster>
     Task<ServiceRoster?> GetRosterForNotificationAsync(Guid rosterId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Read-only Active lines on rosters of non-cancelled events dated <paramref name="fromDate"/> to
+    /// <paramref name="toDate"/> (both included), with Member.User and Roster.LiturgicalEvent loaded.
+    /// </summary>
+    Task<List<RosterAssignment>> GetActiveLinesBetweenAsync(
+        DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Tracked Active lines on rosters of events from fromDate on, not cancelled, for the skill and, when given, the member;
     /// each with its Roster and the Roster's LiturgicalEvent.
     /// </summary>

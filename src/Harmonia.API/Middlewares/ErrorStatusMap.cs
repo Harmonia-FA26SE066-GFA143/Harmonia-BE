@@ -151,6 +151,7 @@ public static class ErrorStatusMap
         [ErrorCodes.EventParticipationAlreadyResponded] = StatusCodes.Status409Conflict,
         [ErrorCodes.EventParticipationClosed] = StatusCodes.Status409Conflict,
         [ErrorCodes.EventParticipationChangeClosed] = StatusCodes.Status409Conflict,
+        [ErrorCodes.EventParticipationReminderTooSoon] = StatusCodes.Status409Conflict,
         [ErrorCodes.EventParticipationNotInvited] = StatusCodes.Status409Conflict,
 
         // 9. Service roster.

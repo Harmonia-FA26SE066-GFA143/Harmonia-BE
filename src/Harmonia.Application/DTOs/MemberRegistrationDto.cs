@@ -19,4 +19,7 @@ public class MemberRegistrationDto
     public string? Note { get; set; }
 
     public DateTime CreatedAt { get; set; }
+
+    /// <summary>Rows that may be the same person under another email; a hint for the Admin, never a block.</summary>
+    public List<RegistrationDuplicateDto> PossibleDuplicates { get; set; } = [];
 }

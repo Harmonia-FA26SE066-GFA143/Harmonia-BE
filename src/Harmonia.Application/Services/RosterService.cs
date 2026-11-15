@@ -16,6 +16,7 @@ public class RosterService(
     INotificationService notificationService,
     ISystemSettingService systemSettingService,
     IChoirScopeService choirScope,
+    IRehearsalRepository rehearsalRepository,
     IMapper mapper) : IRosterService
 {
     private sealed record Candidate(Guid MemberId, SkillLevel? Level, int RecentServiceCount);
@@ -100,7 +101,7 @@ public class RosterService(
             Status = roster.Status,
             GeneratedAt = roster.GeneratedAt,
             IsAiGenerated = isAiGenerated,
-            Assignments = mapper.Map<List<RosterAssignmentDto>>(assignments),
+            Assignments = await ToAssignmentDtosAsync(liturgicalEvent, assignments, cancellationToken),
             Shortages = slots
                 .Where(x => x.Picked.Count < x.NeededCount)
                 .Select(x => ToShortage(x.Need, x.ManualCount + x.Picked.Count))
@@ -135,7 +136,7 @@ public class RosterService(
         var songList = await rosterRepository.GetApprovedSongListAsync(eventId, cancellationToken);
 
         var dto = mapper.Map<ServiceRosterDto>(roster);
-        dto.Assignments = mapper.Map<List<RosterAssignmentDto>>(assignments);
+        dto.Assignments = await ToAssignmentDtosAsync(liturgicalEvent, assignments, cancellationToken);
         dto.Shortages = ComputeShortages(liturgicalEvent, songList, assignments);
         return Result<ServiceRosterDto>.Success(dto);
     }
@@ -185,7 +186,7 @@ public class RosterService(
         await rosterRepository.SaveChangesAsync(cancellationToken);
 
         var dto = mapper.Map<ServiceRosterDto>(roster);
-        dto.Assignments = mapper.Map<List<RosterAssignmentDto>>(assignments);
+        dto.Assignments = await ToAssignmentDtosAsync(roster.LiturgicalEvent, assignments, cancellationToken);
         dto.Shortages = ComputeShortages(roster.LiturgicalEvent, songList, assignments);
         return Result<ServiceRosterDto>.Success(dto);
     }
@@ -212,7 +213,7 @@ public class RosterService(
 
         var songList = await rosterRepository.GetApprovedSongListAsync(roster.EventId, cancellationToken);
         var dto = mapper.Map<ServiceRosterDto>(roster);
-        dto.Assignments = mapper.Map<List<RosterAssignmentDto>>(assignments);
+        dto.Assignments = await ToAssignmentDtosAsync(roster.LiturgicalEvent, assignments, cancellationToken);
         dto.Shortages = ComputeShortages(roster.LiturgicalEvent, songList, assignments);
         return Result<ServiceRosterDto>.Success(dto);
     }
@@ -377,7 +378,8 @@ public class RosterService(
         roster.Assignments.Add(assignment);
         await rosterRepository.SaveChangesAsync(cancellationToken);
 
-        return Result<RosterAssignmentDto>.Success(await GetAssignmentDtoAsync(roster.Id, assignment.Id, cancellationToken));
+        return Result<RosterAssignmentDto>.Success(
+            await GetAssignmentDtoAsync(liturgicalEvent, roster.Id, assignment.Id, cancellationToken));
     }
 
     public async Task<Result<RosterAssignmentDto>> ReplaceAssignmentAsync(
@@ -403,7 +405,8 @@ public class RosterService(
         old.ReplacedByAssignmentId = replacement.Id;
         await rosterRepository.SaveChangesAsync(cancellationToken);
 
-        return Result<RosterAssignmentDto>.Success(await GetAssignmentDtoAsync(roster.Id, replacement.Id, cancellationToken));
+        return Result<RosterAssignmentDto>.Success(
+            await GetAssignmentDtoAsync(roster.LiturgicalEvent, roster.Id, replacement.Id, cancellationToken));
     }
 
     public async Task<Result> RemoveAssignmentAsync(Guid assignmentId, CancellationToken cancellationToken)
@@ -435,7 +438,8 @@ public class RosterService(
 
         assignment.Note = NormalizeNote(request.Note);
         await rosterRepository.SaveChangesAsync(cancellationToken);
-        return Result<RosterAssignmentDto>.Success(await GetAssignmentDtoAsync(roster.Id, assignment.Id, cancellationToken));
+        return Result<RosterAssignmentDto>.Success(
+            await GetAssignmentDtoAsync(roster.LiturgicalEvent, roster.Id, assignment.Id, cancellationToken));
     }
 
     private static string? NormalizeNote(string? note) => string.IsNullOrWhiteSpace(note) ? null : note.Trim();
@@ -512,6 +516,97 @@ public class RosterService(
             memberIds, eventId, date, from, to, locationId, farFrom, farTo, cancellationToken);
     }
 
+    public async Task<List<RehearsalMemberConflictDto>> GetRehearsalConflictsAsync(
+        Guid? choirId, Guid? eventId, Guid? locationId, DateTime startUtc, DateTime endUtc,
+        CancellationToken cancellationToken)
+    {
+        var (minutes, extra) = await GetEventSpanSettingsAsync(cancellationToken);
+        var start = VietnamTime.FromUtc(startUtc);
+        var end = VietnamTime.FromUtc(endUtc);
+        var reach = TimeSpan.FromMinutes(EventLengthMinutes(minutes) + extra);
+        var lines = await rosterRepository.GetActiveLinesBetweenAsync(
+            DateOnly.FromDateTime(start - reach), DateOnly.FromDateTime(end + reach), cancellationToken);
+        var choirMemberIds = await choirScope.GetChoirMemberIdsAsync(choirId, cancellationToken);
+
+        return lines
+            .Where(x => x.Roster.EventId != eventId
+                && (choirMemberIds is null || choirMemberIds.Contains(x.MemberId))
+                && Clashes(x.Roster.LiturgicalEvent, start, end, locationId, minutes, extra))
+            .DistinctBy(x => (x.MemberId, x.Roster.EventId))
+            .OrderBy(x => x.Roster.LiturgicalEvent.EventDate).ThenBy(x => x.Roster.LiturgicalEvent.Time)
+            .ThenBy(x => x.Member.User.FullName)
+            .Select(x => new RehearsalMemberConflictDto
+            {
+                MemberId = x.MemberId, FullName = x.Member.User.FullName, EventId = x.Roster.EventId,
+                EventDate = x.Roster.LiturgicalEvent.EventDate, Time = x.Roster.LiturgicalEvent.Time,
+            })
+            .ToList();
+    }
+
+    /// <summary>Maps the lines and flags members whose choir rehearses at a time that clashes with the event.</summary>
+    private async Task<List<RosterAssignmentDto>> ToAssignmentDtosAsync(
+        LiturgicalEvent liturgicalEvent, List<RosterAssignment> assignments, CancellationToken cancellationToken)
+    {
+        var dtos = mapper.Map<List<RosterAssignmentDto>>(assignments);
+        var rehearsing = await GetMembersInRehearsalAsync(
+            dtos.Select(x => x.MemberId).Distinct().ToList(), liturgicalEvent, cancellationToken);
+        foreach (var dto in dtos)
+        {
+            dto.HasRehearsalConflict = rehearsing.Contains(dto.MemberId);
+        }
+
+        return dtos;
+    }
+
+    /// <summary>
+    /// The given members whose choir has a rehearsal clashing with the event; a rehearsal with no choir counts for
+    /// everyone, and one held for this event (a warm-up before the Mass) is not a clash.
+    /// </summary>
+    private async Task<HashSet<Guid>> GetMembersInRehearsalAsync(
+        IReadOnlyCollection<Guid> memberIds, LiturgicalEvent liturgicalEvent, CancellationToken cancellationToken)
+    {
+        if (memberIds.Count == 0) return [];
+
+        var (minutes, extra) = await GetEventSpanSettingsAsync(cancellationToken);
+        var eventStart = liturgicalEvent.EventDate.ToDateTime(liturgicalEvent.Time);
+        var reach = TimeSpan.FromMinutes(extra);
+        var rehearsals = await rehearsalRepository.GetOverlappingAsync(
+            VietnamTime.ToUtc(eventStart - reach),
+            VietnamTime.ToUtc(eventStart + TimeSpan.FromMinutes(EventLengthMinutes(minutes)) + reach),
+            cancellationToken);
+
+        var busy = new HashSet<Guid>();
+        foreach (var rehearsal in rehearsals.Where(x => x.EventId != liturgicalEvent.Id && Clashes(
+                     liturgicalEvent, VietnamTime.FromUtc(x.StartTime), VietnamTime.FromUtc(x.EndTime), x.LocationId,
+                     minutes, extra)))
+        {
+            var choirMemberIds = await choirScope.GetChoirMemberIdsAsync(rehearsal.ChoirId, cancellationToken);
+            busy.UnionWith(choirMemberIds is null ? memberIds : memberIds.Where(choirMemberIds.Contains));
+        }
+
+        return busy;
+    }
+
+    private async Task<(int Minutes, int Extra)> GetEventSpanSettingsAsync(CancellationToken cancellationToken) =>
+        (await systemSettingService.GetIntAsync(SystemSettingKeys.RosterEventOverlapMinutes, cancellationToken),
+            await systemSettingService.GetIntAsync(SystemSettingKeys.RosterDifferentLocationExtraMinutes, cancellationToken));
+
+    // An event has a start time only; with a 0 setting it still holds its first minute.
+    private static int EventLengthMinutes(int overlapMinutes) => Math.Max(overlapMinutes, 1);
+
+    /// <summary>
+    /// Whether a rehearsal at [start, end) (parish wall-clock) clashes with the event, taken to last
+    /// <paramref name="minutes"/> and widened on both sides by <paramref name="extra"/> when the rehearsal is elsewhere.
+    /// A rehearsal with no location counts as held at the event's place.
+    /// </summary>
+    private static bool Clashes(
+        LiturgicalEvent liturgicalEvent, DateTime start, DateTime end, Guid? locationId, int minutes, int extra)
+    {
+        var travel = locationId is { } id && id != liturgicalEvent.LocationId ? TimeSpan.FromMinutes(extra) : TimeSpan.Zero;
+        var eventStart = liturgicalEvent.EventDate.ToDateTime(liturgicalEvent.Time);
+        return start < eventStart + TimeSpan.FromMinutes(EventLengthMinutes(minutes)) + travel && eventStart - travel < end;
+    }
+
     /// <summary>Start times, both ends included, that lie less than <paramref name="minutes"/> from <paramref name="time"/>.</summary>
     private static (TimeOnly From, TimeOnly To) OverlapWindow(TimeOnly time, int minutes)
     {
@@ -534,10 +629,12 @@ public class RosterService(
         Source = AssignmentSource.Manual,
     };
 
-    private async Task<RosterAssignmentDto> GetAssignmentDtoAsync(Guid rosterId, Guid assignmentId, CancellationToken cancellationToken)
+    private async Task<RosterAssignmentDto> GetAssignmentDtoAsync(
+        LiturgicalEvent liturgicalEvent, Guid rosterId, Guid assignmentId, CancellationToken cancellationToken)
     {
         var assignments = await rosterRepository.GetAssignmentsAsync(rosterId, cancellationToken);
-        return mapper.Map<RosterAssignmentDto>(assignments.First(x => x.Id == assignmentId));
+        return (await ToAssignmentDtosAsync(
+            liturgicalEvent, [assignments.First(x => x.Id == assignmentId)], cancellationToken))[0];
     }
 
     /// <summary>
@@ -559,6 +656,14 @@ public class RosterService(
             var busy = await FindMembersServingNearAsync(
                 candidateSkills.Select(x => x.MemberId).Distinct().ToList(), liturgicalEvent, cancellationToken);
             candidateSkills = candidateSkills.Where(x => !busy.Contains(x.MemberId)).ToList();
+        }
+
+        // Nor are members whose choir rehearses at a clashing time; a hand-picked one is only flagged.
+        if (candidateSkills.Count > 0)
+        {
+            var rehearsing = await GetMembersInRehearsalAsync(
+                candidateSkills.Select(x => x.MemberId).Distinct().ToList(), liturgicalEvent, cancellationToken);
+            candidateSkills = candidateSkills.Where(x => !rehearsing.Contains(x.MemberId)).ToList();
         }
 
         var memberIds = candidateSkills.Select(x => x.MemberId).Distinct().ToList();

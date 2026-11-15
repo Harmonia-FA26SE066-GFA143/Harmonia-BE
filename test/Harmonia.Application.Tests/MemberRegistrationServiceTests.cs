@@ -154,4 +154,29 @@ public class MemberRegistrationServiceTests
 
         Assert.Equal(ErrorCodes.MemberRegistrationNotFound, result.Code);
     }
+
+    [Fact]
+    public async Task Search_FlagsSamePhoneOrSameNameAndSaintName_AgainstRowsAndAccounts_Async()
+    {
+        var row = new MemberRegistration
+        {
+            Id = Guid.NewGuid(), FullName = "Nguyễn Thị Lan", SaintName = "Maria", Email = "lan2@example.com",
+            Phone = "+84 912.345.678",
+        };
+        var samePhone = new MemberRegistration { Id = Guid.NewGuid(), FullName = "Lan N", Email = "x@example.com", Phone = "0912345678" };
+        var nameOnly = new MemberRegistration { Id = Guid.NewGuid(), FullName = "Nguyen Thi Lan", Email = "y@example.com" };
+        var account = new User { Id = Guid.NewGuid(), FullName = "nguyễn  thị LAN", SaintName = "maria", Email = "lan@example.com" };
+        _registrations.SearchAsync(null, Arg.Any<SearchMemberRegistrationsRequest>(), _ct)
+            .Returns(new PagedList<MemberRegistration>([row], 1, 20, 1));
+        _registrations.ListAsync(default!, default).ReturnsForAnyArgs([row, samePhone, nameOnly]);
+        _users.ListAsync(default!, default).ReturnsForAnyArgs([account]);
+
+        var result = await _sut.SearchAsync(new SearchMemberRegistrationsRequest(), _ct);
+
+        // The name-only row has no saint name, and a full name alone repeats too often to flag.
+        var flags = Assert.Single(result.Value!.Items).PossibleDuplicates;
+        Assert.Equal(
+            [("Registration", samePhone.Id, "Phone"), ("User", account.Id, "Name")],
+            flags.Select(x => (x.Kind, x.Id, x.MatchedOn)));
+    }
 }

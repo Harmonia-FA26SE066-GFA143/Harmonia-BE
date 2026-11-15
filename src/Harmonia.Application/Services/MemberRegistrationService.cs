@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using AutoMapper;
 using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
@@ -62,9 +64,74 @@ public class MemberRegistrationService(
     {
         var keyword = string.IsNullOrWhiteSpace(request.Keyword) ? null : request.Keyword.Trim();
         var page = await registrationRepository.SearchAsync(keyword, request, cancellationToken);
+        var dtos = mapper.Map<List<MemberRegistrationDto>>(page.Items);
+        if (dtos.Count > 0)
+        {
+            await FlagDuplicatesAsync(dtos, cancellationToken);
+        }
 
         return Result<PagedList<MemberRegistrationDto>>.Success(new PagedList<MemberRegistrationDto>(
-            mapper.Map<List<MemberRegistrationDto>>(page.Items), page.PageNumber, page.PageSize, page.TotalCount));
+            dtos, page.PageNumber, page.PageSize, page.TotalCount));
+    }
+
+    /// <summary>
+    /// Marks rows that may be the same person under another email: the same phone number, or the same full name and
+    /// saint name (a full name alone repeats too often in a parish). Compared against every waiting row and account.
+    /// </summary>
+    private async Task FlagDuplicatesAsync(List<MemberRegistrationDto> dtos, CancellationToken cancellationToken)
+    {
+        // shortcut: loads every waiting row and account into memory to compare without accents; move to a normalized,
+        // indexed column if the parish grows past a few thousand accounts.
+        var registrations = await registrationRepository.ListAsync(_ => true, cancellationToken);
+        var users = await userRepository.ListAsync(_ => true, cancellationToken);
+        var candidates = registrations
+            .Select(x => (Kind: "Registration", x.Id, x.FullName, x.Email, x.Phone, x.SaintName))
+            .Concat(users.Select(x => (Kind: "User", x.Id, x.FullName, x.Email, x.Phone, x.SaintName)))
+            .Select(x => (Row: x, Phone: NormalizePhone(x.Phone), Name: NameKey(x.FullName, x.SaintName)))
+            .ToList();
+
+        foreach (var dto in dtos)
+        {
+            var phone = NormalizePhone(dto.Phone);
+            var name = NameKey(dto.FullName, dto.SaintName);
+            dto.PossibleDuplicates = candidates
+                .Where(x => !(x.Row.Kind == "Registration" && x.Row.Id == dto.Id))
+                .Select(x => (x.Row, MatchedOn: phone is not null && x.Phone == phone ? "Phone"
+                    : name is not null && x.Name == name ? "Name"
+                    : null))
+                .Where(x => x.MatchedOn is not null)
+                .Select(x => new RegistrationDuplicateDto
+                {
+                    Kind = x.Row.Kind, Id = x.Row.Id, FullName = x.Row.FullName, Email = x.Row.Email,
+                    MatchedOn = x.MatchedOn!,
+                })
+                .ToList();
+        }
+    }
+
+    /// <summary>Digits only, with the +84 country code read as the leading 0; null when too short to compare.</summary>
+    private static string? NormalizePhone(string? phone)
+    {
+        var digits = new string((phone ?? string.Empty).Where(char.IsDigit).ToArray());
+        if (digits.StartsWith("84", StringComparison.Ordinal) && digits.Length == 11)
+        {
+            digits = "0" + digits[2..];
+        }
+
+        return digits.Length < 9 ? null : digits;
+    }
+
+    /// <summary>Full name and saint name without case, accents or extra spaces; null without a saint name.</summary>
+    private static string? NameKey(string fullName, string? saintName) =>
+        string.IsNullOrWhiteSpace(saintName) || string.IsNullOrWhiteSpace(fullName)
+            ? null
+            : $"{Fold(saintName)}|{Fold(fullName)}";
+
+    private static string Fold(string value)
+    {
+        var decomposed = value.Trim().ToLowerInvariant().Replace('đ', 'd').Normalize(NormalizationForm.FormD);
+        var letters = decomposed.Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark);
+        return string.Join(' ', new string(letters.ToArray()).Split(' ', StringSplitOptions.RemoveEmptyEntries));
     }
 
     public async Task<Result<UserDto>> AcceptAsync(Guid id, CancellationToken cancellationToken)

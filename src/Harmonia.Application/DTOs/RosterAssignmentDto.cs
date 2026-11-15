@@ -21,4 +21,7 @@ public class RosterAssignmentDto
     public string? Note { get; set; }
 
     public AssignmentSource Source { get; set; }
+
+    /// <summary>The member's choir rehearses at a time that clashes with this event; a warning only.</summary>
+    public bool HasRehearsalConflict { get; set; }
 }

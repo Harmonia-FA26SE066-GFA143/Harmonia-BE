@@ -166,4 +166,10 @@ public class RehearsalRepository(HarmoniaDbContext dbContext)
         DbContext.Rehearsals.AsNoTracking().AnyAsync(
             x => x.LocationId == locationId && x.StartTime < end && start < x.EndTime && x.Id != excludeId,
             cancellationToken);
+
+    public Task<List<Rehearsal>> GetOverlappingAsync(
+        DateTime fromUtc, DateTime toUtc, CancellationToken cancellationToken) =>
+        DbContext.Rehearsals.AsNoTracking()
+            .Where(x => x.StartTime < toUtc && fromUtc < x.EndTime)
+            .ToListAsync(cancellationToken);
 }

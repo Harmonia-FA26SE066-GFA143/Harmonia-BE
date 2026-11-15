@@ -245,6 +245,7 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 | `EVENT_PARTICIPATION_ALREADY_RESPONDED` | 409 | Bạn đã phản hồi yêu cầu này |
 | `EVENT_PARTICIPATION_CLOSED` | 409 | Sự kiện đã diễn ra, không thể phản hồi |
 | `EVENT_PARTICIPATION_CHANGE_CLOSED` | 409 | Đã quá hạn đổi câu trả lời, vui lòng liên hệ ca trưởng |
+| `EVENT_PARTICIPATION_REMINDER_TOO_SOON` | 409 | Vừa nhắc mọi người chưa trả lời, vui lòng thử lại sau |
 | `EVENT_PARTICIPATION_NOT_INVITED` | 409 | Bạn chưa được mời tham gia sự kiện này |
 
 ## 9. Phân công phục vụ

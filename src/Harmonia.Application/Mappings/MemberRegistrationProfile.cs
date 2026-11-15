@@ -8,6 +8,7 @@ public class MemberRegistrationProfile : Profile
 {
     public MemberRegistrationProfile()
     {
-        CreateMap<MemberRegistration, MemberRegistrationDto>();
+        CreateMap<MemberRegistration, MemberRegistrationDto>()
+            .ForMember(x => x.PossibleDuplicates, o => o.Ignore());
     }
 }

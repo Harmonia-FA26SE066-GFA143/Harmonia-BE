@@ -18,6 +18,9 @@ public static class VietnamTime
     /// <summary>A stored UTC timestamp as the wall-clock time at the parish, for text a person reads.</summary>
     public static DateTime FromUtc(DateTime utc) => utc + Offset;
 
+    /// <summary>A parish wall-clock time (such as an event's EventDate + Time) as the UTC instant, to compare with stored timestamps.</summary>
+    public static DateTime ToUtc(DateTime wallClock) => DateTime.SpecifyKind(wallClock - Offset, DateTimeKind.Utc);
+
     /// <summary>The UTC instant at which <paramref name="date"/> begins at the parish, for filtering UTC timestamps by date.</summary>
     public static DateTime StartOfDayUtc(DateOnly date) => date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc) - Offset;
 }

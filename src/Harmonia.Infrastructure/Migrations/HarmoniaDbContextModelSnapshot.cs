@@ -374,6 +374,9 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Property<Guid>("EventId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTime?>("LastReminderAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<Guid>("MemberId")
                         .HasColumnType("uniqueidentifier");
 

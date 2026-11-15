@@ -26,6 +26,10 @@ public static class SystemSettingKeys
 
     public const string ParticipationChangeCutoffHours = "Participation.ChangeCutoffHours";
 
+    public const string ParticipationReminderCooldownHours = "Participation.ReminderCooldownHours";
+
+    public const string ParticipationAutoReminderDaysBefore = "Participation.AutoReminderDaysBefore";
+
     public const string PracticeAllowLateSubmission = "Practice.AllowLateSubmission";
 
     public const string RehearsalAttendanceOpensMinutesBefore = "Rehearsal.AttendanceOpensMinutesBefore";
@@ -70,6 +74,12 @@ public static class SystemSettingKeys
         new(ParticipationChangeCutoffHours, SettingDataType.Int, "24", "Hạn đổi câu trả lời tham gia (giờ trước lễ)",
             "Phân công", "Ca viên đã trả lời lời mời được đổi ý đến trước giờ lễ số giờ này; 0 thì đổi được đến giờ lễ.",
             MinValue: 0, MaxValue: 168),
+        new(ParticipationReminderCooldownHours, SettingDataType.Int, "12", "Khoảng cách giữa hai lần nhắc xác nhận (giờ)",
+            "Phân công", "Một ca viên chưa trả lời lời mời không bị nhắc lại trong số giờ này, dù nhắc tay hay nhắc tự động.",
+            MinValue: 1, MaxValue: 168),
+        new(ParticipationAutoReminderDaysBefore, SettingDataType.Int, "3", "Tự nhắc xác nhận trước lễ (ngày)", "Phân công",
+            "Mỗi ngày một lần, từ 7 giờ sáng khi có người đầu tiên dùng hệ thống, nhắc ca viên chưa trả lời lời mời của các lễ trong số ngày tới này; 0 thì tắt nhắc tự động.",
+            MinValue: 0, MaxValue: 14),
         new(PracticeAllowLateSubmission, SettingDataType.Bool, "false", "Cho nộp bản thu trễ hạn", "Luyện tập",
             "Cho phép ca viên nộp bản thu sau hạn của bài tập."),
         new(RehearsalAttendanceOpensMinutesBefore, SettingDataType.Int, "0", "Mở điểm danh trước giờ tập (phút)",

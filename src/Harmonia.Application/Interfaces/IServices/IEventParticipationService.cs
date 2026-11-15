@@ -23,5 +23,18 @@ public interface IEventParticipationService
     /// </summary>
     Task<Result<EventParticipationSummaryDto>> ConfirmAllAsync(Guid eventId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Reminds the event's members still Invited, skipping those reminded within Participation.ReminderCooldownHours;
+    /// EVENT_PARTICIPATION_REMINDER_TOO_SOON when every one of them was.
+    /// </summary>
+    Task<Result<ParticipationReminderResponse>> RemindAsync(Guid eventId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The daily run: reminds members still Invited to published events of the next
+    /// Participation.AutoReminderDaysBefore days, under the same cooldown and at most once a day each. Returns how many
+    /// were reminded.
+    /// </summary>
+    Task<int> SendDueRemindersAsync(CancellationToken cancellationToken);
+
     Task<Result<EventParticipationDto>> RespondAsync(Guid userId, Guid eventId, RespondParticipationRequest request, CancellationToken cancellationToken);
 }

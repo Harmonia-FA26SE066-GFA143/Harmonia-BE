@@ -487,4 +487,81 @@ public class EventParticipationServiceTests
     }
 
     private static RespondParticipationRequest Confirm() => new() { Status = ParticipationStatus.Confirmed };
+
+    [Fact]
+    public async Task Remind_SkipsMembersRemindedWithinTheCooldown_StampsAndNotifiesTheRest_Async()
+    {
+        _settings.GetIntAsync(SystemSettingKeys.ParticipationReminderCooldownHours, _ct).Returns(12);
+        var anna = Invitation(_anna);
+        var ben = Invitation(_ben);
+        ben.LastReminderAt = DateTime.UtcNow.AddHours(-1);
+        _participations.GetInvitedForUpdateAsync(_event.Id, _ct).Returns([anna, ben]);
+        _members.ListAsync(default!, default).ReturnsForAnyArgs([_anna]);
+
+        var result = await _sut.RemindAsync(_event.Id, _ct);
+
+        Assert.Equal((1, 2), (result.Value!.RemindedCount, result.Value.PendingCount));
+        Assert.NotNull(anna.LastReminderAt);
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(r => r.Type == NotificationType.ParticipationRequest
+                && r.RecipientUserIds.SequenceEqual(new[] { _anna.UserId }) && r.ReferenceId == _event.Id),
+            _ct);
+    }
+
+    [Fact]
+    public async Task Remind_EveryoneRemindedRecently_ReturnsTooSoon_AndSendsNothing_Async()
+    {
+        _settings.GetIntAsync(SystemSettingKeys.ParticipationReminderCooldownHours, _ct).Returns(12);
+        var anna = Invitation(_anna);
+        anna.LastReminderAt = DateTime.UtcNow.AddHours(-1);
+        _participations.GetInvitedForUpdateAsync(_event.Id, _ct).Returns([anna]);
+
+        var result = await _sut.RemindAsync(_event.Id, _ct);
+
+        Assert.Equal(ErrorCodes.EventParticipationReminderTooSoon, result.Code);
+        await _notifications.DidNotReceiveWithAnyArgs().SendAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task Remind_DraftEvent_ReturnsNotPublished_Async()
+    {
+        _event.Status = EventStatus.Draft;
+
+        var result = await _sut.RemindAsync(_event.Id, _ct);
+
+        Assert.Equal(ErrorCodes.LiturgicalEventNotPublished, result.Code);
+    }
+
+    [Theory]
+    [InlineData(0, 0)] // switched off: the events are not even read
+    [InlineData(3, 1)]
+    public async Task SendDueReminders_RemindsInvitedMembersOfUpcomingEvents_Async(int daysBefore, int expected)
+    {
+        _settings.GetIntAsync(SystemSettingKeys.ParticipationAutoReminderDaysBefore, _ct).Returns(daysBefore);
+        _settings.GetIntAsync(SystemSettingKeys.ParticipationReminderCooldownHours, _ct).Returns(12);
+        _events.ListAsync(default!, default).ReturnsForAnyArgs([_event]);
+        var invitation = Invitation(_anna);
+        _participations.GetInvitedForUpdateAsync(_event.Id, _ct).Returns([invitation]);
+        _members.ListAsync(default!, default).ReturnsForAnyArgs([_anna]);
+
+        var reminded = await _sut.SendDueRemindersAsync(_ct);
+
+        Assert.Equal(expected, reminded);
+        await _events.Received(daysBefore == 0 ? 0 : 1).ListAsync(
+            Arg.Any<System.Linq.Expressions.Expression<Func<LiturgicalEvent, bool>>>(), _ct);
+    }
+
+    [Fact]
+    public async Task SendDueReminders_MemberAlreadyRemindedToday_IsSkipped_EvenPastTheCooldown_Async()
+    {
+        _settings.GetIntAsync(SystemSettingKeys.ParticipationAutoReminderDaysBefore, _ct).Returns(3);
+        _settings.GetIntAsync(SystemSettingKeys.ParticipationReminderCooldownHours, _ct).Returns(0);
+        _events.ListAsync(default!, default).ReturnsForAnyArgs([_event]);
+        var invitation = Invitation(_anna);
+        invitation.LastReminderAt = VietnamTime.StartOfDayUtc(VietnamTime.Today);
+        _participations.GetInvitedForUpdateAsync(_event.Id, _ct).Returns([invitation]);
+
+        Assert.Equal(0, await _sut.SendDueRemindersAsync(_ct));
+        await _notifications.DidNotReceiveWithAnyArgs().SendAsync(default!, default);
+    }
 }

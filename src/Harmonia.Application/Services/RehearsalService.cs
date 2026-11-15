@@ -25,6 +25,7 @@ public class RehearsalService(
     INotificationService notificationService,
     IRehearsalRecordingRepository recordingRepository,
     IFileStorageService fileStorageService,
+    IRosterService rosterService,
     IMapper mapper) : IRehearsalService
 {
     public async Task<Result<PagedList<RehearsalDto>>> SearchAsync(
@@ -103,7 +104,7 @@ public class RehearsalService(
             rehearsalSong.Song = songsById[rehearsalSong.SongId];
         }
 
-        return Result<RehearsalDto>.Success(mapper.Map<RehearsalDto>(rehearsal));
+        return Result<RehearsalDto>.Success(await ToDtoWithConflictsAsync(rehearsal, cancellationToken));
     }
 
     public async Task<Result<RehearsalDto>> UpdateAsync(
@@ -156,7 +157,17 @@ public class RehearsalService(
             rehearsal.ChoirId,
             cancellationToken);
 
-        return Result<RehearsalDto>.Success(mapper.Map<RehearsalDto>(rehearsal));
+        return Result<RehearsalDto>.Success(await ToDtoWithConflictsAsync(rehearsal, cancellationToken));
+    }
+
+    /// <summary>Maps the rehearsal and lists choir members serving a clashing event, so the director can adjust.</summary>
+    private async Task<RehearsalDto> ToDtoWithConflictsAsync(Rehearsal rehearsal, CancellationToken cancellationToken)
+    {
+        var dto = mapper.Map<RehearsalDto>(rehearsal);
+        dto.MemberConflicts = await rosterService.GetRehearsalConflictsAsync(
+            rehearsal.ChoirId, rehearsal.EventId, rehearsal.LocationId, rehearsal.StartTime, rehearsal.EndTime,
+            cancellationToken);
+        return dto;
     }
 
     public async Task<Result> DeleteAsync(Guid id, CancellationToken cancellationToken)

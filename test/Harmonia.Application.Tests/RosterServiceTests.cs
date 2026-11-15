@@ -21,6 +21,7 @@ public class RosterServiceTests
     private readonly ICurrentUserService _currentUser = Substitute.For<ICurrentUserService>();
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
     private readonly ISystemSettingService _settings = Substitute.For<ISystemSettingService>();
+    private readonly IRehearsalRepository _rehearsals = Substitute.For<IRehearsalRepository>();
     private readonly RosterService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
 
@@ -42,7 +43,7 @@ public class RosterServiceTests
             cfg.AddProfile<ServiceRosterProfile>();
         }, NullLoggerFactory.Instance).CreateMapper();
         _currentUser.UserId.Returns(_directorId);
-        _sut = new RosterService(_repository, _generator, _currentUser, _notifications, _settings, _scope, mapper);
+        _sut = new RosterService(_repository, _generator, _currentUser, _notifications, _settings, _scope, _rehearsals, mapper);
         _settings.GetIntAsync(SystemSettingKeys.RosterRecentServiceDays, _ct).Returns(60);
         _settings.GetBoolAsync(SystemSettingKeys.RosterAiSuggestionEnabled, _ct).Returns(true);
 
@@ -58,6 +59,8 @@ public class RosterServiceTests
         _songList = new SongList { EventId = _event.Id, Status = SongListStatus.Approved, Items = [_entrance] };
 
         _repository.GetEventWithRosterAsync(_event.Id, _ct).Returns(_event);
+        _rehearsals.GetOverlappingAsync(default, default, default).ReturnsForAnyArgs([]);
+        _repository.GetActiveLinesBetweenAsync(default, default, default).ReturnsForAnyArgs([]);
         _repository.GetApprovedSongListAsync(_event.Id, _ct).Returns(_songList);
         _repository.GetCandidateSkillsAsync(_event.Id, Arg.Any<IReadOnlyCollection<Guid>>(), _ct).Returns(
         [
@@ -229,6 +232,38 @@ public class RosterServiceTests
         Assert.True(result.IsSuccess);
         Assert.DoesNotContain(_binh, roster.Assignments.Select(x => x.MemberId));
         Assert.Equal([_chi, _an], roster.Assignments.Where(x => x.SkillId == _soprano.Id).Select(x => x.MemberId));
+    }
+
+    /// <summary>
+    /// The member's choir rehearses from <paramref name="startHour"/> for an hour on the event's day (parish time),
+    /// for another event unless <paramref name="forThisEvent"/>.
+    /// </summary>
+    private void RehearsesAt(Guid memberId, int startHour, bool forThisEvent = false)
+    {
+        var choirId = Guid.NewGuid();
+        var start = VietnamTime.ToUtc(_event.EventDate.ToDateTime(new TimeOnly(startHour, 0)));
+        _rehearsals.GetOverlappingAsync(default, default, default).ReturnsForAnyArgs(
+        [
+            new Rehearsal
+            {
+                Id = Guid.NewGuid(), ChoirId = choirId, EventId = forThisEvent ? _event.Id : null,
+                StartTime = start, EndTime = start.AddHours(1),
+            },
+        ]);
+        _scope.GetChoirMemberIdsAsync(choirId, _ct).Returns([memberId]);
+    }
+
+    [Fact]
+    public async Task Suggest_MemberWhoseChoirRehearsesAtTheSameTime_IsNotPicked_Async()
+    {
+        _event.Time = new TimeOnly(9, 0);
+        var roster = ExistingRoster();
+        RehearsesAt(_binh, 9);
+
+        var result = await SuggestAsync();
+
+        Assert.True(result.IsSuccess);
+        Assert.DoesNotContain(_binh, roster.Assignments.Select(x => x.MemberId));
     }
 
     [Fact]
@@ -448,6 +483,52 @@ public class RosterServiceTests
         {
             EventId = _event.Id, SongListItemId = _entrance.Id, SkillId = skillId ?? _soprano.Id, MemberId = memberId,
         }, _ct);
+
+    [Theory]
+    [InlineData(8, false, true)] // 08:00–09:00 rehearsal touches a 09:00 Mass held for its first minute
+    [InlineData(8, true, false)] // a warm-up for this very Mass is no clash
+    [InlineData(7, false, false)]
+    public async Task AddAssignment_ChoirRehearsingAtTheEventTime_IsAddedButFlagged_Async(
+        int rehearsalStartHour, bool forThisEvent, bool flagged)
+    {
+        _event.Time = new TimeOnly(8, 30);
+        RosterWith(RosterStatus.Suggested);
+        MemberIs(_an);
+        RehearsesAt(_an, rehearsalStartHour, forThisEvent);
+
+        var result = await AddAsync(_an);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(flagged, result.Value!.HasRehearsalConflict);
+    }
+
+    [Theory]
+    [InlineData(10, false, 0, true)] // inside the 120 minutes the Mass is taken to last
+    [InlineData(11, false, 0, false)]
+    [InlineData(11, true, 30, true)] // held elsewhere: 30 minutes of travel reach the 11:00 start
+    public async Task GetRehearsalConflicts_ListsAssignedChoirMembersOfClashingEvents_Async(
+        int rehearsalStartHour, bool elsewhere, int travelMinutes, bool listed)
+    {
+        _event.Time = new TimeOnly(9, 0);
+        _event.LocationId = Guid.NewGuid();
+        _settings.GetIntAsync(SystemSettingKeys.RosterEventOverlapMinutes, _ct).Returns(120);
+        _settings.GetIntAsync(SystemSettingKeys.RosterDifferentLocationExtraMinutes, _ct).Returns(travelMinutes);
+        var choirId = Guid.NewGuid();
+        _scope.GetChoirMemberIdsAsync(choirId, _ct).Returns([_an]);
+        var roster = new ServiceRoster { Id = Guid.NewGuid(), EventId = _event.Id, LiturgicalEvent = _event };
+        RosterAssignment Line(Guid memberId) => new()
+        {
+            MemberId = memberId, Roster = roster, Member = new MemberProfile { User = new User { FullName = "x" } },
+        };
+        // Chi serves too but is not in the rehearsing choir.
+        _repository.GetActiveLinesBetweenAsync(default, default, default).ReturnsForAnyArgs([Line(_an), Line(_an), Line(_chi)]);
+        var start = VietnamTime.ToUtc(_event.EventDate.ToDateTime(new TimeOnly(rehearsalStartHour, 0)));
+
+        var conflicts = await _sut.GetRehearsalConflictsAsync(
+            choirId, null, elsewhere ? Guid.NewGuid() : _event.LocationId, start, start.AddHours(1), _ct);
+
+        Assert.Equal(listed ? [(_an, _event.Id)] : [], conflicts.Select(x => (x.MemberId, x.EventId)));
+    }
 
     [Fact]
     public async Task AddAssignment_EligibleMember_AddsManualLine_Async()

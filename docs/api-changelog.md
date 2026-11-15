@@ -15,6 +15,19 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
 
 ### Không phá vỡ
 
+- Endpoint mới `POST api/event-participations/reminders?eventId=` · `ParishPriest`, `ChoirDirector` (ca đoàn phụ trách):
+  nhắc ca viên chưa trả lời lời mời, trả `{ remindedCount, pendingCount }`. Mã mới 409 `EVENT_PARTICIPATION_REMINDER_TOO_SOON`.
+  Server còn tự nhắc mỗi ngày một lần, khi có request đầu tiên của người đã đăng nhập từ 07:00, cho lễ trong
+  `Participation.AutoReminderDaysBefore` ngày tới (mặc định 3, 0 = tắt);
+  hai cách nhắc dùng chung khoảng cách `Participation.ReminderCooldownHours` (mặc định 12). Thông báo dùng type
+  `ParticipationRequest`. **Cần migration**: thêm cột `LastReminderAt` (datetime2, null) vào `EventParticipations`.
+- `RehearsalDto` thêm `memberConflicts[]` (chỉ có ở response `POST` / `PUT api/rehearsals`): ca viên của ca đoàn buổi tập
+  đang được phân công ở lễ trùng giờ. Chỉ cảnh báo, không chặn lưu.
+- `RosterAssignmentDto` thêm `hasRehearsalConflict`: ca đoàn của ca viên có buổi tập trùng giờ lễ. Gợi ý phân công bỏ những
+  người này khỏi ứng viên; thêm tay vẫn được.
+- `MemberRegistrationDto` (`GET api/member-registrations`) thêm `possibleDuplicates[]`: đơn khác hoặc tài khoản đã có trùng
+  số điện thoại, hoặc trùng cả họ tên lẫn tên thánh. Chỉ là gợi ý cho Admin.
+
 - Setting mới `Roster.DifferentLocationExtraMinutes` (Int 0–240, mặc định 0, nhóm "Phân công"), tự thêm khi khởi động:
   hai lễ ở hai nơi cử hành khác nhau phải cách nhau `Roster.EventOverlapMinutes` + N phút, áp cho phân công, gợi ý,
   `hasTimeConflict` của lời mời và kiểm trùng khi dời sự kiện.

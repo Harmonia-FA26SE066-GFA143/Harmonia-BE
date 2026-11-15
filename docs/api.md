@@ -288,7 +288,8 @@ hiển thị email thay tên. `phone`, `saintName` (tên thánh), `gender` (`Mal
 `MemberRegistrationDto`:
 
 ```json
-{ "id": "guid", "fullName": "Nguyễn Văn A", "email": "a@b.com", "phone": "0900000000", "saintName": "Giuse", "gender": "Male", "note": "Muốn vào ca đoàn Cecilia", "createdAt": "2026-11-09T08:00:00Z" }
+{ "id": "guid", "fullName": "Nguyễn Văn A", "email": "a@b.com", "phone": "0900000000", "saintName": "Giuse", "gender": "Male", "note": "Muốn vào ca đoàn Cecilia", "createdAt": "2026-11-09T08:00:00Z",
+  "possibleDuplicates": [{ "kind": "User", "id": "guid", "fullName": "Nguyễn Văn A", "email": "old@b.com", "matchedOn": "Phone" }] }
 ```
 
 | Method | Route | Quyền | Body / Query | Thành công | Lỗi |
@@ -303,6 +304,10 @@ hiển thị email thay tên. `phone`, `saintName` (tên thánh), `gender` (`Mal
   đang có đăng ký chờ thì ghi đè đăng ký đó. Đăng ký mới → báo mọi Admin đang hoạt động (`MemberRegistrationSubmitted`).
   Tối đa 5 lần / 10 phút / IP, quá thì 429.
 - `GET`: chỉ có đăng ký đang chờ (xử lý xong là xoá); `keyword` khớp một phần tên hoặc email; mới nhất trước.
+  `possibleDuplicates`: đơn khác đang chờ (`kind = "Registration"`) hoặc tài khoản đã có (`kind = "User"`) có thể là cùng
+  một người dùng email khác. `matchedOn = "Phone"`: trùng số điện thoại (bỏ khoảng trắng, dấu chấm, gạch; `+84` đọc là `0`).
+  `matchedOn = "Name"`: trùng cả họ tên lẫn tên thánh, không phân biệt hoa thường và dấu (chỉ trùng họ tên thì không gắn cờ).
+  Chỉ là gợi ý cho Admin, không chặn `accept`; không có thì `[]`.
 - `accept`: tạo tài khoản role `ChoirMember` giống `POST /api/users` (mật khẩu đầu tiên gửi qua email, hồ sơ ca viên
   tự tạo) rồi xoá đăng ký. Email đã có tài khoản → 409, đăng ký được giữ lại để Admin xoá.
 - Đơn giấy nộp tại giáo xứ không qua đây: Admin tạo tài khoản thẳng bằng `POST /api/users`.
@@ -911,6 +916,8 @@ dữ liệu trong khoảng lọc vẫn hiện với các số bằng 0.
 | `Roster.AiSuggestionEnabled` | Bool | true | không | Tắt thì gợi ý phân công không gọi AI, chỉ xếp theo luật (`isAiGenerated` = `false`) |
 | `Participation.ChangeCutoffHours` | Int 0–168 | 24 | không | Ca viên đổi được câu trả lời lời mời đến trước giờ lễ N giờ (`EVENT_PARTICIPATION_CHANGE_CLOSED`). 0 = đổi được đến giờ lễ |
 | `Roster.EventOverlapMinutes` | Int 0–720 | 120 | không | Không phân công một ca viên vào hai lễ cùng ngày bắt đầu cách nhau ít hơn N phút (`ROSTER_MEMBER_TIME_CONFLICT`; gợi ý bỏ qua người đó). 0 = chỉ chặn hai lễ cùng giờ |
+| `Participation.ReminderCooldownHours` | Int 1–168 | 12 | không | Ca viên chưa trả lời lời mời không bị nhắc lại trong N giờ, dù nhắc tay (`POST /api/event-participations/reminders`) hay nhắc tự động |
+| `Participation.AutoReminderDaysBefore` | Int 0–14 | 3 | không | Mỗi ngày một lần, khi có request đầu tiên của người đã đăng nhập từ 07:00 (giờ Việt Nam), server nhắc ca viên chưa trả lời lời mời của các lễ `Published` trong N ngày tới (mỗi người tối đa một lần mỗi ngày) (thông báo `ParticipationRequest` "Nhắc xác nhận tham gia"). 0 = tắt |
 | `Roster.DifferentLocationExtraMinutes` | Int 0–240 | 0 | không | Cộng thêm N phút vào `Roster.EventOverlapMinutes` khi hai lễ ở hai nơi cử hành khác nhau (thời gian di chuyển). 0 = không cộng |
 | `Practice.AllowLateSubmission` | Bool | false | không | Bật thì nộp bản thu sau hạn không còn bị `PRACTICE_SUBMISSION_PAST_DUE`; bài vẫn tính là quá hạn |
 | `Rehearsal.AttendanceOpensMinutesBefore` | Int 0–120 | 0 | không | Cho điểm danh sớm N phút trước giờ bắt đầu; sớm hơn nữa vẫn `REHEARSAL_NOT_STARTED` |
@@ -1772,6 +1779,10 @@ Ca trưởng vẫn sửa được bằng `PUT /api/song-list-items/{id}/personne
 `ServiceRosterDto` có thêm `wholeServiceFinalizedAt` (null khi chưa chốt sớm vai cả buổi lễ).
 `RosterAssignmentDto` = một phần tử của `assignments` ở trên. `RosterShortageDto` = một phần tử của `shortages`.
 `songListItemId` / `songTitle` là `null` ở dòng phân công và dòng thiếu người **cả buổi lễ** (organ, bắt nhịp...).
+`hasRehearsalConflict = true` khi ca đoàn của ca viên có buổi tập trùng giờ lễ (lễ tính kéo dài `Roster.EventOverlapMinutes`
+phút, buổi tập ở nơi khác thì nới thêm `Roster.DifferentLocationExtraMinutes` mỗi bên). Buổi tập chưa có ca đoàn tính cho
+mọi ca viên; buổi tập gắn với chính sự kiện này (tập ngay trước lễ) không tính. Chỉ là cảnh báo: thêm tay vẫn được, còn
+`suggestions` bỏ người đó khỏi ứng viên.
 `note` là ghi chú vai ("Thuật giả", "câu 2"), tối đa 200 ký tự; `replacement` không gửi `note` thì giữ ghi chú của dòng cũ,
 `PUT .../note` gửi rỗng để xoá. `MyAssignmentDto` của ca viên cũng có `note`.
 
@@ -2174,9 +2185,14 @@ Lên lịch tập và điểm danh chỉ dành cho `ChoirDirector`. Danh sách b
 {
   "id": "guid", "choirId": "guid | null", "eventId": "guid", "locationId": "guid", "locationName": "Nhà thờ chính",
   "startTime": "2026-10-09T12:00:00Z", "endTime": "2026-10-09T13:30:00Z", "note": "tập bè",
-  "songs": [{ "songId": "guid", "songTitle": "Kinh Hòa Bình", "displayOrder": 1, "note": "tập kỹ điệp khúc" }]
+  "songs": [{ "songId": "guid", "songTitle": "Kinh Hòa Bình", "displayOrder": 1, "note": "tập kỹ điệp khúc" }],
+  "memberConflicts": [{ "memberId": "guid", "fullName": "Nguyễn Văn An", "eventId": "guid", "eventDate": "2026-10-09", "time": "19:00:00" }]
 }
 ```
+
+`memberConflicts` chỉ có ở response của `POST` / `PUT` (danh sách và các GET khác luôn `[]`): ca viên của ca đoàn buổi tập
+(buổi tập chưa có ca đoàn: mọi ca viên) đang có dòng phân công ở một lễ khác trùng giờ, cùng luật với `hasRehearsalConflict`
+của `RosterAssignmentDto`. Chỉ là cảnh báo, buổi tập vẫn được lưu.
 
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
@@ -2300,6 +2316,7 @@ kiện bị gỡ, bảng đã chốt mở lại `Draft`, ca trưởng ca đoàn 
 |---|---|---|---|---|
 | POST | `/api/event-participations` · `ParishPriest`, `ChoirDirector` (ca đoàn phụ trách) — cha xứ gọi ngay sau `publish`, bỏ `memberIds` để mời mọi ca viên `Active` của các ca đoàn phục vụ chưa được mời | `{ "eventId", "memberIds?": ["guid"] }` | 200 `EventParticipationDto[]` | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_NOT_PUBLISHED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `MEMBER_NOT_ACTIVE`, `EVENT_PARTICIPATION_ALREADY_REQUESTED` |
 | GET | `/api/event-participations?eventId=` · `ChoirDirector` | — | 200 `EventParticipationSummaryDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
+| POST | `/api/event-participations/reminders?eventId=` · `ParishPriest`, `ChoirDirector` (ca đoàn phụ trách) — nhắc mọi lời mời `Invited` của ca viên `Active`, bỏ qua người vừa được nhắc trong `Participation.ReminderCooldownHours` giờ | — | 200 `{ "remindedCount", "pendingCount" }` | 403 `CHOIR_NOT_LEAD` · 404 `LITURGICAL_EVENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_NOT_PUBLISHED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `EVENT_PARTICIPATION_REMINDER_TOO_SOON` (mọi người chưa trả lời đều vừa được nhắc) |
 | POST | `/api/event-participations/confirm-all?eventId=` · `ChoirDirector` (ca đoàn phụ trách) — xác nhận hộ mọi lời mời `Invited` của ca viên `Active` (giữ `Declined`/`Unsure`), phục vụ demo; không chặn sự kiện đã qua, không gửi thông báo | — | 200 `EventParticipationSummaryDto` | 403 `CHOIR_NOT_LEAD` · 404 `LITURGICAL_EVENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED` |
 | GET | `/api/event-participations/mine` · `ChoirMember` | — | 200 `MyParticipationDto[]` | 404 `MEMBER_NOT_FOUND` |
 | PUT | `/api/event-participations/mine/{eventId}` · `ChoirMember` | `{ "status", "note?" }` | 200 `EventParticipationDto` | 400 `VALIDATION_FAILED` · 404 `MEMBER_NOT_FOUND` · 409 `MEMBER_NOT_ACTIVE`, `EVENT_PARTICIPATION_NOT_INVITED`, `LITURGICAL_EVENT_CANCELLED`, `EVENT_PARTICIPATION_CLOSED`, `EVENT_PARTICIPATION_CHANGE_CLOSED` |

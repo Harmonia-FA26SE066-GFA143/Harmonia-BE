@@ -295,6 +295,9 @@ public static class ErrorCodes
 
     public const string EventParticipationChangeClosed = "EVENT_PARTICIPATION_CHANGE_CLOSED";
 
+    // Every member still to answer was reminded less than Participation.ReminderCooldownHours ago.
+    public const string EventParticipationReminderTooSoon = "EVENT_PARTICIPATION_REMINDER_TOO_SOON";
+
     public const string EventParticipationNotInvited = "EVENT_PARTICIPATION_NOT_INVITED";
 
     // 9. Service roster.

@@ -106,6 +106,9 @@ public static class DependencyInjection
         services.AddSingleton<LyricsExtractionWorker>();
         services.AddSingleton<ILyricsExtractionQueue>(sp => sp.GetRequiredService<LyricsExtractionWorker>());
         services.AddHostedService(sp => sp.GetRequiredService<LyricsExtractionWorker>());
+        services.AddSingleton<ParticipationReminderWorker>();
+        services.AddSingleton<IParticipationReminderTrigger>(sp => sp.GetRequiredService<ParticipationReminderWorker>());
+        services.AddHostedService(sp => sp.GetRequiredService<ParticipationReminderWorker>());
         services.AddScoped<ISongListItemRepository, SongListItemRepository>();
         services.AddScoped<ISongListRepository, SongListRepository>();
         services.AddScoped<IServiceRosterRepository, ServiceRosterRepository>();

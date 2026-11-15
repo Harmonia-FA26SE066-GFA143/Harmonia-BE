@@ -36,6 +36,14 @@ public class EventParticipationsController(IEventParticipationService eventParti
         [FromQuery] Guid eventId, CancellationToken cancellationToken) =>
         ToActionResult(await eventParticipationService.ConfirmAllAsync(eventId, cancellationToken));
 
+    // The daily job reminds on its own; this lets the priest or the lead director nudge sooner.
+    [HttpPost("reminders")]
+    [Authorize(Roles = $"{RoleNames.ParishPriest},{RoleNames.ChoirDirector}")]
+    [ProducesResponseType<ParticipationReminderResponse>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> RemindAsync(
+        [FromQuery] Guid eventId, CancellationToken cancellationToken) =>
+        ToActionResult(await eventParticipationService.RemindAsync(eventId, cancellationToken));
+
     [HttpGet("mine")]
     [Authorize(Roles = RoleNames.ChoirMember)]
     [ProducesResponseType<List<MyParticipationDto>>(StatusCodes.Status200OK)]

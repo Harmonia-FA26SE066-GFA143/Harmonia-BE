@@ -169,6 +169,114 @@ public class EventParticipationService(
         return await GetByEventAsync(eventId, cancellationToken);
     }
 
+    public async Task<Result<ParticipationReminderResponse>> RemindAsync(Guid eventId, CancellationToken cancellationToken)
+    {
+        var liturgicalEvent = await liturgicalEventRepository.GetByIdAsync(eventId, cancellationToken);
+        if (liturgicalEvent is null)
+        {
+            return Result<ParticipationReminderResponse>.Failure(ErrorCodes.LiturgicalEventNotFound);
+        }
+
+        if (await choirScope.CheckCanLeadEventAsync(
+                eventId, ErrorCodes.LiturgicalEventNotFound, cancellationToken) is { } scopeError)
+        {
+            return Result<ParticipationReminderResponse>.Failure(scopeError);
+        }
+
+        var eventError = liturgicalEvent.Status == EventStatus.Cancelled ? ErrorCodes.LiturgicalEventCancelled
+            : liturgicalEvent.Status != EventStatus.Published ? ErrorCodes.LiturgicalEventNotPublished
+            : HasPassed(liturgicalEvent) ? ErrorCodes.LiturgicalEventAlreadyPassed
+            : null;
+        if (eventError is not null)
+        {
+            return Result<ParticipationReminderResponse>.Failure(eventError);
+        }
+
+        var invited = await participationRepository.GetInvitedForUpdateAsync(eventId, cancellationToken);
+        var due = await DueForReminderAsync(invited, cancellationToken);
+        if (invited.Count > 0 && due.Count == 0)
+        {
+            return Result<ParticipationReminderResponse>.Failure(ErrorCodes.EventParticipationReminderTooSoon);
+        }
+
+        await SendRemindersAsync(liturgicalEvent, due, cancellationToken);
+
+        return Result<ParticipationReminderResponse>.Success(
+            new ParticipationReminderResponse { RemindedCount = due.Count, PendingCount = invited.Count });
+    }
+
+    public async Task<int> SendDueRemindersAsync(CancellationToken cancellationToken)
+    {
+        var days = await systemSettingService.GetIntAsync(
+            SystemSettingKeys.ParticipationAutoReminderDaysBefore, cancellationToken);
+        if (days == 0)
+        {
+            return 0;
+        }
+
+        var today = VietnamTime.Today;
+        var lastDay = today.AddDays(days);
+        var events = await liturgicalEventRepository.ListAsync(
+            x => x.Status == EventStatus.Published && x.EventDate >= today && x.EventDate <= lastDay, cancellationToken);
+
+        // A restart can start the day's run again; members already reminded today are not reminded twice.
+        var startOfToday = VietnamTime.StartOfDayUtc(today);
+        var reminded = 0;
+        foreach (var liturgicalEvent in events.Where(x => !HasPassed(x)))
+        {
+            var due = (await DueForReminderAsync(
+                    await participationRepository.GetInvitedForUpdateAsync(liturgicalEvent.Id, cancellationToken),
+                    cancellationToken))
+                .Where(x => x.LastReminderAt is null || x.LastReminderAt < startOfToday)
+                .ToList();
+            await SendRemindersAsync(liturgicalEvent, due, cancellationToken);
+            reminded += due.Count;
+        }
+
+        return reminded;
+    }
+
+    private async Task<List<EventParticipation>> DueForReminderAsync(
+        List<EventParticipation> invited, CancellationToken cancellationToken)
+    {
+        var cooldownHours = await systemSettingService.GetIntAsync(
+            SystemSettingKeys.ParticipationReminderCooldownHours, cancellationToken);
+        var cutoff = DateTime.UtcNow.AddHours(-cooldownHours);
+        return invited.Where(x => x.LastReminderAt is null || x.LastReminderAt <= cutoff).ToList();
+    }
+
+    /// <summary>Stamps the requests and sends one ParticipationRequest notice to their members.</summary>
+    private async Task SendRemindersAsync(
+        LiturgicalEvent liturgicalEvent, List<EventParticipation> due, CancellationToken cancellationToken)
+    {
+        if (due.Count == 0)
+        {
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        foreach (var participation in due)
+        {
+            participation.LastReminderAt = now;
+        }
+
+        await participationRepository.SaveChangesAsync(cancellationToken);
+
+        var memberIds = due.Select(x => x.MemberId).ToList();
+        var userIds = (await memberProfileRepository.ListAsync(x => memberIds.Contains(x.Id), cancellationToken))
+            .Select(x => x.UserId)
+            .ToList();
+        await notificationService.SendAsync(
+            new SendNotificationRequest(
+                Type: NotificationType.ParticipationRequest,
+                Title: "Nhắc xác nhận tham gia",
+                Content: $"Bạn chưa trả lời lời mời tham gia sự kiện ngày {liturgicalEvent.EventDate:dd/MM/yyyy} lúc {liturgicalEvent.Time:HH:mm}. Vui lòng xác nhận tham gia.",
+                RecipientUserIds: userIds,
+                ReferenceType: nameof(LiturgicalEvent),
+                ReferenceId: liturgicalEvent.Id),
+            cancellationToken);
+    }
+
     public async Task<Result<EventParticipationDto>> RespondAsync(
         Guid userId, Guid eventId, RespondParticipationRequest request, CancellationToken cancellationToken)
     {

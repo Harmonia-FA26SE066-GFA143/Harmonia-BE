@@ -27,6 +27,7 @@ public class RehearsalServiceTests
     private readonly IChoirScopeService _scope = ChoirScopeFakes.Unrestricted();
     private readonly IRehearsalRecordingRepository _recordings = Substitute.For<IRehearsalRecordingRepository>();
     private readonly IFileStorageService _files = Substitute.For<IFileStorageService>();
+    private readonly IRosterService _roster = Substitute.For<IRosterService>();
     private readonly RehearsalService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly List<Rehearsal> _added = [];
@@ -46,8 +47,9 @@ public class RehearsalServiceTests
                 },
                 NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new RehearsalService(_rehearsals, _events, _locations, _songs, _users, _members, _scope, _notifications, _recordings, _files, mapper);
+        _sut = new RehearsalService(_rehearsals, _events, _locations, _songs, _users, _members, _scope, _notifications, _recordings, _files, _roster, mapper);
         _recordings.GetByRehearsalAsync(default, default).ReturnsForAnyArgs([]);
+        _roster.GetRehearsalConflictsAsync(default, default, default, default, default, default).ReturnsForAnyArgs([]);
 
         _events.GetByIdAsync(_event.Id, _ct).Returns(_event);
         _locations.GetByIdAsync(_hall.Id, _ct).Returns(_hall);
@@ -87,6 +89,19 @@ public class RehearsalServiceTests
         Assert.Equal(
             [(_gloria.Id, 1, "slower"), (_kyrie.Id, 2, null)],
             dto.Songs.Select(s => (s.SongId, s.DisplayOrder, s.Note)));
+    }
+
+    [Fact]
+    public async Task Create_MembersServingAClashingEvent_AreListed_ButTheRehearsalIsSaved_Async()
+    {
+        var clash = new RehearsalMemberConflictDto { MemberId = Guid.NewGuid(), FullName = "An", EventId = Guid.NewGuid() };
+        _roster.GetRehearsalConflictsAsync(Arg.Any<Guid?>(), _event.Id, _hall.Id, Start, Start.AddHours(2), _ct).Returns([clash]);
+
+        var result = await _sut.CreateAsync(NewRequest(), _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(_added);
+        Assert.Same(clash, Assert.Single(result.Value!.MemberConflicts));
     }
 
     [Fact]
