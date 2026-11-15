@@ -103,15 +103,28 @@ public class LiturgicalEventService(
             LocationId = request.LocationId,
             Title = request.Title,
             SpecialRequirements = request.SpecialRequirements,
-            Status = EventStatus.Draft,
+            Status = request.IsPublished ? EventStatus.Published : EventStatus.Draft,
+            PublishedAt = request.IsPublished ? DateTime.UtcNow : null,
             EventChoirs = choirIds.Select(choirId => new LiturgicalEventChoir
             {
                 Id = Guid.NewGuid(), EventId = eventId, ChoirId = choirId, IsLead = choirId == request.LeadChoirId,
             }).ToList(),
         };
 
+        // Checked before saving so a refused publish leaves no stray Draft behind.
+        var unpublishable = request.IsPublished ? CheckPublishFields(liturgicalEvent) : null;
+        if (unpublishable is not null)
+        {
+            return Result<LiturgicalEventDto>.Failure(unpublishable);
+        }
+
         await liturgicalEventRepository.AddAsync(liturgicalEvent, cancellationToken);
         await liturgicalEventRepository.SaveChangesAsync(cancellationToken);
+
+        if (request.IsPublished)
+        {
+            await NotifyPublishedAsync(liturgicalEvent, cancellationToken);
+        }
 
         return Result<LiturgicalEventDto>.Success(mapper.Map<LiturgicalEventDto>(liturgicalEvent));
     }
@@ -240,7 +253,13 @@ public class LiturgicalEventService(
         liturgicalEvent.Status = EventStatus.Published;
         liturgicalEvent.PublishedAt = DateTime.UtcNow;
         await liturgicalEventRepository.SaveChangesAsync(cancellationToken);
+        await NotifyPublishedAsync(liturgicalEvent, cancellationToken);
 
+        return Result<LiturgicalEventDto>.Success(mapper.Map<LiturgicalEventDto>(liturgicalEvent));
+    }
+
+    private async Task NotifyPublishedAsync(LiturgicalEvent liturgicalEvent, CancellationToken cancellationToken)
+    {
         await NotifyDirectorsAndMembersAsync(
             liturgicalEvent,
             NotificationType.EventPublished,
@@ -248,8 +267,6 @@ public class LiturgicalEventService(
             $"Sự kiện ngày {liturgicalEvent.EventDate:dd/MM/yyyy} lúc {liturgicalEvent.Time:HH:mm} đã được công bố.",
             cancellationToken);
         await NotifyAssignedDirectorsAsync(liturgicalEvent, cancellationToken);
-
-        return Result<LiturgicalEventDto>.Success(mapper.Map<LiturgicalEventDto>(liturgicalEvent));
     }
 
     public async Task<Result<LiturgicalEventDto>> CancelAsync(Guid id, CancellationToken cancellationToken)
@@ -292,7 +309,8 @@ public class LiturgicalEventService(
     /// A published event must be complete and still valid: not past, with a type, a season and a lead choir, every
     /// catalog active (a row switched off since the last save no longer passes) and the date + time + location still free.
     /// </summary>
-    private async Task<string?> CheckPublishableAsync(LiturgicalEvent liturgicalEvent, CancellationToken cancellationToken)
+    /// <summary>Publish rules a Draft may break but a published event may not; shared with create-and-publish.</summary>
+    private static string? CheckPublishFields(LiturgicalEvent liturgicalEvent)
     {
         if (liturgicalEvent.EventDate < VietnamTime.Today) return ErrorCodes.LiturgicalEventAlreadyPassed;
         if (liturgicalEvent.MassTypeId is null && liturgicalEvent.CeremonyTypeId is null)
@@ -300,7 +318,13 @@ public class LiturgicalEventService(
             return ErrorCodes.LiturgicalEventTypeRequired;
         }
 
-        if (liturgicalEvent.LiturgicalSeasonId is null) return ErrorCodes.LiturgicalEventSeasonRequired;
+        return liturgicalEvent.LiturgicalSeasonId is null ? ErrorCodes.LiturgicalEventSeasonRequired : null;
+    }
+
+    private async Task<string?> CheckPublishableAsync(LiturgicalEvent liturgicalEvent, CancellationToken cancellationToken)
+    {
+        var fields = CheckPublishFields(liturgicalEvent);
+        if (fields is not null) return fields;
 
         // Generated drafts have no choir yet, and only a lead choir may plan a published event.
         if (await choirScope.GetLeadChoirIdAsync(liturgicalEvent.Id, cancellationToken) is null)

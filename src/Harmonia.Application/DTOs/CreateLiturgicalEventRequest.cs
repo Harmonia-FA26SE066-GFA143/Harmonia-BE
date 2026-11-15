@@ -28,4 +28,7 @@ public class CreateLiturgicalEventRequest
 
     /// <summary>The lead choir (D8): required, and must be one of <see cref="ChoirIds"/>.</summary>
     public Guid? LeadChoirId { get; set; }
+
+    /// <summary>True publishes the event on creation instead of saving a Draft.</summary>
+    public bool IsPublished { get; set; }
 }

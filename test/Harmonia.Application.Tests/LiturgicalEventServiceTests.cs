@@ -227,6 +227,35 @@ public class LiturgicalEventServiceTests
     }
 
     [Fact]
+    public async Task Create_IsPublished_SavesPublished_AndNotifies_Async()
+    {
+        var request = CreateRequestWithChoirs(_choir.Id);
+        request.IsPublished = true;
+        request.LiturgicalSeasonId = Guid.NewGuid();
+
+        var result = await _sut.CreateAsync(request, _ct);
+
+        Assert.Equal(EventStatus.Published, result.Value!.Status);
+        await _repository.Received(1).AddAsync(
+            Arg.Is<LiturgicalEvent>(x => x.Status == EventStatus.Published && x.PublishedAt != null), _ct);
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(x => x.Type == NotificationType.EventPublished), _ct);
+    }
+
+    [Fact]
+    public async Task Create_IsPublishedWithoutMassOrCeremonyType_ReturnsTypeRequired_AndAddsNothing_Async()
+    {
+        var request = CreateRequestWithChoirs(_choir.Id);
+        request.IsPublished = true;
+        request.LiturgicalSeasonId = Guid.NewGuid();
+        request.MassTypeId = null;
+
+        Assert.Equal(ErrorCodes.LiturgicalEventTypeRequired, (await _sut.CreateAsync(request, _ct)).Code);
+        await _repository.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+        await _notifications.DidNotReceiveWithAnyArgs().SendAsync(default!, default);
+    }
+
+    [Fact]
     public async Task Create_UnknownChoir_ReturnsChoirNotFound_AndAddsNothing_Async()
     {
         var result = await _sut.CreateAsync(CreateRequestWithChoirs(_choir.Id, Guid.NewGuid()), _ct);
