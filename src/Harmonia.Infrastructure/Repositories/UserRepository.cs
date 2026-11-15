@@ -35,6 +35,25 @@ public class UserRepository(HarmoniaDbContext dbContext)
             logs = logs.Where(l => l.CreatedAt < toUtc);
         }
 
+        // Audit logs have no season, so a season narrows them to its dates (ANDed with the date range above).
+        if (filter.LiturgicalSeasonId is { } seasonId)
+        {
+            var season = await DbContext.LiturgicalSeasons.AsNoTracking()
+                .Where(s => s.Id == seasonId)
+                .Select(s => new { s.StartDate, s.EndDate })
+                .FirstOrDefaultAsync(cancellationToken);
+            if (season is null)
+            {
+                logs = logs.Where(_ => false);
+            }
+            else
+            {
+                var seasonFromUtc = VietnamTime.StartOfDayUtc(season.StartDate);
+                var seasonToUtc = VietnamTime.StartOfDayUtc(season.EndDate.AddDays(1));
+                logs = logs.Where(l => l.CreatedAt >= seasonFromUtc && l.CreatedAt < seasonToUtc);
+            }
+        }
+
         var aboutUsers = logs.Where(l => l.EntityType == nameof(User));
 
         var rows = await DbContext.Users

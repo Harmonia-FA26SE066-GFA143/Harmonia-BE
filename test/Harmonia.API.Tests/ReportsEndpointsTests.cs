@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Harmonia.Domain.Common;
+using Harmonia.Domain.Entities;
 
 namespace Harmonia.API.Tests;
 
@@ -92,6 +93,42 @@ public class ReportsEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<H
         Assert.Equal(1, row.GetProperty("passwordChangeCount").GetInt32());
         Assert.Equal(0, row.GetProperty("passwordResetCount").GetInt32());
         Assert.Equal(RoleNames.ChoirMember, row.GetProperty("roleName").GetString());
+    }
+
+    [Fact]
+    public async Task UserActivity_BySeason_CountsOnlyTheSeasonDates_Async()
+    {
+        var today = VietnamTime.Today;
+        var current = new LiturgicalSeason
+        {
+            Id = Guid.NewGuid(), Name = "Report-test current season", StartDate = today.AddDays(-1), EndDate = today.AddDays(1),
+        };
+        var past = new LiturgicalSeason
+        {
+            Id = Guid.NewGuid(), Name = "Report-test past season", StartDate = new DateOnly(2000, 1, 1), EndDate = new DateOnly(2000, 1, 31),
+        };
+        await factory.WithDbAsync((db, ct) => { db.AddRange(current, past); return db.SaveChangesAsync(ct); }, _ct);
+        var admin = await factory.AddUserAsync("reports-season-admin@test.com", RoleNames.Admin, cancellationToken: _ct);
+        var member = await factory.AddUserAsync("reports-season-member@test.com", cancellationToken: _ct);
+        var memberClient = await factory.CreateClientAsAsync(member.Email, _ct);
+        var change = await memberClient.PostAsJsonAsync(
+            "api/auth/change-password",
+            new { currentPassword = HarmoniaApiFactory.Password, newPassword = "BrandNew123" }, _ct);
+        Assert.Equal(HttpStatusCode.NoContent, change.StatusCode);
+        var adminClient = await factory.CreateClientAsAsync(admin.Email, _ct);
+
+        async Task<int> ChangesInAsync(Guid seasonId)
+        {
+            var page = await adminClient.GetFromJsonAsync<JsonElement>(
+                $"api/reports/user-activity?pageSize=100&liturgicalSeasonId={seasonId}", _ct);
+            return page.GetProperty("items").EnumerateArray()
+                .Single(x => x.GetProperty("email").GetString() == member.Email)
+                .GetProperty("passwordChangeCount").GetInt32();
+        }
+
+        Assert.Equal(1, await ChangesInAsync(current.Id));
+        Assert.Equal(0, await ChangesInAsync(past.Id));
+        Assert.Equal(0, await ChangesInAsync(Guid.NewGuid()));
     }
 
     [Fact]
