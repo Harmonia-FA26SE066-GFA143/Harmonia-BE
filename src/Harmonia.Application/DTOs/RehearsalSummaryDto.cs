@@ -14,5 +14,8 @@ public class RehearsalSummaryDto
 
     public string? Note { get; set; }
 
+    /// <summary>A rehearsal of every choir serving the event.</summary>
+    public bool IsJoint { get; set; }
+
     public List<RehearsalSongDto> Songs { get; set; } = [];
 }

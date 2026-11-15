@@ -5,8 +5,14 @@ namespace Harmonia.Application.DTOs;
 
 public class CreateRehearsalRequest
 {
-    /// <summary>A choir the calling director leads (D8); when <see cref="EventId"/> is set it must serve that event.</summary>
-    public Guid ChoirId { get; set; }
+    /// <summary>
+    /// A choir the calling director leads (D8); when <see cref="EventId"/> is set it must serve that event. Required
+    /// unless <see cref="IsJoint"/>, and must be empty when it is.
+    /// </summary>
+    public Guid? ChoirId { get; set; }
+
+    /// <summary>A rehearsal of every choir serving <see cref="EventId"/>; only the event's lead director may create it.</summary>
+    public bool IsJoint { get; set; }
 
     public Guid? EventId { get; set; }
 

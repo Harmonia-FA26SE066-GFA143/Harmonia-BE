@@ -36,9 +36,14 @@ public class RehearsalSongService(
         Guid rehearsalId, UpdateRehearsalSongsRequest request, CancellationToken cancellationToken)
     {
         var rehearsal = await rehearsalRepository.GetWithSongsForUpdateAsync(rehearsalId, cancellationToken);
-        if (rehearsal is null || !await choirScope.CanManageChoirAsync(rehearsal.ChoirId, cancellationToken))
+        if (rehearsal is null)
         {
             return Result<List<RehearsalSongDto>>.Failure(ErrorCodes.RehearsalNotFound);
+        }
+
+        if (await choirScope.CheckCanManageRehearsalAsync(rehearsal, cancellationToken) is { } scopeError)
+        {
+            return Result<List<RehearsalSongDto>>.Failure(scopeError);
         }
 
         var songIds = request.Items.Select(i => i.SongId).ToList();

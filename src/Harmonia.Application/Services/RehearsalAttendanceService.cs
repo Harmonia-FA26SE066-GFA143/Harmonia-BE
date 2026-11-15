@@ -20,13 +20,18 @@ public class RehearsalAttendanceService(
         Guid rehearsalId, CancellationToken cancellationToken)
     {
         var rehearsal = await rehearsalRepository.GetByIdAsync(rehearsalId, cancellationToken);
-        if (rehearsal is null || !await choirScope.CanManageChoirAsync(rehearsal.ChoirId, cancellationToken))
+        if (rehearsal is null)
         {
             return Result<List<RehearsalAttendanceDto>>.Failure(ErrorCodes.RehearsalNotFound);
         }
 
+        if (await choirScope.CheckCanManageRehearsalAsync(rehearsal, cancellationToken) is { } scopeError)
+        {
+            return Result<List<RehearsalAttendanceDto>>.Failure(scopeError);
+        }
+
         var members = await memberProfileRepository.GetAttendanceRosterAsync(
-            rehearsalId, rehearsal.ChoirId, cancellationToken);
+            rehearsalId, await choirScope.GetRehearsalMemberIdsAsync(rehearsal, cancellationToken), cancellationToken);
 
         return Result<List<RehearsalAttendanceDto>>.Success(mapper.Map<List<RehearsalAttendanceDto>>(members));
     }
@@ -35,9 +40,14 @@ public class RehearsalAttendanceService(
         Guid directorUserId, Guid rehearsalId, RecordRehearsalAttendancesRequest request, CancellationToken cancellationToken)
     {
         var rehearsal = await rehearsalRepository.GetWithAttendancesForUpdateAsync(rehearsalId, cancellationToken);
-        if (rehearsal is null || !await choirScope.CanManageChoirAsync(rehearsal.ChoirId, cancellationToken))
+        if (rehearsal is null)
         {
             return Result.Failure(ErrorCodes.RehearsalNotFound);
+        }
+
+        if (await choirScope.CheckCanManageRehearsalAsync(rehearsal, cancellationToken) is { } scopeError)
+        {
+            return Result.Failure(scopeError);
         }
 
         var now = DateTime.UtcNow;
@@ -52,8 +62,8 @@ public class RehearsalAttendanceService(
         var members = await memberProfileRepository.ListAsync(x => memberIds.Contains(x.Id), cancellationToken);
         if (members.Count != memberIds.Count) return Result.Failure(ErrorCodes.MemberNotFound);
 
-        // Outside the rehearsal's choir reads as not found, unless already recorded here (they left the choir since).
-        if (await choirScope.GetChoirMemberIdsAsync(rehearsal.ChoirId, cancellationToken) is { } choirMemberIds
+        // Outside the rehearsal's choirs reads as not found, unless already recorded here (they left the choir since).
+        if (await choirScope.GetRehearsalMemberIdsAsync(rehearsal, cancellationToken) is { } choirMemberIds
             && memberIds.Any(id => !choirMemberIds.Contains(id) && rehearsal.Attendances.All(a => a.MemberId != id)))
         {
             return Result.Failure(ErrorCodes.MemberNotFound);

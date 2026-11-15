@@ -178,6 +178,7 @@ public static class ErrorStatusMap
         [ErrorCodes.RehearsalTimeConflict] = StatusCodes.Status409Conflict,
         [ErrorCodes.RehearsalAlreadyPassed] = StatusCodes.Status409Conflict,
         [ErrorCodes.RehearsalHasAttendance] = StatusCodes.Status409Conflict,
+        [ErrorCodes.RehearsalJointEventLocked] = StatusCodes.Status409Conflict,
         [ErrorCodes.RehearsalRecordingNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.RehearsalRecordingRequired] = StatusCodes.Status400BadRequest,
         [ErrorCodes.RehearsalRecordingTypeNotAllowed] = StatusCodes.Status400BadRequest,

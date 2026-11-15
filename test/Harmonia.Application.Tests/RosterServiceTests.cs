@@ -513,8 +513,6 @@ public class RosterServiceTests
         _event.LocationId = Guid.NewGuid();
         _settings.GetIntAsync(SystemSettingKeys.RosterEventOverlapMinutes, _ct).Returns(120);
         _settings.GetIntAsync(SystemSettingKeys.RosterDifferentLocationExtraMinutes, _ct).Returns(travelMinutes);
-        var choirId = Guid.NewGuid();
-        _scope.GetChoirMemberIdsAsync(choirId, _ct).Returns([_an]);
         var roster = new ServiceRoster { Id = Guid.NewGuid(), EventId = _event.Id, LiturgicalEvent = _event };
         RosterAssignment Line(Guid memberId) => new()
         {
@@ -525,7 +523,7 @@ public class RosterServiceTests
         var start = VietnamTime.ToUtc(_event.EventDate.ToDateTime(new TimeOnly(rehearsalStartHour, 0)));
 
         var conflicts = await _sut.GetRehearsalConflictsAsync(
-            choirId, null, elsewhere ? Guid.NewGuid() : _event.LocationId, start, start.AddHours(1), _ct);
+            [_an], null, elsewhere ? Guid.NewGuid() : _event.LocationId, start, start.AddHours(1), _ct);
 
         Assert.Equal(listed ? [(_an, _event.Id)] : [], conflicts.Select(x => (x.MemberId, x.EventId)));
     }

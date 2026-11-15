@@ -73,6 +73,36 @@ public class RehearsalAttendanceServiceTests
         await _rehearsals.Received(1).TrySaveAttendancesAsync(_rehearsal, _ct);
     }
 
+    [Theory]
+    [InlineData(true, true)] // Bob sings in another choir serving the event
+    [InlineData(false, false)] // Bob is in no choir serving the event
+    public async Task Record_Joint_AcceptsMembersOfEveryChoirServingTheEvent_Async(bool bobServes, bool isRecorded)
+    {
+        _rehearsal.IsJoint = true;
+        _rehearsal.EventId = Guid.NewGuid();
+        _scope.GetEventMemberIdsAsync(_rehearsal.EventId.Value, _ct)
+            .Returns(bobServes ? [_alice.Id, _bob.Id] : [_alice.Id]);
+
+        var result = await _sut.RecordAsync(_directorUserId, _rehearsal.Id, Request((_bob.Id, AttendanceStatus.Present)), _ct);
+
+        Assert.Equal(isRecorded, result.IsSuccess);
+        if (!isRecorded) Assert.Equal(ErrorCodes.MemberNotFound, result.Code);
+    }
+
+    [Fact]
+    public async Task Record_Joint_ByDirectorWhoDoesNotLead_ReturnsChoirNotLead_Async()
+    {
+        _rehearsal.IsJoint = true;
+        _rehearsal.EventId = Guid.NewGuid();
+        _scope.CheckCanLeadEventAsync(_rehearsal.EventId.Value, ErrorCodes.RehearsalNotFound, _ct)
+            .Returns(ErrorCodes.ChoirNotLead);
+
+        var result = await _sut.RecordAsync(_directorUserId, _rehearsal.Id, Request((_alice.Id, AttendanceStatus.Present)), _ct);
+
+        Assert.Equal(ErrorCodes.ChoirNotLead, result.Code);
+        await _rehearsals.DidNotReceiveWithAnyArgs().TrySaveAttendancesAsync(default!, default);
+    }
+
     [Fact]
     public async Task Record_RehearsalMissing_ReturnsNotFound_Async()
     {

@@ -50,12 +50,12 @@ public interface IMemberProfileRepository : IGenericRepository<MemberProfile>
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// Read-only, ordered by name: active members (of <paramref name="choirId"/> when set) plus anyone already recorded
+    /// Read-only, ordered by name: active members (among <paramref name="memberIds"/> when set) plus anyone already recorded
     /// at the rehearsal, so history survives a member leaving. <see cref="MemberProfile.User"/> is loaded and
     /// <see cref="MemberProfile.RehearsalAttendances"/> holds only the row for this rehearsal, if any.
     /// </summary>
     Task<List<MemberProfile>> GetAttendanceRosterAsync(
-        Guid rehearsalId, Guid? choirId, CancellationToken cancellationToken);
+        Guid rehearsalId, IReadOnlyCollection<Guid>? memberIds, CancellationToken cancellationToken);
 
     /// <summary>
     /// Read-only active members, ordered by name, with <see cref="MemberProfile.User"/> loaded; when choirs serve the

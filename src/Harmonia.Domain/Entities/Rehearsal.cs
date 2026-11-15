@@ -16,6 +16,12 @@ public class Rehearsal : BaseAuditableEntity
 
     public Guid? ChoirId { get; set; }
 
+    /// <summary>
+    /// A rehearsal of every choir serving the event, planned by its lead choir. It has an event and no ChoirId: who
+    /// manages, attends and sees it follows the event's choirs, so a change of lead or of serving choirs applies at once.
+    /// </summary>
+    public bool IsJoint { get; set; }
+
     public LiturgicalEvent? LiturgicalEvent { get; set; }
 
     public WorshipLocation? Location { get; set; }

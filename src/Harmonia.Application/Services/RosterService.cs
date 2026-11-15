@@ -517,7 +517,7 @@ public class RosterService(
     }
 
     public async Task<List<RehearsalMemberConflictDto>> GetRehearsalConflictsAsync(
-        Guid? choirId, Guid? eventId, Guid? locationId, DateTime startUtc, DateTime endUtc,
+        IReadOnlyCollection<Guid>? memberIds, Guid? eventId, Guid? locationId, DateTime startUtc, DateTime endUtc,
         CancellationToken cancellationToken)
     {
         var (minutes, extra) = await GetEventSpanSettingsAsync(cancellationToken);
@@ -526,11 +526,10 @@ public class RosterService(
         var reach = TimeSpan.FromMinutes(EventLengthMinutes(minutes) + extra);
         var lines = await rosterRepository.GetActiveLinesBetweenAsync(
             DateOnly.FromDateTime(start - reach), DateOnly.FromDateTime(end + reach), cancellationToken);
-        var choirMemberIds = await choirScope.GetChoirMemberIdsAsync(choirId, cancellationToken);
 
         return lines
             .Where(x => x.Roster.EventId != eventId
-                && (choirMemberIds is null || choirMemberIds.Contains(x.MemberId))
+                && (memberIds is null || memberIds.Contains(x.MemberId))
                 && Clashes(x.Roster.LiturgicalEvent, start, end, locationId, minutes, extra))
             .DistinctBy(x => (x.MemberId, x.Roster.EventId))
             .OrderBy(x => x.Roster.LiturgicalEvent.EventDate).ThenBy(x => x.Roster.LiturgicalEvent.Time)
@@ -559,8 +558,9 @@ public class RosterService(
     }
 
     /// <summary>
-    /// The given members whose choir has a rehearsal clashing with the event; a rehearsal with no choir counts for
-    /// everyone, and one held for this event (a warm-up before the Mass) is not a clash.
+    /// The given members whose choir has a rehearsal clashing with the event; a joint rehearsal counts for the members of
+    /// its event's choirs, one with no choir for everyone, and one held for this event (a warm-up before the Mass) is
+    /// not a clash.
     /// </summary>
     private async Task<HashSet<Guid>> GetMembersInRehearsalAsync(
         IReadOnlyCollection<Guid> memberIds, LiturgicalEvent liturgicalEvent, CancellationToken cancellationToken)
@@ -580,8 +580,8 @@ public class RosterService(
                      liturgicalEvent, VietnamTime.FromUtc(x.StartTime), VietnamTime.FromUtc(x.EndTime), x.LocationId,
                      minutes, extra)))
         {
-            var choirMemberIds = await choirScope.GetChoirMemberIdsAsync(rehearsal.ChoirId, cancellationToken);
-            busy.UnionWith(choirMemberIds is null ? memberIds : memberIds.Where(choirMemberIds.Contains));
+            var rehearsalMemberIds = await choirScope.GetRehearsalMemberIdsAsync(rehearsal, cancellationToken);
+            busy.UnionWith(rehearsalMemberIds is null ? memberIds : memberIds.Where(rehearsalMemberIds.Contains));
         }
 
         return busy;

@@ -8,6 +8,7 @@ using Harmonia.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
+using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -16,13 +17,24 @@ namespace Harmonia.Infrastructure.Repositories;
 public class RehearsalRepository(HarmoniaDbContext dbContext)
     : GenericRepository<Rehearsal>(dbContext), IRehearsalRepository
 {
+    /// <summary>
+    /// Rehearsals of the given choirs (no filter when null): a joint rehearsal through its event's choirs, any other
+    /// through its ChoirId, plus those with no choir at all.
+    /// </summary>
+    private static Expression<Func<Rehearsal, bool>> InChoirs(IReadOnlyCollection<Guid>? choirIds) =>
+        choirIds is null
+            ? x => true
+            : x => x.IsJoint
+                ? x.LiturgicalEvent != null && x.LiturgicalEvent.EventChoirs.Any(c => choirIds.Contains(c.ChoirId))
+                : x.ChoirId == null || choirIds.Contains(x.ChoirId.Value);
+
     public Task<List<Rehearsal>> GetUpcomingAsync(
         DateTime fromTime, IReadOnlyCollection<Guid>? choirIds, CancellationToken cancellationToken) =>
         DbContext.Rehearsals
             .Include(x => x.Location)
             .Include(x => x.Songs).ThenInclude(s => s.Song)
             .Where(x => x.EndTime >= fromTime)
-            .Where(x => choirIds == null || x.ChoirId == null || choirIds.Contains(x.ChoirId.Value))
+            .Where(InChoirs(choirIds))
             .Where(x => x.LiturgicalEvent == null || x.LiturgicalEvent.Status == EventStatus.Published)
             .OrderBy(x => x.StartTime)
             .AsSplitQuery()
@@ -40,7 +52,7 @@ public class RehearsalRepository(HarmoniaDbContext dbContext)
             .Include(x => x.Location)
             .Include(x => x.Songs).ThenInclude(s => s.Song)
             .Where(x => x.StartTime >= from && x.StartTime < before)
-            .Where(x => choirIds == null || x.ChoirId == null || choirIds.Contains(x.ChoirId.Value))
+            .Where(InChoirs(choirIds))
             .Where(x => x.LiturgicalEvent == null || x.LiturgicalEvent.Status == EventStatus.Published)
             .OrderBy(x => x.StartTime)
             .AsSplitQuery()
@@ -54,11 +66,11 @@ public class RehearsalRepository(HarmoniaDbContext dbContext)
             .Include(x => x.Location)
             .Include(x => x.Songs).ThenInclude(s => s.Song)
             .Include(x => x.Attendances.Where(a => a.MemberId == memberId))
+            .Where(InChoirs(choirIds))
             .AsSplitQuery()
             .FirstOrDefaultAsync(
                 x => x.Id == id
-                    && (x.LiturgicalEvent == null || x.LiturgicalEvent.Status == EventStatus.Published)
-                    && (choirIds == null || x.ChoirId == null || choirIds.Contains(x.ChoirId.Value)),
+                    && (x.LiturgicalEvent == null || x.LiturgicalEvent.Status == EventStatus.Published),
                 cancellationToken);
 
     public async Task<PagedList<Rehearsal>> SearchAsync(
@@ -66,10 +78,7 @@ public class RehearsalRepository(HarmoniaDbContext dbContext)
     {
         var query = DbContext.Rehearsals.AsNoTracking();
 
-        if (choirIds is not null)
-        {
-            query = query.Where(x => x.ChoirId == null || choirIds.Contains(x.ChoirId.Value));
-        }
+        query = query.Where(InChoirs(choirIds));
 
         if (filter.EventId is { } eventId)
         {

@@ -46,8 +46,13 @@ public class RehearsalService(
             return Result<RehearsalDto>.Failure(eventError);
         }
 
-        if (await choirScope.CheckChoirForNewRecordAsync(request.ChoirId, request.EventId, cancellationToken)
-            is { } choirError)
+        // A joint rehearsal belongs to the event's choirs, so only the lead director plans it; the validator makes
+        // EventId set for it and ChoirId set otherwise.
+        var choirError = request.IsJoint
+            ? await choirScope.CheckCanLeadEventAsync(
+                request.EventId!.Value, ErrorCodes.LiturgicalEventNotFound, cancellationToken)
+            : await choirScope.CheckChoirForNewRecordAsync(request.ChoirId!.Value, request.EventId, cancellationToken);
+        if (choirError is not null)
         {
             return Result<RehearsalDto>.Failure(choirError);
         }
@@ -84,7 +89,8 @@ public class RehearsalService(
         var rehearsal = new Rehearsal
         {
             Id = Guid.NewGuid(),
-            ChoirId = request.ChoirId,
+            ChoirId = request.IsJoint ? null : request.ChoirId,
+            IsJoint = request.IsJoint,
             EventId = request.EventId,
             LocationId = request.LocationId,
             Location = location,
@@ -111,14 +117,25 @@ public class RehearsalService(
         Guid id, UpdateRehearsalRequest request, CancellationToken cancellationToken)
     {
         var rehearsal = await rehearsalRepository.GetWithDetailsForUpdateAsync(id, cancellationToken);
-        if (rehearsal is null || !await choirScope.CanManageChoirAsync(rehearsal.ChoirId, cancellationToken))
+        if (rehearsal is null)
         {
             return Result<RehearsalDto>.Failure(ErrorCodes.RehearsalNotFound);
+        }
+
+        if (await choirScope.CheckCanManageRehearsalAsync(rehearsal, cancellationToken) is { } scopeError)
+        {
+            return Result<RehearsalDto>.Failure(scopeError);
         }
 
         if (rehearsal.EndTime < DateTime.UtcNow)
         {
             return Result<RehearsalDto>.Failure(ErrorCodes.RehearsalAlreadyPassed);
+        }
+
+        // Its members and managers come from the event, so moving it would hand it to other choirs.
+        if (rehearsal.IsJoint && request.EventId != rehearsal.EventId)
+        {
+            return Result<RehearsalDto>.Failure(ErrorCodes.RehearsalJointEventLocked);
         }
 
         if (await CheckEventAsync(request.EventId, cancellationToken) is { } eventError)
@@ -154,28 +171,33 @@ public class RehearsalService(
                 + (location is null ? "." : $" tại {location.Name}."),
             nameof(Rehearsal),
             rehearsal.Id,
-            rehearsal.ChoirId,
+            await choirScope.GetRehearsalMemberIdsAsync(rehearsal, cancellationToken),
             cancellationToken);
 
         return Result<RehearsalDto>.Success(await ToDtoWithConflictsAsync(rehearsal, cancellationToken));
     }
 
-    /// <summary>Maps the rehearsal and lists choir members serving a clashing event, so the director can adjust.</summary>
+    /// <summary>Maps the rehearsal and lists its members serving a clashing event, so the director can adjust.</summary>
     private async Task<RehearsalDto> ToDtoWithConflictsAsync(Rehearsal rehearsal, CancellationToken cancellationToken)
     {
         var dto = mapper.Map<RehearsalDto>(rehearsal);
         dto.MemberConflicts = await rosterService.GetRehearsalConflictsAsync(
-            rehearsal.ChoirId, rehearsal.EventId, rehearsal.LocationId, rehearsal.StartTime, rehearsal.EndTime,
-            cancellationToken);
+            await choirScope.GetRehearsalMemberIdsAsync(rehearsal, cancellationToken),
+            rehearsal.EventId, rehearsal.LocationId, rehearsal.StartTime, rehearsal.EndTime, cancellationToken);
         return dto;
     }
 
     public async Task<Result> DeleteAsync(Guid id, CancellationToken cancellationToken)
     {
         var rehearsal = await rehearsalRepository.GetWithAttendancesForUpdateAsync(id, cancellationToken);
-        if (rehearsal is null || !await choirScope.CanManageChoirAsync(rehearsal.ChoirId, cancellationToken))
+        if (rehearsal is null)
         {
             return Result.Failure(ErrorCodes.RehearsalNotFound);
+        }
+
+        if (await choirScope.CheckCanManageRehearsalAsync(rehearsal, cancellationToken) is { } scopeError)
+        {
+            return Result.Failure(scopeError);
         }
 
         // Rows cascade with the rehearsal, so a recorded attendance would be lost silently.
@@ -201,7 +223,7 @@ public class RehearsalService(
                 $"Buổi tập lúc {FormatTime(rehearsal.StartTime)} đã bị huỷ.",
                 rehearsal.EventId is null ? null : nameof(LiturgicalEvent),
                 rehearsal.EventId,
-                rehearsal.ChoirId,
+                await choirScope.GetRehearsalMemberIdsAsync(rehearsal, cancellationToken),
                 cancellationToken);
         }
 
@@ -237,13 +259,16 @@ public class RehearsalService(
             : (location, null);
     }
 
-    /// <summary>Tells the choir's members, or every member for a rehearsal with no choir.</summary>
+    /// <summary>
+    /// Tells the rehearsal's members (<see cref="ChoirScopeServiceExtensions.GetRehearsalMemberIdsAsync"/>), or every
+    /// member when <paramref name="memberIds"/> is null.
+    /// </summary>
     private async Task NotifyMembersAsync(
-        string title, string content, string? referenceType, Guid? referenceId, Guid? choirId,
+        string title, string content, string? referenceType, Guid? referenceId, IReadOnlyCollection<Guid>? memberIds,
         CancellationToken cancellationToken)
     {
         List<Guid> recipientUserIds;
-        if (await choirScope.GetChoirMemberIdsAsync(choirId, cancellationToken) is { } memberIds)
+        if (memberIds is not null)
         {
             recipientUserIds = (await memberProfileRepository.ListAsync(
                     x => memberIds.Contains(x.Id) && x.Status == MemberStatus.Active, cancellationToken))

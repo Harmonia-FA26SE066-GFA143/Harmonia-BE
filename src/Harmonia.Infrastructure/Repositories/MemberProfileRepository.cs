@@ -125,11 +125,10 @@ public class MemberProfileRepository(HarmoniaDbContext dbContext)
     }
 
     public Task<List<MemberProfile>> GetAttendanceRosterAsync(
-        Guid rehearsalId, Guid? choirId, CancellationToken cancellationToken) =>
+        Guid rehearsalId, IReadOnlyCollection<Guid>? memberIds, CancellationToken cancellationToken) =>
         DbContext.MemberProfiles
             .AsNoTracking()
-            .Where(x => (x.Status == MemberStatus.Active
-                    && (choirId == null || x.ChoirMemberships.Any(m => m.ChoirId == choirId && m.IsActive)))
+            .Where(x => (x.Status == MemberStatus.Active && (memberIds == null || memberIds.Contains(x.Id)))
                 || x.RehearsalAttendances.Any(a => a.RehearsalId == rehearsalId))
             .Include(x => x.User)
             .Include(x => x.RehearsalAttendances.Where(a => a.RehearsalId == rehearsalId))

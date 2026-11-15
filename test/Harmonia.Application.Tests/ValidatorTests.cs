@@ -735,6 +735,23 @@ public class ValidatorTests
     }
 
     [Theory]
+    [InlineData(false, true, false, true)] // a choir's own rehearsal
+    [InlineData(false, false, false, false)] // ...needs its choir
+    [InlineData(true, false, true, true)] // a joint rehearsal: event, no choir
+    [InlineData(true, false, false, false)] // ...needs its event
+    [InlineData(true, true, true, false)] // ...and takes no choir
+    public void CreateRehearsal_JointNeedsEventAndNoChoir_OwnNeedsChoir(
+        bool isJoint, bool hasChoir, bool hasEvent, bool isValid)
+    {
+        var request = NewRehearsal();
+        request.IsJoint = isJoint;
+        request.ChoirId = hasChoir ? Guid.NewGuid() : null;
+        request.EventId = hasEvent ? Guid.NewGuid() : null;
+
+        Assert.Equal(isValid, new CreateRehearsalRequestValidator().Validate(request).IsValid);
+    }
+
+    [Theory]
     [InlineData(0)]
     [InlineData(-1)]
     public void CreateRehearsal_EndNotAfterStart_ReturnsTimeInvalid(int hoursAfterStart)

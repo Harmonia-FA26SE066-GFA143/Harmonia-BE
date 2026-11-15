@@ -38,8 +38,9 @@ public class RehearsalRecordingService(
         Guid rehearsalId, CreateRehearsalRecordingRequest request, FileContent? file, CancellationToken cancellationToken)
     {
         var rehearsal = await rehearsalRepository.GetByIdAsync(rehearsalId, cancellationToken);
-        if (rehearsal is null || !await choirScope.CanManageChoirAsync(rehearsal.ChoirId, cancellationToken))
-            return Result<RehearsalRecordingDto>.Failure(ErrorCodes.RehearsalNotFound);
+        if (rehearsal is null) return Result<RehearsalRecordingDto>.Failure(ErrorCodes.RehearsalNotFound);
+        if (await choirScope.CheckCanManageRehearsalAsync(rehearsal, cancellationToken) is { } scopeError)
+            return Result<RehearsalRecordingDto>.Failure(scopeError);
 
         Song? song = null;
         if (request.SongId is { } songId)
@@ -84,8 +85,9 @@ public class RehearsalRecordingService(
     public async Task<Result> DeleteAsync(Guid rehearsalId, Guid recordingId, CancellationToken cancellationToken)
     {
         var rehearsal = await rehearsalRepository.GetByIdAsync(rehearsalId, cancellationToken);
-        if (rehearsal is null || !await choirScope.CanManageChoirAsync(rehearsal.ChoirId, cancellationToken))
-            return Result.Failure(ErrorCodes.RehearsalNotFound);
+        if (rehearsal is null) return Result.Failure(ErrorCodes.RehearsalNotFound);
+        if (await choirScope.CheckCanManageRehearsalAsync(rehearsal, cancellationToken) is { } scopeError)
+            return Result.Failure(scopeError);
 
         var recording = await recordingRepository.GetByIdAsync(recordingId, cancellationToken);
         if (recording is null || recording.RehearsalId != rehearsalId)
@@ -104,7 +106,8 @@ public class RehearsalRecordingService(
         if (isDirector)
         {
             var rehearsal = await rehearsalRepository.GetByIdAsync(rehearsalId, cancellationToken);
-            return rehearsal is not null && await choirScope.CanManageChoirAsync(rehearsal.ChoirId, cancellationToken);
+            // Directors of every choir serving a joint rehearsal may listen; only the lead director records.
+            return rehearsal is not null && await choirScope.CanViewRehearsalAsync(rehearsal, cancellationToken);
         }
 
         var member = await memberProfileRepository.GetByUserIdAsync(userId, cancellationToken);

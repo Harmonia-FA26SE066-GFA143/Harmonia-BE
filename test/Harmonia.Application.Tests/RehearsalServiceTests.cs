@@ -61,7 +61,7 @@ public class RehearsalServiceTests
 
     private CreateRehearsalRequest NewRequest(params (Guid SongId, string? Note)[] songs) => new()
     {
-        EventId = _event.Id, LocationId = _hall.Id, StartTime = Start, EndTime = Start.AddHours(2), Note = "Bring folders",
+        ChoirId = Guid.NewGuid(), EventId = _event.Id, LocationId = _hall.Id, StartTime = Start, EndTime = Start.AddHours(2), Note = "Bring folders",
         Songs = songs.Select(s => new UpdateRehearsalSongRequest { SongId = s.SongId, Note = s.Note }).ToList(),
     };
 
@@ -95,7 +95,7 @@ public class RehearsalServiceTests
     public async Task Create_MembersServingAClashingEvent_AreListed_ButTheRehearsalIsSaved_Async()
     {
         var clash = new RehearsalMemberConflictDto { MemberId = Guid.NewGuid(), FullName = "An", EventId = Guid.NewGuid() };
-        _roster.GetRehearsalConflictsAsync(Arg.Any<Guid?>(), _event.Id, _hall.Id, Start, Start.AddHours(2), _ct).Returns([clash]);
+        _roster.GetRehearsalConflictsAsync(Arg.Any<IReadOnlyCollection<Guid>?>(), _event.Id, _hall.Id, Start, Start.AddHours(2), _ct).Returns([clash]);
 
         var result = await _sut.CreateAsync(NewRequest(), _ct);
 
@@ -107,7 +107,7 @@ public class RehearsalServiceTests
     [Fact]
     public async Task Create_WithoutEventLocationOrSongs_Succeeds_AndSkipsConflictCheck_Async()
     {
-        var request = new CreateRehearsalRequest { StartTime = Start, EndTime = Start.AddHours(1) };
+        var request = new CreateRehearsalRequest { ChoirId = Guid.NewGuid(), StartTime = Start, EndTime = Start.AddHours(1) };
 
         var result = await _sut.CreateAsync(request, _ct);
 
@@ -254,12 +254,100 @@ public class RehearsalServiceTests
     public async Task Create_ChoirRejectedByScope_ReturnsItsCode_AndSavesNothing_Async()
     {
         var request = NewRequest();
-        _scope.CheckChoirForNewRecordAsync(request.ChoirId, request.EventId, _ct).Returns(ErrorCodes.ChoirNotServingEvent);
+        _scope.CheckChoirForNewRecordAsync(request.ChoirId!.Value, request.EventId, _ct).Returns(ErrorCodes.ChoirNotServingEvent);
 
         var result = await _sut.CreateAsync(request, _ct);
 
         Assert.Equal(ErrorCodes.ChoirNotServingEvent, result.Code);
         Assert.Empty(_added);
+    }
+
+    private CreateRehearsalRequest JointRequest()
+    {
+        var request = NewRequest();
+        request.ChoirId = null;
+        request.IsJoint = true;
+        return request;
+    }
+
+    private Rehearsal ExistingJoint()
+    {
+        var rehearsal = Existing(Start.AddDays(1));
+        rehearsal.IsJoint = true;
+        rehearsal.EventId = _event.Id;
+        _rehearsals.GetWithDetailsForUpdateAsync(rehearsal.Id, _ct).Returns(rehearsal);
+        return rehearsal;
+    }
+
+    [Fact]
+    public async Task Create_Joint_ByLeadDirector_SavesWithoutChoir_AndWarnsMembersOfEveryServingChoir_Async()
+    {
+        IReadOnlyCollection<Guid> eventMembers = [Guid.NewGuid(), Guid.NewGuid()];
+        _scope.GetEventMemberIdsAsync(_event.Id, _ct).Returns(eventMembers);
+
+        var result = await _sut.CreateAsync(JointRequest(), _ct);
+
+        Assert.True(result.IsSuccess);
+        var rehearsal = Assert.Single(_added);
+        Assert.True(rehearsal.IsJoint);
+        Assert.Null(rehearsal.ChoirId);
+        Assert.True(result.Value!.IsJoint);
+        await _scope.Received(1).CheckCanLeadEventAsync(_event.Id, ErrorCodes.LiturgicalEventNotFound, _ct);
+        await _scope.DidNotReceiveWithAnyArgs().CheckChoirForNewRecordAsync(default, default, default);
+        await _roster.Received(1).GetRehearsalConflictsAsync(
+            eventMembers, _event.Id, _hall.Id, Start, Start.AddHours(2), _ct);
+    }
+
+    [Fact]
+    public async Task Create_Joint_ByDirectorOfServingChoirThatDoesNotLead_ReturnsChoirNotLead_Async()
+    {
+        _scope.CheckCanLeadEventAsync(_event.Id, ErrorCodes.LiturgicalEventNotFound, _ct).Returns(ErrorCodes.ChoirNotLead);
+
+        var result = await _sut.CreateAsync(JointRequest(), _ct);
+
+        Assert.Equal(ErrorCodes.ChoirNotLead, result.Code);
+        Assert.Empty(_added);
+    }
+
+    [Fact]
+    public async Task Update_Joint_ByDirectorOfServingChoirThatDoesNotLead_ReturnsChoirNotLead_Async()
+    {
+        var rehearsal = ExistingJoint();
+        _scope.CheckCanLeadEventAsync(_event.Id, ErrorCodes.RehearsalNotFound, _ct).Returns(ErrorCodes.ChoirNotLead);
+
+        var result = await _sut.UpdateAsync(rehearsal.Id, UpdateRequest(), _ct);
+
+        Assert.Equal(ErrorCodes.ChoirNotLead, result.Code);
+        await _rehearsals.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Update_Joint_MovedToAnotherEvent_ReturnsEventLocked_Async()
+    {
+        var rehearsal = ExistingJoint();
+        var request = UpdateRequest();
+        request.EventId = Guid.NewGuid();
+
+        var result = await _sut.UpdateAsync(rehearsal.Id, request, _ct);
+
+        Assert.Equal(ErrorCodes.RehearsalJointEventLocked, result.Code);
+        await _rehearsals.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Update_Joint_NotifiesMembersOfEveryServingChoir_Async()
+    {
+        var rehearsal = ExistingJoint();
+        var member = new MemberProfile { Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Status = MemberStatus.Active };
+        _scope.GetEventMemberIdsAsync(_event.Id, _ct).Returns([member.Id]);
+        _members.ListAsync(Arg.Any<Expression<Func<MemberProfile, bool>>>(), _ct)
+            .Returns(call => new[] { member }.AsQueryable()
+                .Where(call.Arg<Expression<Func<MemberProfile, bool>>>()).ToList());
+
+        Assert.True((await _sut.UpdateAsync(rehearsal.Id, UpdateRequest(), _ct)).IsSuccess);
+
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(x => x.RecipientUserIds.SequenceEqual(new[] { member.UserId })), _ct);
     }
 
     [Fact]

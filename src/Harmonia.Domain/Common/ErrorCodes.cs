@@ -356,6 +356,8 @@ public static class ErrorCodes
 
     public const string RehearsalHasAttendance = "REHEARSAL_HAS_ATTENDANCE";
 
+    public const string RehearsalJointEventLocked = "REHEARSAL_JOINT_EVENT_LOCKED";
+
     public const string RehearsalRecordingNotFound = "REHEARSAL_RECORDING_NOT_FOUND";
 
     public const string RehearsalRecordingRequired = "REHEARSAL_RECORDING_REQUIRED";

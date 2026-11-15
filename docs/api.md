@@ -521,7 +521,7 @@ giá trị). Bản `Rejected` hoặc `Revoked` là lịch sử: ca viên khai b�
 ```
 
 `status`: `Draft` | `Published` | `Cancelled`. `LiturgicalEventSummaryDto` = `{ id, eventDate, time, title, locationName, status }`.
-`RehearsalSummaryDto` = `{ id, startTime, endTime, locationName, note, songs }`.
+`RehearsalSummaryDto` = `{ id, startTime, endTime, locationName, note, isJoint, songs }`.
 
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
@@ -1006,7 +1006,7 @@ bài, mời hay phân công được: trả 403 `CHOIR_NOT_LEAD` cho tới khi c
 | Nhóm | Ca trưởng thấy / làm được | Ngoài phạm vi |
 |---|---|---|
 | Ca viên, kỹ năng, tiến độ học tư liệu, 3 báo cáo theo ca viên | Ca viên ở ca đoàn của mình hoặc chưa ở ca đoàn nào (tìm kiếm `GET /api/member-profiles` vẫn toàn giáo xứ) | 404 `MEMBER_NOT_FOUND` / `MEMBER_SKILL_NOT_FOUND`; báo cáo lọc `choirId` của người khác → 404 `CHOIR_NOT_FOUND` |
-| Buổi tập, bài hát buổi tập, điểm danh | Buổi tập có `choirId` thuộc mình. Tạo mới **bắt buộc** `choirId` của mình; gắn sự kiện thì ca đoàn đó phải phục vụ sự kiện. Danh sách điểm danh và thông báo chỉ gồm ca viên của ca đoàn | 404 `REHEARSAL_NOT_FOUND`; tạo: 404 `CHOIR_NOT_FOUND`, 409 `CHOIR_INACTIVE`, `CHOIR_NOT_SERVING_EVENT`; điểm danh người ngoài ca đoàn → 404 `MEMBER_NOT_FOUND` |
+| Buổi tập, bài hát buổi tập, điểm danh | Buổi tập có `choirId` thuộc mình. Tạo mới **bắt buộc** `choirId` của mình; gắn sự kiện thì ca đoàn đó phải phục vụ sự kiện. Danh sách điểm danh và thông báo chỉ gồm ca viên của ca đoàn. Buổi tập chung (`isJoint`) theo ca đoàn của sự kiện: ca đoàn phụ trách quản lý, ca đoàn phục vụ khác chỉ xem (403 `CHOIR_NOT_LEAD`) | 404 `REHEARSAL_NOT_FOUND`; tạo: 404 `CHOIR_NOT_FOUND`, 409 `CHOIR_INACTIVE`, `CHOIR_NOT_SERVING_EVENT`; điểm danh người ngoài ca đoàn → 404 `MEMBER_NOT_FOUND` |
 | Bài tập về nhà, bản nộp | Bài tập có `choirId` thuộc mình. Tạo mới **bắt buộc** `choirId`; `All` = cả ca đoàn, `SkillGroup` / `Individual` chỉ trong ca đoàn | 404 `PRACTICE_ASSIGNMENT_NOT_FOUND` / `PRACTICE_SUBMISSION_NOT_FOUND`; chỉ định người ngoài ca đoàn → 404 `MEMBER_NOT_FOUND` |
 | Sự kiện (danh sách, tiến độ chuẩn bị) | Sự kiện có ca đoàn của mình phục vụ, hoặc chưa gán ca đoàn | 404 `LITURGICAL_EVENT_NOT_FOUND` |
 | Danh sách bài, yêu cầu nhân sự, xác nhận tham gia, phân công | **Xem**: ca trưởng mọi ca đoàn phục vụ. **Tạo / sửa / nộp / mời / phân công / chốt / gửi thông báo**: chỉ ca trưởng của ca đoàn phụ trách (sự kiện có ca đoàn nhưng chưa chọn phụ trách: ca trưởng mọi ca đoàn phục vụ). Người được mời / phân công phải là ca viên của các ca đoàn phục vụ | Không phục vụ: 404 như cũ (`LITURGICAL_EVENT_NOT_FOUND`, `SONG_LIST_NOT_FOUND`, `ROSTER_NOT_FOUND`…); phục vụ nhưng không phụ trách, hoặc sự kiện chưa gán ca đoàn: 403 `CHOIR_NOT_LEAD`; người ngoài ca đoàn: 404 `MEMBER_NOT_FOUND` |
@@ -2183,7 +2183,7 @@ Lên lịch tập và điểm danh chỉ dành cho `ChoirDirector`. Danh sách b
 
 ```json
 {
-  "id": "guid", "choirId": "guid | null", "eventId": "guid", "locationId": "guid", "locationName": "Nhà thờ chính",
+  "id": "guid", "choirId": "guid | null", "isJoint": false, "eventId": "guid", "locationId": "guid", "locationName": "Nhà thờ chính",
   "startTime": "2026-10-09T12:00:00Z", "endTime": "2026-10-09T13:30:00Z", "note": "tập bè",
   "songs": [{ "songId": "guid", "songTitle": "Kinh Hòa Bình", "displayOrder": 1, "note": "tập kỹ điệp khúc" }],
   "memberConflicts": [{ "memberId": "guid", "fullName": "Nguyễn Văn An", "eventId": "guid", "eventDate": "2026-10-09", "time": "19:00:00" }]
@@ -2196,12 +2196,19 @@ của `RosterAssignmentDto`. Chỉ là cảnh báo, buổi tập vẫn được 
 
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
-| POST | `/api/rehearsals` · `ChoirDirector` | `{ "choirId", "eventId?", "locationId?", "startTime", "endTime", "note?", "songs": [{ "songId", "note" }] }` | 200 `RehearsalDto` | 400 `VALIDATION_FAILED` (`REHEARSAL_TIME_INVALID`, `REHEARSAL_SONG_DUPLICATE`) · 404 `LITURGICAL_EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND`, `SONG_NOT_FOUND`, `CHOIR_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `CHOIR_INACTIVE`, `CHOIR_NOT_SERVING_EVENT`, `LOOKUP_INACTIVE`, `REHEARSAL_TIME_CONFLICT`, `SONG_INACTIVE` |
+| POST | `/api/rehearsals` · `ChoirDirector` | `{ "choirId?", "isJoint?", "eventId?", "locationId?", "startTime", "endTime", "note?", "songs": [{ "songId", "note" }] }` | 200 `RehearsalDto` | 400 `VALIDATION_FAILED` (`REHEARSAL_TIME_INVALID`, `REHEARSAL_SONG_DUPLICATE`) · 403 `CHOIR_NOT_LEAD` (buổi tập chung) · 404 `LITURGICAL_EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND`, `SONG_NOT_FOUND`, `CHOIR_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `CHOIR_INACTIVE`, `CHOIR_NOT_SERVING_EVENT`, `LOOKUP_INACTIVE`, `REHEARSAL_TIME_CONFLICT`, `SONG_INACTIVE` |
 | GET | `/api/rehearsals?eventId=&fromDate=&toDate=&pageNumber=&pageSize=` · `ChoirDirector` | — | 200 `PagedList<RehearsalDto>` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`) |
-| PUT | `/api/rehearsals/{id}` · `ChoirDirector` | `{ "eventId?", "locationId?", "startTime", "endTime", "note?" }` | 200 `RehearsalDto` | 400 `VALIDATION_FAILED` (`REHEARSAL_TIME_INVALID`) · 404 `REHEARSAL_NOT_FOUND`, `LITURGICAL_EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND` · 409 `REHEARSAL_ALREADY_PASSED`, `LITURGICAL_EVENT_CANCELLED`, `LOOKUP_INACTIVE`, `REHEARSAL_TIME_CONFLICT`, `CHOIR_INACTIVE`, `CHOIR_NOT_SERVING_EVENT` (đổi sự kiện) |
+| PUT | `/api/rehearsals/{id}` · `ChoirDirector` | `{ "eventId?", "locationId?", "startTime", "endTime", "note?" }` | 200 `RehearsalDto` | 400 `VALIDATION_FAILED` (`REHEARSAL_TIME_INVALID`) · 404 `REHEARSAL_NOT_FOUND`, `LITURGICAL_EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND` · 409 `REHEARSAL_ALREADY_PASSED`, `LITURGICAL_EVENT_CANCELLED`, `LOOKUP_INACTIVE`, `REHEARSAL_TIME_CONFLICT`, `CHOIR_INACTIVE`, `CHOIR_NOT_SERVING_EVENT` (đổi sự kiện), `REHEARSAL_JOINT_EVENT_LOCKED` · 403 `CHOIR_NOT_LEAD` (buổi tập chung) |
 | DELETE | `/api/rehearsals/{id}` · `ChoirDirector` | — | 204 | 404 `REHEARSAL_NOT_FOUND` · 409 `REHEARSAL_HAS_ATTENDANCE` |
 | GET | `/api/rehearsals/default-songs?eventId=` · `ChoirDirector` | — | 200 `RehearsalSongDto[]` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
 
+- **Buổi tập chung** (`isJoint = true`): buổi tập của **mọi ca đoàn phục vụ** sự kiện, chỉ ca trưởng ca đoàn phụ trách
+  (`LiturgicalEventChoir.IsLead`, hoặc ca trưởng thay thế) tạo / sửa / xoá / sửa bài / điểm danh / ghi bản thu; ca trưởng ca
+  đoàn phục vụ khác chỉ xem và nghe bản thu, sửa → 403 `CHOIR_NOT_LEAD`. Bắt buộc `eventId`, không gửi `choirId`
+  (`VALIDATION_FAILED`); response có `choirId = null`, `isJoint = true`. Sự kiện một ca đoàn cũng tạo được (ca đoàn đó là
+  phụ trách). Ca viên của mọi ca đoàn phục vụ thấy lịch, nhận thông báo, có tên trong danh sách điểm danh. Quyền đi theo
+  ca đoàn của sự kiện lúc gọi — cha xứ đổi ca đoàn phụ trách thì quyền chuyển theo. Không đổi được sang sự kiện khác
+  (409 `REHEARSAL_JOINT_EVENT_LOCKED`). Từng ca đoàn vẫn tạo buổi tập riêng (`isJoint = false`, bắt buộc `choirId`) như cũ.
 - `eventId` tuỳ chọn: có thì buổi tập là buổi chuẩn bị cho sự kiện đó (sự kiện đã huỷ → 409 `LITURGICAL_EVENT_CANCELLED`);
   bỏ trống là buổi tập thường. `locationId` tuỳ chọn, lấy từ `GET /api/lookups/worship-locations`.
 - `endTime` phải sau `startTime` (`REHEARSAL_TIME_INVALID`). `note` tối đa 500 ký tự.

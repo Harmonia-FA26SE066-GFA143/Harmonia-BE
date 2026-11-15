@@ -1425,6 +1425,9 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Property<Guid?>("EventId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<bool>("IsJoint")
+                        .HasColumnType("bit");
+
                     b.Property<Guid?>("LocationId")
                         .HasColumnType("uniqueidentifier");
 

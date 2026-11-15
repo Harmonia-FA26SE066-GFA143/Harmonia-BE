@@ -10,6 +10,9 @@ public class RehearsalDto
     /// <summary>Null on rehearsals created before choirs were scoped (D8).</summary>
     public Guid? ChoirId { get; set; }
 
+    /// <summary>A rehearsal of every choir serving the event; ChoirId is then null.</summary>
+    public bool IsJoint { get; set; }
+
     public Guid? EventId { get; set; }
 
     public Guid? LocationId { get; set; }
