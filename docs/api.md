@@ -2006,7 +2006,7 @@ Role `ParishPriest`, `ChoirDirector`. 200 `PagedList<SongSuggestionResponse>` ·
 | GET | `/api/practice-assignments/mine?isOpen=&status=&hasSubmission=&pageNumber=&pageSize=` | 200 `PagedList<PracticeAssignmentDetailDto>` | 404 `MEMBER_NOT_FOUND` |
 | GET | `/api/practice-assignments/mine/counts` | 200 `MyPracticeAssignmentCountsResponse` | 404 `MEMBER_NOT_FOUND` |
 | GET | `/api/practice-assignments/mine/{id}` | 200 `PracticeAssignmentDetailDto` | 404 `MEMBER_NOT_FOUND`, `PRACTICE_ASSIGNMENT_NOT_FOUND` |
-| POST | `/api/practice-assignments/mine/{id}/score` — multipart `file` (`.mp3`, `.m4a`, `.wav`, ≤ 20 MB) | 200 `PracticeAudioScoreResponse` | 400 `PRACTICE_AUDIO_REQUIRED`, `PRACTICE_AUDIO_TYPE_NOT_ALLOWED` · 404 `MEMBER_NOT_FOUND`, `PRACTICE_ASSIGNMENT_NOT_FOUND` · 413 `PRACTICE_AUDIO_TOO_LARGE` · 422 `PRACTICE_AUDIO_UNREADABLE`, `PRACTICE_REFERENCE_MISSING` · 502 `EXTERNAL_STORAGE_FAILED` |
+| POST | `/api/practice-assignments/mine/{id}/score` — multipart `file` (`.mp3`, `.m4a`, `.mp4`, `.wav`, ≤ 20 MB) | 200 `PracticeAudioScoreResponse` | 400 `PRACTICE_AUDIO_REQUIRED`, `PRACTICE_AUDIO_TYPE_NOT_ALLOWED` · 404 `MEMBER_NOT_FOUND`, `PRACTICE_ASSIGNMENT_NOT_FOUND` · 413 `PRACTICE_AUDIO_TOO_LARGE` · 422 `PRACTICE_AUDIO_UNREADABLE`, `PRACTICE_REFERENCE_MISSING` · 502 `EXTERNAL_STORAGE_FAILED` |
 
 **Chấm thử trước khi nộp — `POST mine/{id}/score`.** Điểm tham khảo, **không lưu**, không nộp bài; file phân tích xong bỏ
 luôn. Hạn nộp và trạng thái bài không ảnh hưởng. So với bản mẫu MIDI của bài tập (`notes.json` của tư liệu MIDI hoặc
@@ -2071,7 +2071,7 @@ luôn. Hạn nộp và trạng thái bài không ảnh hưởng. So với bản 
 |---|---|---|---|---|
 | POST | `/api/practice-assignments/{id}/submissions` | `multipart/form-data`: `file`, `durationSeconds?` | 200 `PracticeSubmissionDto` | 400 `VALIDATION_FAILED`, `PRACTICE_AUDIO_REQUIRED`, `PRACTICE_AUDIO_TYPE_NOT_ALLOWED` · 404 `MEMBER_NOT_FOUND`, `PRACTICE_ASSIGNMENT_NOT_FOUND` · 409 `PRACTICE_SUBMISSION_ALREADY_PASSED`, `PRACTICE_SUBMISSION_PAST_DUE`, `PRACTICE_SUBMISSION_CONFLICT` · 413 `PRACTICE_AUDIO_TOO_LARGE` · 502 `EXTERNAL_STORAGE_FAILED` |
 
-- `file`: `.mp3`, `.m4a`, `.wav`, tối đa 20 MB. Server kiểm đuôi và dung lượng, không tin `Content-Type`.
+- `file`: `.mp3`, `.m4a`, `.mp4`, `.wav`, tối đa 20 MB. Server kiểm đuôi và dung lượng, không tin `Content-Type`.
 - `durationSeconds`: do app ghi âm báo, 1–3600, chỉ để hiển thị.
 - Bài không dành cho ca viên → 404 `PRACTICE_ASSIGNMENT_NOT_FOUND`.
 - Nộp được nhiều lần tới hạn nộp; mỗi lần là một bản thu mới, `attemptNo` tăng dần từ 1, `status = Submitted`.

@@ -27,7 +27,8 @@ public class PracticeAssignmentService(
 {
     public const long MaxAudioSizeBytes = 20 * 1024 * 1024;
 
-    private static readonly string[] AudioExtensions = [".mp3", ".m4a", ".wav"];
+    // .mp4: the mobile recorder saves AAC audio in an MP4 container, the same format as .m4a.
+    private static readonly string[] AudioExtensions = [".mp3", ".m4a", ".mp4", ".wav"];
 
     public async Task<Result<PagedList<PracticeAssignmentDto>>> SearchAsync(
         SearchPracticeAssignmentsRequest request, CancellationToken cancellationToken)

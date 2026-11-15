@@ -589,6 +589,20 @@ public class PracticeAssignmentServiceTests
     }
 
     [Fact]
+    public async Task ScoreMyRecording_Mp4FromMobile_IsScored_Async()
+    {
+        var assignment = ReceivedAssignment();
+        var expected = new PracticeAudioScoreResponse(90, 92, 85, 100, "Alto");
+        _assignments.GetReferenceNotesPublicIdAsync(assignment.Id, _ct).Returns("notes.json");
+        _scorer.ScoreAsync(Arg.Any<Stream>(), "take.mp4", "signed:notes.json", _ct)
+            .Returns(Result<PracticeAudioScoreResponse>.Success(expected));
+
+        var result = await _sut.ScoreMyRecordingAsync(_activeMember.UserId, assignment.Id, NewAudio("take.mp4"), _ct);
+
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
     public async Task ScoreMyRecording_NoMidiReference_ReturnsReferenceMissing_Async()
     {
         var assignment = ReceivedAssignment();

@@ -132,7 +132,7 @@
     `LyricsText`, không có file (chốt 2026-10-30); `SampleAudio` nhận `.mp3`, `.m4a`, `.wav`, `.mid`, `.midi`
     (MIDI thêm 2026-10-29, lưu Cloudinary dạng raw);
     `RehearsalMaterial` nhận nhóm của `SheetMusic` và `SampleAudio`. Tối đa 20 MB một file.
-  - `PracticeSubmission` nhận `.mp3`, `.m4a`, `.wav`.
+  - `PracticeSubmission` nhận `.mp3`, `.m4a`, `.mp4`, `.wav` (`.mp4`: mobile ghi AAC trong vỏ MP4, chốt 2026-11-15).
   - Avatar (`User.AvatarUrl`) nhận `.jpg`, `.jpeg`, `.png`, `.webp`, tối đa 2 MB, lưu Cloudinary **public**
     — chỉ người dùng tự đổi qua `PUT/DELETE api/auth/me/avatar` (chốt 2026-11-01).
   - `RehearsalRecording` (bản thu ca trưởng ghi ở phòng tập) nhận `.webm`, `.ogg`, `.m4a`, `.mp3`, `.wav` — trình duyệt

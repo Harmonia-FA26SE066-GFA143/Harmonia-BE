@@ -15,6 +15,8 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
 
 ### Không phá vỡ
 
+- `POST api/practice-assignments/{id}/submissions` và `POST api/practice-assignments/mine/{id}/score` nhận thêm file
+  `.mp4` (bản ghi âm AAC của mobile); trước đây trả 400 `PRACTICE_AUDIO_TYPE_NOT_ALLOWED`.
 - Endpoint mới `POST api/event-participations/reminders?eventId=` · `ParishPriest`, `ChoirDirector` (ca đoàn phụ trách):
   nhắc ca viên chưa trả lời lời mời, trả `{ remindedCount, pendingCount }`. Mã mới 409 `EVENT_PARTICIPATION_REMINDER_TOO_SOON`.
   Server còn tự nhắc mỗi ngày một lần, khi có request đầu tiên của người đã đăng nhập từ 07:00, cho lễ trong
