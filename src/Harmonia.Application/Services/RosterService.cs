@@ -688,9 +688,12 @@ public class RosterService(
         {
             var inSlot = kept.Where(a => a.SongListItemId == x.Item?.Id && a.SkillId == x.SkillId).ToList();
             var manualCount = inSlot.Count(a => a.Status == RosterAssignmentStatus.Active);
-            var excludedMemberIds = inSlot.Select(a => a.MemberId)
-                .Concat(x.Item is null ? [] : wholeServiceHolders.Where(a => a.SkillId == x.SkillId).Select(a => a.MemberId))
-                .ToHashSet();
+            // One tier per member and skill (ROSTER_ASSIGNMENT_DUPLICATE): a song slot skips the whole-service holders, a
+            // whole-service slot skips members kept on a song line of that skill.
+            var otherTier = x.Item is null
+                ? kept.Where(a => a.Status == RosterAssignmentStatus.Active && a.SongListItemId is not null && a.SkillId == x.SkillId)
+                : wholeServiceHolders.Where(a => a.SkillId == x.SkillId);
+            var excludedMemberIds = inSlot.Select(a => a.MemberId).Concat(otherTier.Select(a => a.MemberId)).ToHashSet();
 
             var candidates = candidateSkills
                 .Where(c => c.SkillId == x.SkillId && !excludedMemberIds.Contains(c.MemberId))

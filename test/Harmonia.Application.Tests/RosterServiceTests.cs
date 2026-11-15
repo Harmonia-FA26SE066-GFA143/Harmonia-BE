@@ -979,6 +979,28 @@ public class RosterServiceTests
     }
 
     [Fact]
+    public async Task Suggest_MemberOnAManualSongLine_IsNotPickedForTheWholeServiceOfThatSkill_Async()
+    {
+        var roster = ExistingRoster();
+        EventNeedsGuitar();
+        _repository.GetCandidateSkillsAsync(_event.Id, Arg.Any<IReadOnlyCollection<Guid>>(), _ct).Returns(
+        [
+            new MemberSkill { MemberId = _an, SkillId = _guitar.Id, Level = SkillLevel.Advanced },
+            new MemberSkill { MemberId = _binh, SkillId = _guitar.Id, Level = SkillLevel.Beginner },
+        ]);
+        // Added by hand before the whole-service guitar was required.
+        roster.Assignments.Add(new RosterAssignment
+        {
+            Id = Guid.NewGuid(), RosterId = roster.Id, MemberId = _an, SkillId = _guitar.Id, SongListItemId = _entrance.Id,
+            Source = AssignmentSource.Manual,
+        });
+
+        await SuggestAsync();
+
+        Assert.Equal(_binh, Assert.Single(roster.Assignments, x => x.SkillId == _guitar.Id && x.SongListItemId == null).MemberId);
+    }
+
+    [Fact]
     public async Task Suggest_ByRules_SpreadsSongLinesAcrossMembers_Async()
     {
         var roster = ExistingRoster();
