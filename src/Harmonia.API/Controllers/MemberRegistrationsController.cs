@@ -38,6 +38,7 @@ public class MemberRegistrationsController(IMemberRegistrationService memberRegi
 
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    public async Task<IActionResult> DeleteAsync(Guid id, CancellationToken cancellationToken) =>
-        ToActionResult(await memberRegistrationService.DeleteAsync(id, cancellationToken));
+    public async Task<IActionResult> DeleteAsync(
+        Guid id, [FromBody] DeleteMemberRegistrationRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await memberRegistrationService.DeleteAsync(id, request, cancellationToken));
 }

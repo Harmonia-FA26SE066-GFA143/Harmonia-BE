@@ -19,6 +19,7 @@ public class MemberRegistrationServiceTests
     private readonly IUserRepository _users = Substitute.For<IUserRepository>();
     private readonly IUserService _userService = Substitute.For<IUserService>();
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
+    private readonly IEmailSender _email = Substitute.For<IEmailSender>();
     private readonly MemberRegistrationService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly Guid _adminId = Guid.NewGuid();
@@ -29,7 +30,7 @@ public class MemberRegistrationServiceTests
         var mapper = new MapperConfiguration(
                 cfg => cfg.AddProfile<MemberRegistrationProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new MemberRegistrationService(_registrations, _users, _userService, _notifications, mapper);
+        _sut = new MemberRegistrationService(_registrations, _users, _userService, _notifications, _email, mapper);
 
         _users.GetActiveUserIdsByRolesAsync(Arg.Any<IReadOnlyCollection<string>>(), _ct).Returns([_adminId]);
         _registrations.AddAsync(Arg.Do<MemberRegistration>(_added.Add), _ct).Returns(Task.CompletedTask);
@@ -135,24 +136,29 @@ public class MemberRegistrationServiceTests
     }
 
     [Fact]
-    public async Task Delete_RemovesRegistration_Async()
+    public async Task Delete_RemovesRegistration_AndEmailsReasonToApplicant_Async()
     {
         var registration = new MemberRegistration { Id = Guid.NewGuid(), Email = "a@example.com", FullName = "A" };
         _registrations.GetByIdAsync(registration.Id, _ct).Returns(registration);
 
-        var result = await _sut.DeleteAsync(registration.Id, _ct);
+        var result = await _sut.DeleteAsync(
+            registration.Id, new DeleteMemberRegistrationRequest { Reason = " <Đủ người> " }, _ct);
 
         Assert.True(result.IsSuccess);
         _registrations.Received(1).Remove(registration);
         await _registrations.Received(1).SaveChangesAsync(_ct);
+        await _email.Received(1).SendAsync(
+            "a@example.com", Arg.Any<string>(), Arg.Is<string>(body => body.Contains("&lt;Đủ người&gt;")), _ct);
     }
 
     [Fact]
-    public async Task Delete_UnknownId_ReturnsNotFound_Async()
+    public async Task Delete_UnknownId_ReturnsNotFound_AndSendsNoEmail_Async()
     {
-        var result = await _sut.DeleteAsync(Guid.NewGuid(), _ct);
+        var result = await _sut.DeleteAsync(
+            Guid.NewGuid(), new DeleteMemberRegistrationRequest { Reason = "x" }, _ct);
 
         Assert.Equal(ErrorCodes.MemberRegistrationNotFound, result.Code);
+        await _email.DidNotReceiveWithAnyArgs().SendAsync(default!, default!, default!, _ct);
     }
 
     [Fact]

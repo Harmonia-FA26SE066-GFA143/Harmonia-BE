@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Text;
 using AutoMapper;
 using Harmonia.Application.Common.Models;
@@ -16,6 +17,7 @@ public class MemberRegistrationService(
     IUserRepository userRepository,
     IUserService userService,
     INotificationService notificationService,
+    IEmailSender emailSender,
     IMapper mapper) : IMemberRegistrationService
 {
     public async Task<Result> SubmitAsync(CreateMemberRegistrationRequest request, CancellationToken cancellationToken)
@@ -165,7 +167,8 @@ public class MemberRegistrationService(
         return created;
     }
 
-    public async Task<Result> DeleteAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<Result> DeleteAsync(
+        Guid id, DeleteMemberRegistrationRequest request, CancellationToken cancellationToken)
     {
         var registration = await registrationRepository.GetByIdAsync(id, cancellationToken);
         if (registration is null)
@@ -175,6 +178,16 @@ public class MemberRegistrationService(
 
         registrationRepository.Remove(registration);
         await registrationRepository.SaveChangesAsync(cancellationToken);
+
+        // The result is ignored on purpose: the request is already gone, and the sender logs the failure.
+        await emailSender.SendAsync(
+            registration.Email,
+            "Harmonia - Kết quả đăng ký gia nhập ca đoàn",
+            $"<p>Chào {WebUtility.HtmlEncode(registration.FullName)},</p>"
+                + "<p>Rất tiếc, đơn đăng ký gia nhập ca đoàn của bạn chưa được chấp nhận.</p>"
+                + $"<p>Lý do: {WebUtility.HtmlEncode(request.Reason.Trim())}</p>"
+                + "<p>Nếu cần trao đổi thêm, vui lòng liên hệ giáo xứ.</p>",
+            cancellationToken);
 
         return Result.Success();
     }

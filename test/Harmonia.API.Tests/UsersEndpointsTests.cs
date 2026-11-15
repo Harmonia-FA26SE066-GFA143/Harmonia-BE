@@ -19,7 +19,7 @@ public class UsersEndpointsTests(HarmoniaApiFactory factory) : IClassFixture<Har
         var body = factory.EmailSender.ReceivedCalls()
             .Select(c => c.GetArguments())
             .Last(a => (string)a[0]! == email)[2] as string;
-        return System.Text.RegularExpressions.Regex.Match(body!, "Password: <b>([^<]+)</b>").Groups[1].Value;
+        return System.Text.RegularExpressions.Regex.Match(body!, "Mật khẩu: <b>([^<]+)</b>").Groups[1].Value;
     }
 
     [Fact]

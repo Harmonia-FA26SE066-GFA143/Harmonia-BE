@@ -17,5 +17,5 @@ public interface IMemberRegistrationService
     /// <summary>Creates a Choir Member account from the registration, then deletes the registration.</summary>
     Task<Result<UserDto>> AcceptAsync(Guid id, CancellationToken cancellationToken);
 
-    Task<Result> DeleteAsync(Guid id, CancellationToken cancellationToken);
+    Task<Result> DeleteAsync(Guid id, DeleteMemberRegistrationRequest request, CancellationToken cancellationToken);
 }

@@ -297,7 +297,7 @@ hiển thị email thay tên. `phone`, `saintName` (tên thánh), `gender` (`Mal
 | POST | `/api/member-registrations` | anonymous | `{ "fullName", "email", "phone?", "note?" }` | 204 | 400 `VALIDATION_FAILED` · 429 `RATE_LIMIT_EXCEEDED` |
 | GET | `/api/member-registrations` | `Admin` | query `keyword`, `pageNumber`, `pageSize` | 200 `PagedList<MemberRegistrationDto>` | — |
 | POST | `/api/member-registrations/{id}/accept` | `Admin` | — | 200 `UserDto` | 404 `MEMBER_REGISTRATION_NOT_FOUND` · 409 `USER_EMAIL_ALREADY_EXISTS` |
-| DELETE | `/api/member-registrations/{id}` | `Admin` | — | 204 | 404 `MEMBER_REGISTRATION_NOT_FOUND` |
+| DELETE | `/api/member-registrations/{id}` | `Admin` | `{ "reason" }` | 204 | 400 `VALIDATION_FAILED` · 404 `MEMBER_REGISTRATION_NOT_FOUND` |
 
 - `POST` (form trang chủ): `fullName` ≤ 100, `email` ≤ 256, `gender` bắt buộc (`Male` | `Female`), `phone` ≤ 20, `saintName` ≤ 50, `note` ≤ 500; cắt khoảng trắng, bỏ trống →
   `null`. **Luôn trả 204** kể cả khi email đã có tài khoản (không lưu gì) — không tiết lộ email nào đã đăng ký. Email
@@ -308,6 +308,8 @@ hiển thị email thay tên. `phone`, `saintName` (tên thánh), `gender` (`Mal
   một người dùng email khác. `matchedOn = "Phone"`: trùng số điện thoại (bỏ khoảng trắng, dấu chấm, gạch; `+84` đọc là `0`).
   `matchedOn = "Name"`: trùng cả họ tên lẫn tên thánh, không phân biệt hoa thường và dấu (chỉ trùng họ tên thì không gắn cờ).
   Chỉ là gợi ý cho Admin, không chặn `accept`; không có thì `[]`.
+- `DELETE` (từ chối): `reason` bắt buộc, ≤ 500. Xoá đơn rồi gửi email báo từ chối kèm lý do tới email của đơn; gửi
+  mail lỗi vẫn trả 204.
 - `accept`: tạo tài khoản role `ChoirMember` giống `POST /api/users` (mật khẩu đầu tiên gửi qua email, hồ sơ ca viên
   tự tạo) rồi xoá đăng ký. Email đã có tài khoản → 409, đăng ký được giữ lại để Admin xoá.
 - Đơn giấy nộp tại giáo xứ không qua đây: Admin tạo tài khoản thẳng bằng `POST /api/users`.

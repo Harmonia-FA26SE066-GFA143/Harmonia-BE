@@ -81,10 +81,10 @@ public class UserService(
 		// through forgot-password; the sender already logs the failure. The password is never logged or returned.
 		await emailSender.SendAsync(
 			user.Email,
-			"Harmonia - Your account",
-			"<p>An account has been created for you on Harmonia.</p>"
-				+ $"<p>Email: <b>{WebUtility.HtmlEncode(user.Email)}</b><br/>Password: <b>{WebUtility.HtmlEncode(initialPassword)}</b></p>"
-				+ "<p>You will be asked to choose a new password the first time you sign in.</p>",
+			"Harmonia - Tài khoản của bạn",
+			"<p>Tài khoản Harmonia của bạn đã được tạo.</p>"
+				+ $"<p>Email: <b>{WebUtility.HtmlEncode(user.Email)}</b><br/>Mật khẩu: <b>{WebUtility.HtmlEncode(initialPassword)}</b></p>"
+				+ "<p>Bạn sẽ được yêu cầu đổi mật khẩu ở lần đăng nhập đầu tiên.</p>",
 			ct);
 
 		return Result<UserDto>.Success(mapper.Map<UserDto>(user));

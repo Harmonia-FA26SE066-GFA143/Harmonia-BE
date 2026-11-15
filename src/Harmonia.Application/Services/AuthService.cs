@@ -171,10 +171,10 @@ public class AuthService(
         // and the sender already logs it.
         await emailSender.SendAsync(
             user.Email,
-            "Harmonia - Reset your password",
-            $"<p>We received a request to reset your Harmonia password.</p>"
-                + $"<p><a href=\"{WebUtility.HtmlEncode(link)}\">Reset password</a></p>"
-                + "<p>This link expires in 1 hour and can be used once. If you did not request it, ignore this email.</p>",
+            "Harmonia - Đặt lại mật khẩu",
+            "<p>Chúng tôi nhận được yêu cầu đặt lại mật khẩu Harmonia của bạn.</p>"
+                + $"<p><a href=\"{WebUtility.HtmlEncode(link)}\">Đặt lại mật khẩu</a></p>"
+                + "<p>Liên kết hết hạn sau 1 giờ và chỉ dùng được một lần. Nếu bạn không yêu cầu, hãy bỏ qua email này.</p>",
             cancellationToken);
 
         return Result.Success();

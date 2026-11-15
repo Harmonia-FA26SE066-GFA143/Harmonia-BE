@@ -84,6 +84,8 @@ móc vào chúng.
   Ngoại lệ: `Title` / `Content` của `SendNotificationRequest` viết tiếng Việt ngay trong service
   (và chuỗi test so khớp chúng) — thông báo lưu DB rồi hiển thị nguyên văn cho người dùng,
   không có mã để FE dịch (chốt 2026-10-11). Comment, log, exception quanh đó vẫn tiếng Anh.
+  Ngoại lệ: tiêu đề và nội dung email gửi qua `IEmailSender` viết tiếng Việt ngay trong service — mail đi thẳng tới
+  người dùng, không qua FE (chốt 2026-11-15). Comment, log, exception quanh đó vẫn tiếng Anh.
   Ngoại lệ: `ReportExportColumns.cs` giữ tên báo cáo và tiêu đề cột tiếng Việt của file xuất
   (CSV, XLSX, PDF) — file đi thẳng tới Admin, không qua FE (chốt 2026-10-11). Chuỗi tiếng Việt
   của file xuất chỉ được nằm trong file này.
