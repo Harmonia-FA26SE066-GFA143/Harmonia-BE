@@ -141,7 +141,7 @@ public class RosterService(
     }
 
     public async Task<bool> HasAssignedMemberTimeConflictAsync(
-        Guid eventId, DateOnly date, TimeOnly time, CancellationToken cancellationToken)
+        Guid eventId, DateOnly date, TimeOnly time, Guid locationId, CancellationToken cancellationToken)
     {
         var roster = (await rosterRepository.GetEventWithRosterAsync(eventId, cancellationToken))?.ServiceRoster;
         var memberIds = roster?.Assignments
@@ -151,8 +151,7 @@ public class RosterService(
             .ToList() ?? [];
         if (memberIds.Count == 0) return false;
 
-        var (from, to) = await OverlapWindowAsync(time, cancellationToken);
-        return (await rosterRepository.GetMembersServingNearAsync(memberIds, eventId, date, from, to, cancellationToken)).Count > 0;
+        return (await FindMembersServingNearAsync(memberIds, eventId, date, time, locationId, cancellationToken)).Count > 0;
     }
 
     public async Task<IReadOnlyCollection<Guid>> GetMembersServingNearAsync(
@@ -160,9 +159,7 @@ public class RosterService(
     {
         if (memberIds.Count == 0) return [];
 
-        var (from, to) = await OverlapWindowAsync(liturgicalEvent.Time, cancellationToken);
-        return await rosterRepository.GetMembersServingNearAsync(
-            memberIds, liturgicalEvent.Id, liturgicalEvent.EventDate, from, to, cancellationToken);
+        return await FindMembersServingNearAsync(memberIds, liturgicalEvent, cancellationToken);
     }
 
     public async Task<Result<ServiceRosterDto>> FinalizeAsync(Guid rosterId, CancellationToken cancellationToken)
@@ -487,19 +484,37 @@ public class RosterService(
         if (member.MemberSkills.Count == 0) return ErrorCodes.RosterAssignmentMemberSkillNotApproved;
         if (member.EventParticipations.Count == 0) return ErrorCodes.RosterAssignmentMemberNotConfirmed;
 
-        var (from, to) = await OverlapWindowAsync(liturgicalEvent.Time, cancellationToken);
-        var busy = await rosterRepository.GetMembersServingNearAsync(
-            [memberId], eventId, liturgicalEvent.EventDate, from, to, cancellationToken);
+        var busy = await FindMembersServingNearAsync([memberId], liturgicalEvent, cancellationToken);
         return busy.Count > 0 ? ErrorCodes.RosterMemberTimeConflict : null;
     }
 
+    private Task<List<Guid>> FindMembersServingNearAsync(
+        IReadOnlyCollection<Guid> memberIds, LiturgicalEvent liturgicalEvent, CancellationToken cancellationToken) =>
+        FindMembersServingNearAsync(
+            memberIds, liturgicalEvent.Id, liturgicalEvent.EventDate, liturgicalEvent.Time, liturgicalEvent.LocationId,
+            cancellationToken);
+
     /// <summary>
-    /// Start times, both ends included, at which another event clashes with this one. Events have a start time only, so
-    /// two events clash when they start less than Roster.EventOverlapMinutes apart; 0 means the same start only.
+    /// Members among <paramref name="memberIds"/> serving another event that clashes with one at this date, time and
+    /// place. Events have a start time only, so two events clash when they start less than Roster.EventOverlapMinutes
+    /// apart, plus Roster.DifferentLocationExtraMinutes when held at different places; 0 means the same start only.
     /// </summary>
-    private async Task<(TimeOnly From, TimeOnly To)> OverlapWindowAsync(TimeOnly time, CancellationToken cancellationToken)
+    private async Task<List<Guid>> FindMembersServingNearAsync(
+        IReadOnlyCollection<Guid> memberIds, Guid eventId, DateOnly date, TimeOnly time, Guid locationId,
+        CancellationToken cancellationToken)
     {
         var minutes = await systemSettingService.GetIntAsync(SystemSettingKeys.RosterEventOverlapMinutes, cancellationToken);
+        var extra = await systemSettingService.GetIntAsync(
+            SystemSettingKeys.RosterDifferentLocationExtraMinutes, cancellationToken);
+        var (from, to) = OverlapWindow(time, minutes);
+        var (farFrom, farTo) = OverlapWindow(time, minutes + extra);
+        return await rosterRepository.GetMembersServingNearAsync(
+            memberIds, eventId, date, from, to, locationId, farFrom, farTo, cancellationToken);
+    }
+
+    /// <summary>Start times, both ends included, that lie less than <paramref name="minutes"/> from <paramref name="time"/>.</summary>
+    private static (TimeOnly From, TimeOnly To) OverlapWindow(TimeOnly time, int minutes)
+    {
         // "Less than N minutes apart" with inclusive bounds: one tick short of N.
         var margin = minutes == 0 ? TimeSpan.Zero : TimeSpan.FromMinutes(minutes) - TimeSpan.FromTicks(1);
         var start = time.ToTimeSpan();
@@ -541,10 +556,8 @@ public class RosterService(
         // Members already serving another event near the same time are not suggested.
         if (candidateSkills.Count > 0)
         {
-            var (from, to) = await OverlapWindowAsync(liturgicalEvent.Time, cancellationToken);
-            var busy = await rosterRepository.GetMembersServingNearAsync(
-                candidateSkills.Select(x => x.MemberId).Distinct().ToList(), liturgicalEvent.Id, liturgicalEvent.EventDate,
-                from, to, cancellationToken);
+            var busy = await FindMembersServingNearAsync(
+                candidateSkills.Select(x => x.MemberId).Distinct().ToList(), liturgicalEvent, cancellationToken);
             candidateSkills = candidateSkills.Where(x => !busy.Contains(x.MemberId)).ToList();
         }
 

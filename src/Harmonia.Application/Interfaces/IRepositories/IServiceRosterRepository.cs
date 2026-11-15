@@ -32,11 +32,13 @@ public interface IServiceRosterRepository : IGenericRepository<ServiceRoster>
 
     /// <summary>
     /// Members among <paramref name="memberIds"/> holding an Active line on the roster of another non-cancelled event
-    /// dated <paramref name="date"/> whose start time lies between <paramref name="from"/> and <paramref name="to"/>, both included.
+    /// dated <paramref name="date"/> whose start time lies between <paramref name="from"/> and <paramref name="to"/>, both
+    /// included, when it is held at <paramref name="locationId"/>; between <paramref name="farFrom"/> and
+    /// <paramref name="farTo"/> when it is held elsewhere.
     /// </summary>
     Task<List<Guid>> GetMembersServingNearAsync(
         IReadOnlyCollection<Guid> memberIds, Guid excludeEventId, DateOnly date, TimeOnly from, TimeOnly to,
-        CancellationToken cancellationToken);
+        Guid locationId, TimeOnly farFrom, TimeOnly farTo, CancellationToken cancellationToken);
 
     /// <summary>Read-only Active assignments of the roster, with Member.User, Skill and SongListItem.Song loaded.</summary>
     Task<List<RosterAssignment>> GetAssignmentsAsync(Guid rosterId, CancellationToken cancellationToken);

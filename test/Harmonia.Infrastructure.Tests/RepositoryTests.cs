@@ -1640,18 +1640,29 @@ public sealed class RepositoryTests : IDisposable
         var seed = await SeedRosterAsync();
         var date = VietnamTime.Today.AddDays(-10);
         Guid recentEventId;
+        Guid locationId;
         await using (var lookup = _db.NewContext())
+        {
             recentEventId = (await lookup.ServiceRosters.SingleAsync(x => x.Assignments.Count == 2, _ct)).EventId;
+            locationId = (await lookup.LiturgicalEvents.SingleAsync(x => x.Id == recentEventId, _ct)).LocationId;
+        }
 
-        async Task<List<Guid>> NearAsync(Guid excludeEventId, DateOnly day, TimeOnly from)
+        // The window used for events held elsewhere starts at farFrom; it matches the same-place one unless given.
+        async Task<List<Guid>> NearAsync(
+            Guid excludeEventId, DateOnly day, TimeOnly from, Guid? at = null, TimeOnly? farFrom = null)
         {
             await using var context = _db.NewContext();
             return await new ServiceRosterRepository(context).GetMembersServingNearAsync(
-                [seed.ConfirmedId, seed.DeclinedId], excludeEventId, day, from, new TimeOnly(1, 0), _ct);
+                [seed.ConfirmedId, seed.DeclinedId], excludeEventId, day, from, new TimeOnly(1, 0),
+                at ?? locationId, farFrom ?? from, new TimeOnly(1, 0), _ct);
         }
 
         // "confirmed" serves the 10-day-old event, starting 00:00, on two lines: listed once.
         Assert.Equal([seed.ConfirmedId], await NearAsync(seed.EventId, date, TimeOnly.MinValue));
+        // Same place reads the near window, another place the far one.
+        Assert.Equal([seed.ConfirmedId], await NearAsync(seed.EventId, date, TimeOnly.MinValue, farFrom: new TimeOnly(0, 1)));
+        Assert.Empty(await NearAsync(seed.EventId, date, TimeOnly.MinValue, Guid.NewGuid(), new TimeOnly(0, 1)));
+        Assert.Equal([seed.ConfirmedId], await NearAsync(seed.EventId, date, new TimeOnly(0, 1), Guid.NewGuid(), TimeOnly.MinValue));
         Assert.Empty(await NearAsync(recentEventId, date, TimeOnly.MinValue));
         Assert.Empty(await NearAsync(seed.EventId, date, new TimeOnly(0, 1)));
         Assert.Empty(await NearAsync(seed.EventId, date.AddDays(1), TimeOnly.MinValue));

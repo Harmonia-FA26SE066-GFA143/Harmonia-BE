@@ -42,6 +42,12 @@ public interface IChoirScopeService
     /// <summary>The event's lead choir, else its only choir, else null.</summary>
     Task<Guid?> GetLeadChoirIdAsync(Guid eventId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// User ids who plan the event for its lead choir (<see cref="GetLeadChoirIdAsync"/>): the choir's director and the
+    /// event's substitute director for it, when set. Empty when the event has no lead.
+    /// </summary>
+    Task<IReadOnlyCollection<Guid>> GetLeadDirectorUserIdsAsync(Guid eventId, CancellationToken cancellationToken);
+
     /// <summary>Member profile ids active in the choirs serving the event; null when no choir serves it.</summary>
     Task<IReadOnlyCollection<Guid>?> GetEventMemberIdsAsync(Guid eventId, CancellationToken cancellationToken);
 

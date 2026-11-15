@@ -149,7 +149,7 @@ public class LiturgicalEventService(
         var rescheduled = isPublished
             && (dateChanged || liturgicalEvent.Time != request.Time || liturgicalEvent.LocationId != request.LocationId);
         if (rescheduled && await rosterService.HasAssignedMemberTimeConflictAsync(
-                id, request.EventDate, request.Time, cancellationToken))
+                id, request.EventDate, request.Time, request.LocationId, cancellationToken))
         {
             return Result<LiturgicalEventDto>.Failure(ErrorCodes.RosterMemberTimeConflict);
         }

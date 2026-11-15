@@ -16,7 +16,6 @@ public class MemberSkillService(
     IFileStorageService fileStorageService,
     IServiceRosterRepository rosterRepository,
     IChoirScopeService choirScope,
-    IGenericRepository<Choir> choirRepository,
     IMapper mapper) : IMemberSkillService
 {
     public const long MaxVoiceSizeBytes = 20 * 1024 * 1024;
@@ -244,9 +243,10 @@ public class MemberSkillService(
     {
         foreach (var liturgicalEvent in events)
         {
-            if (await choirScope.GetLeadChoirIdAsync(liturgicalEvent.Id, cancellationToken) is not { } leadChoirId
-                || await choirRepository.GetByIdAsync(leadChoirId, cancellationToken) is not { DirectorId: { } directorId }
-                || directorId == revokerUserId)
+            var directorIds = (await choirScope.GetLeadDirectorUserIdsAsync(liturgicalEvent.Id, cancellationToken))
+                .Where(x => x != revokerUserId)
+                .ToList();
+            if (directorIds.Count == 0)
             {
                 continue;
             }
@@ -255,7 +255,7 @@ public class MemberSkillService(
                 new SendNotificationRequest(
                     NotificationType.AssignmentNotice, "Phân công bị gỡ do thu hồi kỹ năng",
                     $"Một ca viên bị thu hồi kỹ năng {skillName} nên đã bị gỡ khỏi phân công sự kiện ngày {liturgicalEvent.EventDate:dd/MM/yyyy} lúc {liturgicalEvent.Time:HH:mm}; vui lòng xếp người thay.",
-                    [directorId], nameof(LiturgicalEvent), liturgicalEvent.Id),
+                    directorIds, nameof(LiturgicalEvent), liturgicalEvent.Id),
                 cancellationToken);
         }
     }

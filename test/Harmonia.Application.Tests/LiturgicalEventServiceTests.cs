@@ -146,7 +146,7 @@ public class LiturgicalEventServiceTests
     public async Task Update_PublishedEventMovedOntoAssignedMembersOtherEvent_ReturnsTimeConflict_AndSavesNothing_Async()
     {
         var request = UpdateRequest();
-        _roster.HasAssignedMemberTimeConflictAsync(_event.Id, request.EventDate, request.Time, _ct).Returns(true);
+        _roster.HasAssignedMemberTimeConflictAsync(_event.Id, request.EventDate, request.Time, request.LocationId, _ct).Returns(true);
 
         var result = await _sut.UpdateAsync(_event.Id, request, _ct);
 
@@ -162,7 +162,7 @@ public class LiturgicalEventServiceTests
         var result = await _sut.UpdateAsync(_event.Id, UpdateRequest(), _ct);
 
         Assert.True(result.IsSuccess);
-        await _roster.DidNotReceiveWithAnyArgs().HasAssignedMemberTimeConflictAsync(default, default, default, default);
+        await _roster.DidNotReceiveWithAnyArgs().HasAssignedMemberTimeConflictAsync(default, default, default, default, default);
         await _notifications.DidNotReceiveWithAnyArgs().SendAsync(default!, default);
     }
 

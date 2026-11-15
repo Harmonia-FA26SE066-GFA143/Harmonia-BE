@@ -466,7 +466,8 @@ giá trị). Bản `Rejected` hoặc `Revoked` là lịch sử: ca viên khai b�
 
 - `revoke`: chỉ thu hồi được bản `Approved` của ca viên ca trưởng quản lý. Dòng phân công của ca viên dùng kỹ năng đó ở
   sự kiện sắp tới (chưa huỷ) bị gỡ, bảng đã chốt mở lại `Draft`. Ca viên nhận `SkillReview` "Kỹ năng bị thu hồi"; ca
-  trưởng ca đoàn phụ trách của từng sự kiện bị gỡ (nếu không phải người thu hồi) nhận `AssignmentNotice`.
+  trưởng ca đoàn phụ trách của từng sự kiện bị gỡ và ca trưởng thay thế của ca đoàn đó (trừ người thu hồi) nhận
+  `AssignmentNotice`.
 - `pending` trả bản khai `Pending` của ca viên ca trưởng **quản lý** (D8 — cùng luật với `GET /api/member-profiles/{id}`),
   cũ nhất trước. Duyệt / từ chối bản khai của ca viên khác → 404 `MEMBER_SKILL_NOT_FOUND`.
 - `reason` bắt buộc, tối đa 500 ký tự.
@@ -910,6 +911,7 @@ dữ liệu trong khoảng lọc vẫn hiện với các số bằng 0.
 | `Roster.AiSuggestionEnabled` | Bool | true | không | Tắt thì gợi ý phân công không gọi AI, chỉ xếp theo luật (`isAiGenerated` = `false`) |
 | `Participation.ChangeCutoffHours` | Int 0–168 | 24 | không | Ca viên đổi được câu trả lời lời mời đến trước giờ lễ N giờ (`EVENT_PARTICIPATION_CHANGE_CLOSED`). 0 = đổi được đến giờ lễ |
 | `Roster.EventOverlapMinutes` | Int 0–720 | 120 | không | Không phân công một ca viên vào hai lễ cùng ngày bắt đầu cách nhau ít hơn N phút (`ROSTER_MEMBER_TIME_CONFLICT`; gợi ý bỏ qua người đó). 0 = chỉ chặn hai lễ cùng giờ |
+| `Roster.DifferentLocationExtraMinutes` | Int 0–240 | 0 | không | Cộng thêm N phút vào `Roster.EventOverlapMinutes` khi hai lễ ở hai nơi cử hành khác nhau (thời gian di chuyển). 0 = không cộng |
 | `Practice.AllowLateSubmission` | Bool | false | không | Bật thì nộp bản thu sau hạn không còn bị `PRACTICE_SUBMISSION_PAST_DUE`; bài vẫn tính là quá hạn |
 | `Rehearsal.AttendanceOpensMinutesBefore` | Int 0–120 | 0 | không | Cho điểm danh sớm N phút trước giờ bắt đầu; sớm hơn nữa vẫn `REHEARSAL_NOT_STARTED` |
 | `Rehearsal.AttendanceStartCheckEnabled` | Bool | true | không | Bật thì chỉ điểm danh được khi đến ngày và giờ của buổi tập. Tắt thì điểm danh được bất cứ lúc nào, không còn `REHEARSAL_NOT_STARTED` (dùng khi demo) |
@@ -960,7 +962,8 @@ Admin thấy và quản lý mọi ca đoàn.
   Ca viên đã ở trong ca đoàn thì bỏ qua; ca viên từng rời ca đoàn thì vào lại, `joinedDate` = hôm nay.
 - `DELETE .../members/{memberId}`: ca viên rời ca đoàn, lịch sử vẫn giữ; thêm lại bằng `POST .../members`. Ở các sự kiện
   sắp tới của ca đoàn mà ca viên không còn phục vụ qua ca đoàn nào khác: lời mời và dòng phân công bị xoá, bảng đã chốt mở
-  lại `Draft`.
+  lại `Draft`. Sự kiện nào mất dòng phân công thì ca trưởng ca đoàn phụ trách và ca trưởng thay thế của ca đoàn đó (trừ
+  người gỡ) nhận `AssignmentNotice` "Ca viên rời ca đoàn".
 - `PUT /api/liturgical-events/{id}/choirs` **thay toàn bộ** danh sách ca đoàn của sự kiện; không nhận `[]`
   (400 `LITURGICAL_EVENT_CHOIR_REQUIRED`).
   Sự kiện đã huỷ hoặc đã qua ngày thì không sửa được. Ca đoàn đã tắt vẫn được giữ lại nếu đã gán từ trước,
@@ -1688,7 +1691,8 @@ Danh sách `/mine` sắp theo tên bài hát, rồi `materialType`, rồi `title
 - `GET /api/song-lists/{id}`: cùng luật — cha xứ mở id của một bản `Draft` → 404 `SONG_LIST_NOT_FOUND`.
 - `GET …/pending`: các danh sách đang `Submitted`, bản gửi sớm nhất trước. **`items` và `reviews` ở đây luôn rỗng** —
   gọi `GET /api/song-lists/{id}` để lấy chi tiết.
-- `submit` xong, mọi `ParishPriest` đang hoạt động nhận thông báo `SongListSubmitted`; `review` xong, ca trưởng đề xuất
+- `submit` xong, mọi `ParishPriest` đang hoạt động nhận thông báo `SongListSubmitted`; gửi sau hạn (`songListDueDate`
+  của sự kiện đã qua) thì tiêu đề có "(gấp)" và nội dung ghi số ngày còn tới lễ. `review` xong, ca trưởng đề xuất
   nhận thông báo `SongListDecision`. Cả hai có `referenceType = "SongList"`, `referenceId` = id danh sách (S-05).
 - Nhân sự cần cho từng bài: xem mục 7a, dùng `items[].id`.
 
@@ -2290,7 +2294,7 @@ chỉ là cảnh báo, mời vẫn được, nhưng phân công vào lễ này s
 sẽ trả (`LITURGICAL_EVENT_CANCELLED`, `MEMBER_NOT_ACTIVE`, `EVENT_PARTICIPATION_CLOSED`,
 `EVENT_PARTICIPATION_CHANGE_CLOSED`). Lời mời `Invited` trả lời được đến giờ lễ; câu trả lời đã gửi đổi được đến trước giờ lễ
 `Participation.ChangeCutoffHours` giờ. Đổi từ `Confirmed` / `Unsure` sang `Declined` thì dòng phân công của ca viên ở sự
-kiện bị gỡ, bảng đã chốt mở lại `Draft`, ca trưởng ca đoàn phụ trách nhận thông báo `AssignmentNotice`. Ca viên `Inactive` / `Left` vẫn thấy lời mời nhưng `canRespond = false`.
+kiện bị gỡ, bảng đã chốt mở lại `Draft`, ca trưởng ca đoàn phụ trách và ca trưởng thay thế của ca đoàn đó nhận thông báo `AssignmentNotice`. Ca viên `Inactive` / `Left` vẫn thấy lời mời nhưng `canRespond = false`.
 
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
@@ -2374,7 +2378,7 @@ danh sách (dữ liệu cũ vẫn trỏ tới nó). Không phân trang — trả
 | POST · PUT `{id}` | `/api/lookups/song-themes` | `{ "name", "description?", "isActive", "parentId?" }` | 200 `SongThemeDto` | 400 `VALIDATION_FAILED`, `SONG_THEME_PARENT_INVALID` · 404 `LOOKUP_NOT_FOUND` (PUT) · 409 `LOOKUP_NAME_DUPLICATE` |
 | POST · PUT `{id}` | `/api/lookups/liturgical-slots` · `Admin`, `ChoirDirector` | `{ "name", "defaultOrder", "isActive" }` | 200 `LiturgicalSlotDto` | như trên |
 | POST · PUT `{id}` | `/api/lookups/worship-locations` | `{ "name", "address?", "isActive" }` | 200 `WorshipLocationDto` | như trên |
-| POST · PUT `{id}` | `/api/lookups/liturgical-seasons` | `{ "name", "startDate", "endDate", "colorHex?", "isActive" }` | 200 `LiturgicalSeasonDto` | 400 `VALIDATION_FAILED` (`LITURGICAL_SEASON_DATE_INVALID`) · 404 `LOOKUP_NOT_FOUND` (PUT) · 409 `LITURGICAL_SEASON_DATE_OVERLAP` |
+| POST · PUT `{id}` | `/api/lookups/liturgical-seasons` | `{ "name", "startDate", "endDate", "colorHex?", "isActive" }` | 200 `LiturgicalSeasonDto` | 400 `VALIDATION_FAILED` (`LITURGICAL_SEASON_DATE_INVALID`) · 404 `LOOKUP_NOT_FOUND` (PUT) · 409 `LITURGICAL_SEASON_DATE_OVERLAP` · 409 `LOOKUP_IN_USE` (PUT: ngày mới bỏ ra ngoài một sự kiện sắp tới chưa huỷ thuộc mùa này; ngày trước `startDate` vẫn tính là lễ vọng) |
 
 - `isActive` mặc định `true`. **Không có xoá**: các bảng khác đang trỏ tới danh mục, nên muốn bỏ thì gửi
   `PUT` với `isActive: false`. Bật lại bằng `isActive: true`.

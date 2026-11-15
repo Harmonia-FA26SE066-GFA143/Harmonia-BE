@@ -5,6 +5,7 @@ using Harmonia.Application.Interfaces.IRepositories;
 using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Domain.Common;
 using Harmonia.Domain.Entities;
+using Harmonia.Domain.Enums;
 using System.Linq.Expressions;
 
 namespace Harmonia.Application.Services;
@@ -23,6 +24,7 @@ public class LookupService(
     IGenericRepository<SongInstrumentRequirement> songInstrumentRequirements,
     IGenericRepository<LiturgicalSlotRequirement> slotRequirements,
     IServiceRosterRepository rosterRepository,
+    IGenericRepository<LiturgicalEvent> liturgicalEvents,
     IMapper mapper) : ILookupService
 {
     public async Task<Result<List<MassTypeDto>>> GetMassTypesAsync(bool includeInactive, CancellationToken cancellationToken)
@@ -349,11 +351,27 @@ public class LookupService(
 
     /// <summary>
     /// Season names repeat every year, so only the dates must not overlap another active season.
-    /// An inactive season is not checked.
+    /// An inactive season is not checked. New dates may not leave out an upcoming event planned in the season
+    /// (LOOKUP_IN_USE), with the same vigil allowance as <see cref="CheckEventCatalogsAsync"/>.
     /// </summary>
-    public Task<Result<LiturgicalSeasonDto>> SaveLiturgicalSeasonAsync(
-        Guid? id, SaveLiturgicalSeasonRequest request, CancellationToken cancellationToken) =>
-        SaveAsync<LiturgicalSeason, LiturgicalSeasonDto>(
+    public async Task<Result<LiturgicalSeasonDto>> SaveLiturgicalSeasonAsync(
+        Guid? id, SaveLiturgicalSeasonRequest request, CancellationToken cancellationToken)
+    {
+        if (id is not null)
+        {
+            var today = VietnamTime.Today;
+            var earliest = request.StartDate.AddDays(-1);
+            var stranded = await liturgicalEvents.ListAsync(
+                x => x.LiturgicalSeasonId == id && x.Status != EventStatus.Cancelled && x.EventDate >= today
+                    && (x.EventDate < earliest || x.EventDate > request.EndDate),
+                cancellationToken);
+            if (stranded.Count > 0)
+            {
+                return Result<LiturgicalSeasonDto>.Failure(ErrorCodes.LookupInUse);
+            }
+        }
+
+        return await SaveAsync<LiturgicalSeason, LiturgicalSeasonDto>(
             liturgicalSeasons, id, ErrorCodes.LookupNotFound,
             x => request.IsActive && x.IsActive && x.Id != id && x.StartDate <= request.EndDate && request.StartDate <= x.EndDate,
             ErrorCodes.LiturgicalSeasonDateOverlap,
@@ -366,6 +384,7 @@ public class LookupService(
                 x.IsActive = request.IsActive;
             },
             cancellationToken);
+    }
 
     /// <summary>
     /// Creates the row when <paramref name="id"/> is null, otherwise updates it. Rows matching

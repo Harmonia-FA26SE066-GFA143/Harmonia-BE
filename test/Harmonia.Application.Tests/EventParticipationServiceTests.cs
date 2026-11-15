@@ -20,7 +20,6 @@ public class EventParticipationServiceTests
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
     private readonly ISystemSettingService _settings = Substitute.For<ISystemSettingService>();
     private readonly IServiceRosterRepository _rosters = Substitute.For<IServiceRosterRepository>();
-    private readonly IGenericRepository<Choir> _choirs = Substitute.For<IGenericRepository<Choir>>();
     private readonly IChoirScopeService _scope = ChoirScopeFakes.Unrestricted();
     private readonly IRosterService _roster = Substitute.For<IRosterService>();
     private readonly EventParticipationService _sut;
@@ -43,7 +42,7 @@ public class EventParticipationServiceTests
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<EventParticipationProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
         _sut = new EventParticipationService(
-            _participations, _events, _members, _notifications, _scope, _settings, _rosters, _choirs, _roster, mapper);
+            _participations, _events, _members, _notifications, _scope, _settings, _rosters, _roster, mapper);
         _settings.GetIntAsync(SystemSettingKeys.ParticipationChangeCutoffHours, _ct).Returns(24);
         _roster.GetMembersServingNearAsync(Arg.Any<LiturgicalEvent>(), Arg.Any<IReadOnlyCollection<Guid>>(), _ct)
             .Returns(Array.Empty<Guid>());
@@ -346,14 +345,13 @@ public class EventParticipationServiceTests
     }
 
     [Fact]
-    public async Task Respond_ConfirmedThenDeclined_DropsRosterLines_ReopensRoster_AndTellsLeadDirector_Async()
+    public async Task Respond_ConfirmedThenDeclined_DropsRosterLines_ReopensRoster_AndTellsLeadAndSubstituteDirectors_Async()
     {
         Invitation(_anna, ParticipationStatus.Confirmed);
         _anna.User.FullName = "Anna";
         var directorId = Guid.NewGuid();
-        var choir = new Choir { Id = Guid.NewGuid(), DirectorId = directorId };
-        _scope.GetLeadChoirIdAsync(_event.Id, _ct).Returns(choir.Id);
-        _choirs.GetByIdAsync(choir.Id, _ct).Returns(choir);
+        var substituteId = Guid.NewGuid();
+        _scope.GetLeadDirectorUserIdsAsync(_event.Id, _ct).Returns([directorId, substituteId]);
         var roster = new ServiceRoster
         {
             Id = Guid.NewGuid(), EventId = _event.Id, Status = RosterStatus.Finalized, FinalizedAt = DateTime.UtcNow,
@@ -374,7 +372,7 @@ public class EventParticipationServiceTests
         Assert.Equal([benLine], roster.Assignments);
         Assert.Equal((RosterStatus.Draft, null, null), (roster.Status, roster.FinalizedAt, roster.WholeServiceFinalizedAt));
         await _notifications.Received(1).SendAsync(
-            Arg.Is<SendNotificationRequest>(r => r.Type == NotificationType.AssignmentNotice && r.RecipientUserIds.SequenceEqual(new[] { directorId })),
+            Arg.Is<SendNotificationRequest>(r => r.Type == NotificationType.AssignmentNotice && r.RecipientUserIds.SequenceEqual(new[] { directorId, substituteId })),
             _ct);
     }
 

@@ -70,7 +70,8 @@ public interface IRosterService
     /// Whether a member with an active line on this event's roster serves another event near the given date and time;
     /// used before an event is moved.
     /// </summary>
-    Task<bool> HasAssignedMemberTimeConflictAsync(Guid eventId, DateOnly date, TimeOnly time, CancellationToken cancellationToken);
+    Task<bool> HasAssignedMemberTimeConflictAsync(
+        Guid eventId, DateOnly date, TimeOnly time, Guid locationId, CancellationToken cancellationToken);
 
     /// <summary>The given members who serve another event near this event's date and time.</summary>
     Task<IReadOnlyCollection<Guid>> GetMembersServingNearAsync(

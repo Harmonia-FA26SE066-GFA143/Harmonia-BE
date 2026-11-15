@@ -22,7 +22,6 @@ public class EventParticipationService(
     IChoirScopeService choirScope,
     ISystemSettingService systemSettingService,
     IServiceRosterRepository rosterRepository,
-    IGenericRepository<Choir> choirRepository,
     IRosterService rosterService,
     IMapper mapper) : IEventParticipationService
 {
@@ -312,8 +311,8 @@ public class EventParticipationService(
     private async Task NotifyLeadDirectorOfWithdrawalAsync(
         LiturgicalEvent liturgicalEvent, string memberName, CancellationToken cancellationToken)
     {
-        if (await choirScope.GetLeadChoirIdAsync(liturgicalEvent.Id, cancellationToken) is not { } leadChoirId
-            || await choirRepository.GetByIdAsync(leadChoirId, cancellationToken) is not { DirectorId: { } directorId })
+        var directorIds = await choirScope.GetLeadDirectorUserIdsAsync(liturgicalEvent.Id, cancellationToken);
+        if (directorIds.Count == 0)
         {
             return;
         }
@@ -323,7 +322,7 @@ public class EventParticipationService(
                 Type: NotificationType.AssignmentNotice,
                 Title: "Ca viên rút khỏi sự kiện",
                 Content: $"{memberName} đã từ chối tham gia sự kiện ngày {liturgicalEvent.EventDate:dd/MM/yyyy} lúc {liturgicalEvent.Time:HH:mm}; phân công của ca viên đã được gỡ, vui lòng xếp người thay.",
-                RecipientUserIds: [directorId],
+                RecipientUserIds: directorIds,
                 ReferenceType: nameof(LiturgicalEvent),
                 ReferenceId: liturgicalEvent.Id),
             cancellationToken);

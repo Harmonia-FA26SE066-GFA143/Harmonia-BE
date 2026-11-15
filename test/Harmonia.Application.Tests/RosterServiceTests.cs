@@ -70,18 +70,22 @@ public class RosterServiceTests
         _repository.CountRecentServicesAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), _ct)
             .Returns(new Dictionary<Guid, int> { [_chi] = 3, [_binh] = 1 });
         _repository.GetAssignmentsAsync(Arg.Any<Guid>(), _ct).Returns([]);
-        _repository.GetMembersServingNearAsync(default!, default, default, default, default, default)
+        _repository.GetMembersServingNearAsync(default!, default, default, default, default, default, default, default, default)
             .ReturnsForAnyArgs(new List<Guid>());
 
         AiFails();
     }
 
-    /// <summary>The member holds a line on another event of the same date starting at <paramref name="start"/>.</summary>
-    private void ServesAnotherEventAt(Guid memberId, TimeOnly start) =>
+    /// <summary>
+    /// The member holds a line on another event of the same date starting at <paramref name="start"/>, at the same place
+    /// unless <paramref name="elsewhere"/>.
+    /// </summary>
+    private void ServesAnotherEventAt(Guid memberId, TimeOnly start, bool elsewhere = false) =>
         _repository.GetMembersServingNearAsync(
-                Arg.Any<IReadOnlyCollection<Guid>>(), _event.Id, _event.EventDate, Arg.Any<TimeOnly>(), Arg.Any<TimeOnly>(), _ct)
+                Arg.Any<IReadOnlyCollection<Guid>>(), _event.Id, _event.EventDate, Arg.Any<TimeOnly>(), Arg.Any<TimeOnly>(),
+                _event.LocationId, Arg.Any<TimeOnly>(), Arg.Any<TimeOnly>(), _ct)
             .Returns(call => call.ArgAt<IReadOnlyCollection<Guid>>(0).Contains(memberId)
-                && call.ArgAt<TimeOnly>(3) <= start && start <= call.ArgAt<TimeOnly>(4)
+                && call.ArgAt<TimeOnly>(elsewhere ? 6 : 3) <= start && start <= call.ArgAt<TimeOnly>(elsewhere ? 7 : 4)
                     ? new List<Guid> { memberId }
                     : new List<Guid>());
 
@@ -529,6 +533,23 @@ public class RosterServiceTests
         _settings.GetIntAsync(SystemSettingKeys.RosterEventOverlapMinutes, _ct).Returns(overlapMinutes);
         RosterWith(RosterStatus.Suggested);
         ServesAnotherEventAt(_an, new TimeOnly(otherStartHour, 0));
+        MemberIs(_an);
+
+        var result = await AddAsync(_an);
+
+        Assert.Equal(conflict ? ErrorCodes.RosterMemberTimeConflict : null, result.Code);
+    }
+
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(30, true)] // 120 + 30: a Mass elsewhere two hours earlier leaves no time to travel
+    public async Task AddAssignment_MemberServingEventElsewhere_AddsTravelMinutes_Async(int extraMinutes, bool conflict)
+    {
+        _event.Time = new TimeOnly(9, 0);
+        _settings.GetIntAsync(SystemSettingKeys.RosterEventOverlapMinutes, _ct).Returns(120);
+        _settings.GetIntAsync(SystemSettingKeys.RosterDifferentLocationExtraMinutes, _ct).Returns(extraMinutes);
+        RosterWith(RosterStatus.Suggested);
+        ServesAnotherEventAt(_an, new TimeOnly(7, 0), elsewhere: true);
         MemberIs(_an);
 
         var result = await AddAsync(_an);

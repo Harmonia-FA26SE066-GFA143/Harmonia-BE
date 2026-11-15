@@ -22,6 +22,7 @@ public class ChoirService(
     IGenericRepository<SongList> songListRepository,
     INotificationService notificationService,
     ICurrentUserService currentUser,
+    IChoirScopeService choirScope,
     IMapper mapper) : IChoirService
 {
     public async Task<Result<ChoirDto>> CreateAsync(CreateChoirRequest request, CancellationToken cancellationToken)
@@ -256,14 +257,48 @@ public class ChoirService(
                 .Select(x => x.EventId)
                 .ToHashSet();
         var droppedEventIds = upcomingEventIds.Where(x => !stillServing.Contains(x)).ToList();
+        var reopened = new List<LiturgicalEvent>();
         foreach (var eventId in droppedEventIds)
         {
-            await DropMembersFromEventAsync(eventId, [memberId], cancellationToken);
+            if (await DropMembersFromEventAsync(eventId, [memberId], cancellationToken) is { } liturgicalEvent)
+            {
+                reopened.Add(liturgicalEvent);
+            }
         }
 
         await membershipRepository.SaveChangesAsync(cancellationToken);
 
+        if (reopened.Count > 0)
+        {
+            await NotifyLeadDirectorsOfRemovalAsync(reopened, memberId, cancellationToken);
+        }
+
         return Result.Success();
+    }
+
+    /// <summary>Tells who plans each event that a roster line went with the member; the caller already knows.</summary>
+    private async Task NotifyLeadDirectorsOfRemovalAsync(
+        IReadOnlyCollection<LiturgicalEvent> events, Guid memberId, CancellationToken cancellationToken)
+    {
+        var memberName = (await memberRepository.GetByIdsWithUserAsync([memberId], cancellationToken))
+            .SingleOrDefault()?.User.FullName ?? "Một ca viên";
+        foreach (var liturgicalEvent in events)
+        {
+            var directorIds = (await choirScope.GetLeadDirectorUserIdsAsync(liturgicalEvent.Id, cancellationToken))
+                .Where(x => x != currentUser.UserId)
+                .ToList();
+            if (directorIds.Count == 0)
+            {
+                continue;
+            }
+
+            await notificationService.SendAsync(
+                new SendNotificationRequest(
+                    NotificationType.AssignmentNotice, "Ca viên rời ca đoàn",
+                    $"{memberName} đã rời ca đoàn nên được gỡ khỏi phân công sự kiện {EventLabel(liturgicalEvent)}; vui lòng xếp người thay.",
+                    directorIds, nameof(LiturgicalEvent), liturgicalEvent.Id),
+                cancellationToken);
+        }
     }
 
     public async Task<Result<List<LiturgicalEventChoirDto>>> GetEventChoirsAsync(
@@ -427,14 +462,15 @@ public class ChoirService(
 
     /// <summary>
     /// Deletes the members' invitations and roster lines for the event. A finalized roster reopens so the new lead can
-    /// fill the gaps; the early lock on whole-service lines lifts too when one of them went.
+    /// fill the gaps; the early lock on whole-service lines lifts too when one of them went. Returns the event when a
+    /// roster line went, else null.
     /// </summary>
-    private async Task DropMembersFromEventAsync(
+    private async Task<LiturgicalEvent?> DropMembersFromEventAsync(
         Guid eventId, IReadOnlyCollection<Guid> memberIds, CancellationToken cancellationToken)
     {
         if (memberIds.Count == 0)
         {
-            return;
+            return null;
         }
 
         foreach (var participation in await participationRepository.ListAsync(
@@ -443,11 +479,12 @@ public class ChoirService(
             participationRepository.Remove(participation);
         }
 
-        var roster = (await rosterRepository.GetEventWithRosterAsync(eventId, cancellationToken))?.ServiceRoster;
+        var liturgicalEvent = await rosterRepository.GetEventWithRosterAsync(eventId, cancellationToken);
+        var roster = liturgicalEvent?.ServiceRoster;
         var lines = roster?.Assignments.Where(x => memberIds.Contains(x.MemberId)).ToList() ?? [];
         if (roster is null || lines.Count == 0)
         {
-            return;
+            return null;
         }
 
         // Lines they replaced keep their Replaced status; the FK clears their ReplacedByAssignmentId.
@@ -467,6 +504,8 @@ public class ChoirService(
         {
             roster.WholeServiceFinalizedAt = null;
         }
+
+        return liturgicalEvent;
     }
 
     private async Task NotifyChoirChangeAsync(

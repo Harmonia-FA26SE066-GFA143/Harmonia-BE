@@ -46,15 +46,16 @@ public class ServiceRosterRepository(HarmoniaDbContext dbContext)
 
     public Task<List<Guid>> GetMembersServingNearAsync(
         IReadOnlyCollection<Guid> memberIds, Guid excludeEventId, DateOnly date, TimeOnly from, TimeOnly to,
-        CancellationToken cancellationToken) =>
+        Guid locationId, TimeOnly farFrom, TimeOnly farTo, CancellationToken cancellationToken) =>
         DbContext.RosterAssignments
             .Where(x => memberIds.Contains(x.MemberId)
                 && x.Status == RosterAssignmentStatus.Active
                 && x.Roster.EventId != excludeEventId
                 && x.Roster.LiturgicalEvent.Status != EventStatus.Cancelled
                 && x.Roster.LiturgicalEvent.EventDate == date
-                && x.Roster.LiturgicalEvent.Time >= from
-                && x.Roster.LiturgicalEvent.Time <= to)
+                && (x.Roster.LiturgicalEvent.LocationId == locationId
+                    ? x.Roster.LiturgicalEvent.Time >= from && x.Roster.LiturgicalEvent.Time <= to
+                    : x.Roster.LiturgicalEvent.Time >= farFrom && x.Roster.LiturgicalEvent.Time <= farTo))
             .Select(x => x.MemberId)
             .Distinct()
             .ToListAsync(cancellationToken);

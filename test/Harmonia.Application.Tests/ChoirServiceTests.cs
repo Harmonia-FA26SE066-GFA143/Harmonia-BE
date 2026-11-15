@@ -26,6 +26,7 @@ public class ChoirServiceTests
     private readonly IGenericRepository<SongList> _songLists = Substitute.For<IGenericRepository<SongList>>();
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
     private readonly ICurrentUserService _currentUser = Substitute.For<ICurrentUserService>();
+    private readonly IChoirScopeService _scope = ChoirScopeFakes.Unrestricted();
     private readonly ChoirService _sut;
     private readonly List<EventParticipation> _participationRows = [];
     private readonly List<EventParticipation> _removedParticipations = [];
@@ -50,7 +51,7 @@ public class ChoirServiceTests
             .CreateMapper();
         _sut = new ChoirService(
             _choirs, _memberships, _eventChoirs, _members, _events, _users, _participations, _rosters, _songLists,
-            _notifications, _currentUser, mapper);
+            _notifications, _currentUser, _scope, mapper);
         _currentUser.RoleName.Returns(RoleNames.Admin);
 
         // The fakes evaluate the service's predicate against in-memory rows, as the database would.
@@ -395,6 +396,11 @@ public class ChoirServiceTests
             Assignments = [new RosterAssignment { Id = Guid.NewGuid(), MemberId = member.Id, SongListItemId = Guid.NewGuid() }],
         };
         _rosters.GetEventWithRosterAsync(_event.Id, _ct).Returns(new LiturgicalEvent { Id = _event.Id, ServiceRoster = roster });
+        // The caller stands in as substitute, so only the lead director hears of the gap.
+        var callerId = Guid.NewGuid();
+        var leadDirectorId = Guid.NewGuid();
+        _currentUser.UserId.Returns(callerId);
+        _scope.GetLeadDirectorUserIdsAsync(_event.Id, _ct).Returns([leadDirectorId, callerId]);
 
         var result = await _sut.RemoveMemberAsync(_choir.Id, member.Id, _ct);
 
@@ -404,6 +410,9 @@ public class ChoirServiceTests
         Assert.Empty(roster.Assignments);
         Assert.Equal(RosterStatus.Draft, roster.Status);
         await _rosters.DidNotReceive().GetEventWithRosterAsync(shared.Id, _ct);
+        var notice = Assert.Single(_sent);
+        Assert.Equal((NotificationType.AssignmentNotice, _event.Id), (notice.Type, notice.ReferenceId));
+        Assert.Equal([leadDirectorId], notice.RecipientUserIds);
     }
 
     [Fact]

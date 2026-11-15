@@ -7,6 +7,7 @@ using Harmonia.Application.Services;
 using Harmonia.Application.Validators;
 using Harmonia.Domain.Common;
 using Harmonia.Domain.Entities;
+using Harmonia.Domain.Enums;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
@@ -15,6 +16,7 @@ namespace Harmonia.Application.Tests;
 public class LookupServiceTests
 {
     private readonly IServiceRosterRepository _rosters = Substitute.For<IServiceRosterRepository>();
+    private readonly IGenericRepository<LiturgicalEvent> _events = Substitute.For<IGenericRepository<LiturgicalEvent>>();
     private readonly IGenericRepository<MassType> _massTypes = Substitute.For<IGenericRepository<MassType>>();
     private readonly IGenericRepository<SkillCategory> _skillCategories = Substitute.For<IGenericRepository<SkillCategory>>();
     private readonly IGenericRepository<Skill> _skills = Substitute.For<IGenericRepository<Skill>>();
@@ -55,10 +57,12 @@ public class LookupServiceTests
             _instrumentRequirements,
             _slotRequirements,
             _rosters,
+            _events,
             mapper);
 
         Rows(_vocalRequirements);
         Rows(_instrumentRequirements);
+        Rows(_events);
         _rosters.GetUpcomingAssignmentsForUpdateAsync(default, default, default, default).ReturnsForAnyArgs([]);
     }
 
@@ -461,6 +465,28 @@ public class LookupServiceTests
         }, _ct);
 
         Assert.Equal(ErrorCodes.LiturgicalSeasonDateOverlap, result.Code);
+    }
+
+    [Theory]
+    [InlineData(20, true)] // the event's day moves out of the season
+    [InlineData(19, false)] // the day before the new start still holds the vigil
+    public async Task SaveSeason_NewDatesLeaveOutUpcomingEvent_ReturnsLookupInUse_Async(int newStartDay, bool blocked)
+    {
+        var today = VietnamTime.Today;
+        var season = new LiturgicalSeason { Id = Guid.NewGuid(), Name = "Ordinary", StartDate = today, EndDate = today.AddDays(40) };
+        Rows(_seasons, season);
+        _seasons.GetByIdAsync(season.Id, _ct).Returns(season);
+        Rows(_events, new LiturgicalEvent
+        {
+            Id = Guid.NewGuid(), LiturgicalSeasonId = season.Id, EventDate = today.AddDays(18), Status = EventStatus.Published,
+        });
+
+        var result = await _sut.SaveLiturgicalSeasonAsync(season.Id, new SaveLiturgicalSeasonRequest
+        {
+            Name = "Ordinary", StartDate = today.AddDays(newStartDay), EndDate = today.AddDays(40), IsActive = true,
+        }, _ct);
+
+        Assert.Equal(blocked ? ErrorCodes.LookupInUse : null, result.Code);
     }
 
     [Fact]

@@ -22,6 +22,8 @@ public static class SystemSettingKeys
 
     public const string RosterEventOverlapMinutes = "Roster.EventOverlapMinutes";
 
+    public const string RosterDifferentLocationExtraMinutes = "Roster.DifferentLocationExtraMinutes";
+
     public const string ParticipationChangeCutoffHours = "Participation.ChangeCutoffHours";
 
     public const string PracticeAllowLateSubmission = "Practice.AllowLateSubmission";
@@ -62,6 +64,9 @@ public static class SystemSettingKeys
         new(RosterEventOverlapMinutes, SettingDataType.Int, "120", "Khoảng cách tối thiểu giữa hai lễ (phút)", "Phân công",
             "Không phân công một ca viên vào hai lễ cùng ngày bắt đầu cách nhau ít hơn số phút này; 0 thì chỉ chặn hai lễ cùng giờ.",
             MinValue: 0, MaxValue: 720),
+        new(RosterDifferentLocationExtraMinutes, SettingDataType.Int, "0", "Thời gian di chuyển giữa hai nơi cử hành (phút)",
+            "Phân công", "Cộng thêm vào khoảng cách tối thiểu giữa hai lễ khi hai lễ ở hai nơi khác nhau; 0 thì không cộng.",
+            MinValue: 0, MaxValue: 240),
         new(ParticipationChangeCutoffHours, SettingDataType.Int, "24", "Hạn đổi câu trả lời tham gia (giờ trước lễ)",
             "Phân công", "Ca viên đã trả lời lời mời được đổi ý đến trước giờ lễ số giờ này; 0 thì đổi được đến giờ lễ.",
             MinValue: 0, MaxValue: 168),

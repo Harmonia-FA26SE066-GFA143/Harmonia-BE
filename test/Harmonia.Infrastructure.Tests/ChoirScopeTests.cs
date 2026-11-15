@@ -155,6 +155,20 @@ public sealed class ChoirScopeTests : IDisposable
         Assert.False(await scope.CanViewEventAsync(notMine, _ct));
         Assert.Equal(_mine.Id, await scope.GetLeadChoirIdAsync(iLead, _ct));
         Assert.Null(await scope.GetLeadChoirIdAsync(noLeadMarked, _ct));
+        Assert.Equal([_meId], await scope.GetLeadDirectorUserIdsAsync(iLead, _ct));
+        Assert.Empty(await scope.GetLeadDirectorUserIdsAsync(noLeadMarked, _ct));
+    }
+
+    [Fact]
+    public async Task GetLeadDirectorUserIds_AddsTheLeadChoirsSubstitute_Async()
+    {
+        var eventId = await AddEventAsync((_theirs.Id, true), (_mine.Id, false));
+        await using (var change = _db.NewContext())
+            await change.LiturgicalEventChoirs.Where(x => x.EventId == eventId && x.ChoirId == _theirs.Id)
+                .ExecuteUpdateAsync(x => x.SetProperty(c => c.SubstituteDirectorId, _meId), _ct);
+        await using var context = _db.NewContext();
+
+        Assert.Equal([_theirs.DirectorId!.Value, _meId], await NewScope(context).GetLeadDirectorUserIdsAsync(eventId, _ct));
     }
 
     [Fact]

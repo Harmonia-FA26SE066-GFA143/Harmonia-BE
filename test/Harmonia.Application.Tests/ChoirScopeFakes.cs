@@ -22,6 +22,7 @@ public static class ChoirScopeFakes
         scope.CheckCanLeadEventAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns((string?)null);
         scope.GetLeadChoirIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((Guid?)null);
+        scope.GetLeadDirectorUserIdsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(Array.Empty<Guid>());
         scope.GetEventMemberIdsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns((IReadOnlyCollection<Guid>?)null);
         scope.GetChoirMemberIdsAsync(Arg.Any<Guid?>(), Arg.Any<CancellationToken>())

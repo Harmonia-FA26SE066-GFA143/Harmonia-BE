@@ -94,12 +94,26 @@ public class ChoirScopeService(
         return await CanViewEventAsync(eventId, cancellationToken) ? ErrorCodes.ChoirNotLead : notFoundCode;
     }
 
-    public async Task<Guid?> GetLeadChoirIdAsync(Guid eventId, CancellationToken cancellationToken)
+    public async Task<Guid?> GetLeadChoirIdAsync(Guid eventId, CancellationToken cancellationToken) =>
+        (await GetLeadRowAsync(eventId, cancellationToken))?.ChoirId;
+
+    public async Task<IReadOnlyCollection<Guid>> GetLeadDirectorUserIdsAsync(
+        Guid eventId, CancellationToken cancellationToken)
+    {
+        if (await GetLeadRowAsync(eventId, cancellationToken) is not { } lead)
+        {
+            return [];
+        }
+
+        var directorId = (await choirRepository.GetByIdAsync(lead.ChoirId, cancellationToken))?.DirectorId;
+        return new[] { directorId, lead.SubstituteDirectorId }.OfType<Guid>().Distinct().ToList();
+    }
+
+    private async Task<LiturgicalEventChoir?> GetLeadRowAsync(Guid eventId, CancellationToken cancellationToken)
     {
         var eventChoirs = await eventChoirRepository.ListAsync(x => x.EventId == eventId, cancellationToken);
 
-        return eventChoirs.FirstOrDefault(x => x.IsLead)?.ChoirId
-            ?? (eventChoirs.Count == 1 ? eventChoirs[0].ChoirId : null);
+        return eventChoirs.FirstOrDefault(x => x.IsLead) ?? (eventChoirs.Count == 1 ? eventChoirs[0] : null);
     }
 
     public async Task<IReadOnlyCollection<Guid>?> GetEventMemberIdsAsync(

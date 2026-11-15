@@ -11,6 +11,19 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
   huống trước đây chưa có. FE bỏ qua trường lạ, hiển thị câu chung cho mã lạ.
 - Mỗi PR đổi hợp đồng thêm một dòng vào mục ngày tương ứng ở đây, cùng PR cập nhật `api.md` / `error-codes.md`.
 
+## 2026-11-15
+
+### Không phá vỡ
+
+- Setting mới `Roster.DifferentLocationExtraMinutes` (Int 0–240, mặc định 0, nhóm "Phân công"), tự thêm khi khởi động:
+  hai lễ ở hai nơi cử hành khác nhau phải cách nhau `Roster.EventOverlapMinutes` + N phút, áp cho phân công, gợi ý,
+  `hasTimeConflict` của lời mời và kiểm trùng khi dời sự kiện.
+- `PUT api/lookups/liturgical-seasons/{id}`: ngày mới bỏ ra ngoài một sự kiện sắp tới chưa huỷ thuộc mùa → 409 `LOOKUP_IN_USE`.
+- Thông báo `AssignmentNotice` "Ca viên rút khỏi sự kiện" và "Phân công bị gỡ do thu hồi kỹ năng" giờ gửi cả ca trưởng thay
+  thế của ca đoàn phụ trách (người thu hồi không tự nhận).
+- `DELETE api/choirs/{id}/members/{memberId}` làm gỡ dòng phân công: ca trưởng (và ca trưởng thay thế) của ca đoàn phụ
+  trách sự kiện nhận `AssignmentNotice` "Ca viên rời ca đoàn", trừ chính người gỡ.
+
 ## 2026-11-14
 
 ### Phá vỡ

@@ -21,7 +21,6 @@ public class MemberSkillServiceTests
     private readonly IFileStorageService _files = Substitute.For<IFileStorageService>();
     private readonly IServiceRosterRepository _rosters = Substitute.For<IServiceRosterRepository>();
     private readonly IChoirScopeService _scope = ChoirScopeFakes.Unrestricted();
-    private readonly IGenericRepository<Choir> _choirs = Substitute.For<IGenericRepository<Choir>>();
     private readonly MemberSkillService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly Guid _userId = Guid.NewGuid();
@@ -32,7 +31,7 @@ public class MemberSkillServiceTests
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<MemberSkillProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new MemberSkillService(_memberSkills, _members, _notifications, _files, _rosters, _scope, _choirs, mapper);
+        _sut = new MemberSkillService(_memberSkills, _members, _notifications, _files, _rosters, _scope, mapper);
         _rosters.GetUpcomingAssignmentsForUpdateAsync(default, default, default, default).ReturnsForAnyArgs([]);
         _files.UploadAsync(default!, default!, default!, default, default).ReturnsForAnyArgs(call =>
             Result<FileUploadResponse>.Success(new FileUploadResponse(
@@ -308,9 +307,8 @@ public class MemberSkillServiceTests
         var line = new RosterAssignment { Id = Guid.NewGuid(), MemberId = row.MemberId, SkillId = row.SkillId, Roster = roster };
         roster.Assignments.Add(line);
         _rosters.GetUpcomingAssignmentsForUpdateAsync(row.MemberId, row.SkillId, Arg.Any<DateOnly>(), _ct).Returns([line]);
-        var leadChoir = new Choir { Id = Guid.NewGuid(), DirectorId = leadDirectorId };
-        _scope.GetLeadChoirIdAsync(liturgicalEvent.Id, _ct).Returns(leadChoir.Id);
-        _choirs.GetByIdAsync(leadChoir.Id, _ct).Returns(leadChoir);
+        // The revoker stands in as substitute here, so only the choir's own director hears of the gap.
+        _scope.GetLeadDirectorUserIdsAsync(liturgicalEvent.Id, _ct).Returns([leadDirectorId, revokerId]);
 
         var result = await _sut.RevokeAsync(revokerId, row.Id, new RevokeMemberSkillRequest { Reason = " Lost voice " }, _ct);
 
