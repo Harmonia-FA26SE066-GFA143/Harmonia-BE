@@ -171,6 +171,7 @@ public class ChoirServiceTests
         Assert.True(result.Value.IsActive);
         await _choirs.Received(1).AddAsync(Arg.Is<Choir>(c => c.Name == "Cecilia"), _ct);
         await _choirs.Received(1).SaveChangesAsync(_ct);
+        Assert.Empty(_sent);
     }
 
     [Fact]
@@ -193,6 +194,9 @@ public class ChoirServiceTests
         Assert.Equal(director.Id, result.Value!.DirectorId);
         Assert.Equal("Anh Tuan", result.Value.DirectorFullName);
         await _choirs.Received(1).AddAsync(Arg.Is<Choir>(c => c.DirectorId == director.Id), _ct);
+        var notice = Assert.Single(_sent);
+        Assert.Equal((NotificationType.ChoirChanged, result.Value.Id), (notice.Type, notice.ReferenceId));
+        Assert.Equal([director.Id], notice.RecipientUserIds);
     }
 
     [Fact]
@@ -410,8 +414,8 @@ public class ChoirServiceTests
         Assert.Empty(roster.Assignments);
         Assert.Equal(RosterStatus.Draft, roster.Status);
         await _rosters.DidNotReceive().GetEventWithRosterAsync(shared.Id, _ct);
-        var notice = Assert.Single(_sent);
-        Assert.Equal((NotificationType.AssignmentNotice, _event.Id), (notice.Type, notice.ReferenceId));
+        var notice = Assert.Single(_sent, x => x.Type == NotificationType.AssignmentNotice);
+        Assert.Equal(_event.Id, notice.ReferenceId);
         Assert.Equal([leadDirectorId], notice.RecipientUserIds);
     }
 
@@ -542,6 +546,34 @@ public class ChoirServiceTests
         Assert.Equal(VietnamTime.Today, leftRow.JoinedDate);
         Assert.Equal(new DateOnly(2025, 1, 1), currentRow.JoinedDate);
         await _memberships.Received(1).SaveChangesAsync(_ct);
+        var notice = Assert.Single(_sent);
+        Assert.Equal((NotificationType.ChoirChanged, _choir.Id), (notice.Type, notice.ReferenceId));
+        Assert.Equal(new[] { fresh.UserId, returning.UserId }.Order(), notice.RecipientUserIds.Order());
+    }
+
+    [Fact]
+    public async Task AddMembers_AllAlreadyInChoir_SendsNothing_Async()
+    {
+        var current = NewMember();
+        NewMembership(current);
+
+        var result = await _sut.AddMembersAsync(_choir.Id, new AddChoirMembersRequest { MemberIds = [current.Id] }, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(_sent);
+    }
+
+    [Fact]
+    public async Task RemoveMember_NotifiesTheMember_Async()
+    {
+        var member = NewMember();
+        NewMembership(member);
+
+        await _sut.RemoveMemberAsync(_choir.Id, member.Id, _ct);
+
+        var notice = Assert.Single(_sent);
+        Assert.Equal((NotificationType.ChoirChanged, _choir.Id), (notice.Type, notice.ReferenceId));
+        Assert.Equal([member.UserId], notice.RecipientUserIds);
     }
 
     [Fact]

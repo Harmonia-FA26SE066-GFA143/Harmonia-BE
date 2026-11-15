@@ -45,6 +45,11 @@ public class ChoirService(
         await choirRepository.AddAsync(choir, cancellationToken);
         await choirRepository.SaveChangesAsync(cancellationToken);
 
+        if (request.DirectorId is not null)
+        {
+            await NotifyDirectorChangeAsync(choir, null, request.DirectorId, cancellationToken);
+        }
+
         return Result<ChoirDto>.Success((await ToDtosAsync([choir], cancellationToken))[0]);
     }
 
@@ -198,6 +203,7 @@ public class ChoirService(
                 x => x.ChoirId == choirId && memberIds.Contains(x.MemberId), cancellationToken))
             .ToDictionary(x => x.MemberId);
         var today = VietnamTime.Today;
+        var joinedMemberIds = new List<Guid>();
 
         foreach (var memberId in memberIds)
         {
@@ -207,23 +213,40 @@ public class ChoirService(
                 {
                     Id = Guid.NewGuid(), ChoirId = choirId, MemberId = memberId, JoinedDate = today,
                 }, cancellationToken);
+                joinedMemberIds.Add(memberId);
             }
             else if (!row.IsActive)
             {
                 var tracked = await membershipRepository.GetByIdAsync(row.Id, cancellationToken);
                 tracked!.IsActive = true;
                 tracked.JoinedDate = today;
+                joinedMemberIds.Add(memberId);
             }
         }
 
         await membershipRepository.SaveChangesAsync(cancellationToken);
+
+        // Members already in the choir hear nothing new.
+        var recipientIds = activeMembers
+            .Where(x => joinedMemberIds.Contains(x.Id))
+            .Select(x => x.UserId)
+            .ToList();
+        if (recipientIds.Count > 0)
+        {
+            await notificationService.SendAsync(
+                new SendNotificationRequest(
+                    NotificationType.ChoirChanged, "Gia nhập ca đoàn",
+                    $"Bạn được thêm vào ca đoàn {choir.Name}.", recipientIds, nameof(Choir), choir.Id),
+                cancellationToken);
+        }
 
         return Result.Success();
     }
 
     public async Task<Result> RemoveMemberAsync(Guid choirId, Guid memberId, CancellationToken cancellationToken)
     {
-        if (await GetManagedChoirAsync(choirId, cancellationToken) is null)
+        var choir = await GetManagedChoirAsync(choirId, cancellationToken);
+        if (choir is null)
         {
             return Result.Failure(ErrorCodes.ChoirNotFound);
         }
@@ -268,9 +291,19 @@ public class ChoirService(
 
         await membershipRepository.SaveChangesAsync(cancellationToken);
 
+        var member = (await memberRepository.GetByIdsWithUserAsync([memberId], cancellationToken)).SingleOrDefault();
+        if (member is not null)
+        {
+            await notificationService.SendAsync(
+                new SendNotificationRequest(
+                    NotificationType.ChoirChanged, "Rời ca đoàn",
+                    $"Bạn không còn ở ca đoàn {choir.Name}.", [member.UserId], nameof(Choir), choir.Id),
+                cancellationToken);
+        }
+
         if (reopened.Count > 0)
         {
-            await NotifyLeadDirectorsOfRemovalAsync(reopened, memberId, cancellationToken);
+            await NotifyLeadDirectorsOfRemovalAsync(reopened, member?.User.FullName, cancellationToken);
         }
 
         return Result.Success();
@@ -278,10 +311,9 @@ public class ChoirService(
 
     /// <summary>Tells who plans each event that a roster line went with the member; the caller already knows.</summary>
     private async Task NotifyLeadDirectorsOfRemovalAsync(
-        IReadOnlyCollection<LiturgicalEvent> events, Guid memberId, CancellationToken cancellationToken)
+        IReadOnlyCollection<LiturgicalEvent> events, string? memberFullName, CancellationToken cancellationToken)
     {
-        var memberName = (await memberRepository.GetByIdsWithUserAsync([memberId], cancellationToken))
-            .SingleOrDefault()?.User.FullName ?? "Một ca viên";
+        var memberName = memberFullName ?? "Một ca viên";
         foreach (var liturgicalEvent in events)
         {
             var directorIds = (await choirScope.GetLeadDirectorUserIdsAsync(liturgicalEvent.Id, cancellationToken))
