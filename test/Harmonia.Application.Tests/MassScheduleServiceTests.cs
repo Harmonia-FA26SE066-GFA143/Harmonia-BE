@@ -72,7 +72,8 @@ public class MassScheduleServiceTests
     private static DateOnly NextSunday()
     {
         var today = VietnamTime.Today;
-        return today.AddDays(((int)DayOfWeek.Sunday - (int)today.DayOfWeek + 7) % 7);
+        // Never today: a Mass earlier today has already passed and is skipped.
+        return today.AddDays(7 - (int)today.DayOfWeek);
     }
 
     [Fact]
@@ -165,6 +166,18 @@ public class MassScheduleServiceTests
         Assert.Equal(season.Id, _addedEvents[0].LiturgicalSeasonId);
         Assert.Null(_addedEvents[^1].LiturgicalSeasonId);
         await _events.Received(1).SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Generate_SkipsMassAlreadyOverToday_Async()
+    {
+        var today = VietnamTime.Today;
+        AddSchedule(today.DayOfWeek, 0);
+
+        var result = await _sut.GenerateEventsAsync(
+            new GenerateLiturgicalEventsRequest { FromDate = today, ToDate = today.AddDays(7) }, _ct);
+
+        Assert.Equal(today.AddDays(7), Assert.Single(result.Value!).EventDate);
     }
 
     [Fact]

@@ -456,6 +456,41 @@ public class LiturgicalEventServiceTests
     }
 
     [Fact]
+    public async Task Publish_DraftWhoseTimeHasPassed_ReturnsAlreadyPassed_Async()
+    {
+        DraftReadyToPublish();
+        var past = VietnamTime.Now.AddMinutes(-1);
+        (_event.EventDate, _event.Time) = (DateOnly.FromDateTime(past), TimeOnly.FromDateTime(past));
+
+        Assert.Equal(ErrorCodes.LiturgicalEventAlreadyPassed, (await _sut.PublishAsync(_event.Id, _ct)).Code);
+    }
+
+    [Fact]
+    public async Task Create_DraftWhoseTimeHasPassed_ReturnsAlreadyPassed_AndAddsNothing_Async()
+    {
+        var past = VietnamTime.Now.AddMinutes(-1);
+        var request = new CreateLiturgicalEventRequest
+        {
+            EventDate = DateOnly.FromDateTime(past), Time = TimeOnly.FromDateTime(past), LocationId = Guid.NewGuid(),
+            MassTypeId = Guid.NewGuid(), ChoirIds = [_choir.Id], LeadChoirId = _choir.Id,
+        };
+
+        Assert.Equal(ErrorCodes.LiturgicalEventAlreadyPassed, (await _sut.CreateAsync(request, _ct)).Code);
+        await _repository.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task Update_DraftMovedToPastTime_ReturnsAlreadyPassed_AndSavesNothing_Async()
+    {
+        _event.Status = EventStatus.Draft;
+        var request = UpdateRequest();
+        request.EventDate = VietnamTime.Today.AddDays(-1);
+
+        Assert.Equal(ErrorCodes.LiturgicalEventAlreadyPassed, (await _sut.UpdateAsync(_event.Id, request, _ct)).Code);
+        await _repository.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
     public async Task Publish_InactiveCatalog_ReturnsItsCode_Async()
     {
         DraftReadyToPublish();

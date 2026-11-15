@@ -90,12 +90,14 @@ public class MassScheduleService(
             .Select(x => (x.EventDate, x.Time, x.LocationId))
             .ToHashSet();
 
+        var now = VietnamTime.Now;
         var created = new List<LiturgicalEvent>();
         for (var date = from; date <= to; date = date.AddDays(1))
         {
             foreach (var schedule in schedules.Where(x => x.DayOfWeek == date.DayOfWeek).OrderBy(x => x.Time))
             {
-                if (taken.Contains((date, schedule.Time, schedule.LocationId))) continue;
+                // A Mass already over today could never be published, so no Draft for it.
+                if (date.ToDateTime(schedule.Time) <= now || taken.Contains((date, schedule.Time, schedule.LocationId))) continue;
 
                 created.Add(new LiturgicalEvent
                 {

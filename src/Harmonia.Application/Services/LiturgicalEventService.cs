@@ -61,6 +61,11 @@ public class LiturgicalEventService(
     public async Task<Result<LiturgicalEventDto>> CreateAsync(
         CreateLiturgicalEventRequest request, CancellationToken cancellationToken)
     {
+        if (HasPassed(request.EventDate, request.Time))
+        {
+            return Result<LiturgicalEventDto>.Failure(ErrorCodes.LiturgicalEventAlreadyPassed);
+        }
+
         // Same rule as events generated from Mass schedules: no season picked → the season covering the date.
         var seasonId = request.LiturgicalSeasonId ?? await lookupService.FindLiturgicalSeasonIdAsync(request.EventDate, cancellationToken);
 
@@ -141,6 +146,11 @@ public class LiturgicalEventService(
         if (liturgicalEvent.Status == EventStatus.Cancelled)
         {
             return Result<LiturgicalEventDto>.Failure(ErrorCodes.LiturgicalEventCancelled);
+        }
+
+        if (HasPassed(request.EventDate, request.Time))
+        {
+            return Result<LiturgicalEventDto>.Failure(ErrorCodes.LiturgicalEventAlreadyPassed);
         }
 
         var catalogs = await lookupService.CheckEventCatalogsAsync(
@@ -312,7 +322,7 @@ public class LiturgicalEventService(
     /// <summary>Publish rules a Draft may break but a published event may not; shared with create-and-publish.</summary>
     private static string? CheckPublishFields(LiturgicalEvent liturgicalEvent)
     {
-        if (liturgicalEvent.EventDate < VietnamTime.Today) return ErrorCodes.LiturgicalEventAlreadyPassed;
+        if (HasPassed(liturgicalEvent.EventDate, liturgicalEvent.Time)) return ErrorCodes.LiturgicalEventAlreadyPassed;
         if (liturgicalEvent.MassTypeId is null && liturgicalEvent.CeremonyTypeId is null)
         {
             return ErrorCodes.LiturgicalEventTypeRequired;
@@ -320,6 +330,9 @@ public class LiturgicalEventService(
 
         return liturgicalEvent.LiturgicalSeasonId is null ? ErrorCodes.LiturgicalEventSeasonRequired : null;
     }
+
+    // Event date and time are parish wall-clock values stored without a zone.
+    private static bool HasPassed(DateOnly eventDate, TimeOnly time) => eventDate.ToDateTime(time) <= VietnamTime.Now;
 
     private async Task<string?> CheckPublishableAsync(LiturgicalEvent liturgicalEvent, CancellationToken cancellationToken)
     {
