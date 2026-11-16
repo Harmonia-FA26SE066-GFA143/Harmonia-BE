@@ -369,6 +369,8 @@ public static class ErrorCodes
     // 11. Practice assignment & submission.
     public const string PracticeAssignmentNotFound = "PRACTICE_ASSIGNMENT_NOT_FOUND";
 
+    public const string PracticeAssignmentNoRecipients = "PRACTICE_ASSIGNMENT_NO_RECIPIENTS";
+
     public const string PracticeDueDateInPast = "PRACTICE_DUE_DATE_IN_PAST";
 
     public const string PracticeTargetRequired = "PRACTICE_TARGET_REQUIRED";

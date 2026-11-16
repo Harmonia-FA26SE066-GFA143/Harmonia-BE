@@ -145,6 +145,30 @@ public class PracticeAssignmentServiceTests
     }
 
     [Fact]
+    public async Task Create_AllScope_ChoirWithoutActiveMembers_ReturnsNoRecipients_Async()
+    {
+        _scope.GetChoirMemberIdsAsync(Arg.Any<Guid?>(), _ct).Returns([_leftMember.Id]);
+
+        var result = await _sut.CreateAsync(Request(AssignmentScope.All), _ct);
+
+        Assert.Equal(ErrorCodes.PracticeAssignmentNoRecipients, result.Code);
+        await AssertNothingSavedAsync();
+    }
+
+    [Fact]
+    public async Task Create_SkillGroupScope_NoSkillHolderInTheChoir_ReturnsNoRecipients_Async()
+    {
+        _memberSkills.GetActiveMemberUserIdsBySkillsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), _ct).Returns([Guid.NewGuid()]);
+        var request = Request(AssignmentScope.SkillGroup);
+        request.SkillIds = [_soprano.Id];
+
+        var result = await _sut.CreateAsync(request, _ct);
+
+        Assert.Equal(ErrorCodes.PracticeAssignmentNoRecipients, result.Code);
+        await AssertNothingSavedAsync();
+    }
+
+    [Fact]
     public async Task Create_AllScope_NotifiesOnlyActiveMembersOfTheChoir_Async()
     {
         var result = await _sut.CreateAsync(Request(AssignmentScope.All), _ct);

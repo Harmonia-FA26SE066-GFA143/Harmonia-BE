@@ -688,6 +688,20 @@ public class RosterServiceTests
     }
 
     [Fact]
+    public async Task ReplaceAssignment_FinalizedRoster_ReplacesTheLine_Async()
+    {
+        var old = SopranoLine(_binh);
+        var roster = RosterWith(RosterStatus.Finalized, old);
+        MemberIs(_an);
+
+        var result = await _sut.ReplaceAssignmentAsync(old.Id, new ReplaceRosterAssignmentRequest { MemberId = _an }, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(RosterAssignmentStatus.Replaced, old.Status);
+        Assert.Equal(_an, roster.Assignments.Single(x => x.Status == RosterAssignmentStatus.Active).MemberId);
+    }
+
+    [Fact]
     public async Task ReplaceAssignment_AlreadyReplacedLine_ReturnsAssignmentNotFound_Async()
     {
         var old = SopranoLine(_binh);

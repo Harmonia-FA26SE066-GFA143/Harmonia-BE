@@ -127,6 +127,11 @@ public class PracticeAssignmentService(
                 break;
         }
 
+        if (recipientUserIds.Count == 0)
+        {
+            return Result<PracticeAssignmentDto>.Failure(ErrorCodes.PracticeAssignmentNoRecipients);
+        }
+
         await practiceAssignmentRepository.AddAsync(assignment, cancellationToken);
         await practiceAssignmentRepository.SaveChangesAsync(cancellationToken);
 

@@ -191,6 +191,7 @@ public static class ErrorStatusMap
 
         // 11. Practice assignment & submission.
         [ErrorCodes.PracticeAssignmentNotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.PracticeAssignmentNoRecipients] = StatusCodes.Status422UnprocessableEntity,
         [ErrorCodes.PracticeDueDateInPast] = StatusCodes.Status400BadRequest,
         [ErrorCodes.PracticeTargetRequired] = StatusCodes.Status400BadRequest,
         [ErrorCodes.PracticeNotAssignedToMember] = StatusCodes.Status409Conflict,

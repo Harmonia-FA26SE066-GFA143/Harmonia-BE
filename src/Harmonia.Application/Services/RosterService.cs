@@ -391,8 +391,9 @@ public class RosterService(
         if (await choirScope.CheckCanLeadEventAsync(roster.EventId, ErrorCodes.RosterAssignmentNotFound, cancellationToken)
             is { } scopeError)
             return Result<RosterAssignmentDto>.Failure(scopeError);
-        // A locked whole-service line can still change hands (the organist falls ill); the new member is told separately.
-        if (RosterNotEditableCode(roster) is { } rosterError) return Result<RosterAssignmentDto>.Failure(rosterError);
+        // A finalized roster or locked whole-service line can still change hands (a member drops out after finalizing);
+        // the new member is told separately.
+        if (EventNotEditableCode(roster.LiturgicalEvent) is { } eventError) return Result<RosterAssignmentDto>.Failure(eventError);
 
         var memberError = await MemberNotAssignableCodeAsync(
             roster, roster.LiturgicalEvent, old.SongListItemId, old.SkillId, request.MemberId, cancellationToken);

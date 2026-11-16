@@ -294,6 +294,7 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 | Mã | HTTP | Tiếng Việt |
 |---|---|---|
 | `PRACTICE_ASSIGNMENT_NOT_FOUND` | 404 | Không tìm thấy bài tập |
+| `PRACTICE_ASSIGNMENT_NO_RECIPIENTS` | 422 | Không có ca viên nào nhận bài tập này |
 | `PRACTICE_DUE_DATE_IN_PAST` | 400 | Hạn nộp không được ở quá khứ |
 | `PRACTICE_TARGET_REQUIRED` | 400 | Vui lòng chọn ca viên hoặc nhóm kỹ năng nhận bài tập |
 | `PRACTICE_NOT_ASSIGNED_TO_MEMBER` | 409 | Bài tập này không dành cho bạn |
@@ -466,3 +467,6 @@ xem — trả 404, để không lộ sự tồn tại của bản ghi.
 - 2026-11-07: thêm `CHOIR_CHANGE_REASON_REQUIRED` — cha xứ gán ca trưởng thay thế cho một sự kiện
   (`PUT .../choirs/{choirId}/substitute-director`) hoặc gỡ ca đoàn khỏi sự kiện đã công bố (`PUT .../choirs`) mà không nhập lý do.
   Người thay không phải ca trưởng đang hoạt động, hoặc trùng ca trưởng chính của ca đoàn, trả `CHOIR_DIRECTOR_INVALID`.
+- 2026-11-16: thêm `PRACTICE_ASSIGNMENT_NO_RECIPIENTS` — giao bài tập mà không ai nhận (ca đoàn chưa có ca viên đang
+  hoạt động, hoặc không ai trong ca đoàn có kỹ năng đã chọn); không tạo bài. Thay người (`POST .../assignments/{id}/replacement`)
+  không còn trả `ROSTER_ALREADY_FINALIZED` khi bảng phân công đã chốt — vẫn chặn khi sự kiện đã huỷ hoặc đã qua.
