@@ -11,6 +11,13 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
   huống trước đây chưa có. FE bỏ qua trường lạ, hiển thị câu chung cho mã lạ.
 - Mỗi PR đổi hợp đồng thêm một dòng vào mục ngày tương ứng ở đây, cùng PR cập nhật `api.md` / `error-codes.md`.
 
+## 2026-11-16
+
+### Không phá vỡ
+
+- `RehearsalAttendanceDto` (`GET api/rehearsals/{id}/attendances`) thêm `isActive`: `false` với ca viên đã ngừng sinh hoạt
+  sau khi được điểm danh. FE khoá dòng đó — gửi `PUT` cho họ vẫn trả 409 `MEMBER_NOT_ACTIVE`.
+
 ## 2026-11-15
 
 ### Không phá vỡ

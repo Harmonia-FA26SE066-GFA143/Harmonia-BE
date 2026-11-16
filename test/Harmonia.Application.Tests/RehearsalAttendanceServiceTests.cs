@@ -206,6 +206,18 @@ public class RehearsalAttendanceServiceTests
     }
 
     [Fact]
+    public async Task GetAttendances_MemberLeftAfterRecorded_ReturnsInactiveLine_Async()
+    {
+        _bob.Status = MemberStatus.Left;
+        _bob.RehearsalAttendances.Add(new RehearsalAttendance { MemberId = _bob.Id, Status = AttendanceStatus.Present });
+        _members.GetAttendanceRosterAsync(_rehearsal.Id, null, _ct).Returns([_alice, _bob]);
+
+        var result = await _sut.GetAttendancesAsync(_rehearsal.Id, _ct);
+
+        Assert.Equal([true, false], result.Value!.Select(x => x.IsActive));
+    }
+
+    [Fact]
     public async Task GetAttendances_RehearsalMissing_ReturnsNotFound_Async()
     {
         var result = await _sut.GetAttendancesAsync(Guid.NewGuid(), _ct);

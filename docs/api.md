@@ -2235,10 +2235,11 @@ của `RosterAssignmentDto`. Chỉ là cảnh báo, buổi tập vẫn được 
 ### `RehearsalAttendanceDto`
 
 ```json
-{ "memberId": "guid", "fullName": "Nguyễn Văn A", "status": "Present", "checkedAt": "2026-10-09T12:00:00Z" }
+{ "memberId": "guid", "fullName": "Nguyễn Văn A", "status": "Present", "checkedAt": "2026-10-09T12:00:00Z", "isActive": true }
 ```
 
 `status`: `Present` | `Absent` | `Late` | `Excused`, hoặc `null` khi chưa điểm danh (khi đó `checkedAt` cũng `null`).
+`isActive`: `false` với ca viên đã ngừng sinh hoạt sau khi được điểm danh — dòng chỉ để xem, gửi `PUT` cho họ → 409 `MEMBER_NOT_ACTIVE`.
 
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|

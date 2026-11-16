@@ -12,4 +12,7 @@ public class RehearsalAttendanceDto
     public AttendanceStatus? Status { get; set; }
 
     public DateTime? CheckedAt { get; set; }
+
+    /// <summary>False for a member who left or went inactive after being recorded; their line is read-only.</summary>
+    public bool IsActive { get; set; }
 }

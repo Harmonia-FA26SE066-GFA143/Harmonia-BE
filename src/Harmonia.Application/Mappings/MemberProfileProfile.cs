@@ -55,6 +55,7 @@ public class MemberProfileProfile : Profile
             .ForMember(dest => dest.Status, opt => opt.MapFrom(src =>
                 src.RehearsalAttendances.Select(a => (AttendanceStatus?)a.Status).FirstOrDefault()))
             .ForMember(dest => dest.CheckedAt, opt => opt.MapFrom(src =>
-                src.RehearsalAttendances.Select(a => (DateTime?)a.CheckedAt).FirstOrDefault()));
+                src.RehearsalAttendances.Select(a => (DateTime?)a.CheckedAt).FirstOrDefault()))
+            .ForMember(dest => dest.IsActive, opt => opt.MapFrom(src => src.Status == MemberStatus.Active));
     }
 }
