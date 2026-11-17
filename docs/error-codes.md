@@ -279,6 +279,7 @@ một quyết định; đã quyết thì `Status` không còn `Submitted`).
 |---|---|---|
 | `REHEARSAL_NOT_FOUND` | 404 | Không tìm thấy buổi tập |
 | `REHEARSAL_TIME_INVALID` | 400 | Giờ kết thúc phải sau giờ bắt đầu |
+| `REHEARSAL_START_IN_PAST` | 400 | Không tạo được buổi tập trong quá khứ |
 | `REHEARSAL_TIME_CONFLICT` | 409 | Địa điểm đã có buổi tập khác vào giờ này |
 | `REHEARSAL_ALREADY_PASSED` | 409 | Buổi tập đã diễn ra |
 | `REHEARSAL_ATTENDANCE_NOT_FOUND` | 404 | Không tìm thấy bản ghi điểm danh |

@@ -177,6 +177,7 @@ public static class ErrorStatusMap
         // 10. Rehearsal & attendance.
         [ErrorCodes.RehearsalNotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.RehearsalTimeInvalid] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.RehearsalStartInPast] = StatusCodes.Status400BadRequest,
         [ErrorCodes.RehearsalTimeConflict] = StatusCodes.Status409Conflict,
         [ErrorCodes.RehearsalAlreadyPassed] = StatusCodes.Status409Conflict,
         [ErrorCodes.RehearsalHasAttendance] = StatusCodes.Status409Conflict,

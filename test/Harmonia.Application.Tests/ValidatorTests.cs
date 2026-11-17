@@ -685,8 +685,8 @@ public class ValidatorTests
     private static CreateRehearsalRequest NewRehearsal(params Guid[] songIds) => new()
     {
         ChoirId = Guid.NewGuid(),
-        StartTime = new DateTime(2026, 12, 1, 12, 0, 0, DateTimeKind.Utc),
-        EndTime = new DateTime(2026, 12, 1, 14, 0, 0, DateTimeKind.Utc),
+        StartTime = DateTime.UtcNow.AddDays(7),
+        EndTime = DateTime.UtcNow.AddDays(7).AddHours(2),
         Songs = songIds.Select(id => new UpdateRehearsalSongRequest { SongId = id }).ToList(),
     };
 
@@ -760,6 +760,16 @@ public class ValidatorTests
         request.EndTime = request.StartTime.AddHours(hoursAfterStart);
 
         Assert.Equal([ErrorCodes.RehearsalTimeInvalid], ErrorCodesOf(new CreateRehearsalRequestValidator(), request));
+    }
+
+    [Fact]
+    public void CreateRehearsal_StartInPast_ReturnsStartInPast()
+    {
+        var request = NewRehearsal();
+        request.StartTime = DateTime.UtcNow.AddMinutes(-1);
+        request.EndTime = DateTime.UtcNow.AddHours(1);
+
+        Assert.Equal([ErrorCodes.RehearsalStartInPast], ErrorCodesOf(new CreateRehearsalRequestValidator(), request));
     }
 
     [Fact]

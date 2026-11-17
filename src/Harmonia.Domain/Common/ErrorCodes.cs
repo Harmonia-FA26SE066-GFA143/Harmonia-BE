@@ -344,6 +344,8 @@ public static class ErrorCodes
 
     public const string RehearsalTimeInvalid = "REHEARSAL_TIME_INVALID";
 
+    public const string RehearsalStartInPast = "REHEARSAL_START_IN_PAST";
+
     public const string RehearsalTimeConflict = "REHEARSAL_TIME_CONFLICT";
 
     public const string RehearsalAlreadyPassed = "REHEARSAL_ALREADY_PASSED";

@@ -14,6 +14,12 @@ public class CreateRehearsalRequestValidator : AbstractValidator<CreateRehearsal
         RuleFor(x => x.StartTime).NotEmpty();
         RuleFor(x => x.EndTime).NotEmpty();
 
+        RuleFor(x => x.StartTime)
+            .GreaterThan(_ => DateTime.UtcNow)
+            .WithErrorCode(ErrorCodes.RehearsalStartInPast)
+            .WithMessage("StartTime cannot be in the past.")
+            .When(x => x.StartTime != default);
+
         RuleFor(x => x.EndTime)
             .GreaterThan(x => x.StartTime)
             .WithErrorCode(ErrorCodes.RehearsalTimeInvalid)

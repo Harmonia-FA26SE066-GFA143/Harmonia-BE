@@ -2228,7 +2228,7 @@ phục vụ, không phụ trách sự kiện (sửa sẽ trả 403 `CHOIR_NOT_LE
 
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
-| POST | `/api/rehearsals` · `ChoirDirector` | `{ "choirId?", "isJoint?", "eventId?", "locationId?", "startTime", "endTime", "note?", "songs": [{ "songId", "note" }] }` | 200 `RehearsalDto` | 400 `VALIDATION_FAILED` (`REHEARSAL_TIME_INVALID`, `REHEARSAL_SONG_DUPLICATE`) · 403 `CHOIR_NOT_LEAD` (buổi tập chung) · 404 `LITURGICAL_EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND`, `SONG_NOT_FOUND`, `CHOIR_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `CHOIR_INACTIVE`, `CHOIR_NOT_SERVING_EVENT`, `LOOKUP_INACTIVE`, `REHEARSAL_TIME_CONFLICT`, `SONG_INACTIVE` |
+| POST | `/api/rehearsals` · `ChoirDirector` | `{ "choirId?", "isJoint?", "eventId?", "locationId?", "startTime", "endTime", "note?", "songs": [{ "songId", "note" }] }` | 200 `RehearsalDto` | 400 `VALIDATION_FAILED` (`REHEARSAL_TIME_INVALID`, `REHEARSAL_START_IN_PAST`, `REHEARSAL_SONG_DUPLICATE`) · 403 `CHOIR_NOT_LEAD` (buổi tập chung) · 404 `LITURGICAL_EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND`, `SONG_NOT_FOUND`, `CHOIR_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `CHOIR_INACTIVE`, `CHOIR_NOT_SERVING_EVENT`, `LOOKUP_INACTIVE`, `REHEARSAL_TIME_CONFLICT`, `SONG_INACTIVE` |
 | GET | `/api/rehearsals?eventId=&fromDate=&toDate=&pageNumber=&pageSize=` · `ChoirDirector` | — | 200 `PagedList<RehearsalDto>` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`) |
 | PUT | `/api/rehearsals/{id}` · `ChoirDirector` | `{ "eventId?", "locationId?", "startTime", "endTime", "note?" }` | 200 `RehearsalDto` | 400 `VALIDATION_FAILED` (`REHEARSAL_TIME_INVALID`) · 404 `REHEARSAL_NOT_FOUND`, `LITURGICAL_EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND` · 409 `REHEARSAL_ALREADY_PASSED`, `LITURGICAL_EVENT_CANCELLED`, `LOOKUP_INACTIVE`, `REHEARSAL_TIME_CONFLICT`, `CHOIR_INACTIVE`, `CHOIR_NOT_SERVING_EVENT` (đổi sự kiện), `REHEARSAL_JOINT_EVENT_LOCKED` · 403 `CHOIR_NOT_LEAD` (buổi tập chung) |
 | DELETE | `/api/rehearsals/{id}` · `ChoirDirector` | — | 204 | 404 `REHEARSAL_NOT_FOUND` · 409 `REHEARSAL_HAS_ATTENDANCE` |
@@ -2244,6 +2244,7 @@ phục vụ, không phụ trách sự kiện (sửa sẽ trả 403 `CHOIR_NOT_LE
 - `eventId` tuỳ chọn: có thì buổi tập là buổi chuẩn bị cho sự kiện đó (sự kiện đã huỷ → 409 `LITURGICAL_EVENT_CANCELLED`);
   bỏ trống là buổi tập thường. `locationId` tuỳ chọn, lấy từ `GET /api/lookups/worship-locations`.
 - `endTime` phải sau `startTime` (`REHEARSAL_TIME_INVALID`). `note` tối đa 500 ký tự.
+- Khi tạo, `startTime` phải ở tương lai (`REHEARSAL_START_IN_PAST`).
 - 409 `REHEARSAL_TIME_CONFLICT`: nơi tập đã có buổi tập khác trùng giờ. Không chọn `locationId` thì không kiểm trùng.
 - `songs` bắt buộc gửi (có thể `[]`), không trùng `songId`; thứ tự trong mảng là thứ tự hiển thị — server tự đánh
   `displayOrder` từ 1. `note` của từng bài tối đa 500 ký tự.
