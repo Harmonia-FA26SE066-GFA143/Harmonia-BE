@@ -2213,7 +2213,7 @@ Lên lịch tập và điểm danh chỉ dành cho `ChoirDirector`. Danh sách b
 ```json
 {
   "id": "guid", "choirId": "guid | null", "isJoint": false, "eventId": "guid", "locationId": "guid", "locationName": "Nhà thờ chính",
-  "startTime": "2026-10-09T12:00:00Z", "endTime": "2026-10-09T13:30:00Z", "note": "tập bè", "canManage": true,
+  "startTime": "2026-10-09T12:00:00Z", "endTime": "2026-10-09T13:30:00Z", "note": "tập bè", "isPassed": false, "canManage": true,
   "songs": [{ "songId": "guid", "songTitle": "Kinh Hòa Bình", "displayOrder": 1, "note": "tập kỹ điệp khúc" }],
   "memberConflicts": [{ "memberId": "guid", "fullName": "Nguyễn Văn An", "eventId": "guid", "eventDate": "2026-10-09", "time": "19:00:00" }]
 }
@@ -2225,6 +2225,8 @@ của `RosterAssignmentDto`. Chỉ là cảnh báo, buổi tập vẫn được 
 
 `canManage`: người gọi sửa / xoá được buổi tập và điểm danh được. `false` với buổi tập chung mà ca đoàn của người gọi chỉ
 phục vụ, không phụ trách sự kiện (sửa sẽ trả 403 `CHOIR_NOT_LEAD`).
+
+`isPassed`: buổi tập đã kết thúc (`endTime` trước giờ hiện tại) — FE gắn tag "Đã qua"; sửa sẽ trả 409 `REHEARSAL_ALREADY_PASSED`.
 
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
