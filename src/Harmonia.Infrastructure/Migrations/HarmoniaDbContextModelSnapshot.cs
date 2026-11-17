@@ -616,11 +616,15 @@ namespace Harmonia.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("CalendarKey")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<string>("ColorHex")
                         .HasMaxLength(7)
                         .HasColumnType("nvarchar(7)");
 
-                    b.Property<DateOnly>("EndDate")
+                    b.Property<DateOnly?>("EndDate")
                         .HasColumnType("date");
 
                     b.Property<bool>("IsActive")
@@ -631,10 +635,14 @@ namespace Harmonia.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<DateOnly>("StartDate")
+                    b.Property<DateOnly?>("StartDate")
                         .HasColumnType("date");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CalendarKey")
+                        .IsUnique()
+                        .HasFilter("[CalendarKey] IS NOT NULL AND [IsActive] = 1");
 
                     b.ToTable("LiturgicalSeasons");
                 });
