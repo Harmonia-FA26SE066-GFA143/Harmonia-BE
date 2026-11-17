@@ -21,6 +21,9 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
   (tạo, sinh từ giờ lễ cố định, công bố khi chưa có mùa) lấy theo lịch đã đồng bộ; lễ từ 17:00 đêm trước mùa mới lấy mùa
   mới. Mã mới `LITURGICAL_SEASON_CALENDAR_KEY_INVALID` (400), `LITURGICAL_SEASON_CALENDAR_KEY_DUPLICATE` (409). Các mùa theo
   năm cũ vẫn dùng được; Admin tắt khi không cần, phân loại bài hát theo mùa cần chọn lại sang mùa có key.
+- **[Phá vỡ]** Danh sách bài hát bị khoá khi sự kiện đã huỷ hoặc đã tới giờ lễ: `POST api/song-lists`,
+  `PUT api/song-lists/{id}/items`, `POST .../submit`, `POST .../review` trả 409 `LITURGICAL_EVENT_CANCELLED` hoặc
+  `LITURGICAL_EVENT_ALREADY_PASSED` (mã đã có). Trước đây sửa / nộp / duyệt vẫn qua.
 
 ### Không phá vỡ
 

@@ -47,7 +47,11 @@ public class SongListServiceTests
             .CreateMapper();
         _sut = new SongListService(_songLists, _events, _songs, _slots, _users, _notifications, ChoirScopeFakes.Unrestricted(), _settings, mapper);
 
-        _event = new LiturgicalEvent { Id = _eventId, Status = EventStatus.Published };
+        // Upcoming: a song list of a past event is locked.
+        _event = new LiturgicalEvent
+        {
+            Id = _eventId, Status = EventStatus.Published, EventDate = VietnamTime.Today.AddDays(7), Time = new TimeOnly(9, 0),
+        };
         _events.GetByIdAsync(_eventId, _ct).Returns(_event);
         // Run the service's predicate over in-memory rows, so a missing id really is missing.
         _songRows.Add(new Song { Id = _songId, IsActive = true });
@@ -535,6 +539,29 @@ public class SongListServiceTests
         Assert.Equal(ErrorCodes.SongListNotSubmitted, result.Code);
         Assert.Equal(status, songList.Status);
         await _songLists.DidNotReceiveWithAnyArgs().AddReviewAsync(default!, default);
+    }
+
+    // ---- Closed event ----
+
+    [Theory]
+    [InlineData(true, ErrorCodes.LiturgicalEventCancelled)]
+    [InlineData(false, ErrorCodes.LiturgicalEventAlreadyPassed)]
+    public async Task EveryWrite_CancelledOrPassedEvent_ReturnsItsCode_AndChangesNothing_Async(bool cancelled, string code)
+    {
+        if (cancelled) _event.Status = EventStatus.Cancelled;
+        else _event.EventDate = VietnamTime.Today.AddDays(-1);
+        var draft = Existing(SongListStatus.Draft);
+
+        var create = await _sut.CreateAsync(NewCreateRequest(), _directorId, _ct);
+        var update = await _sut.UpdateItemsAsync(draft.Id, new UpdateSongListItemsRequest(), _ct);
+        var submit = await _sut.SubmitAsync(draft.Id, _ct);
+        var submitted = Existing(SongListStatus.Submitted);
+        var review = await _sut.ReviewAsync(
+            submitted.Id, new ReviewSongListRequest { Decision = ReviewDecision.Approve }, _priestId, _ct);
+
+        Assert.Equal([code, code, code, code], new[] { create.Code, update.Code, submit.Code, review.Code });
+        Assert.Equal((SongListStatus.Draft, SongListStatus.Submitted), (draft.Status, submitted.Status));
+        await _songLists.DidNotReceiveWithAnyArgs().SaveChangesAsync(default);
     }
 
     [Fact]

@@ -101,9 +101,9 @@ public class SongListService(
             return Result<SongListDto>.Failure(scopeError);
         }
 
-        if (liturgicalEvent.Status == EventStatus.Cancelled)
+        if (EventClosedCode(liturgicalEvent) is { } closedError)
         {
-            return Result<SongListDto>.Failure(ErrorCodes.LiturgicalEventCancelled);
+            return Result<SongListDto>.Failure(closedError);
         }
 
         // Only the Parish Priest sees a Draft event; every other role sees it once it is published.
@@ -178,6 +178,11 @@ public class SongListService(
             return Result<SongListDto>.Failure(scopeError);
         }
 
+        if (await EventClosedCodeAsync(songList.EventId, cancellationToken) is { } closedError)
+        {
+            return Result<SongListDto>.Failure(closedError);
+        }
+
         var latest = await songListRepository.GetLatestVersionAsync(songList.EventId, cancellationToken);
         if (latest is null || latest.Id != songList.Id)
         {
@@ -230,6 +235,11 @@ public class SongListService(
                 songList.EventId, ErrorCodes.SongListNotFound, cancellationToken) is { } scopeError)
         {
             return Result<SongListDto>.Failure(scopeError);
+        }
+
+        if (await EventClosedCodeAsync(songList.EventId, cancellationToken) is { } closedError)
+        {
+            return Result<SongListDto>.Failure(closedError);
         }
 
         var latest = await songListRepository.GetLatestVersionAsync(songList.EventId, cancellationToken);
@@ -296,6 +306,11 @@ public class SongListService(
         if (songList.Status != SongListStatus.Submitted)
         {
             return Result<SongListDto>.Failure(ErrorCodes.SongListNotSubmitted);
+        }
+
+        if (await EventClosedCodeAsync(songList.EventId, cancellationToken) is { } closedError)
+        {
+            return Result<SongListDto>.Failure(closedError);
         }
 
         songList.Status = request.Decision switch
@@ -394,5 +409,23 @@ public class SongListService(
         var slots = await slotRepository.ListAsync(x => slotIds.Contains(x.Id), cancellationToken);
         if (slots.Count != slotIds.Count) return ErrorCodes.SlotNotFound;
         return slots.Any(x => !x.IsActive) ? ErrorCodes.LookupInactive : null;
+    }
+
+    /// <summary>
+    /// A song list of a cancelled event, or of one whose Mass has begun, can no longer be proposed, edited, submitted
+    /// or reviewed; null while the event is open.
+    /// </summary>
+    private async Task<string?> EventClosedCodeAsync(Guid eventId, CancellationToken cancellationToken) =>
+        await liturgicalEventRepository.GetByIdAsync(eventId, cancellationToken) is { } liturgicalEvent
+            ? EventClosedCode(liturgicalEvent)
+            : ErrorCodes.LiturgicalEventNotFound;
+
+    // Event date and time are parish wall-clock values stored without a zone, as in LiturgicalEventService.
+    private static string? EventClosedCode(LiturgicalEvent liturgicalEvent)
+    {
+        if (liturgicalEvent.Status == EventStatus.Cancelled) return ErrorCodes.LiturgicalEventCancelled;
+        return liturgicalEvent.EventDate.ToDateTime(liturgicalEvent.Time) <= VietnamTime.Now
+            ? ErrorCodes.LiturgicalEventAlreadyPassed
+            : null;
     }
 }
