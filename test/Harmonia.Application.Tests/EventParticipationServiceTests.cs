@@ -18,6 +18,7 @@ public class EventParticipationServiceTests
     private readonly ILiturgicalEventRepository _events = Substitute.For<ILiturgicalEventRepository>();
     private readonly IMemberProfileRepository _members = Substitute.For<IMemberProfileRepository>();
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
+    private readonly INotificationPublisher _publisher = Substitute.For<INotificationPublisher>();
     private readonly ISystemSettingService _settings = Substitute.For<ISystemSettingService>();
     private readonly IServiceRosterRepository _rosters = Substitute.For<IServiceRosterRepository>();
     private readonly IChoirScopeService _scope = ChoirScopeFakes.Unrestricted();
@@ -42,7 +43,7 @@ public class EventParticipationServiceTests
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<EventParticipationProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
         _sut = new EventParticipationService(
-            _participations, _events, _members, _notifications, _scope, _settings, _rosters, _roster, mapper);
+            _participations, _events, _members, _notifications, _scope, _settings, _rosters, _roster, _publisher, mapper);
         _settings.GetIntAsync(SystemSettingKeys.ParticipationChangeCutoffHours, _ct).Returns(24);
         _roster.GetMembersServingNearAsync(Arg.Any<LiturgicalEvent>(), Arg.Any<IReadOnlyCollection<Guid>>(), _ct)
             .Returns(Array.Empty<Guid>());
@@ -286,6 +287,22 @@ public class EventParticipationServiceTests
         Assert.NotNull(participation.RespondedAt);
         Assert.Equal("Anna", result.Value!.MemberFullName);
         await _participations.Received(1).SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Respond_PushesTheAnswerToTheLeadDirectors_WithoutStoringANotification_Async()
+    {
+        Invitation(_anna);
+        IReadOnlyCollection<Guid> directors = [Guid.NewGuid(), Guid.NewGuid()];
+        _scope.GetLeadDirectorUserIdsAsync(_event.Id, _ct).Returns(directors);
+
+        Assert.True((await _sut.RespondAsync(_anna.UserId, _event.Id, Confirm(), _ct)).IsSuccess);
+
+        await _publisher.Received(1).PublishParticipationChangedAsync(
+            Arg.Is<ParticipationChangedDto>(x => x.EventId == _event.Id && x.MemberId == _anna.Id
+                && x.Status == ParticipationStatus.Confirmed),
+            directors, _ct);
+        await _notifications.DidNotReceiveWithAnyArgs().SendAsync(default!, default);
     }
 
     [Fact]

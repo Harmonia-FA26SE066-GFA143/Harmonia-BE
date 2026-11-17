@@ -5,9 +5,12 @@ public class SaveLiturgicalSeasonRequest
 {
     public string Name { get; set; } = string.Empty;
 
-    public DateOnly StartDate { get; set; }
+    /// <summary>The calendar season the row stands for; without it both dates are required.</summary>
+    public string? CalendarKey { get; set; }
 
-    public DateOnly EndDate { get; set; }
+    public DateOnly? StartDate { get; set; }
+
+    public DateOnly? EndDate { get; set; }
 
     public string? ColorHex { get; set; }
 

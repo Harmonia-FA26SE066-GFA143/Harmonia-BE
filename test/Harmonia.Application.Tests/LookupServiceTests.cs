@@ -27,6 +27,8 @@ public class LookupServiceTests
     private readonly IGenericRepository<SongVocalRequirement> _vocalRequirements = Substitute.For<IGenericRepository<SongVocalRequirement>>();
     private readonly IGenericRepository<SongInstrumentRequirement> _instrumentRequirements = Substitute.For<IGenericRepository<SongInstrumentRequirement>>();
     private readonly IGenericRepository<LiturgicalSlotRequirement> _slotRequirements = Substitute.For<IGenericRepository<LiturgicalSlotRequirement>>();
+    private readonly ILiturgicalDayRepository _days = Substitute.For<ILiturgicalDayRepository>();
+    private readonly TimeOnly _eventTime = new(9, 0);
     private readonly LookupService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
 
@@ -58,11 +60,13 @@ public class LookupServiceTests
             _slotRequirements,
             _rosters,
             _events,
+            _days,
             mapper);
 
         Rows(_vocalRequirements);
         Rows(_instrumentRequirements);
         Rows(_events);
+        _days.GetRangeAsync(default, default, default).ReturnsForAnyArgs([]);
         _rosters.GetUpcomingAssignmentsForUpdateAsync(default, default, default, default).ReturnsForAnyArgs([]);
     }
 
@@ -393,7 +397,7 @@ public class LookupServiceTests
         var season = Season(_eventDate, _eventDate.AddDays(10));
 
         var result = await _sut.CheckEventCatalogsAsync(
-            _eventDate, season.Id, MassTypeRow().Id, null, null, Location().Id, null, _ct);
+            _eventDate, _eventTime, season.Id, MassTypeRow().Id, null, null, Location().Id, null, _ct);
 
         Assert.True(result.IsSuccess);
     }
@@ -401,9 +405,9 @@ public class LookupServiceTests
     [Fact]
     public async Task CheckEventCatalogs_UnknownId_ReturnsLookupNotFound_Async()
     {
-        var unknownMassType = await _sut.CheckEventCatalogsAsync(_eventDate, null, Guid.NewGuid(), null, null, Location().Id, null, _ct);
-        var unknownLocation = await _sut.CheckEventCatalogsAsync(_eventDate, null, MassTypeRow().Id, null, null, Guid.NewGuid(), null, _ct);
-        var unknownSeason = await _sut.CheckEventCatalogsAsync(_eventDate, Guid.NewGuid(), null, null, null, Location().Id, null, _ct);
+        var unknownMassType = await _sut.CheckEventCatalogsAsync(_eventDate, _eventTime, null, Guid.NewGuid(), null, null, Location().Id, null, _ct);
+        var unknownLocation = await _sut.CheckEventCatalogsAsync(_eventDate, _eventTime, null, MassTypeRow().Id, null, null, Guid.NewGuid(), null, _ct);
+        var unknownSeason = await _sut.CheckEventCatalogsAsync(_eventDate, _eventTime, Guid.NewGuid(), null, null, null, Location().Id, null, _ct);
 
         Assert.All(
             new[] { unknownMassType, unknownLocation, unknownSeason }, r => Assert.Equal(ErrorCodes.LookupNotFound, r.Code));
@@ -416,9 +420,9 @@ public class LookupServiceTests
         var closed = Location(isActive: false);
         var current = new LiturgicalEvent { MassTypeId = retired.Id, LocationId = closed.Id };
 
-        var onCreate = await _sut.CheckEventCatalogsAsync(_eventDate, null, retired.Id, null, null, Location().Id, null, _ct);
-        var newLocation = await _sut.CheckEventCatalogsAsync(_eventDate, null, MassTypeRow().Id, null, null, closed.Id, null, _ct);
-        var unchanged = await _sut.CheckEventCatalogsAsync(_eventDate, null, retired.Id, null, null, closed.Id, current, _ct);
+        var onCreate = await _sut.CheckEventCatalogsAsync(_eventDate, _eventTime, null, retired.Id, null, null, Location().Id, null, _ct);
+        var newLocation = await _sut.CheckEventCatalogsAsync(_eventDate, _eventTime, null, MassTypeRow().Id, null, null, closed.Id, null, _ct);
+        var unchanged = await _sut.CheckEventCatalogsAsync(_eventDate, _eventTime, null, retired.Id, null, null, closed.Id, current, _ct);
 
         Assert.Equal(ErrorCodes.LookupInactive, onCreate.Code);
         Assert.Equal(ErrorCodes.LookupInactive, newLocation.Code);
@@ -431,7 +435,7 @@ public class LookupServiceTests
         var season = Season(_eventDate, _eventDate.AddDays(10));
 
         var result = await _sut.CheckEventCatalogsAsync(
-            _eventDate.AddDays(-1), season.Id, MassTypeRow().Id, null, null, Location().Id, null, _ct);
+            _eventDate.AddDays(-1), _eventTime, season.Id, MassTypeRow().Id, null, null, Location().Id, null, _ct);
 
         Assert.True(result.IsSuccess);
     }
@@ -446,7 +450,7 @@ public class LookupServiceTests
         var current = new LiturgicalEvent { LiturgicalSeasonId = season.Id, LocationId = location.Id };
 
         var result = await _sut.CheckEventCatalogsAsync(
-            _eventDate.AddDays(offsetDays), season.Id, null, null, null, location.Id, current, _ct);
+            _eventDate.AddDays(offsetDays), _eventTime, season.Id, null, null, null, location.Id, current, _ct);
 
         Assert.Equal(ErrorCodes.LiturgicalEventDateOutsideLiturgicalSeason, result.Code);
     }
@@ -503,6 +507,101 @@ public class LookupServiceTests
         }, _ct);
 
         Assert.True(result.IsSuccess);
+    }
+
+    // ---- Keyed seasons (B64) ----
+
+    private LiturgicalSeason KeyedSeason(string key)
+    {
+        var season = new LiturgicalSeason { Id = Guid.NewGuid(), Name = key, CalendarKey = key, IsActive = true };
+        _seasons.GetByIdAsync(season.Id, _ct).Returns(season);
+        return season;
+    }
+
+    private void SyncDay(DateOnly date, string seasonName) =>
+        _days.GetRangeAsync(date, date.AddDays(1), _ct).Returns([new LiturgicalDay { Date = date, SeasonName = seasonName }]);
+
+    [Theory]
+    [InlineData(LiturgicalCalendarSeasons.Advent, true)]
+    [InlineData(LiturgicalCalendarSeasons.Lent, false)]
+    public async Task CheckEventCatalogs_KeyedSeason_MustMatchTheSyncedDay_Async(string dayKey, bool isValid)
+    {
+        var advent = KeyedSeason(LiturgicalCalendarSeasons.Advent);
+        SyncDay(_eventDate, dayKey);
+
+        var result = await _sut.CheckEventCatalogsAsync(
+            _eventDate, _eventTime, advent.Id, MassTypeRow().Id, null, null, Location().Id, null, _ct);
+
+        Assert.Equal(isValid ? null : ErrorCodes.LiturgicalEventDateOutsideLiturgicalSeason, result.Code);
+    }
+
+    [Fact]
+    public async Task CheckEventCatalogs_KeyedSeason_DayNotSynced_Succeeds_Async()
+    {
+        var advent = KeyedSeason(LiturgicalCalendarSeasons.Advent);
+
+        var result = await _sut.CheckEventCatalogsAsync(
+            _eventDate, _eventTime, advent.Id, MassTypeRow().Id, null, null, Location().Id, null, _ct);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task FindSeason_SyncedDay_ReturnsTheActiveKeyedSeason_Async()
+    {
+        var advent = new LiturgicalSeason { Id = Guid.NewGuid(), CalendarKey = LiturgicalCalendarSeasons.Advent, IsActive = true };
+        var retired = new LiturgicalSeason { Id = Guid.NewGuid(), CalendarKey = LiturgicalCalendarSeasons.Advent, IsActive = false };
+        Rows(_seasons, retired, advent);
+        SyncDay(_eventDate, LiturgicalCalendarSeasons.Advent);
+
+        Assert.Equal(advent.Id, await _sut.FindLiturgicalSeasonIdAsync(_eventDate, _eventTime, _ct));
+    }
+
+    [Fact]
+    public async Task SaveSeason_SecondActiveRowWithTheSameKey_ReturnsKeyDuplicate_Async()
+    {
+        Rows(_seasons, new LiturgicalSeason
+        {
+            Id = Guid.NewGuid(), Name = "Mùa Vọng", CalendarKey = LiturgicalCalendarSeasons.Advent, IsActive = true,
+        });
+
+        var duplicate = await _sut.SaveLiturgicalSeasonAsync(null, new SaveLiturgicalSeasonRequest
+        {
+            Name = "Advent again", CalendarKey = LiturgicalCalendarSeasons.Advent,
+        }, _ct);
+        var inactive = await _sut.SaveLiturgicalSeasonAsync(null, new SaveLiturgicalSeasonRequest
+        {
+            Name = "Old Advent", CalendarKey = LiturgicalCalendarSeasons.Advent, IsActive = false,
+        }, _ct);
+
+        Assert.Equal(ErrorCodes.LiturgicalSeasonCalendarKeyDuplicate, duplicate.Code);
+        Assert.True(inactive.IsSuccess);
+    }
+
+    [Theory]
+    [InlineData(LiturgicalCalendarSeasons.Lent, false, false, true)]  // keyed: dates optional
+    [InlineData(LiturgicalCalendarSeasons.Lent, true, true, true)]
+    [InlineData(LiturgicalCalendarSeasons.Lent, true, false, false)]  // not just one date
+    [InlineData(null, false, false, false)]                            // dated season needs its dates
+    [InlineData(null, true, true, true)]
+    public async Task SeasonValidator_KeyOrBothDates_Async(string? key, bool hasStart, bool hasEnd, bool isValid)
+    {
+        var result = await new SaveLiturgicalSeasonRequestValidator().ValidateAsync(new SaveLiturgicalSeasonRequest
+        {
+            Name = "Season", CalendarKey = key,
+            StartDate = hasStart ? new DateOnly(2027, 2, 1) : null, EndDate = hasEnd ? new DateOnly(2027, 3, 1) : null,
+        }, _ct);
+
+        Assert.Equal(isValid, result.IsValid);
+    }
+
+    [Fact]
+    public async Task SeasonValidator_UnknownKey_ReturnsCalendarKeyInvalid_Async()
+    {
+        var result = await new SaveLiturgicalSeasonRequestValidator().ValidateAsync(
+            new SaveLiturgicalSeasonRequest { Name = "Summer", CalendarKey = "Summer" }, _ct);
+
+        Assert.Contains(result.Errors, e => e.ErrorCode == ErrorCodes.LiturgicalSeasonCalendarKeyInvalid);
     }
 
     [Fact]

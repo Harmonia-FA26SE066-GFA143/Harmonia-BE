@@ -178,6 +178,8 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `LITURGICAL_EVENT_GENERATION_RANGE_INVALID` | 400 | Khoảng ngày không hợp lệ: không bắt đầu trong quá khứ và dài tối đa 62 ngày |
 | `LITURGICAL_SEASON_DATE_OVERLAP` | 409 | Khoảng thời gian trùng với mùa phụng vụ khác |
 | `LITURGICAL_SEASON_DATE_INVALID` | 400 | Ngày kết thúc phải sau ngày bắt đầu |
+| `LITURGICAL_SEASON_CALENDAR_KEY_INVALID` | 400 | Loại mùa không hợp lệ |
+| `LITURGICAL_SEASON_CALENDAR_KEY_DUPLICATE` | 409 | Đã có mùa phụng vụ đang hoạt động cho loại mùa này |
 
 ## 6. Thư viện thánh ca
 
@@ -475,3 +477,6 @@ xem — trả 404, để không lộ sự tồn tại của bản ghi.
   không còn trả `ROSTER_ALREADY_FINALIZED` khi bảng phân công đã chốt — vẫn chặn khi sự kiện đã huỷ hoặc đã qua.
 - 2026-11-17: thêm `PRACTICE_ASSIGNMENT_HAS_SUBMISSIONS` — huỷ bài tập (`DELETE /api/practice-assignments/{id}`) đã có
   ca viên nộp bài.
+- 2026-11-17: thêm `LITURGICAL_SEASON_CALENDAR_KEY_INVALID`, `LITURGICAL_SEASON_CALENDAR_KEY_DUPLICATE` — mùa phụng vụ gắn
+  với mùa của lịch (`calendarKey`). `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` còn trả khi mùa có key khác mùa của ngày
+  cử hành trong lịch đã đồng bộ.

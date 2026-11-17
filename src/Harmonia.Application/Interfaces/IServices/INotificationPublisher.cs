@@ -17,4 +17,7 @@ public interface INotificationPublisher
 
     Task PublishDirectorNotesReadAsync(
         DirectorNotesReadDto read, IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken);
+
+    Task PublishParticipationChangedAsync(
+        ParticipationChangedDto change, IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken);
 }

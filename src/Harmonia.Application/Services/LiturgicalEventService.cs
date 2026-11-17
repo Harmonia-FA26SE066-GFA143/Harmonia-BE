@@ -66,11 +66,12 @@ public class LiturgicalEventService(
             return Result<LiturgicalEventDto>.Failure(ErrorCodes.LiturgicalEventAlreadyPassed);
         }
 
-        // Same rule as events generated from Mass schedules: no season picked → the season covering the date.
-        var seasonId = request.LiturgicalSeasonId ?? await lookupService.FindLiturgicalSeasonIdAsync(request.EventDate, cancellationToken);
+        // Same rule as events generated from Mass schedules: no season picked → the season of that day in the calendar.
+        var seasonId = request.LiturgicalSeasonId
+            ?? await lookupService.FindLiturgicalSeasonIdAsync(request.EventDate, request.Time, cancellationToken);
 
         var catalogs = await lookupService.CheckEventCatalogsAsync(
-            request.EventDate, seasonId, request.MassTypeId, request.CeremonyTypeId,
+            request.EventDate, request.Time, seasonId, request.MassTypeId, request.CeremonyTypeId,
             request.CategoryId, request.LocationId, null, cancellationToken);
         if (!catalogs.IsSuccess)
         {
@@ -154,7 +155,7 @@ public class LiturgicalEventService(
         }
 
         var catalogs = await lookupService.CheckEventCatalogsAsync(
-            request.EventDate, request.LiturgicalSeasonId, request.MassTypeId, request.CeremonyTypeId,
+            request.EventDate, request.Time, request.LiturgicalSeasonId, request.MassTypeId, request.CeremonyTypeId,
             request.CategoryId, request.LocationId, liturgicalEvent, cancellationToken);
         if (!catalogs.IsSuccess)
         {
@@ -254,6 +255,10 @@ public class LiturgicalEventService(
             return Result<LiturgicalEventDto>.Failure(ErrorCodes.LiturgicalEventCancelled);
         }
 
+        // A draft saved before its day was synced (or before the season existed) gets its season now; saved only on success.
+        liturgicalEvent.LiturgicalSeasonId ??= await lookupService.FindLiturgicalSeasonIdAsync(
+            liturgicalEvent.EventDate, liturgicalEvent.Time, cancellationToken);
+
         var incomplete = await CheckPublishableAsync(liturgicalEvent, cancellationToken);
         if (incomplete is not null)
         {
@@ -346,7 +351,7 @@ public class LiturgicalEventService(
         }
 
         var catalogs = await lookupService.CheckEventCatalogsAsync(
-            liturgicalEvent.EventDate, liturgicalEvent.LiturgicalSeasonId, liturgicalEvent.MassTypeId,
+            liturgicalEvent.EventDate, liturgicalEvent.Time, liturgicalEvent.LiturgicalSeasonId, liturgicalEvent.MassTypeId,
             liturgicalEvent.CeremonyTypeId, liturgicalEvent.CategoryId, liturgicalEvent.LocationId, null,
             cancellationToken);
         if (!catalogs.IsSuccess) return catalogs.Code;

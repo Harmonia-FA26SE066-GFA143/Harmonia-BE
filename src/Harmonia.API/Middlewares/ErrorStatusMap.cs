@@ -93,6 +93,8 @@ public static class ErrorStatusMap
         [ErrorCodes.LiturgicalEventGenerationRangeInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.LiturgicalSeasonDateOverlap] = StatusCodes.Status409Conflict,
         [ErrorCodes.LiturgicalSeasonDateInvalid] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.LiturgicalSeasonCalendarKeyInvalid] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.LiturgicalSeasonCalendarKeyDuplicate] = StatusCodes.Status409Conflict,
 
         // 6. Song library.
         [ErrorCodes.SongNotFound] = StatusCodes.Status404NotFound,

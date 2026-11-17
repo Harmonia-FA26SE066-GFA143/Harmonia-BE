@@ -66,8 +66,12 @@ public interface ILookupService
     Task<Result<List<LiturgicalSlotRequirementDto>>> UpdateLiturgicalSlotRequirementsAsync(
         Guid slotId, UpdateLiturgicalSlotRequirementsRequest request, CancellationToken cancellationToken);
 
-    /// <summary>The active season whose dates contain <paramref name="date"/>, or null; used to pre-fill a new event.</summary>
-    Task<Guid?> FindLiturgicalSeasonIdAsync(DateOnly date, CancellationToken cancellationToken);
+    /// <summary>
+    /// The season of an event at <paramref name="date"/> <paramref name="time"/>, or null: the active season keyed to the
+    /// synced calendar's season of that day (an evening vigil takes the next day's), else the active dated season holding
+    /// the date (<see cref="Harmonia.Application.Services.LiturgicalSeasonResolver"/>).
+    /// </summary>
+    Task<Guid?> FindLiturgicalSeasonIdAsync(DateOnly date, TimeOnly time, CancellationToken cancellationToken);
 
     Task<Result<LiturgicalSlotDto>> SaveLiturgicalSlotAsync(Guid? id, SaveLiturgicalSlotRequest request, CancellationToken cancellationToken);
 
@@ -75,12 +79,13 @@ public interface ILookupService
 
     /// <summary>
     /// Checks the catalog rows an event is about to point at: LOOKUP_NOT_FOUND for an unknown id, LOOKUP_INACTIVE
-    /// for a switched-off row, LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON when <paramref name="eventDate"/> is not inside the season
-    /// or on the day before it starts (vigil Mass).
+    /// for a switched-off row, LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON when the event does not fall in the season:
+    /// for a keyed season, the synced day has another season (not checked while the day is not synced); for a dated
+    /// season, the date is outside it and not the day before it starts (vigil Mass).
     /// A row <paramref name="current"/> already points at may stay even when switched off, so an old event
     /// remains editable.
     /// </summary>
     Task<Result> CheckEventCatalogsAsync(
-        DateOnly eventDate, Guid? liturgicalSeasonId, Guid? massTypeId, Guid? ceremonyTypeId, Guid? categoryId,
-        Guid locationId, LiturgicalEvent? current, CancellationToken cancellationToken);
+        DateOnly eventDate, TimeOnly eventTime, Guid? liturgicalSeasonId, Guid? massTypeId, Guid? ceremonyTypeId,
+        Guid? categoryId, Guid locationId, LiturgicalEvent? current, CancellationToken cancellationToken);
 }

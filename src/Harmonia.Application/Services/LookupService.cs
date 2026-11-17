@@ -25,6 +25,7 @@ public class LookupService(
     IGenericRepository<LiturgicalSlotRequirement> slotRequirements,
     IServiceRosterRepository rosterRepository,
     IGenericRepository<LiturgicalEvent> liturgicalEvents,
+    ILiturgicalDayRepository liturgicalDays,
     IMapper mapper) : ILookupService
 {
     public async Task<Result<List<MassTypeDto>>> GetMassTypesAsync(bool includeInactive, CancellationToken cancellationToken)
@@ -61,7 +62,8 @@ public class LookupService(
     {
         var rows = await liturgicalSeasons.ListAsync(x => includeInactive || x.IsActive, cancellationToken);
         return Result<List<LiturgicalSeasonDto>>.Success(
-            mapper.Map<List<LiturgicalSeasonDto>>(rows.OrderBy(x => x.StartDate).ThenBy(x => x.Name)));
+            mapper.Map<List<LiturgicalSeasonDto>>(rows
+                .OrderBy(LiturgicalSeasonResolver.OrderOf).ThenBy(x => x.StartDate).ThenBy(x => x.Name)));
     }
 
     public async Task<Result<List<LiturgicalSlotDto>>> GetLiturgicalSlotsAsync(bool includeInactive, CancellationToken cancellationToken)
@@ -281,9 +283,15 @@ public class LookupService(
             .OrderBy(x => x.SkillName)
             .ToList();
 
-    public async Task<Guid?> FindLiturgicalSeasonIdAsync(DateOnly date, CancellationToken cancellationToken) =>
-        (await liturgicalSeasons.ListAsync(x => x.IsActive && x.StartDate <= date && date <= x.EndDate, cancellationToken))
-            .FirstOrDefault()?.Id;
+    public async Task<Guid?> FindLiturgicalSeasonIdAsync(DateOnly date, TimeOnly time, CancellationToken cancellationToken) =>
+        LiturgicalSeasonResolver.Resolve(
+            date, time, await GetDayKeysAsync(date, cancellationToken),
+            await liturgicalSeasons.ListAsync(x => x.IsActive, cancellationToken));
+
+    /// <summary>Synced season of <paramref name="date"/> and of the next day (for a vigil); missing days are absent.</summary>
+    private async Task<Dictionary<DateOnly, string?>> GetDayKeysAsync(DateOnly date, CancellationToken cancellationToken) =>
+        (await liturgicalDays.GetRangeAsync(date, date.AddDays(1), cancellationToken))
+            .ToDictionary(x => x.Date, x => x.SeasonName);
 
     public Task<Result<LiturgicalSlotDto>> SaveLiturgicalSlotAsync(Guid? id, SaveLiturgicalSlotRequest request, CancellationToken cancellationToken)
     {
@@ -306,8 +314,8 @@ public class LookupService(
     }
 
     public async Task<Result> CheckEventCatalogsAsync(
-        DateOnly eventDate, Guid? liturgicalSeasonId, Guid? massTypeId, Guid? ceremonyTypeId, Guid? categoryId,
-        Guid locationId, LiturgicalEvent? current, CancellationToken cancellationToken)
+        DateOnly eventDate, TimeOnly eventTime, Guid? liturgicalSeasonId, Guid? massTypeId, Guid? ceremonyTypeId,
+        Guid? categoryId, Guid locationId, LiturgicalEvent? current, CancellationToken cancellationToken)
     {
         var season = liturgicalSeasonId is { } seasonId
             ? await liturgicalSeasons.GetByIdAsync(seasonId, cancellationToken)
@@ -322,8 +330,20 @@ public class LookupService(
         if (error is not null) return Result.Failure(error);
 
         // Checked on every save, not only when the date or the season changed: either one moving breaks the pair.
+        if (season is null) return Result.Success();
+
+        if (season.CalendarKey is { } seasonKey)
+        {
+            // A day not synced yet cannot contradict the choice.
+            var dayKey = LiturgicalSeasonResolver.CalendarKeyOf(
+                eventDate, eventTime, await GetDayKeysAsync(eventDate, cancellationToken));
+            return dayKey is not null && dayKey != seasonKey
+                ? Result.Failure(ErrorCodes.LiturgicalEventDateOutsideLiturgicalSeason)
+                : Result.Success();
+        }
+
         // The day before the start is allowed: an evening vigil Mass belongs to the next day's season (24/12 evening → Christmas).
-        return season is not null && (eventDate < season.StartDate.AddDays(-1) || eventDate > season.EndDate)
+        return eventDate < season.StartDate!.Value.AddDays(-1) || eventDate > season.EndDate
             ? Result.Failure(ErrorCodes.LiturgicalEventDateOutsideLiturgicalSeason)
             : Result.Success();
     }
@@ -350,20 +370,27 @@ public class LookupService(
         || (await songInstrumentRequirements.ListAsync(x => x.SkillId == skillId, cancellationToken)).Count > 0;
 
     /// <summary>
-    /// Season names repeat every year, so only the dates must not overlap another active season.
-    /// An inactive season is not checked. New dates may not leave out an upcoming event planned in the season
-    /// (LOOKUP_IN_USE), with the same vigil allowance as <see cref="CheckEventCatalogsAsync"/>.
+    /// A keyed season must be the only active one with its key (LITURGICAL_SEASON_CALENDAR_KEY_DUPLICATE). Dated seasons
+    /// repeat their names every year, so only their dates must not overlap another active dated season; an inactive
+    /// season is not checked. New dates may not leave out an upcoming event planned in the season (LOOKUP_IN_USE),
+    /// with the same vigil allowance as <see cref="CheckEventCatalogsAsync"/>.
     /// </summary>
     public async Task<Result<LiturgicalSeasonDto>> SaveLiturgicalSeasonAsync(
         Guid? id, SaveLiturgicalSeasonRequest request, CancellationToken cancellationToken)
     {
-        if (id is not null)
+        if (request.IsActive && request.CalendarKey is { } key
+            && (await liturgicalSeasons.ListAsync(x => x.IsActive && x.CalendarKey == key && x.Id != id, cancellationToken)).Count > 0)
+        {
+            return Result<LiturgicalSeasonDto>.Failure(ErrorCodes.LiturgicalSeasonCalendarKeyDuplicate);
+        }
+
+        if (id is not null && request.StartDate is { } startDate && request.EndDate is { } endDate)
         {
             var today = VietnamTime.Today;
-            var earliest = request.StartDate.AddDays(-1);
+            var earliest = startDate.AddDays(-1);
             var stranded = await liturgicalEvents.ListAsync(
                 x => x.LiturgicalSeasonId == id && x.Status != EventStatus.Cancelled && x.EventDate >= today
-                    && (x.EventDate < earliest || x.EventDate > request.EndDate),
+                    && (x.EventDate < earliest || x.EventDate > endDate),
                 cancellationToken);
             if (stranded.Count > 0)
             {
@@ -373,11 +400,13 @@ public class LookupService(
 
         return await SaveAsync<LiturgicalSeason, LiturgicalSeasonDto>(
             liturgicalSeasons, id, ErrorCodes.LookupNotFound,
-            x => request.IsActive && x.IsActive && x.Id != id && x.StartDate <= request.EndDate && request.StartDate <= x.EndDate,
+            x => request.IsActive && x.IsActive && x.Id != id && request.CalendarKey == null && x.CalendarKey == null
+                && x.StartDate <= request.EndDate && request.StartDate <= x.EndDate,
             ErrorCodes.LiturgicalSeasonDateOverlap,
             x =>
             {
                 x.Name = request.Name.Trim();
+                x.CalendarKey = request.CalendarKey;
                 x.StartDate = request.StartDate;
                 x.EndDate = request.EndDate;
                 x.ColorHex = request.ColorHex;

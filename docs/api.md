@@ -603,12 +603,17 @@ giá trị). Bản `Rejected` hoặc `Revoked` là lịch sử: ca viên khai b�
   có gì để tạo. Không gửi thông báo.
 - Danh sách (`GET`) trả sự kiện **mọi trạng thái** (kể cả `Draft`, `Cancelled`), sắp theo ngày rồi giờ; các bộ lọc
   `fromDate`, `toDate` (bao gồm hai đầu, `yyyy-MM-dd`) và `status` kết hợp AND, đều tuỳ chọn.
-- **Tự điền mùa (`POST`)**: không gửi `liturgicalSeasonId` thì lấy mùa đang hoạt động có `startDate`–`endDate` chứa
-  `eventDate` (cùng luật với sinh sự kiện từ giờ lễ cố định); không có mùa nào thì để `null`. `PUT` không tự điền.
+- **Tự điền mùa (`POST`, sinh từ giờ lễ cố định, và `publish` khi sự kiện chưa có mùa)**: không gửi `liturgicalSeasonId`
+  thì lấy mùa của ngày cử hành trong lịch đã đồng bộ (`LiturgicalDay`), rồi chọn mùa đang hoạt động có `calendarKey` đó.
+  Lễ từ **17:00** trở đi mà ngày hôm sau sang mùa khác thì là lễ vọng, lấy mùa của ngày hôm sau (tối 24/12 → Giáng Sinh).
+  Ngày chưa đồng bộ, hoặc chưa có mùa mang key đó → mùa có `startDate`–`endDate` chứa `eventDate` như cũ; không có thì
+  để `null`. `PUT` không tự điền.
 - **Kiểm danh mục (cả `POST` lẫn `PUT`)**: `liturgicalSeasonId`, `massTypeId`, `ceremonyTypeId`, `categoryId`, `locationId`
   phải trỏ tới mục có thật → nếu không 404 `LOOKUP_NOT_FOUND`; mục đã tắt (`isActive: false`) → 409 `LOOKUP_INACTIVE`.
   Lỗi không cho biết trường nào sai. Khi `PUT`, Id giữ nguyên so với sự kiện hiện tại vẫn được chấp nhận dù mục đã tắt.
-- **Ngày phải thuộc mùa**: có `liturgicalSeasonId` mà `eventDate` nằm ngoài `startDate − 1 ngày`–`endDate` của mùa → 400
+- **Ngày phải thuộc mùa**: mùa có `calendarKey` mà ngày cử hành đã đồng bộ thuộc mùa khác (tính cả luật lễ vọng ở trên) → 400
+  `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON`; ngày chưa đồng bộ thì không kiểm. Mùa theo ngày (không có key):
+  `eventDate` nằm ngoài `startDate − 1 ngày`–`endDate` của mùa → 400
   `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON`. Cho lùi 1 ngày vì lễ vọng chiều tối thuộc mùa của ngày hôm sau:
   mùa nhập đúng lịch (Mùa Vọng đến 24/12, Giáng Sinh từ 25/12), lễ sáng 24/12 chọn Mùa Vọng, lễ vọng tối 24/12 chọn Giáng Sinh. Kiểm ở mọi lần lưu, nên sự kiện cũ đang lệch mùa phải chọn lại mùa (hoặc bỏ trống) mới sửa được.
 - Sửa (`PUT`) được khi sự kiện `Draft` hoặc `Published`; gửi đủ mọi trường như `POST`. Sửa không đổi trạng thái,
@@ -2382,6 +2387,9 @@ Chỉ server → client; client không gọi method nào trên hub.
 - Sự kiện lắng nghe: **`ReceiveNotificationAsync`**, tham số là một `NotificationDto`
   (enum dạng tên, như REST).
 - Thông báo được gửi riêng tới từng user nhận, không broadcast.
+- **`ReceiveParticipationChangedAsync`** (`{ eventId, memberId, status }`): mỗi lần ca viên trả lời / đổi câu trả lời lời
+  mời, gửi tới ca trưởng ca đoàn phụ trách sự kiện và ca trưởng thay thế. Chỉ là tín hiệu — không lưu thông báo; trang
+  xác nhận tham gia gọi lại `GET /api/event-participations?eventId=` khi nhận.
 - Access token hết hạn: refresh rồi kết nối lại với token mới.
 
 ```js
@@ -2392,6 +2400,7 @@ const conn = new signalR.HubConnectionBuilder()
 conn.on("ReceiveNotificationAsync", (n) => { /* n: NotificationDto */ });
 conn.on("ReceiveDirectorNoteAsync", (note) => { /* note: DirectorNoteDto — chat cha xứ ↔ ca trưởng, mục 5a */ });
 conn.on("ReceiveDirectorNotesReadAsync", (r) => { /* r: { readerUserId, senderUserId, readAt } */ });
+conn.on("ReceiveParticipationChangedAsync", (c) => { /* c: { eventId, memberId, status } — ca viên vừa trả lời lời mời */ });
 await conn.start();
 ```
 
@@ -2409,7 +2418,7 @@ danh sách (dữ liệu cũ vẫn trỏ tới nó). Không phân trang — trả
 | `GET /api/lookups/event-categories` | `{ "id", "name", "description", "isActive" }` | tên |
 | `GET /api/lookups/song-themes` | `{ "id", "name", "description", "isActive", "parentId" }` | tên |
 | `GET /api/lookups/skill-categories` | `{ "id", "name", "description", "isActive" }` | tên |
-| `GET /api/lookups/liturgical-seasons` | `{ "id", "name", "startDate", "endDate", "colorHex", "isActive" }` | `startDate` |
+| `GET /api/lookups/liturgical-seasons` | `{ "id", "name", "calendarKey", "startDate", "endDate", "colorHex", "isActive" }` — `startDate` / `endDate` `null` ở mùa có `calendarKey` | mùa có `calendarKey` theo thứ tự năm phụng vụ (Vọng, Giáng Sinh, Chay, Phục Sinh, Thường Niên), rồi `startDate` |
 | `GET /api/lookups/liturgical-slots` | `{ "id", "name", "defaultOrder", "isActive" }` | `defaultOrder` (thứ tự trong lễ) |
 | `GET /api/lookups/worship-locations` | `{ "id", "name", "address", "isActive" }` | tên |
 | `GET /api/lookups/skills?categoryId=` | `{ "id", "categoryId", "name", "description", "isActive" }` | tên |
@@ -2429,7 +2438,7 @@ danh sách (dữ liệu cũ vẫn trỏ tới nó). Không phân trang — trả
 | POST · PUT `{id}` | `/api/lookups/song-themes` | `{ "name", "description?", "isActive", "parentId?" }` | 200 `SongThemeDto` | 400 `VALIDATION_FAILED`, `SONG_THEME_PARENT_INVALID` · 404 `LOOKUP_NOT_FOUND` (PUT) · 409 `LOOKUP_NAME_DUPLICATE` |
 | POST · PUT `{id}` | `/api/lookups/liturgical-slots` · `Admin`, `ChoirDirector` | `{ "name", "defaultOrder", "isActive" }` | 200 `LiturgicalSlotDto` | như trên |
 | POST · PUT `{id}` | `/api/lookups/worship-locations` | `{ "name", "address?", "isActive" }` | 200 `WorshipLocationDto` | như trên |
-| POST · PUT `{id}` | `/api/lookups/liturgical-seasons` | `{ "name", "startDate", "endDate", "colorHex?", "isActive" }` | 200 `LiturgicalSeasonDto` | 400 `VALIDATION_FAILED` (`LITURGICAL_SEASON_DATE_INVALID`) · 404 `LOOKUP_NOT_FOUND` (PUT) · 409 `LITURGICAL_SEASON_DATE_OVERLAP` · 409 `LOOKUP_IN_USE` (PUT: ngày mới bỏ ra ngoài một sự kiện sắp tới chưa huỷ thuộc mùa này; ngày trước `startDate` vẫn tính là lễ vọng) |
+| POST · PUT `{id}` | `/api/lookups/liturgical-seasons` | `{ "name", "calendarKey?", "startDate?", "endDate?", "colorHex?", "isActive" }` — `calendarKey` là `Advent`, `Christmas`, `Lent`, `Easter` hoặc `OrdinaryTime`; không có key thì bắt buộc cả hai ngày, có key thì bỏ trống cả hai được | 200 `LiturgicalSeasonDto` | 400 `VALIDATION_FAILED` (`LITURGICAL_SEASON_DATE_INVALID`, `LITURGICAL_SEASON_CALENDAR_KEY_INVALID`) · 404 `LOOKUP_NOT_FOUND` (PUT) · 409 `LITURGICAL_SEASON_DATE_OVERLAP` (chỉ giữa các mùa theo ngày), `LITURGICAL_SEASON_CALENDAR_KEY_DUPLICATE` (đã có mùa đang hoạt động cùng key) · 409 `LOOKUP_IN_USE` (PUT: ngày mới bỏ ra ngoài một sự kiện sắp tới chưa huỷ thuộc mùa này; ngày trước `startDate` vẫn tính là lễ vọng) |
 
 - `isActive` mặc định `true`. **Không có xoá**: các bảng khác đang trỏ tới danh mục, nên muốn bỏ thì gửi
   `PUT` với `isActive: false`. Bật lại bằng `isActive: true`.

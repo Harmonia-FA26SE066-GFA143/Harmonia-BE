@@ -91,7 +91,8 @@ móc vào chúng.
   của file xuất chỉ được nằm trong file này.
   Ngoại lệ: dữ liệu seed hiển thị cho người dùng viết tiếng Việt — `Name` trong `HasData` của
   `SkillCategoryConfiguration`, `DisplayName` / `Group` / `Description` trong `SystemSettingKeys`, `FullName` của Admin đầu tiên
-  trong `DataSeeder` (chốt 2026-10-17). Tên role và key của setting vẫn tiếng Anh — code so khớp theo chúng.
+  trong `DataSeeder` (chốt 2026-10-17), tên 5 mùa phụng vụ có `CalendarKey` trong `DataSeeder.SeedCalendarSeasonsAsync`
+  (chốt 2026-11-17). Tên role và key của setting vẫn tiếng Anh — code so khớp theo chúng.
   Ngoại lệ: `LiturgicalNamePatterns.cs` giữ quy tắc dịch tiếng Việt cho tên lễ theo mẫu (thứ trong tuần, Chúa nhật
   đánh số) — là ngữ pháp, không phải dữ liệu Admin sửa (chốt 2026-10-25). Bản dịch từng tên nằm trong bảng
   `LiturgicalNameTranslation`, dữ liệu nạp lần đầu ở `Infrastructure/Data/LiturgicalNameTranslations.json`, không ở `.cs`.

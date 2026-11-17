@@ -47,7 +47,7 @@ public class LiturgicalEventServiceTests
         _sut = new LiturgicalEventService(
             _repository, _users, _choirs, _notifications, _lookups, _scope, _settings, Substitute.For<ICurrentUserService>(),
             _roster, _participations, _rosters, mapper);
-        _lookups.CheckEventCatalogsAsync(default, default, default, default, default, default, default, default)
+        _lookups.CheckEventCatalogsAsync(default, default, default, default, default, default, default, default, default)
             .ReturnsForAnyArgs(Result.Success());
         _choirs.ListAsync(default!, default).ReturnsForAnyArgs([_choir]);
         _repository.GetWithLocationAsync(_event.Id, _ct).Returns(_event);
@@ -176,7 +176,7 @@ public class LiturgicalEventServiceTests
             ChoirIds = [_choir.Id], LeadChoirId = _choir.Id,
         };
         _lookups.CheckEventCatalogsAsync(
-                request.EventDate, request.LiturgicalSeasonId, request.MassTypeId, request.CeremonyTypeId,
+                request.EventDate, request.Time, request.LiturgicalSeasonId, request.MassTypeId, request.CeremonyTypeId,
                 request.CategoryId, request.LocationId, null, _ct)
             .Returns(Result.Failure(ErrorCodes.LookupInactive));
 
@@ -195,13 +195,13 @@ public class LiturgicalEventServiceTests
             EventDate = _event.EventDate, Time = _event.Time, LocationId = Guid.NewGuid(), MassTypeId = Guid.NewGuid(),
             ChoirIds = [_choir.Id], LeadChoirId = _choir.Id,
         };
-        _lookups.FindLiturgicalSeasonIdAsync(request.EventDate, _ct).Returns(advent);
+        _lookups.FindLiturgicalSeasonIdAsync(request.EventDate, request.Time, _ct).Returns(advent);
 
         var result = await _sut.CreateAsync(request, _ct);
 
         Assert.Equal(advent, result.Value!.LiturgicalSeasonId);
         await _lookups.Received(1).CheckEventCatalogsAsync(
-            request.EventDate, advent, request.MassTypeId, null, null, request.LocationId, null, _ct);
+            request.EventDate, request.Time, advent, request.MassTypeId, null, null, request.LocationId, null, _ct);
     }
 
     private CreateLiturgicalEventRequest CreateRequestWithChoirs(params Guid[] choirIds) => new()
@@ -280,7 +280,7 @@ public class LiturgicalEventServiceTests
     {
         var request = UpdateRequest();
         _lookups.CheckEventCatalogsAsync(
-                request.EventDate, request.LiturgicalSeasonId, request.MassTypeId, request.CeremonyTypeId,
+                request.EventDate, request.Time, request.LiturgicalSeasonId, request.MassTypeId, request.CeremonyTypeId,
                 request.CategoryId, request.LocationId, _event, _ct)
             .Returns(Result.Failure(ErrorCodes.LiturgicalEventDateOutsideLiturgicalSeason));
 
@@ -401,7 +401,7 @@ public class LiturgicalEventServiceTests
         Assert.Equal(EventStatus.Published, result.Value!.Status);
         // current = null: a catalog switched off since the last save no longer passes.
         await _lookups.Received(1).CheckEventCatalogsAsync(
-            _event.EventDate, _event.LiturgicalSeasonId, _event.MassTypeId, _event.CeremonyTypeId,
+            _event.EventDate, _event.Time, _event.LiturgicalSeasonId, _event.MassTypeId, _event.CeremonyTypeId,
             _event.CategoryId, _event.LocationId, null, _ct);
         await _repository.Received(1).ExistsBySlotAsync(_event.EventDate, _event.Time, _event.LocationId, _event.Id, _ct);
     }
@@ -435,6 +435,19 @@ public class LiturgicalEventServiceTests
         Assert.Equal(ErrorCodes.LiturgicalEventSeasonRequired, (await _sut.PublishAsync(_event.Id, _ct)).Code);
         Assert.Equal(EventStatus.Draft, _event.Status);
         await _repository.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Publish_WithoutSeason_TakesTheSeasonOfItsDay_ThenPublishes_Async()
+    {
+        DraftReadyToPublish();
+        _event.LiturgicalSeasonId = null;
+        var advent = Guid.NewGuid();
+        _lookups.FindLiturgicalSeasonIdAsync(_event.EventDate, _event.Time, _ct).Returns(advent);
+
+        Assert.True((await _sut.PublishAsync(_event.Id, _ct)).IsSuccess);
+        Assert.Equal(advent, _event.LiturgicalSeasonId);
+        Assert.Equal(EventStatus.Published, _event.Status);
     }
 
     [Fact]
@@ -494,7 +507,7 @@ public class LiturgicalEventServiceTests
     public async Task Publish_InactiveCatalog_ReturnsItsCode_Async()
     {
         DraftReadyToPublish();
-        _lookups.CheckEventCatalogsAsync(default, default, default, default, default, default, default, default)
+        _lookups.CheckEventCatalogsAsync(default, default, default, default, default, default, default, default, default)
             .ReturnsForAnyArgs(Result.Failure(ErrorCodes.LookupInactive));
 
         Assert.Equal(ErrorCodes.LookupInactive, (await _sut.PublishAsync(_event.Id, _ct)).Code);

@@ -2346,6 +2346,36 @@ public sealed class RepositoryTests : IDisposable
             page.Items.Select(x => (x.User.Id, x.User.Role.Name, x.PasswordChangeCount, x.PasswordResetCount, x.AccountChangeCount, x.ActionCount)));
     }
 
+    [Fact]
+    public async Task GetActivity_KeyedSeason_CountsLogsOnTheSyncedDaysOfThatSeason_Async()
+    {
+        var member = await _db.AddUserAsync("b@test.com", cancellationToken: _ct);
+        var today = VietnamTime.Today;
+        var lent = new LiturgicalSeason { Id = Guid.NewGuid(), Name = "Lent", CalendarKey = LiturgicalCalendarSeasons.Lent };
+        LiturgicalDay Day(int daysAgo, string season) =>
+            new() { Id = Guid.NewGuid(), Date = today.AddDays(-daysAgo), CelebrationName = "d", SeasonName = season };
+        AuditLog Log(int daysAgo) => new()
+        {
+            Id = Guid.NewGuid(), Action = "Updated", EntityType = nameof(User), EntityId = member.Id, UserId = member.Id,
+            CreatedAt = VietnamTime.StartOfDayUtc(today.AddDays(-daysAgo)).AddHours(12),
+        };
+        await using (var seedContext = _db.NewContext())
+        {
+            // Two separate runs of Lent days, with an Easter day between them.
+            seedContext.AddRange(lent,
+                Day(10, LiturgicalCalendarSeasons.Lent), Day(9, LiturgicalCalendarSeasons.Lent),
+                Day(8, LiturgicalCalendarSeasons.Easter), Day(5, LiturgicalCalendarSeasons.Lent));
+            seedContext.AddRange(Log(10), Log(9), Log(8), Log(5), Log(2));
+            await seedContext.SaveChangesAsync(_ct);
+        }
+
+        await using var context = _db.NewContext();
+        var page = await new UserRepository(context).GetActivityAsync(
+            new SearchReportsRequest { LiturgicalSeasonId = lent.Id }, _ct);
+
+        Assert.Equal(3, page.Items.Single(x => x.User.Id == member.Id).ActionCount);
+    }
+
     // ---- Audit log (UC-35) ----
 
     [Fact]

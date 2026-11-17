@@ -21,6 +21,8 @@ public class MassScheduleServiceTests
     private readonly ILiturgicalEventRepository _events = Substitute.For<ILiturgicalEventRepository>();
     private readonly IGenericRepository<Choir> _choirs = Substitute.For<IGenericRepository<Choir>>();
     private readonly List<Choir> _choirRows = [];
+    private readonly ILiturgicalDayRepository _days = Substitute.For<ILiturgicalDayRepository>();
+    private readonly List<LiturgicalDay> _dayRows = [];
     private readonly MassScheduleService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly MassType _massType = new() { Id = Guid.NewGuid(), Name = "Sunday Mass" };
@@ -38,7 +40,7 @@ public class MassScheduleServiceTests
                 cfg.AddProfile<LiturgicalEventProfile>();
             }, NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new MassScheduleService(_schedules, _massTypes, _locations, _seasons, _events, _choirs, mapper);
+        _sut = new MassScheduleService(_schedules, _massTypes, _locations, _seasons, _events, _choirs, _days, mapper);
 
         // The fakes evaluate the service's predicate against in-memory rows, as the database would.
         _schedules.ListAsync(Arg.Any<Expression<Func<MassSchedule, bool>>>(), _ct)
@@ -52,6 +54,8 @@ public class MassScheduleServiceTests
         _events.AddAsync(Arg.Do<LiturgicalEvent>(_addedEvents.Add), _ct).Returns(Task.CompletedTask);
         _choirs.ListAsync(Arg.Any<Expression<Func<Choir, bool>>>(), _ct)
             .Returns(call => _choirRows.Where(call.Arg<Expression<Func<Choir, bool>>>().Compile()).ToList());
+        _days.GetRangeAsync(Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), _ct)
+            .Returns(call => _dayRows.Where(d => d.Date >= call.ArgAt<DateOnly>(0) && d.Date <= call.ArgAt<DateOnly>(1)).ToList());
         _massTypes.GetByIdAsync(_massType.Id, _ct).Returns(_massType);
         _locations.GetByIdAsync(_location.Id, _ct).Returns(_location);
     }
@@ -192,6 +196,23 @@ public class MassScheduleServiceTests
 
         Assert.Empty(result.Value!);
         await _events.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Generate_SyncedDays_TakeTheKeyedSeason_AndAnEveningVigilTheNextDays_Async()
+    {
+        var sunday = NextSunday();
+        AddSchedule(DayOfWeek.Sunday, 7);
+        AddSchedule(DayOfWeek.Sunday, 18);
+        var advent = new LiturgicalSeason { Id = Guid.NewGuid(), CalendarKey = LiturgicalCalendarSeasons.Advent };
+        var christmas = new LiturgicalSeason { Id = Guid.NewGuid(), CalendarKey = LiturgicalCalendarSeasons.Christmas };
+        _seasonRows.AddRange([advent, christmas]);
+        _dayRows.Add(new LiturgicalDay { Date = sunday, SeasonName = LiturgicalCalendarSeasons.Advent });
+        _dayRows.Add(new LiturgicalDay { Date = sunday.AddDays(1), SeasonName = LiturgicalCalendarSeasons.Christmas });
+
+        await _sut.GenerateEventsAsync(new GenerateLiturgicalEventsRequest { FromDate = sunday, ToDate = sunday }, _ct);
+
+        Assert.Equal([advent.Id, christmas.Id], _addedEvents.Select(x => x.LiturgicalSeasonId));
     }
 
     [Fact]

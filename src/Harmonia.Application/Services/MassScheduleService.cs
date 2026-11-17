@@ -16,6 +16,7 @@ public class MassScheduleService(
     IGenericRepository<LiturgicalSeason> seasonRepository,
     ILiturgicalEventRepository liturgicalEventRepository,
     IGenericRepository<Choir> choirRepository,
+    ILiturgicalDayRepository liturgicalDayRepository,
     IMapper mapper) : IMassScheduleService
 {
     public async Task<Result<MassScheduleDto>> CreateAsync(
@@ -93,8 +94,10 @@ public class MassScheduleService(
 
         var schedules = await scheduleRepository.ListAsync(
             x => x.IsActive && x.MassType.IsActive && x.Location.IsActive, cancellationToken);
-        var seasons = await seasonRepository.ListAsync(
-            x => x.IsActive && x.StartDate <= to && x.EndDate >= from, cancellationToken);
+        var seasons = await seasonRepository.ListAsync(x => x.IsActive, cancellationToken);
+        // One day past the range: a vigil on the last day takes the next day's season.
+        var dayKeys = (await liturgicalDayRepository.GetRangeAsync(from, to.AddDays(1), cancellationToken))
+            .ToDictionary(x => x.Date, x => x.SeasonName);
         var taken = (await liturgicalEventRepository.ListAsync(
                 x => x.EventDate >= from && x.EventDate <= to && x.Status != EventStatus.Cancelled, cancellationToken))
             .Select(x => (x.EventDate, x.Time, x.LocationId))
@@ -115,7 +118,7 @@ public class MassScheduleService(
                     Id = eventId,
                     EventDate = date,
                     Time = schedule.Time,
-                    LiturgicalSeasonId = seasons.FirstOrDefault(s => s.StartDate <= date && date <= s.EndDate)?.Id,
+                    LiturgicalSeasonId = LiturgicalSeasonResolver.Resolve(date, schedule.Time, dayKeys, seasons),
                     MassTypeId = schedule.MassTypeId,
                     LocationId = schedule.LocationId,
                     Title = schedule.Title,

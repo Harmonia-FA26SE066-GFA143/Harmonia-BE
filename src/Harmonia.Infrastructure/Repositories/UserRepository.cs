@@ -7,6 +7,7 @@ using Harmonia.Infrastructure.Data;
 using Harmonia.Infrastructure.Data.Interceptors;
 using Microsoft.EntityFrameworkCore;
 using Harmonia.Domain.Common;
+using System.Linq.Expressions;
 
 namespace Harmonia.Infrastructure.Repositories;
 
@@ -40,18 +41,25 @@ public class UserRepository(HarmoniaDbContext dbContext)
         {
             var season = await DbContext.LiturgicalSeasons.AsNoTracking()
                 .Where(s => s.Id == seasonId)
-                .Select(s => new { s.StartDate, s.EndDate })
+                .Select(s => new { s.CalendarKey, s.StartDate, s.EndDate })
                 .FirstOrDefaultAsync(cancellationToken);
-            if (season is null)
+            List<(DateOnly From, DateOnly To)> ranges;
+            if (season?.CalendarKey is { } key)
             {
-                logs = logs.Where(_ => false);
+                // A keyed season spans every year: its days are the synced days of that season.
+                var days = await DbContext.LiturgicalDays.AsNoTracking()
+                    .Where(d => d.SeasonName == key)
+                    .OrderBy(d => d.Date)
+                    .Select(d => d.Date)
+                    .ToListAsync(cancellationToken);
+                ranges = ToRanges(days);
             }
             else
             {
-                var seasonFromUtc = VietnamTime.StartOfDayUtc(season.StartDate);
-                var seasonToUtc = VietnamTime.StartOfDayUtc(season.EndDate.AddDays(1));
-                logs = logs.Where(l => l.CreatedAt >= seasonFromUtc && l.CreatedAt < seasonToUtc);
+                ranges = season is { StartDate: { } start, EndDate: { } end } ? [(start, end)] : [];
             }
+
+            logs = logs.Where(CreatedWithin(ranges));
         }
 
         var aboutUsers = logs.Where(l => l.EntityType == nameof(User));
@@ -202,4 +210,39 @@ public class UserRepository(HarmoniaDbContext dbContext)
             .OrderBy(x => x.FullName)
             .ThenBy(x => x.Id)
             .ToListAsync(cancellationToken);
+
+    /// <summary>Collapses sorted dates into runs of consecutive days.</summary>
+    private static List<(DateOnly From, DateOnly To)> ToRanges(List<DateOnly> sortedDates)
+    {
+        var ranges = new List<(DateOnly From, DateOnly To)>();
+        foreach (var date in sortedDates)
+        {
+            if (ranges.Count > 0 && ranges[^1].To.AddDays(1) == date)
+            {
+                ranges[^1] = (ranges[^1].From, date);
+            }
+            else
+            {
+                ranges.Add((date, date));
+            }
+        }
+
+        return ranges;
+    }
+
+    /// <summary>Log rows created on any of the parish days in <paramref name="ranges"/>; none when empty.</summary>
+    private static Expression<Func<AuditLog, bool>> CreatedWithin(List<(DateOnly From, DateOnly To)> ranges)
+    {
+        var log = Expression.Parameter(typeof(AuditLog), "l");
+        var createdAt = Expression.Property(log, nameof(AuditLog.CreatedAt));
+        Expression body = Expression.Constant(false);
+        foreach (var (from, to) in ranges)
+        {
+            body = Expression.OrElse(body, Expression.AndAlso(
+                Expression.GreaterThanOrEqual(createdAt, Expression.Constant(VietnamTime.StartOfDayUtc(from))),
+                Expression.LessThan(createdAt, Expression.Constant(VietnamTime.StartOfDayUtc(to.AddDays(1))))));
+        }
+
+        return Expression.Lambda<Func<AuditLog, bool>>(body, log);
+    }
 }

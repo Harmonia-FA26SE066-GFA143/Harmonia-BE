@@ -23,6 +23,7 @@ public class EventParticipationService(
     ISystemSettingService systemSettingService,
     IServiceRosterRepository rosterRepository,
     IRosterService rosterService,
+    INotificationPublisher notificationPublisher,
     IMapper mapper) : IEventParticipationService
 {
     public async Task<Result<List<EventParticipationDto>>> SendRequestsAsync(
@@ -313,6 +314,15 @@ public class EventParticipationService(
         {
             await NotifyLeadDirectorOfWithdrawalAsync(
                 participation.LiturgicalEvent, participation.Member.User.FullName, cancellationToken);
+        }
+
+        // Push only, no stored notification: every answer would flood the director's inbox.
+        var leadDirectorIds = await choirScope.GetLeadDirectorUserIdsAsync(eventId, cancellationToken);
+        if (leadDirectorIds.Count > 0)
+        {
+            await notificationPublisher.PublishParticipationChangedAsync(
+                new ParticipationChangedDto { EventId = eventId, MemberId = profile.Id, Status = participation.Status },
+                leadDirectorIds, cancellationToken);
         }
 
         var dto = mapper.Map<EventParticipationDto>(participation);

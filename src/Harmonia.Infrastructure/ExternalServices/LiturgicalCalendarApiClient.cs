@@ -89,11 +89,11 @@ public class LiturgicalCalendarApiClient(
     // The Triduum counts as Lent, as the season lookup has no entry of its own for it.
     private static string? ToSeason(string? season) => season switch
     {
-        "ADVENT" => "Advent",
-        "CHRISTMAS" => "Christmas",
-        "LENT" or "EASTER_TRIDUUM" => "Lent",
-        "EASTER" => "Easter",
-        "ORDINARY_TIME" => "OrdinaryTime",
+        "ADVENT" => LiturgicalCalendarSeasons.Advent,
+        "CHRISTMAS" => LiturgicalCalendarSeasons.Christmas,
+        "LENT" or "EASTER_TRIDUUM" => LiturgicalCalendarSeasons.Lent,
+        "EASTER" => LiturgicalCalendarSeasons.Easter,
+        "ORDINARY_TIME" => LiturgicalCalendarSeasons.OrdinaryTime,
         _ => null,
     };
 

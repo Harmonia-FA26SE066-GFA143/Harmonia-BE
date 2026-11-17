@@ -35,12 +35,45 @@ public class DataSeeder(
         await SeedMissingAssignmentMaterialsAsync(cancellationToken);
         await SeedLiturgicalNameTranslationsAsync(cancellationToken);
         await SeedSongCatalogsAsync(cancellationToken);
+        await SeedCalendarSeasonsAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Adds one keyed season per calendar season no row holds yet (B64), so events take their season from the synced
+    /// calendar. Only adds: a key an Admin already gave a row, active or not, is left alone.
+    /// </summary>
+    private async Task SeedCalendarSeasonsAsync(CancellationToken cancellationToken)
+    {
+        (string Key, string Name, string ColorHex)[] seasons =
+        [
+            (LiturgicalCalendarSeasons.Advent, "Mùa Vọng", "#6A1B9A"),
+            (LiturgicalCalendarSeasons.Christmas, "Mùa Giáng Sinh", "#F9A825"),
+            (LiturgicalCalendarSeasons.Lent, "Mùa Chay", "#4A148C"),
+            (LiturgicalCalendarSeasons.Easter, "Mùa Phục Sinh", "#F9A825"),
+            (LiturgicalCalendarSeasons.OrdinaryTime, "Mùa Thường Niên", "#2E7D32"),
+        ];
+        var existing = await dbContext.LiturgicalSeasons
+            .Where(x => x.CalendarKey != null)
+            .Select(x => x.CalendarKey!)
+            .ToListAsync(cancellationToken);
+        var missing = seasons.Where(x => !existing.Contains(x.Key)).ToList();
+        if (missing.Count == 0)
+        {
+            return;
+        }
+
+        dbContext.LiturgicalSeasons.AddRange(missing.Select(x => new LiturgicalSeason
+        {
+            Id = Guid.NewGuid(), Name = x.Name, CalendarKey = x.Key, ColorHex = x.ColorHex,
+        }));
+        await dbContext.SaveChangesAsync(cancellationToken);
+        logger.LogInformation("Seeded calendar seasons: {Keys}", string.Join(", ", missing.Select(x => x.Key)));
     }
 
     /// <summary>
     /// Fills the Mass type, ceremony type, Mass part and song theme catalogs from SongCatalogs.json (classification
     /// modelled on dieuca.net). Each table only while it is empty, for the same reason as the translations.
-    /// Liturgical seasons are not seeded: their dates change every year.
+    /// Liturgical seasons are seeded by calendar key in SeedCalendarSeasonsAsync instead.
     /// </summary>
     private async Task SeedSongCatalogsAsync(CancellationToken cancellationToken)
     {

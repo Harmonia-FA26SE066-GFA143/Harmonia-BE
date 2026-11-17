@@ -17,4 +17,7 @@ public interface INotificationClient
 
     /// <summary>One side of a conversation read every note the other side sent them.</summary>
     Task ReceiveDirectorNotesReadAsync(DirectorNotesReadDto read, CancellationToken cancellationToken);
+
+    /// <summary>A member answered an invitation to an event the receiving director leads; no notification is stored.</summary>
+    Task ReceiveParticipationChangedAsync(ParticipationChangedDto change, CancellationToken cancellationToken);
 }

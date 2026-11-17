@@ -22,6 +22,10 @@ public class SignalRNotificationPublisher(
         DirectorNotesReadDto read, IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken) =>
         TryPushAsync(client => client.ReceiveDirectorNotesReadAsync(read, cancellationToken), "director notes read", userIds);
 
+    public Task PublishParticipationChangedAsync(
+        ParticipationChangedDto change, IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken) =>
+        TryPushAsync(client => client.ReceiveParticipationChangedAsync(change, cancellationToken), "participation change", userIds);
+
     /// <summary>
     /// Best effort: the data is already stored, so a client that misses the push still sees it on its
     /// next fetch. A failed push is logged and swallowed, never failing the business operation that sent it.

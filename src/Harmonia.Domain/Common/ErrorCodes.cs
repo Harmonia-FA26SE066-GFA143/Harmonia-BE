@@ -160,6 +160,10 @@ public static class ErrorCodes
 
     public const string LiturgicalEventGenerationRangeInvalid = "LITURGICAL_EVENT_GENERATION_RANGE_INVALID";
 
+    public const string LiturgicalSeasonCalendarKeyInvalid = "LITURGICAL_SEASON_CALENDAR_KEY_INVALID";
+
+    public const string LiturgicalSeasonCalendarKeyDuplicate = "LITURGICAL_SEASON_CALENDAR_KEY_DUPLICATE";
+
     public const string LiturgicalSeasonDateOverlap = "LITURGICAL_SEASON_DATE_OVERLAP";
 
     public const string LiturgicalSeasonDateInvalid = "LITURGICAL_SEASON_DATE_INVALID";

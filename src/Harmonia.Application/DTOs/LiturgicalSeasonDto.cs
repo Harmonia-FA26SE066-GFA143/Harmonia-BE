@@ -6,9 +6,13 @@ public class LiturgicalSeasonDto
 
     public string Name { get; set; } = string.Empty;
 
-    public DateOnly StartDate { get; set; }
+    /// <summary>Advent, Christmas, Lent, Easter or OrdinaryTime; null on a season described by dates.</summary>
+    public string? CalendarKey { get; set; }
 
-    public DateOnly EndDate { get; set; }
+    /// <summary>Null on a keyed season, which spans every year.</summary>
+    public DateOnly? StartDate { get; set; }
+
+    public DateOnly? EndDate { get; set; }
 
     public string? ColorHex { get; set; }
 

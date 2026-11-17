@@ -13,6 +13,15 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
 
 ## 2026-11-17
 
+### Phá vỡ
+
+- **[Phá vỡ]** `LiturgicalSeasonDto.startDate` / `endDate` có thể `null` (mùa gắn `calendarKey`, dùng cho mọi năm).
+  `POST` / `PUT api/lookups/liturgical-seasons` nhận `calendarKey?`; có key thì bỏ trống được cả hai ngày. Server tự thêm 5
+  mùa "Mùa Vọng", "Mùa Giáng Sinh", "Mùa Chay", "Mùa Phục Sinh", "Mùa Thường Niên" có key nếu chưa có. Mùa của sự kiện
+  (tạo, sinh từ giờ lễ cố định, công bố khi chưa có mùa) lấy theo lịch đã đồng bộ; lễ từ 17:00 đêm trước mùa mới lấy mùa
+  mới. Mã mới `LITURGICAL_SEASON_CALENDAR_KEY_INVALID` (400), `LITURGICAL_SEASON_CALENDAR_KEY_DUPLICATE` (409). Các mùa theo
+  năm cũ vẫn dùng được; Admin tắt khi không cần, phân loại bài hát theo mùa cần chọn lại sang mùa có key.
+
 ### Không phá vỡ
 
 - `MemberSkillSummaryDto` (`approvedSkills` của `GET api/member-profiles`, `GET api/member-profiles/{id}`) thêm `id` — id
@@ -32,6 +41,8 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
   (huỷ khi chưa ai nộp, mã mới 409 `PRACTICE_ASSIGNMENT_HAS_SUBMISSIONS`). `POST` trả thêm `recipientCount`.
 - Body lỗi có thể có `details` (object chuỗi → chuỗi). Chốt phân công thất bại vì một dòng không còn hợp lệ trả
   `details.assignmentId`; FE không cần tách id từ `message` nữa.
+- SignalR thêm message `ReceiveParticipationChangedAsync({ eventId, memberId, status })` tới ca trưởng phụ trách (và ca trưởng
+  thay thế) mỗi khi ca viên trả lời lời mời; không lưu thông báo.
 
 ## 2026-11-16
 
