@@ -105,6 +105,8 @@ public sealed class HarmoniaApiFactory : WebApplicationFactory<AuthController>
             Remove(services, typeof(IEmailSender), typeof(IFileStorageService));
             services.AddSingleton(EmailSender);
             services.AddSingleton(FileStorage);
+
+            services.AddSingleton<IStartupFilter, ClientIpStartupFilter>();
         });
     }
 

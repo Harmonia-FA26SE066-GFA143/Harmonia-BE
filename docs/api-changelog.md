@@ -11,6 +11,21 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
   huống trước đây chưa có. FE bỏ qua trường lạ, hiển thị câu chung cho mã lạ.
 - Mỗi PR đổi hợp đồng thêm một dòng vào mục ngày tương ứng ở đây, cùng PR cập nhật `api.md` / `error-codes.md`.
 
+## 2026-11-17
+
+### Không phá vỡ
+
+- `MemberSkillSummaryDto` (`approvedSkills` của `GET api/member-profiles`, `GET api/member-profiles/{id}`) thêm `id` — id
+  của `MemberSkill`, dùng cho `PATCH api/member-skills/{id}/revoke`.
+- `GET api/event-participations?eventId=` mở cho `ParishPriest` (xem mọi sự kiện).
+- `Rehearsal.AttendanceOpensMinutesBefore` và `Rehearsal.AttendanceStartCheckEnabled` thành key công khai: mọi role đã
+  đăng nhập đọc qua `GET api/system-settings/public`.
+- `RehearsalDto` thêm `canManage`: `false` với buổi tập chung mà ca đoàn của người gọi không phụ trách sự kiện.
+- Thông báo buổi tập: `POST api/rehearsals` gửi `RehearsalChanged` "Buổi tập mới" cho ca viên; `PUT api/rehearsals/{id}`
+  chỉ gửi khi đổi giờ bắt đầu, giờ kết thúc hoặc nơi tập.
+- `POST api/auth/login`, `google`, `forgot-password`, `reset-password` giới hạn 10 request / phút / IP, quá thì 429
+  `RATE_LIMIT_EXCEEDED` (mã đã có).
+
 ## 2026-11-16
 
 ### Không phá vỡ

@@ -120,6 +120,8 @@ Khi cờ là `true`, server trả **403 `AUTH_PASSWORD_CHANGE_REQUIRED`** cho m�
 
 ### `POST /api/auth/login` — anonymous
 
+`login`, `google`, `forgot-password`, `reset-password` giới hạn 10 request / phút / IP; quá thì 429 `RATE_LIMIT_EXCEEDED`.
+
 ```json
 { "email": "a@b.com", "password": "Secret123", "deviceId": "optional", "platform": "Android" }
 ```
@@ -351,12 +353,13 @@ Hồ sơ đó chuyển sang `Inactive` và rời mọi ca đoàn, nên không c�
   "...": "các field của MemberProfileDto",
   "roleName": "ChoirMember",
   "approvedSkills": [
-    { "skillId": "guid", "skillName": "Tenor", "categoryId": "guid", "categoryName": "Vocal", "level": "Intermediate" }
+    { "id": "guid", "skillId": "guid", "skillName": "Tenor", "categoryId": "guid", "categoryName": "Vocal", "level": "Intermediate" }
   ]
 }
 ```
 
-`approvedSkills` chỉ gồm kỹ năng **đã duyệt** và skill đang hoạt động; `level` có thể `null`.
+`approvedSkills` chỉ gồm kỹ năng **đã duyệt** và skill đang hoạt động; `level` có thể `null`. `id` là id của `MemberSkill`
+(dùng cho `PATCH /api/member-skills/{id}/revoke`), `skillId` là id kỹ năng trong danh mục.
 Chưa có kỹ năng nào → `[]`.
 
 | Method | Route | Role | Body / Query | Thành công | Lỗi |
@@ -924,8 +927,8 @@ dữ liệu trong khoảng lọc vẫn hiện với các số bằng 0.
 | `Participation.AutoReminderDaysBefore` | Int 0–14 | 3 | không | Mỗi ngày một lần, khi có request đầu tiên của người đã đăng nhập từ 07:00 (giờ Việt Nam), server nhắc ca viên chưa trả lời lời mời của các lễ `Published` trong N ngày tới (mỗi người tối đa một lần mỗi ngày) (thông báo `ParticipationRequest` "Nhắc xác nhận tham gia"). 0 = tắt |
 | `Roster.DifferentLocationExtraMinutes` | Int 0–240 | 0 | không | Cộng thêm N phút vào `Roster.EventOverlapMinutes` khi hai lễ ở hai nơi cử hành khác nhau (thời gian di chuyển). 0 = không cộng |
 | `Practice.AllowLateSubmission` | Bool | false | không | Bật thì nộp bản thu sau hạn không còn bị `PRACTICE_SUBMISSION_PAST_DUE`; bài vẫn tính là quá hạn |
-| `Rehearsal.AttendanceOpensMinutesBefore` | Int 0–120 | 0 | không | Cho điểm danh sớm N phút trước giờ bắt đầu; sớm hơn nữa vẫn `REHEARSAL_NOT_STARTED` |
-| `Rehearsal.AttendanceStartCheckEnabled` | Bool | true | không | Bật thì chỉ điểm danh được khi đến ngày và giờ của buổi tập. Tắt thì điểm danh được bất cứ lúc nào, không còn `REHEARSAL_NOT_STARTED` (dùng khi demo) |
+| `Rehearsal.AttendanceOpensMinutesBefore` | Int 0–120 | 0 | có | Cho điểm danh sớm N phút trước giờ bắt đầu; sớm hơn nữa vẫn `REHEARSAL_NOT_STARTED` |
+| `Rehearsal.AttendanceStartCheckEnabled` | Bool | true | có | Bật thì chỉ điểm danh được khi đến ngày và giờ của buổi tập. Tắt thì điểm danh được bất cứ lúc nào, không còn `REHEARSAL_NOT_STARTED` (dùng khi demo) |
 | `SongList.LeadDays` | Int 0–60 | 7 | không | Hạn nộp danh sách bài hát = ngày lễ − N ngày (`songListDueDate` của danh sách sự kiện); chỉ nhắc, không chặn |
 
 ---
@@ -2192,7 +2195,7 @@ Lên lịch tập và điểm danh chỉ dành cho `ChoirDirector`. Danh sách b
 ```json
 {
   "id": "guid", "choirId": "guid | null", "isJoint": false, "eventId": "guid", "locationId": "guid", "locationName": "Nhà thờ chính",
-  "startTime": "2026-10-09T12:00:00Z", "endTime": "2026-10-09T13:30:00Z", "note": "tập bè",
+  "startTime": "2026-10-09T12:00:00Z", "endTime": "2026-10-09T13:30:00Z", "note": "tập bè", "canManage": true,
   "songs": [{ "songId": "guid", "songTitle": "Kinh Hòa Bình", "displayOrder": 1, "note": "tập kỹ điệp khúc" }],
   "memberConflicts": [{ "memberId": "guid", "fullName": "Nguyễn Văn An", "eventId": "guid", "eventDate": "2026-10-09", "time": "19:00:00" }]
 }
@@ -2201,6 +2204,9 @@ Lên lịch tập và điểm danh chỉ dành cho `ChoirDirector`. Danh sách b
 `memberConflicts` chỉ có ở response của `POST` / `PUT` (danh sách và các GET khác luôn `[]`): ca viên của ca đoàn buổi tập
 (buổi tập chưa có ca đoàn: mọi ca viên) đang có dòng phân công ở một lễ khác trùng giờ, cùng luật với `hasRehearsalConflict`
 của `RosterAssignmentDto`. Chỉ là cảnh báo, buổi tập vẫn được lưu.
+
+`canManage`: người gọi sửa / xoá được buổi tập và điểm danh được. `false` với buổi tập chung mà ca đoàn của người gọi chỉ
+phục vụ, không phụ trách sự kiện (sửa sẽ trả 403 `CHOIR_NOT_LEAD`).
 
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
@@ -2227,8 +2233,9 @@ của `RosterAssignmentDto`. Chỉ là cảnh báo, buổi tập vẫn được 
   Việt Nam, tính cả hai đầu, so với `startTime`. Dùng để chọn buổi tập cần điểm danh.
 - `PUT {id}` sửa giờ, nơi tập, sự kiện, ghi chú; **bài hát sửa riêng** qua `PUT {id}/songs`. Buổi tập đã kết thúc →
   `REHEARSAL_ALREADY_PASSED`. Kiểm trùng giờ bỏ qua chính buổi đang sửa. Giữ nguyên nơi tập đã ngưng hoạt động thì được,
-  đổi sang nơi tập đã ngưng → `LOOKUP_INACTIVE`. Sửa xong, mọi ca viên đang hoạt động nhận thông báo `RehearsalChanged`
-  (`referenceType = "Rehearsal"`).
+  đổi sang nơi tập đã ngưng → `LOOKUP_INACTIVE`. Sửa xong, ca viên của buổi tập nhận thông báo `RehearsalChanged`
+  (`referenceType = "Rehearsal"`) **chỉ khi** đổi `startTime`, `endTime` hoặc `locationId`; đổi ghi chú hay sự kiện thì
+  không báo. `POST` tạo buổi tập cũng gửi `RehearsalChanged` "Buổi tập mới" cho ca viên của buổi tập.
 - `DELETE {id}`: buổi tập đã có điểm danh → `REHEARSAL_HAS_ATTENDANCE` (xoá sẽ mất điểm danh). Xoá buổi chưa kết thúc thì
   mọi ca viên đang hoạt động nhận thông báo `RehearsalChanged` (`referenceType = "LiturgicalEvent"` nếu buổi tập gắn
   sự kiện, ngược lại `null`).
@@ -2331,7 +2338,7 @@ kiện bị gỡ, bảng đã chốt mở lại `Draft`, ca trưởng ca đoàn 
 | Method | Route | Body | Thành công | Lỗi |
 |---|---|---|---|---|
 | POST | `/api/event-participations` · `ParishPriest`, `ChoirDirector` (ca đoàn phụ trách) — cha xứ gọi ngay sau `publish`, bỏ `memberIds` để mời mọi ca viên `Active` của các ca đoàn phục vụ chưa được mời | `{ "eventId", "memberIds?": ["guid"] }` | 200 `EventParticipationDto[]` | 400 `VALIDATION_FAILED` · 403 `CHOIR_NOT_LEAD` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `MEMBER_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_NOT_PUBLISHED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `MEMBER_NOT_ACTIVE`, `EVENT_PARTICIPATION_ALREADY_REQUESTED` |
-| GET | `/api/event-participations?eventId=` · `ChoirDirector` | — | 200 `EventParticipationSummaryDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
+| GET | `/api/event-participations?eventId=` · `ParishPriest`, `ChoirDirector` (ca đoàn phục vụ) | — | 200 `EventParticipationSummaryDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
 | POST | `/api/event-participations/reminders?eventId=` · `ParishPriest`, `ChoirDirector` (ca đoàn phụ trách) — nhắc mọi lời mời `Invited` của ca viên `Active`, bỏ qua người vừa được nhắc trong `Participation.ReminderCooldownHours` giờ | — | 200 `{ "remindedCount", "pendingCount" }` | 403 `CHOIR_NOT_LEAD` · 404 `LITURGICAL_EVENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_NOT_PUBLISHED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `EVENT_PARTICIPATION_REMINDER_TOO_SOON` (mọi người chưa trả lời đều vừa được nhắc) |
 | POST | `/api/event-participations/confirm-all?eventId=` · `ChoirDirector` (ca đoàn phụ trách) — xác nhận hộ mọi lời mời `Invited` của ca viên `Active` (giữ `Declined`/`Unsure`), phục vụ demo; không chặn sự kiện đã qua, không gửi thông báo | — | 200 `EventParticipationSummaryDto` | 403 `CHOIR_NOT_LEAD` · 404 `LITURGICAL_EVENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED` |
 | GET | `/api/event-participations/mine` · `ChoirMember` | — | 200 `MyParticipationDto[]` | 404 `MEMBER_NOT_FOUND` |

@@ -28,6 +28,12 @@ public class RehearsalDto
     public List<RehearsalSongDto> Songs { get; set; } = [];
 
     /// <summary>
+    /// The caller may change the rehearsal and record its attendance; false on a joint rehearsal whose event another
+    /// choir leads.
+    /// </summary>
+    public bool CanManage { get; set; }
+
+    /// <summary>
     /// Members of the rehearsal's choir serving an event that clashes with it; filled only by create and update, a
     /// warning that does not block the save.
     /// </summary>

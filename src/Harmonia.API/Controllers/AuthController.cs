@@ -5,6 +5,7 @@ using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IServices;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Harmonia.API.Controllers;
 
@@ -13,12 +14,14 @@ public class AuthController(IAuthService authService, IUserService userService) 
 {
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitingExtensions.AuthPolicy)]
     [ProducesResponseType<LoginResponse>(StatusCodes.Status200OK)]
     public async Task<IActionResult> LoginAsync([FromBody] LoginRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await authService.LoginAsync(request, cancellationToken));
 
     [HttpPost("google")]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitingExtensions.AuthPolicy)]
     [ProducesResponseType<LoginResponse>(StatusCodes.Status200OK)]
     public async Task<IActionResult> LoginWithGoogleAsync(
         [FromBody] GoogleLoginRequest request, CancellationToken cancellationToken) =>
@@ -91,6 +94,7 @@ public class AuthController(IAuthService authService, IUserService userService) 
 
     [HttpPost("forgot-password")]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitingExtensions.AuthPolicy)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> ForgotPasswordAsync(
         [FromBody] ForgotPasswordRequest request, CancellationToken cancellationToken) =>
@@ -98,6 +102,7 @@ public class AuthController(IAuthService authService, IUserService userService) 
 
     [HttpPost("reset-password")]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitingExtensions.AuthPolicy)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> ResetPasswordAsync(
         [FromBody] ResetPasswordRequest request, CancellationToken cancellationToken) =>

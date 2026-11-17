@@ -89,6 +89,23 @@ public partial class AuthEndpointsTests(HarmoniaApiFactory factory) : IClassFixt
         Assert.Equal(ErrorCodes.ValidationFailed, (await ErrorOfAsync(response, _ct)).Code);
     }
 
+    [Fact]
+    public async Task Login_EleventhAttemptFromOneIpInAMinute_Returns429_Async()
+    {
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add(ClientIpStartupFilter.Header, "203.0.113.7");
+        var statuses = new List<HttpStatusCode>();
+        for (var i = 0; i < 11; i++)
+        {
+            var response = await client.PostAsJsonAsync(
+                "api/auth/login", new { email = "director@test.com", password = "WrongPass1" }, _ct);
+            statuses.Add(response.StatusCode);
+        }
+
+        Assert.All(statuses.Take(10), s => Assert.Equal(HttpStatusCode.Unauthorized, s));
+        Assert.Equal(HttpStatusCode.TooManyRequests, statuses[10]);
+    }
+
     // ---- Refresh / logout ----
 
     [Fact]

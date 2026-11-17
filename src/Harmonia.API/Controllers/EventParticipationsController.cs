@@ -23,7 +23,7 @@ public class EventParticipationsController(IEventParticipationService eventParti
         ToActionResult(await eventParticipationService.SendRequestsAsync(request, cancellationToken));
 
     [HttpGet]
-    [Authorize(Roles = RoleNames.ChoirDirector)]
+    [Authorize(Roles = $"{RoleNames.ParishPriest},{RoleNames.ChoirDirector}")]
     [ProducesResponseType<EventParticipationSummaryDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetByEventAsync(
         [FromQuery] Guid eventId, CancellationToken cancellationToken) =>

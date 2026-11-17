@@ -9,12 +9,22 @@ public static class RateLimitingExtensions
     /// <summary>The anonymous join form on the home page: 5 submissions per IP every 10 minutes.</summary>
     public const string MemberRegistrationPolicy = "member-registration";
 
+    /// <summary>
+    /// Anonymous sign-in and password-reset routes: 10 requests per IP per minute, against password guessing and
+    /// reset-mail flooding. Loose enough for a parish sharing one IP.
+    /// </summary>
+    public const string AuthPolicy = "auth";
+
     public static IServiceCollection AddApiRateLimiting(this IServiceCollection services) =>
         services.AddRateLimiter(options =>
         {
             options.AddPolicy(MemberRegistrationPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
                 context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(10) }));
+
+            options.AddPolicy(AuthPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
+                context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
 
             options.OnRejected = async (context, cancellationToken) =>
             {

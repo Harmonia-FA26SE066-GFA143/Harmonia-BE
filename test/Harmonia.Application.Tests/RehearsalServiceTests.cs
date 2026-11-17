@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using AutoMapper;
+using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IRepositories;
 using Harmonia.Application.Interfaces.IServices;
@@ -49,6 +50,7 @@ public class RehearsalServiceTests
             .CreateMapper();
         _sut = new RehearsalService(_rehearsals, _events, _locations, _songs, _users, _members, _scope, _notifications, _recordings, _files, _roster, mapper);
         _recordings.GetByRehearsalAsync(default, default).ReturnsForAnyArgs([]);
+        _members.ListAsync(default!, default).ReturnsForAnyArgs([]);
         _roster.GetRehearsalConflictsAsync(default, default, default, default, default, default).ReturnsForAnyArgs([]);
 
         _events.GetByIdAsync(_event.Id, _ct).Returns(_event);
@@ -215,6 +217,49 @@ public class RehearsalServiceTests
                 && x.ReferenceId == rehearsal.Id && x.RecipientUserIds == recipients
                 && x.Content.Contains("19:00 01/12/2026")),
             _ct);
+    }
+
+    [Fact]
+    public async Task Create_Valid_NotifiesMembersOfTheNewRehearsal_Async()
+    {
+        var result = await _sut.CreateAsync(NewRequest(), _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value!.CanManage);
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(x => x.Type == NotificationType.RehearsalChanged
+                && x.ReferenceId == _added[0].Id && x.Content.Contains("19:00 01/12/2026")),
+            _ct);
+    }
+
+    [Fact]
+    public async Task Update_SameTimeAndPlace_SavesWithoutNotifying_Async()
+    {
+        var rehearsal = Existing(Start, _hall.Id);
+        _rehearsals.GetWithDetailsForUpdateAsync(rehearsal.Id, _ct).Returns(rehearsal);
+
+        var result = await _sut.UpdateAsync(rehearsal.Id, UpdateRequest(), _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Moved", rehearsal.Note);
+        await _rehearsals.Received(1).SaveChangesAsync(_ct);
+        await _notifications.DidNotReceiveWithAnyArgs().SendAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task Search_JointRehearsalLedByAnotherChoir_CannotBeManaged_Async()
+    {
+        var own = Existing(Start);
+        var joint = Existing(Start);
+        joint.IsJoint = true;
+        joint.EventId = _event.Id;
+        _rehearsals.SearchAsync(Arg.Any<SearchRehearsalsRequest>(), Arg.Any<IReadOnlyCollection<Guid>?>(), _ct)
+            .Returns(new PagedList<Rehearsal>([own, joint], 1, 20, 2));
+        _scope.CheckCanLeadEventAsync(_event.Id, ErrorCodes.RehearsalNotFound, _ct).Returns(ErrorCodes.ChoirNotLead);
+
+        var result = await _sut.SearchAsync(new SearchRehearsalsRequest(), _ct);
+
+        Assert.Equal([true, false], result.Value!.Items.Select(x => x.CanManage));
     }
 
     [Fact]

@@ -33,9 +33,14 @@ public class RehearsalService(
     {
         var choirIds = await choirScope.GetDirectedChoirIdsAsync(cancellationToken);
         var page = await rehearsalRepository.SearchAsync(request, choirIds, cancellationToken);
+        var items = mapper.Map<List<RehearsalDto>>(page.Items);
+        for (var i = 0; i < items.Count; i++)
+        {
+            items[i].CanManage = await choirScope.CheckCanManageRehearsalAsync(page.Items[i], cancellationToken) is null;
+        }
 
         return Result<PagedList<RehearsalDto>>.Success(new PagedList<RehearsalDto>(
-            mapper.Map<List<RehearsalDto>>(page.Items), page.PageNumber, page.PageSize, page.TotalCount));
+            items, page.PageNumber, page.PageSize, page.TotalCount));
     }
 
     public async Task<Result<RehearsalDto>> CreateAsync(
@@ -110,6 +115,14 @@ public class RehearsalService(
             rehearsalSong.Song = songsById[rehearsalSong.SongId];
         }
 
+        await NotifyMembersAsync(
+            "Buổi tập mới",
+            $"Có buổi tập lúc {FormatTime(rehearsal.StartTime)}" + (location is null ? "." : $" tại {location.Name}."),
+            nameof(Rehearsal),
+            rehearsal.Id,
+            await choirScope.GetRehearsalMemberIdsAsync(rehearsal, cancellationToken),
+            cancellationToken);
+
         return Result<RehearsalDto>.Success(await ToDtoWithConflictsAsync(rehearsal, cancellationToken));
     }
 
@@ -157,6 +170,10 @@ public class RehearsalService(
             return Result<RehearsalDto>.Failure(locationError);
         }
 
+        // Members only need to hear about a new time or place, not a note or program edit.
+        var isTimeOrPlaceChanged = rehearsal.StartTime != request.StartTime || rehearsal.EndTime != request.EndTime
+            || rehearsal.LocationId != request.LocationId;
+
         rehearsal.EventId = request.EventId;
         rehearsal.LocationId = request.LocationId;
         rehearsal.Location = location;
@@ -165,14 +182,17 @@ public class RehearsalService(
         rehearsal.Note = request.Note;
         await rehearsalRepository.SaveChangesAsync(cancellationToken);
 
-        await NotifyMembersAsync(
-            "Buổi tập đã thay đổi",
-            $"Buổi tập đã được cập nhật, bắt đầu lúc {FormatTime(rehearsal.StartTime)}"
-                + (location is null ? "." : $" tại {location.Name}."),
-            nameof(Rehearsal),
-            rehearsal.Id,
-            await choirScope.GetRehearsalMemberIdsAsync(rehearsal, cancellationToken),
-            cancellationToken);
+        if (isTimeOrPlaceChanged)
+        {
+            await NotifyMembersAsync(
+                "Buổi tập đã thay đổi",
+                $"Buổi tập đã được cập nhật, bắt đầu lúc {FormatTime(rehearsal.StartTime)}"
+                    + (location is null ? "." : $" tại {location.Name}."),
+                nameof(Rehearsal),
+                rehearsal.Id,
+                await choirScope.GetRehearsalMemberIdsAsync(rehearsal, cancellationToken),
+                cancellationToken);
+        }
 
         return Result<RehearsalDto>.Success(await ToDtoWithConflictsAsync(rehearsal, cancellationToken));
     }
@@ -181,6 +201,8 @@ public class RehearsalService(
     private async Task<RehearsalDto> ToDtoWithConflictsAsync(Rehearsal rehearsal, CancellationToken cancellationToken)
     {
         var dto = mapper.Map<RehearsalDto>(rehearsal);
+        // Create and update already passed the manage check, so the caller manages it.
+        dto.CanManage = true;
         dto.MemberConflicts = await rosterService.GetRehearsalConflictsAsync(
             await choirScope.GetRehearsalMemberIdsAsync(rehearsal, cancellationToken),
             rehearsal.EventId, rehearsal.LocationId, rehearsal.StartTime, rehearsal.EndTime, cancellationToken);

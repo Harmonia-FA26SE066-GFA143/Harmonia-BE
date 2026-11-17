@@ -26,7 +26,8 @@ public class SystemSettingsEndpointsTests(HarmoniaApiFactory factory) : IClassFi
         Assert.Equal(
             [
                 SystemSettingKeys.ParishName, SystemSettingKeys.ChoirName, SystemSettingKeys.ContactEmail,
-                SystemSettingKeys.SystemAnnouncement,
+                SystemSettingKeys.SystemAnnouncement, SystemSettingKeys.RehearsalAttendanceOpensMinutesBefore,
+                SystemSettingKeys.RehearsalAttendanceStartCheckEnabled,
             ],
             visible.Select(x => x.Key));
         Assert.Equal(HttpStatusCode.Forbidden, allAsMember.StatusCode);

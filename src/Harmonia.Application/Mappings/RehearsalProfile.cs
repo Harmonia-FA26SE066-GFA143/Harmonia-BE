@@ -27,6 +27,7 @@ public class RehearsalProfile : Profile
                 dest => dest.LocationName,
                 opt => opt.MapFrom(src => src.Location == null ? null : src.Location.Name))
             .ForMember(dest => dest.Songs, opt => opt.MapFrom(src => src.Songs.OrderBy(s => s.DisplayOrder)))
-            .ForMember(dest => dest.MemberConflicts, opt => opt.Ignore());
+            .ForMember(dest => dest.MemberConflicts, opt => opt.Ignore())
+            .ForMember(dest => dest.CanManage, opt => opt.Ignore());
     }
 }
