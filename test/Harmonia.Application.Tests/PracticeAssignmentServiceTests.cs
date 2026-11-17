@@ -174,8 +174,76 @@ public class PracticeAssignmentServiceTests
         var result = await _sut.CreateAsync(Request(AssignmentScope.All), _ct);
 
         Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.Value!.RecipientCount);
         await _notifications.Received(1).SendAsync(
             Arg.Is<SendNotificationRequest>(x => x.RecipientUserIds.SequenceEqual(new[] { _activeMember.UserId })), _ct);
+    }
+
+    // ---- Update / Delete (B59) ----
+
+    private PracticeAssignment Existing()
+    {
+        var assignment = new PracticeAssignment
+        {
+            Id = Guid.NewGuid(), ChoirId = Guid.NewGuid(), Title = "Old", Scope = AssignmentScope.All,
+            DueDate = DateTime.UtcNow.AddDays(1),
+        };
+        _assignments.GetForUpdateAsync(assignment.Id, _ct).Returns(assignment);
+        return assignment;
+    }
+
+    [Fact]
+    public async Task Update_ChangesTextAndDueDate_Async()
+    {
+        var assignment = Existing();
+        var due = DateTime.UtcNow.AddDays(5);
+
+        var result = await _sut.UpdateAsync(
+            assignment.Id, new UpdatePracticeAssignmentRequest { Title = "New", Instruction = "Bars 1-8", DueDate = due }, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(("New", "Bars 1-8", due), (assignment.Title, assignment.Instruction, assignment.DueDate));
+        Assert.Null(result.Value!.RecipientCount);
+        await _assignments.Received(1).SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Update_AssignmentOfAnotherDirectorsChoir_ReturnsNotFound_Async()
+    {
+        var assignment = Existing();
+        _scope.CanManageChoirAsync(assignment.ChoirId, _ct).Returns(false);
+
+        var result = await _sut.UpdateAsync(
+            assignment.Id, new UpdatePracticeAssignmentRequest { Title = "New", DueDate = DateTime.UtcNow.AddDays(5) }, _ct);
+
+        Assert.Equal(ErrorCodes.PracticeAssignmentNotFound, result.Code);
+        await _assignments.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Delete_NobodySubmitted_RemovesIt_Async()
+    {
+        var assignment = Existing();
+
+        Assert.True((await _sut.DeleteAsync(assignment.Id, _ct)).IsSuccess);
+        _assignments.Received(1).Remove(assignment);
+        await _assignments.Received(1).SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Delete_WithSubmissions_ReturnsHasSubmissions_AndKeepsIt_Async()
+    {
+        var assignment = Existing();
+        _assignments.HasSubmissionsAsync(assignment.Id, _ct).Returns(true);
+
+        Assert.Equal(ErrorCodes.PracticeAssignmentHasSubmissions, (await _sut.DeleteAsync(assignment.Id, _ct)).Code);
+        _assignments.DidNotReceive().Remove(Arg.Any<PracticeAssignment>());
+    }
+
+    [Fact]
+    public async Task Delete_Unknown_ReturnsNotFound_Async()
+    {
+        Assert.Equal(ErrorCodes.PracticeAssignmentNotFound, (await _sut.DeleteAsync(Guid.NewGuid(), _ct)).Code);
     }
 
     [Fact]

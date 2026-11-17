@@ -539,6 +539,38 @@ public sealed class RepositoryTests : IDisposable
         Assert.Equal(0, page.TotalCount);
     }
 
+    [Fact]
+    public async Task SearchMembers_EventIdAndHasChoir_FilterByCurrentMemberships_AndLoadTheChoirs_Async()
+    {
+        await SeedMaterialsAsync(_ct);
+        var binh = await AddMemberAsync("Binh", MemberStatus.Active, [], _ct);
+        var an = await AddMemberAsync("An", MemberStatus.Active, [], _ct);
+        var location = new WorshipLocation { Id = Guid.NewGuid(), Name = "Main church" };
+        var serving = new Choir { Id = Guid.NewGuid(), Name = "Serving" };
+        var other = new Choir { Id = Guid.NewGuid(), Name = "Other" };
+        var liturgicalEvent = new LiturgicalEvent { Id = Guid.NewGuid(), EventDate = VietnamTime.Today, LocationId = location.Id };
+        await using (var context = _db.NewContext())
+        {
+            context.AddRange(location, serving, other, liturgicalEvent);
+            context.AddRange(
+                new LiturgicalEventChoir { Id = Guid.NewGuid(), EventId = liturgicalEvent.Id, ChoirId = serving.Id, IsLead = true },
+                new ChoirMembership { Id = Guid.NewGuid(), ChoirId = serving.Id, MemberId = binh },
+                new ChoirMembership { Id = Guid.NewGuid(), ChoirId = other.Id, MemberId = binh },
+                // Left the serving choir: counts neither for the event nor as having a choir.
+                new ChoirMembership { Id = Guid.NewGuid(), ChoirId = serving.Id, MemberId = an, IsActive = false });
+            await context.SaveChangesAsync(_ct);
+        }
+
+        var forEvent = await SearchMembersAsync(new SearchMemberProfilesRequest { EventId = liturgicalEvent.Id }, _ct);
+        var withoutChoir = await SearchMembersAsync(new SearchMemberProfilesRequest { HasChoir = false }, _ct);
+
+        var row = Assert.Single(forEvent.Items);
+        Assert.Equal(binh, row.Id);
+        Assert.Equal(["Other", "Serving"], row.ChoirMemberships.Select(m => m.Choir.Name).Order());
+        Assert.Equal(["An", "Member"], withoutChoir.Items.Select(m => m.User.FullName));
+        Assert.Empty(withoutChoir.Items.Single(m => m.Id == an).ChoirMemberships);
+    }
+
     // ---- MemberProfileRepository.GetByUserIdWithApprovedSkillsAsync ----
 
     [Fact]

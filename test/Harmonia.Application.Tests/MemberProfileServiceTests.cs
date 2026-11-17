@@ -2,6 +2,7 @@ using AutoMapper;
 using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
 using Harmonia.Application.Interfaces.IRepositories;
+using Harmonia.Application.Interfaces.IServices;
 using Harmonia.Application.Services;
 using Harmonia.Domain.Common;
 using Harmonia.Domain.Entities;
@@ -15,6 +16,7 @@ public class MemberProfileServiceTests
     private readonly IMemberProfileRepository _members = Substitute.For<IMemberProfileRepository>();
     private readonly ILiturgicalEventRepository _events = Substitute.For<ILiturgicalEventRepository>();
     private readonly IPracticeAssignmentRepository _assignments = Substitute.For<IPracticeAssignmentRepository>();
+    private readonly IChoirScopeService _scope = ChoirScopeFakes.Unrestricted();
     private readonly MemberProfileService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly Guid _userId = Guid.NewGuid();
@@ -23,8 +25,20 @@ public class MemberProfileServiceTests
 
     public MemberProfileServiceTests()
     {
-        _sut = new MemberProfileService(_members, _events, _assignments, Substitute.For<IMapper>());
+        _sut = new MemberProfileService(_members, _events, _assignments, _scope, Substitute.For<IMapper>());
         _members.GetByUserIdAsync(_userId, _ct).Returns(_member);
+    }
+
+    [Fact]
+    public async Task Search_ByEventOutsideTheDirectorsScope_ReturnsEventNotFound_Async()
+    {
+        var request = new SearchMemberProfilesRequest { EventId = Guid.NewGuid() };
+        _scope.CanViewEventAsync(request.EventId.Value, _ct).Returns(false);
+
+        var result = await _sut.SearchAsync(request, _ct);
+
+        Assert.Equal(ErrorCodes.LiturgicalEventNotFound, result.Code);
+        await _members.DidNotReceiveWithAnyArgs().SearchAsync(default, default!, default);
     }
 
     [Fact]

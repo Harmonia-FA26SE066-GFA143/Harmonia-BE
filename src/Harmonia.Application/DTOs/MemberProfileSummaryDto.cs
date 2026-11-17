@@ -28,4 +28,7 @@ public class MemberProfileSummaryDto
     public string RoleName { get; set; } = string.Empty;
 
     public List<MemberSkillSummaryDto> ApprovedSkills { get; set; } = [];
+
+    /// <summary>Choirs the member currently belongs to; empty when none.</summary>
+    public List<MemberChoirDto> Choirs { get; set; } = [];
 }

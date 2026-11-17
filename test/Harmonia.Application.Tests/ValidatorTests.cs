@@ -928,6 +928,22 @@ public class ValidatorTests
         Assert.Equal(isValid ? [] : [ErrorCodes.LiturgicalEventGenerationRangeInvalid], codes);
     }
 
+    [Theory]
+    [InlineData(false, false, true)]  // no choirs: drafts stay without a choir
+    [InlineData(true, true, true)]
+    [InlineData(true, false, false)]  // lead missing or not among the choirs
+    public void GenerateLiturgicalEvents_LeadChoirMustBeAmongTheChoirs(bool hasChoirs, bool leadAmongThem, bool isValid)
+    {
+        var choirId = Guid.NewGuid();
+        var codes = ErrorCodesOf(new GenerateLiturgicalEventsRequestValidator(), new GenerateLiturgicalEventsRequest
+        {
+            FromDate = VietnamTime.Today, ToDate = VietnamTime.Today,
+            ChoirIds = hasChoirs ? [choirId] : [], LeadChoirId = leadAmongThem ? choirId : null,
+        });
+
+        Assert.Equal(isValid ? [] : [ErrorCodes.ChoirLeadInvalid], codes);
+    }
+
     // ---- Timed lyrics ----
 
     [Theory]

@@ -25,6 +25,13 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
   chỉ gửi khi đổi giờ bắt đầu, giờ kết thúc hoặc nơi tập.
 - `POST api/auth/login`, `google`, `forgot-password`, `reset-password` giới hạn 10 request / phút / IP, quá thì 429
   `RATE_LIMIT_EXCEEDED` (mã đã có).
+- `GET api/member-profiles` thêm lọc `eventId` (ca viên thuộc mọi ca đoàn phục vụ sự kiện — dùng để mời) và `hasChoir`;
+  mỗi dòng thêm `choirs: [{ id, name }]`.
+- `POST api/liturgical-events/generation` nhận thêm `choirIds?`, `leadChoirId?`: gán ca đoàn cho mọi bản nháp vừa tạo.
+- Endpoint mới `PUT api/practice-assignments/{id}` (sửa tiêu đề, hướng dẫn, hạn nộp) và `DELETE api/practice-assignments/{id}`
+  (huỷ khi chưa ai nộp, mã mới 409 `PRACTICE_ASSIGNMENT_HAS_SUBMISSIONS`). `POST` trả thêm `recipientCount`.
+- Body lỗi có thể có `details` (object chuỗi → chuỗi). Chốt phân công thất bại vì một dòng không còn hợp lệ trả
+  `details.assignmentId`; FE không cần tách id từ `message` nữa.
 
 ## 2026-11-16
 

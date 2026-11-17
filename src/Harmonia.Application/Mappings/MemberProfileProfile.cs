@@ -26,7 +26,11 @@ public class MemberProfileProfile : Profile
             .ForMember(dest => dest.Gender, opt => opt.MapFrom(src => src.User.Gender))
             .ForMember(dest => dest.SaintName, opt => opt.MapFrom(src => src.User.SaintName))
             .ForMember(dest => dest.RoleName, opt => opt.MapFrom(src => src.User.Role.Name))
-            .ForMember(dest => dest.ApprovedSkills, opt => opt.MapFrom(src => src.MemberSkills));
+            .ForMember(dest => dest.ApprovedSkills, opt => opt.MapFrom(src => src.MemberSkills))
+            .ForMember(dest => dest.Choirs, opt => opt.MapFrom(src => src.ChoirMemberships
+                .Where(m => m.IsActive)
+                .OrderBy(m => m.Choir.Name)
+                .Select(m => new MemberChoirDto { Id = m.ChoirId, Name = m.Choir.Name })));
 
         // MemberSkills must hold only the approved, active skills (see GetByUserIdWithApprovedSkillsAsync).
         CreateMap<MemberProfile, MemberProfileDetailDto>()

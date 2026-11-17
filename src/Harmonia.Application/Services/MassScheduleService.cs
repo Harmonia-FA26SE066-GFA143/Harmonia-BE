@@ -15,6 +15,7 @@ public class MassScheduleService(
     IGenericRepository<WorshipLocation> locationRepository,
     IGenericRepository<LiturgicalSeason> seasonRepository,
     ILiturgicalEventRepository liturgicalEventRepository,
+    IGenericRepository<Choir> choirRepository,
     IMapper mapper) : IMassScheduleService
 {
     public async Task<Result<MassScheduleDto>> CreateAsync(
@@ -81,6 +82,15 @@ public class MassScheduleService(
         GenerateLiturgicalEventsRequest request, CancellationToken cancellationToken)
     {
         var (from, to) = (request.FromDate, request.ToDate);
+        // Same checks as creating an event by hand.
+        var choirIds = request.ChoirIds.Distinct().ToList();
+        if (choirIds.Count > 0)
+        {
+            var choirs = await choirRepository.ListAsync(x => choirIds.Contains(x.Id), cancellationToken);
+            if (choirs.Count != choirIds.Count) return Result<List<LiturgicalEventDto>>.Failure(ErrorCodes.ChoirNotFound);
+            if (choirs.Any(x => !x.IsActive)) return Result<List<LiturgicalEventDto>>.Failure(ErrorCodes.ChoirInactive);
+        }
+
         var schedules = await scheduleRepository.ListAsync(
             x => x.IsActive && x.MassType.IsActive && x.Location.IsActive, cancellationToken);
         var seasons = await seasonRepository.ListAsync(
@@ -99,9 +109,10 @@ public class MassScheduleService(
                 // A Mass already over today could never be published, so no Draft for it.
                 if (date.ToDateTime(schedule.Time) <= now || taken.Contains((date, schedule.Time, schedule.LocationId))) continue;
 
+                var eventId = Guid.NewGuid();
                 created.Add(new LiturgicalEvent
                 {
-                    Id = Guid.NewGuid(),
+                    Id = eventId,
                     EventDate = date,
                     Time = schedule.Time,
                     LiturgicalSeasonId = seasons.FirstOrDefault(s => s.StartDate <= date && date <= s.EndDate)?.Id,
@@ -109,6 +120,10 @@ public class MassScheduleService(
                     LocationId = schedule.LocationId,
                     Title = schedule.Title,
                     Status = EventStatus.Draft,
+                    EventChoirs = choirIds.Select(choirId => new LiturgicalEventChoir
+                    {
+                        Id = Guid.NewGuid(), EventId = eventId, ChoirId = choirId, IsLead = choirId == request.LeadChoirId,
+                    }).ToList(),
                 });
             }
         }

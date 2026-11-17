@@ -30,4 +30,7 @@ public class PracticeAssignmentDto
     public List<Guid> SkillIds { get; set; } = [];
 
     public List<Guid> MemberIds { get; set; } = [];
+
+    /// <summary>How many members were notified; filled only by POST, null elsewhere.</summary>
+    public int? RecipientCount { get; set; }
 }

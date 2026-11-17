@@ -97,6 +97,16 @@ public class PracticeAssignmentRepository(HarmoniaDbContext dbContext)
     public Task<PracticeAssignment?> GetByIdForMemberAsync(Guid id, Guid memberId, CancellationToken cancellationToken) =>
         WithDetails(VisibleToMember(memberId), memberId).FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
+    public Task<PracticeAssignment?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken) =>
+        DbContext.PracticeAssignments
+            .Include(x => x.Targets)
+            .Include(x => x.Materials)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+    public Task<bool> HasSubmissionsAsync(Guid id, CancellationToken cancellationToken) =>
+        DbContext.PracticeSubmissions.AnyAsync(x => x.PracticeAssignmentId == id, cancellationToken);
+
     public Task<string?> GetReferenceNotesPublicIdAsync(Guid id, CancellationToken cancellationToken) =>
         DbContext.PracticeAssignmentMaterials
             .AsNoTracking()

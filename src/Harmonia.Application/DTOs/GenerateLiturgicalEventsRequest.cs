@@ -6,4 +6,10 @@ public class GenerateLiturgicalEventsRequest
     public DateOnly FromDate { get; set; }
 
     public DateOnly ToDate { get; set; }
+
+    /// <summary>Choirs serving every created draft; empty leaves the drafts without a choir, as before (B55).</summary>
+    public List<Guid> ChoirIds { get; set; } = [];
+
+    /// <summary>Required among <see cref="ChoirIds"/> when choirs are given.</summary>
+    public Guid? LeadChoirId { get; set; }
 }

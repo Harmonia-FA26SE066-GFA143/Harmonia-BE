@@ -178,7 +178,9 @@ public class RosterService(
         var assignments = await rosterRepository.GetAssignmentsWithEligibilityAsync(roster.Id, roster.EventId, cancellationToken);
         var eventMemberIds = await choirScope.GetEventMemberIdsAsync(roster.EventId, cancellationToken);
         if (FirstIneligible(assignments, eventMemberIds) is { } ineligible)
-            return Result<ServiceRosterDto>.Failure(ineligible.Code, $"Assignment {ineligible.AssignmentId} is no longer valid.");
+            return Result<ServiceRosterDto>.Failure(
+                ineligible.Code, $"Assignment {ineligible.AssignmentId} is no longer valid.",
+                new Dictionary<string, string> { ["assignmentId"] = ineligible.AssignmentId.ToString() });
 
         roster.Status = RosterStatus.Finalized;
         roster.FinalizedAt = DateTime.UtcNow;
@@ -206,7 +208,9 @@ public class RosterService(
         var assignments = await rosterRepository.GetAssignmentsWithEligibilityAsync(roster.Id, roster.EventId, cancellationToken);
         var eventMemberIds = await choirScope.GetEventMemberIdsAsync(roster.EventId, cancellationToken);
         if (FirstIneligible(assignments.Where(x => x.SongListItemId is null), eventMemberIds) is { } ineligible)
-            return Result<ServiceRosterDto>.Failure(ineligible.Code, $"Assignment {ineligible.AssignmentId} is no longer valid.");
+            return Result<ServiceRosterDto>.Failure(
+                ineligible.Code, $"Assignment {ineligible.AssignmentId} is no longer valid.",
+                new Dictionary<string, string> { ["assignmentId"] = ineligible.AssignmentId.ToString() });
 
         roster.WholeServiceFinalizedAt = DateTime.UtcNow;
         await rosterRepository.SaveChangesAsync(cancellationToken);

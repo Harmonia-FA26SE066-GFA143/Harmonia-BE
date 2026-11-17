@@ -846,6 +846,7 @@ public class RosterServiceTests
 
         Assert.Equal(expectedCode, result.Code);
         Assert.Contains(invalid.Id.ToString(), result.Message);
+        Assert.Equal(invalid.Id.ToString(), result.Details!["assignmentId"]);
         Assert.Equal(RosterStatus.Suggested, roster.Status);
         await _repository.DidNotReceive().SaveChangesAsync(_ct);
     }

@@ -71,12 +71,26 @@ public class MemberProfileRepository(HarmoniaDbContext dbContext)
                 s => s.SkillId == skillId && s.Status == ApprovalStatus.Approved && s.Skill.IsActive));
         }
 
+        if (filter.EventId is { } eventId)
+        {
+            query = query.Where(x => x.ChoirMemberships.Any(m => m.IsActive
+                && DbContext.LiturgicalEventChoirs.Any(c => c.EventId == eventId && c.ChoirId == m.ChoirId)));
+        }
+
+        if (filter.HasChoir is { } hasChoir)
+        {
+            query = query.Where(x => x.ChoirMemberships.Any(m => m.IsActive) == hasChoir);
+        }
+
         var totalCount = await query.CountAsync(cancellationToken);
 
         var items = await query
             .Include(x => x.User.Role)
+            .Include(x => x.ChoirMemberships.Where(m => m.IsActive))
+                .ThenInclude(m => m.Choir)
             .Include(x => x.MemberSkills.Where(s => s.Status == ApprovalStatus.Approved && s.Skill.IsActive))
                 .ThenInclude(s => s.Skill.Category)
+            .AsSplitQuery()
             .OrderBy(x => x.User.FullName)
             .ThenBy(x => x.Id)
             .Skip((filter.PageNumber - 1) * filter.PageSize)

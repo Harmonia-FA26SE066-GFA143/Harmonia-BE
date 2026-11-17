@@ -12,6 +12,7 @@ public class MemberProfileService(
     IMemberProfileRepository memberProfileRepository,
     ILiturgicalEventRepository liturgicalEventRepository,
     IPracticeAssignmentRepository practiceAssignmentRepository,
+    IChoirScopeService choirScope,
     IMapper mapper) : IMemberProfileService
 {
     public async Task<Result<PagedList<ParticipationHistoryDto>>> GetMyHistoryAsync(
@@ -85,6 +86,12 @@ public class MemberProfileService(
     public async Task<Result<PagedList<MemberProfileSummaryDto>>> SearchAsync(
         SearchMemberProfilesRequest request, CancellationToken cancellationToken)
     {
+        // The list is parish-wide, but filtering by an event must not reveal which choirs serve an event out of scope.
+        if (request.EventId is { } eventId && !await choirScope.CanViewEventAsync(eventId, cancellationToken))
+        {
+            return Result<PagedList<MemberProfileSummaryDto>>.Failure(ErrorCodes.LiturgicalEventNotFound);
+        }
+
         var keyword = string.IsNullOrWhiteSpace(request.Keyword) ? null : request.Keyword.Trim();
         var page = await memberProfileRepository.SearchAsync(keyword, request, cancellationToken);
 

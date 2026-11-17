@@ -21,6 +21,20 @@ public class PracticeAssignmentsController(
         [FromBody] CreatePracticeAssignmentRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await practiceAssignmentService.CreateAsync(request, cancellationToken));
 
+    [HttpPut("{id:guid}")]
+    [Authorize(Roles = RoleNames.ChoirDirector)]
+    [ProducesResponseType<PracticeAssignmentDto>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdateAsync(
+        Guid id, [FromBody] UpdatePracticeAssignmentRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await practiceAssignmentService.UpdateAsync(id, request, cancellationToken));
+
+    /// <summary>Withdraws the assignment while nobody has submitted to it.</summary>
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = RoleNames.ChoirDirector)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeleteAsync(Guid id, CancellationToken cancellationToken) =>
+        ToActionResult(await practiceAssignmentService.DeleteAsync(id, cancellationToken));
+
     /// <summary>Assignments the Choir Director has given, all or those of one event (B21).</summary>
     [HttpGet]
     [Authorize(Roles = RoleNames.ChoirDirector)]

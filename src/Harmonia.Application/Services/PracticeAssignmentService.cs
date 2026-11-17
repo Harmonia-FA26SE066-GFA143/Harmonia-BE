@@ -145,7 +145,45 @@ public class PracticeAssignmentService(
                 ReferenceId: assignment.Id),
             cancellationToken);
 
+        var dto = mapper.Map<PracticeAssignmentDto>(assignment);
+        dto.RecipientCount = recipientUserIds.Count;
+        return Result<PracticeAssignmentDto>.Success(dto);
+    }
+
+    public async Task<Result<PracticeAssignmentDto>> UpdateAsync(
+        Guid id, UpdatePracticeAssignmentRequest request, CancellationToken cancellationToken)
+    {
+        var assignment = await practiceAssignmentRepository.GetForUpdateAsync(id, cancellationToken);
+        if (assignment is null || !await choirScope.CanManageChoirAsync(assignment.ChoirId, cancellationToken))
+        {
+            return Result<PracticeAssignmentDto>.Failure(ErrorCodes.PracticeAssignmentNotFound);
+        }
+
+        assignment.Title = request.Title;
+        assignment.Instruction = request.Instruction;
+        assignment.DueDate = request.DueDate;
+        await practiceAssignmentRepository.SaveChangesAsync(cancellationToken);
+
         return Result<PracticeAssignmentDto>.Success(mapper.Map<PracticeAssignmentDto>(assignment));
+    }
+
+    public async Task<Result> DeleteAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var assignment = await practiceAssignmentRepository.GetForUpdateAsync(id, cancellationToken);
+        if (assignment is null || !await choirScope.CanManageChoirAsync(assignment.ChoirId, cancellationToken))
+        {
+            return Result.Failure(ErrorCodes.PracticeAssignmentNotFound);
+        }
+
+        // Submissions cascade with the assignment, so a member's recording would be lost.
+        if (await practiceAssignmentRepository.HasSubmissionsAsync(id, cancellationToken))
+        {
+            return Result.Failure(ErrorCodes.PracticeAssignmentHasSubmissions);
+        }
+
+        practiceAssignmentRepository.Remove(assignment);
+        await practiceAssignmentRepository.SaveChangesAsync(cancellationToken);
+        return Result.Success();
     }
 
     public async Task<Result<PagedList<PracticeAssignmentDetailDto>>> GetMineAsync(

@@ -352,6 +352,7 @@ Hồ sơ đó chuyển sang `Inactive` và rời mọi ca đoàn, nên không c�
 {
   "...": "các field của MemberProfileDto",
   "roleName": "ChoirMember",
+  "choirs": [{ "id": "guid", "name": "Ca đoàn Cecilia" }],
   "approvedSkills": [
     { "id": "guid", "skillId": "guid", "skillName": "Tenor", "categoryId": "guid", "categoryName": "Vocal", "level": "Intermediate" }
   ]
@@ -362,11 +363,16 @@ Hồ sơ đó chuyển sang `Inactive` và rời mọi ca đoàn, nên không c�
 (dùng cho `PATCH /api/member-skills/{id}/revoke`), `skillId` là id kỹ năng trong danh mục.
 Chưa có kỹ năng nào → `[]`.
 
+`choirs` (chỉ ở `MemberProfileSummaryDto`): các ca đoàn ca viên **đang** thuộc, theo tên; chưa vào ca đoàn nào → `[]`.
+Lọc của `GET /api/member-profiles`: `eventId` giữ ca viên đang thuộc một ca đoàn phục vụ sự kiện đó (mọi ca đoàn, không chỉ
+ca đoàn của ca trưởng — dùng để chọn người mời); ca trưởng không xem được sự kiện → 404 `LITURGICAL_EVENT_NOT_FOUND`.
+`hasChoir=false` giữ ca viên chưa thuộc ca đoàn nào, `true` giữ người đã thuộc ít nhất một.
+
 | Method | Route | Role | Body / Query | Thành công | Lỗi |
 |---|---|---|---|---|---|
 | GET | `/api/member-profiles/me` | `ChoirMember` | — | 200 `MemberProfileDetailDto` | 404 `MEMBER_NOT_FOUND` |
 | PUT | `/api/member-profiles/me` | `ChoirMember` | `{ "fullName", "phone", "saintName", "gender", "dateOfBirth" }` | 200 `MemberProfileDto` | 400 `VALIDATION_FAILED` · 404 `MEMBER_NOT_FOUND` |
-| GET | `/api/member-profiles` | `ChoirDirector`, `Admin`, `ParishPriest` | query `keyword`, `status`, `skillId`, `pageNumber`, `pageSize` | 200 `PagedList<MemberProfileSummaryDto>` | — |
+| GET | `/api/member-profiles` | `ChoirDirector`, `Admin`, `ParishPriest` | query `keyword`, `status`, `skillId`, `eventId`, `hasChoir`, `pageNumber`, `pageSize` | 200 `PagedList<MemberProfileSummaryDto>` | 404 `LITURGICAL_EVENT_NOT_FOUND` (`eventId` ngoài phạm vi ca trưởng) |
 | GET | `/api/member-profiles/{id}` | `ChoirDirector` | — | 200 `MemberProfileDto` | 404 `MEMBER_NOT_FOUND` |
 | PUT | `/api/member-profiles/{id}` | `ChoirDirector` | `{ "phone", "saintName", "gender", "dateOfBirth", "joinedDate", "status" }` | 200 `MemberProfileDto` | 400 `VALIDATION_FAILED`, `MEMBER_JOINED_DATE_IN_FUTURE` · 404 `MEMBER_NOT_FOUND` · 409 `MEMBER_NOT_ACTIVE` (tài khoản không còn là `ChoirMember`) |
 | GET | `/api/member-profiles/me/history` | `ChoirMember` | query `liturgicalSeasonId`, `fromDate`, `toDate`, `pageNumber`, `pageSize` | 200 `PagedList<ParticipationHistoryDto>` | 400 `VALIDATION_FAILED` (`REPORT_DATE_RANGE_INVALID`) · 404 `MEMBER_NOT_FOUND` |
@@ -537,7 +543,7 @@ giá trị). Bản `Rejected` hoặc `Revoked` là lịch sử: ca viên khai b�
 | GET | `/api/liturgical-events/{id}` | — | 200 `LiturgicalEventDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` |
 | POST | `/api/liturgical-events` | `{ "eventDate", "time", "liturgicalSeasonId?", "massTypeId?", "ceremonyTypeId?", "categoryId?", "locationId", "title?", "specialRequirements?", "choirIds": ["guid"], "leadChoirId", "isPublished?" }` | 200 `LiturgicalEventDto` | 400 `VALIDATION_FAILED` (`LITURGICAL_EVENT_TYPE_REQUIRED`, `LITURGICAL_EVENT_CHOIR_REQUIRED`, `CHOIR_LEAD_INVALID`), `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON`, `LITURGICAL_EVENT_TYPE_REQUIRED`, `LITURGICAL_EVENT_SEASON_REQUIRED` (khi `isPublished`) · 404 `LOOKUP_NOT_FOUND`, `CHOIR_NOT_FOUND` · 409 `LITURGICAL_EVENT_ALREADY_PASSED` (khi `isPublished`), `LITURGICAL_EVENT_SLOT_TAKEN`, `LOOKUP_INACTIVE`, `CHOIR_INACTIVE` |
 | PUT | `/api/liturgical-events/{id}` | như `POST`, trừ `choirIds`, `leadChoirId` (sửa qua `PUT .../choirs`) | 200 `LiturgicalEventDto` | 400 `VALIDATION_FAILED` (`LITURGICAL_EVENT_TYPE_REQUIRED`), `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_SLOT_TAKEN`, `LOOKUP_INACTIVE`, `ROSTER_MEMBER_TIME_CONFLICT` |
-| POST | `/api/liturgical-events/generation` | `{ "fromDate", "toDate" }` | 200 `LiturgicalEventDto[]` (các sự kiện vừa tạo) | 400 `VALIDATION_FAILED` (`LITURGICAL_EVENT_GENERATION_RANGE_INVALID`) |
+| POST | `/api/liturgical-events/generation` | `{ "fromDate", "toDate", "choirIds?": ["guid"], "leadChoirId?" }` — có `choirIds` thì mọi bản nháp vừa tạo được gán các ca đoàn đó, `leadChoirId` bắt buộc và phải nằm trong `choirIds`; bỏ trống thì bản nháp chưa có ca đoàn | 200 `LiturgicalEventDto[]` (các sự kiện vừa tạo) | 400 `VALIDATION_FAILED` (`LITURGICAL_EVENT_GENERATION_RANGE_INVALID`, `CHOIR_LEAD_INVALID`) · 404 `CHOIR_NOT_FOUND` · 409 `CHOIR_INACTIVE` |
 | PATCH | `/api/liturgical-events/{id}/publish` | — | 200 `LiturgicalEventDto` | 400 `LITURGICAL_EVENT_TYPE_REQUIRED`, `LITURGICAL_EVENT_SEASON_REQUIRED`, `LITURGICAL_EVENT_CHOIR_REQUIRED`, `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `LOOKUP_NOT_FOUND` · 409 `LITURGICAL_EVENT_ALREADY_PUBLISHED`, `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `LITURGICAL_EVENT_SLOT_TAKEN`, `LOOKUP_INACTIVE` |
 | PATCH | `/api/liturgical-events/{id}/cancel` | — | 200 `LiturgicalEventDto` | 404 `LITURGICAL_EVENT_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED` |
 | GET | `/api/schedule/events` · mọi role | — | 200 `LiturgicalEventSummaryDto[]` | — |
@@ -1917,7 +1923,7 @@ Role `ParishPriest`, `ChoirDirector`. 200 `PagedList<SongSuggestionResponse>` ·
   sửa nhân sự cần cho bài được nữa. Chưa có API bỏ chốt.
 - **Còn thiếu người vẫn chốt được**: các cặp còn thiếu trả trong `shortages`.
 - Kiểm lại từng dòng còn hiệu lực: ca viên phải còn **đang hoạt động**, còn skill **đã duyệt** và vẫn
-  **xác nhận tham gia**. Dòng nào hỏng → 409 với mã tương ứng, `message` chứa id dòng đó; bảng **không** bị chốt.
+  **xác nhận tham gia**. Dòng nào hỏng → 409 với mã tương ứng và `details.assignmentId` = id dòng đó (cũng có trong `message`); bảng **không** bị chốt.
   Ca trưởng thay / xoá dòng đó rồi chốt lại.
 - `assignments` chỉ gồm dòng còn hiệu lực, sắp như `suggestions`.
 
@@ -1950,13 +1956,18 @@ Role `ParishPriest`, `ChoirDirector`. 200 `PagedList<SongSuggestionResponse>` ·
   "scope": "SkillGroup",
   "dueDate": "2026-10-12T15:00:00Z",
   "skillIds": ["guid"],
-  "memberIds": []
+  "memberIds": [],
+  "recipientCount": 12
 }
 ```
+
+`recipientCount`: số ca viên nhận thông báo, chỉ có ở response của `POST`; nơi khác là `null`.
 
 | Method | Path | Body | Thành công | Lỗi |
 |---|---|---|---|---|
 | GET | `/api/practice-assignments?eventId=&pageNumber=&pageSize=` | — | 200 `PagedList<PracticeAssignmentDto>` | — |
+| PUT | `/api/practice-assignments/{id}` — chỉ sửa tiêu đề, hướng dẫn, hạn nộp; người nhận và tài liệu giữ nguyên; sửa được cả khi đã có bài nộp | `{ "title", "instruction?", "dueDate" }` | 200 `PracticeAssignmentDto` | 400 `VALIDATION_FAILED` (`PRACTICE_DUE_DATE_IN_PAST`) · 404 `PRACTICE_ASSIGNMENT_NOT_FOUND` (cả bài của ca đoàn khác) |
+| DELETE | `/api/practice-assignments/{id}` — huỷ bài khi chưa ai nộp; không gửi thông báo (thông báo cũ mở ra 404) | — | 204 | 404 `PRACTICE_ASSIGNMENT_NOT_FOUND` · 409 `PRACTICE_ASSIGNMENT_HAS_SUBMISSIONS` |
 | POST | `/api/practice-assignments` | `{ "choirId", "title", "instruction?", "scope", "dueDate", "eventId?", "songId?", "materialIds?", "materialId?", "skillIds?", "memberIds?" }` | 200 `PracticeAssignmentDto` | 400 `VALIDATION_FAILED` (`PRACTICE_DUE_DATE_IN_PAST`, `PRACTICE_TARGET_REQUIRED`) · 404 `LITURGICAL_EVENT_NOT_FOUND`, `SONG_NOT_FOUND`, `MATERIAL_NOT_FOUND`, `SKILL_NOT_FOUND`, `MEMBER_NOT_FOUND`, `CHOIR_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `CHOIR_INACTIVE`, `CHOIR_NOT_SERVING_EVENT`, `SONG_INACTIVE`, `SKILL_INACTIVE` · 422 `PRACTICE_ASSIGNMENT_NO_RECIPIENTS` |
 
 - `GET`: bài tập ca trưởng đã giao, tất cả hoặc của một sự kiện (`eventId`), hạn nộp muộn nhất trước.

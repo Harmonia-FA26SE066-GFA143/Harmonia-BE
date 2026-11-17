@@ -15,4 +15,10 @@ public class SearchMemberProfilesRequest : PagingRequest
 
     /// <summary>Keeps only members with this skill approved.</summary>
     public Guid? SkillId { get; set; }
+
+    /// <summary>Keeps only current members of the choirs serving this event (B53).</summary>
+    public Guid? EventId { get; set; }
+
+    /// <summary>False keeps only members in no choir; true only members in at least one (B54).</summary>
+    public bool? HasChoir { get; set; }
 }

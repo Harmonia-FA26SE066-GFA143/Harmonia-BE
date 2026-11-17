@@ -19,6 +19,8 @@ public class MassScheduleServiceTests
     private readonly IGenericRepository<WorshipLocation> _locations = Substitute.For<IGenericRepository<WorshipLocation>>();
     private readonly IGenericRepository<LiturgicalSeason> _seasons = Substitute.For<IGenericRepository<LiturgicalSeason>>();
     private readonly ILiturgicalEventRepository _events = Substitute.For<ILiturgicalEventRepository>();
+    private readonly IGenericRepository<Choir> _choirs = Substitute.For<IGenericRepository<Choir>>();
+    private readonly List<Choir> _choirRows = [];
     private readonly MassScheduleService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly MassType _massType = new() { Id = Guid.NewGuid(), Name = "Sunday Mass" };
@@ -36,7 +38,7 @@ public class MassScheduleServiceTests
                 cfg.AddProfile<LiturgicalEventProfile>();
             }, NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new MassScheduleService(_schedules, _massTypes, _locations, _seasons, _events, mapper);
+        _sut = new MassScheduleService(_schedules, _massTypes, _locations, _seasons, _events, _choirs, mapper);
 
         // The fakes evaluate the service's predicate against in-memory rows, as the database would.
         _schedules.ListAsync(Arg.Any<Expression<Func<MassSchedule, bool>>>(), _ct)
@@ -48,6 +50,8 @@ public class MassScheduleServiceTests
         _events.ListAsync(Arg.Any<Expression<Func<LiturgicalEvent, bool>>>(), _ct)
             .Returns(call => _eventRows.Where(call.Arg<Expression<Func<LiturgicalEvent, bool>>>().Compile()).ToList());
         _events.AddAsync(Arg.Do<LiturgicalEvent>(_addedEvents.Add), _ct).Returns(Task.CompletedTask);
+        _choirs.ListAsync(Arg.Any<Expression<Func<Choir, bool>>>(), _ct)
+            .Returns(call => _choirRows.Where(call.Arg<Expression<Func<Choir, bool>>>().Compile()).ToList());
         _massTypes.GetByIdAsync(_massType.Id, _ct).Returns(_massType);
         _locations.GetByIdAsync(_location.Id, _ct).Returns(_location);
     }
@@ -188,5 +192,47 @@ public class MassScheduleServiceTests
 
         Assert.Empty(result.Value!);
         await _events.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Generate_WithChoirs_GivesEveryDraftTheChoirsAndLead_Async()
+    {
+        var sunday = NextSunday();
+        AddSchedule(DayOfWeek.Sunday, 7);
+        AddSchedule(DayOfWeek.Sunday, 9);
+        Choir lead = new() { Id = Guid.NewGuid(), IsActive = true }, other = new() { Id = Guid.NewGuid(), IsActive = true };
+        _choirRows.AddRange([lead, other]);
+
+        var result = await _sut.GenerateEventsAsync(
+            new GenerateLiturgicalEventsRequest
+            {
+                FromDate = sunday, ToDate = sunday, ChoirIds = [lead.Id, other.Id, lead.Id], LeadChoirId = lead.Id,
+            }, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, _addedEvents.Count);
+        Assert.All(_addedEvents, x => Assert.Equal(
+            [(lead.Id, true), (other.Id, false)],
+            x.EventChoirs.Select(c => (c.ChoirId, c.IsLead))));
+        Assert.All(_addedEvents, x => Assert.All(x.EventChoirs, c => Assert.Equal(x.Id, c.EventId)));
+    }
+
+    [Theory]
+    [InlineData(false, ErrorCodes.ChoirNotFound)]
+    [InlineData(true, ErrorCodes.ChoirInactive)]
+    public async Task Generate_UnknownOrInactiveChoir_ReturnsItsCode_AndCreatesNothing_Async(bool exists, string code)
+    {
+        AddSchedule(DayOfWeek.Sunday, 7);
+        var choir = new Choir { Id = Guid.NewGuid(), IsActive = false };
+        if (exists) _choirRows.Add(choir);
+
+        var result = await _sut.GenerateEventsAsync(
+            new GenerateLiturgicalEventsRequest
+            {
+                FromDate = NextSunday(), ToDate = NextSunday(), ChoirIds = [choir.Id], LeadChoirId = choir.Id,
+            }, _ct);
+
+        Assert.Equal(code, result.Code);
+        Assert.Empty(_addedEvents);
     }
 }

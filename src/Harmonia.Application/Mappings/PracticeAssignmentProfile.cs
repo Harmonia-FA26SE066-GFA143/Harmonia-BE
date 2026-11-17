@@ -18,7 +18,8 @@ public class PracticeAssignmentProfile : Profile
                 .Select(t => t.MemberId!.Value)))
             .ForMember(dest => dest.MaterialIds, opt => opt.MapFrom(src => src.Materials
                 .OrderBy(m => m.DisplayOrder)
-                .Select(m => m.MaterialId)));
+                .Select(m => m.MaterialId)))
+            .ForMember(dest => dest.RecipientCount, opt => opt.Ignore());
 
         // Submissions arrives filtered to the calling member's newest row; the ordering keeps it safe if not.
         // The "!" member chains are null-safe: AutoMapper maps null when LiturgicalEvent, Song or Material is null.
