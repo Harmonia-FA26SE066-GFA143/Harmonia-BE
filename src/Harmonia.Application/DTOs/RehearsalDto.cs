@@ -25,6 +25,9 @@ public class RehearsalDto
 
     public string? Note { get; set; }
 
+    /// <summary>The rehearsal has ended; it can still be created afterwards, but no longer edited.</summary>
+    public bool IsPassed { get; set; }
+
     public List<RehearsalSongDto> Songs { get; set; } = [];
 
     /// <summary>

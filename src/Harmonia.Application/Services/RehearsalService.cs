@@ -115,13 +115,17 @@ public class RehearsalService(
             rehearsalSong.Song = songsById[rehearsalSong.SongId];
         }
 
-        await NotifyMembersAsync(
-            "Buổi tập mới",
-            $"Có buổi tập lúc {FormatTime(rehearsal.StartTime)}" + (location is null ? "." : $" tại {location.Name}."),
-            nameof(Rehearsal),
-            rehearsal.Id,
-            await choirScope.GetRehearsalMemberIdsAsync(rehearsal, cancellationToken),
-            cancellationToken);
+        // A rehearsal entered after it ended is only a record; nobody needs to hear about it.
+        if (rehearsal.EndTime >= DateTime.UtcNow)
+        {
+            await NotifyMembersAsync(
+                "Buổi tập mới",
+                $"Có buổi tập lúc {FormatTime(rehearsal.StartTime)}" + (location is null ? "." : $" tại {location.Name}."),
+                nameof(Rehearsal),
+                rehearsal.Id,
+                await choirScope.GetRehearsalMemberIdsAsync(rehearsal, cancellationToken),
+                cancellationToken);
+        }
 
         return Result<RehearsalDto>.Success(await ToDtoWithConflictsAsync(rehearsal, cancellationToken));
     }
