@@ -1,3 +1,4 @@
+using System.Net;
 using AutoMapper;
 using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
@@ -16,6 +17,7 @@ public class MemberSkillService(
     IFileStorageService fileStorageService,
     IServiceRosterRepository rosterRepository,
     IChoirScopeService choirScope,
+    IEmailSender emailSender,
     IMapper mapper) : IMemberSkillService
 {
     public const long MaxVoiceSizeBytes = 20 * 1024 * 1024;
@@ -210,6 +212,11 @@ public class MemberSkillService(
                 $"Kỹ năng {skillName} của bạn đã bị thu hồi: {reason}",
                 [memberSkill.Member.UserId], nameof(MemberSkill), memberSkill.Id),
             cancellationToken);
+        await EmailMemberAsync(
+            memberSkill.Member.User, "Harmonia - Kỹ năng bị thu hồi",
+            $"Kỹ năng {WebUtility.HtmlEncode(skillName)} của bạn đã bị ca trưởng thu hồi.</p>"
+                + $"<p>Lý do: {WebUtility.HtmlEncode(reason)}",
+            cancellationToken);
         await NotifyLeadDirectorsAsync(affectedEvents, directorUserId, skillName, cancellationToken);
 
         return Result<MemberSkillDetailDto>.Success(ToDto<MemberSkillDetailDto>(memberSkill));
@@ -304,9 +311,26 @@ public class MemberSkillService(
                 nameof(MemberSkill),
                 memberSkill.Id),
             cancellationToken);
+        await EmailMemberAsync(
+            memberSkill.Member.User, "Harmonia - Kết quả duyệt kỹ năng",
+            decision == ApprovalStatus.Approved
+                ? $"Kỹ năng {WebUtility.HtmlEncode(skillName)} bạn khai báo đã được ca trưởng duyệt."
+                : $"Kỹ năng {WebUtility.HtmlEncode(skillName)} bạn khai báo chưa được ca trưởng duyệt.</p>"
+                    + $"<p>Lý do: {WebUtility.HtmlEncode(rejectReason)}",
+            cancellationToken);
 
         return Result<MemberSkillDetailDto>.Success(ToDto<MemberSkillDetailDto>(memberSkill));
     }
+
+    /// <summary>
+    /// The result is ignored on purpose: the review is already saved, the in-app notification went out,
+    /// and the sender logs the failure. <paramref name="htmlMessage"/> must already be HTML-encoded.
+    /// </summary>
+    private Task EmailMemberAsync(User user, string subject, string htmlMessage, CancellationToken cancellationToken) =>
+        emailSender.SendAsync(
+            user.Email, subject,
+            $"<p>Chào {WebUtility.HtmlEncode(user.FullName)},</p><p>{htmlMessage}</p>",
+            cancellationToken);
 
     /// <summary>Extension and size come from the server-side upload; the client's Content-Type is never trusted.</summary>
     private static string? CheckEvidence(FileContent? file)

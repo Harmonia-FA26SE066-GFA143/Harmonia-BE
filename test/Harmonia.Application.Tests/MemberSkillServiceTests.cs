@@ -21,6 +21,7 @@ public class MemberSkillServiceTests
     private readonly IFileStorageService _files = Substitute.For<IFileStorageService>();
     private readonly IServiceRosterRepository _rosters = Substitute.For<IServiceRosterRepository>();
     private readonly IChoirScopeService _scope = ChoirScopeFakes.Unrestricted();
+    private readonly IEmailSender _email = Substitute.For<IEmailSender>();
     private readonly MemberSkillService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly Guid _userId = Guid.NewGuid();
@@ -31,7 +32,7 @@ public class MemberSkillServiceTests
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<MemberSkillProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new MemberSkillService(_memberSkills, _members, _notifications, _files, _rosters, _scope, mapper);
+        _sut = new MemberSkillService(_memberSkills, _members, _notifications, _files, _rosters, _scope, _email, mapper);
         _rosters.GetUpcomingAssignmentsForUpdateAsync(default, default, default, default).ReturnsForAnyArgs([]);
         _files.UploadAsync(default!, default!, default!, default, default).ReturnsForAnyArgs(call =>
             Result<FileUploadResponse>.Success(new FileUploadResponse(
@@ -245,7 +246,7 @@ public class MemberSkillServiceTests
 
     private MemberSkill StubForReview(ApprovalStatus status)
     {
-        _member.User = new User { Id = _userId, FullName = "Skill Member" };
+        _member.User = new User { Id = _userId, FullName = "Skill Member", Email = "member@example.com" };
         var row = new MemberSkill
         {
             Id = Guid.NewGuid(), MemberId = _member.Id, Member = _member, SkillId = _tenor.Id, Skill = _tenor,
@@ -274,6 +275,8 @@ public class MemberSkillServiceTests
             Arg.Is<SendNotificationRequest>(x => x.Type == NotificationType.SkillReview
                 && x.RecipientUserIds.Single() == _userId && x.ReferenceId == row.Id),
             _ct);
+        await _email.Received(1).SendAsync(
+            "member@example.com", Arg.Any<string>(), Arg.Is<string>(x => x.Contains("Tenor") && x.Contains("đã được")), _ct);
     }
 
     [Fact]
@@ -287,6 +290,8 @@ public class MemberSkillServiceTests
         Assert.Equal("Not ready", result.Value.RejectReason);
         await _notifications.Received(1).SendAsync(
             Arg.Is<SendNotificationRequest>(x => x.Content.Contains("Not ready")), _ct);
+        await _email.Received(1).SendAsync(
+            "member@example.com", Arg.Any<string>(), Arg.Is<string>(x => x.Contains("Lý do: Not ready")), _ct);
     }
 
     [Theory]
@@ -301,6 +306,7 @@ public class MemberSkillServiceTests
         Assert.Equal(ErrorCodes.MemberSkillAlreadyReviewed, result.Code);
         await _memberSkills.DidNotReceive().TrySaveReviewAsync(Arg.Any<MemberSkill>(), _ct);
         await _notifications.DidNotReceive().SendAsync(Arg.Any<SendNotificationRequest>(), _ct);
+        await _email.DidNotReceiveWithAnyArgs().SendAsync(default!, default!, default!, default);
     }
 
     [Theory]
@@ -348,6 +354,8 @@ public class MemberSkillServiceTests
         await _notifications.Received(1).SendAsync(
             Arg.Is<SendNotificationRequest>(x => x.Type == NotificationType.AssignmentNotice
                 && x.RecipientUserIds.Single() == leadDirectorId), _ct);
+        await _email.Received(1).SendAsync(
+            "member@example.com", Arg.Any<string>(), Arg.Is<string>(x => x.Contains("Lý do: Lost voice")), _ct);
     }
 
     [Theory]
