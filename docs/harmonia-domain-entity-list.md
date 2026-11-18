@@ -1,6 +1,6 @@
 # Harmonia – Domain Entity List & Attributes (for ERD, Report 3/4)
 
-57 entities derived from FE-01→FE-54 (`claude/functional-requirements-by-actor.md`), the canonical use cases (`claude/use-case-list.md`) and the daily liturgical program model (D6). Diagram: `harmonia-erd.mmd`.
+58 entities derived from FE-01→FE-54 (`claude/functional-requirements-by-actor.md`), the canonical use cases (`claude/use-case-list.md`) and the daily liturgical program model (D6). Diagram: `harmonia-erd.mmd`.
 
 Conceptual/logical level: attribute names, types and constraints. No indexes, no migration syntax.
 
@@ -74,10 +74,10 @@ Written once here instead of repeated 47 times:
 `name` string(50) unique · `description` string(300)? · `isActive` bool
 
 **6. `Skill`** — Soprano, Alto, Tenor, Bass, Guitar, Organ, Solo, Psalmist
-`categoryId` Guid → SkillCategory · `name` string(50) · `description` string(300)? · `isActive` bool · unique `(categoryId, name)`
+`categoryId` Guid → SkillCategory · `name` string(50) · `description` string(300)? · `gender` Gender? (voice part limited to one gender; null = anyone) · `isActive` bool · unique `(categoryId, name)`
 
 **7. `MemberSkill`** — declared skill + approval outcome (FE-03/04/25)
-`memberId` Guid → MemberProfile · `skillId` Guid → Skill · `status` ApprovalStatus · `declaredAt` DateTime · `approvedBy` Guid? → User · `approvedAt` DateTime? · `rejectReason` string(500)? · `evidencePublicId` string(255)? · `evidenceFileName` string(255)? · `evidenceSizeBytes` long? · `evidenceUploadedAt` DateTime? · unique `(memberId, skillId)` where `status ≠ Rejected` — rejected rows stay as history and the skill can be declared again as a new Pending row
+`memberId` Guid → MemberProfile · `skillId` Guid → Skill · `status` ApprovalStatus · `declaredAt` DateTime · `approvedBy` Guid? → User · `approvedAt` DateTime? · `rejectReason` string(500)? · `revokedBy` Guid? → User · `revokedAt` DateTime? · `revokeReason` string(500)? (Choir Director withdraws an approved skill) · `evidencePublicId` string(255)? · `evidenceFileName` string(255)? · `evidenceSizeBytes` long? · `evidenceUploadedAt` DateTime? · unique `(memberId, skillId)` where `status ≠ Rejected` — rejected rows stay as history and the skill can be declared again as a new Pending row
 
 ## C. Liturgical calendar
 
@@ -91,10 +91,10 @@ Written once here instead of repeated 47 times:
 `eventDate` DateOnly · `liturgicalSeasonId` Guid? → LiturgicalSeason (pre-filled from `LiturgicalDay.seasonName`) · `time` TimeOnly · `massTypeId` Guid? → MassType · `ceremonyTypeId` Guid? → CeremonyType · `categoryId` Guid? → EventCategory · `locationId` Guid → WorshipLocation · `title` string(200)? · `specialRequirements` string(1000)? · `status` EventStatus · `publishedAt` DateTime? · unique `(eventDate, time, locationId)` (D3)
 
 **47. `LiturgicalEventChoir`** — a choir serving an event (D7)
-`eventId` Guid → LiturgicalEvent · `choirId` Guid → Choir · `isLead` bool (D8, at most one per event) · unique `(eventId, choirId)`
+`eventId` Guid → LiturgicalEvent · `choirId` Guid → Choir · `isLead` bool (D8, at most one per event) · `substituteDirectorId` Guid? → User (Choir Director standing in for this choir's director at this event only, chosen by the Parish Priest) · `reason` string(500)? · unique `(eventId, choirId)`
 
 **10. `LiturgicalSeason`** — Advent, Lent, Ordinary Time… (FE-50)
-`name` string(100) · `startDate` DateOnly · `endDate` DateOnly · `colorHex` string(7)? · `isActive` bool
+`name` string(100) · `calendarKey` string(20)? (links the season to the calendar API's season; unique among active rows) · `startDate` DateOnly? · `endDate` DateOnly? (null when `calendarKey` is set) · `colorHex` string(7)? · `isActive` bool
 
 **11. `MassType`** · **12. `CeremonyType`** · **13. `EventCategory`** — same shape (FE-50)
 `name` string(100) unique · `description` string(300)? · `isActive` bool
@@ -117,10 +117,10 @@ Written once here instead of repeated 47 times:
 `songId` Guid → Song · `targetType` ClassificationTarget · `targetId` Guid · unique `(songId, targetType, targetId)`
 
 **18. `SongVocalRequirement`** · **19. `SongInstrumentRequirement`** — skills the song needs (FE-29)
-`songId` Guid → Song · `skillId` Guid → Skill · `isMandatory` bool · unique `(songId, skillId)`
+`songId` Guid → Song · `skillId` Guid → Skill · `isMandatory` bool · `requiredCount` int = 1 · unique `(songId, skillId)`
 
 **20. `MusicMaterial`** — sheet music / lyrics / sample audio / rehearsal material (FE-08/28) ***auditable***
-`songId` Guid → Song · `materialType` MaterialType · `title` string(200) · `filePublicId` string(255)? (private, signed URL on read) · `fileName` string(200)? · `lyricsText` string(max)? (Lyrics typed as text — exactly one of file or text) · `fileSizeBytes` long? · `fileRevision` int (1, +1 per file replacement) · `audioDurationSeconds` double? (.mp3/.m4a/.wav) · `playbackNotesSha256` string(64)? · `scoreRevision` int? · `scoreSha256` string(64)? · `playbackAudioSha256` string(64)? (the last three for InteractiveScore only) · `targetSkillId` Guid? → Skill · `isActive` bool
+`songId` Guid → Song · `materialType` MaterialType · `title` string(200) · `filePublicId` string(255)? (private, signed URL on read) · `fileName` string(200)? · `lyricsText` string(max)? (Lyrics typed as text — exactly one of file or text) · `fileSizeBytes` long? · `fileRevision` int (1, +1 per file replacement) · `audioDurationSeconds` double? (.mp3/.m4a/.wav) · `playbackAudioPublicId` string(255)? · `playbackNotesPublicId` string(255)? · `playbackDurationSeconds` double? · `playbackInstrument` PlaybackInstrument? (rendering of a MIDI or InteractiveScore file) · `playbackNotesSha256` string(64)? · `scoreRevision` int? · `scoreSha256` string(64)? · `playbackAudioSha256` string(64)? (the last three for InteractiveScore only) · `targetSkillId` Guid? → Skill · `isActive` bool
 
 **21. `MaterialLearningProgress`** — Learned / Needs practice (FE-09)
 `memberId` Guid → MemberProfile · `materialId` Guid → MusicMaterial · `status` LearningStatus · `updatedAt` DateTime · unique `(memberId, materialId)`
@@ -156,23 +156,23 @@ Written once here instead of repeated 47 times:
 ## F. Participation & service roster
 
 **26. `EventParticipation`** — request + member response (FE-06/33/34)
-`eventId` Guid → LiturgicalEvent · `memberId` Guid → MemberProfile · `status` ParticipationStatus · `requestedAt` DateTime · `respondedAt` DateTime? · `note` string(300)? · unique `(eventId, memberId)`
+`eventId` Guid → LiturgicalEvent · `memberId` Guid → MemberProfile · `status` ParticipationStatus · `requestedAt` DateTime · `respondedAt` DateTime? · `note` string(300)? · `lastReminderAt` DateTime? · unique `(eventId, memberId)`
 
 **27. `SongPersonnelRequirement`** — people needed per song of an event (FE-35)
 `songListItemId` Guid → SongListItem · `skillId` Guid → Skill · `requiredCount` int · unique `(songListItemId, skillId)`
 
 **28. `ServiceRoster`** — roster of one event (FE-36/39) ***auditable***
-`eventId` Guid → LiturgicalEvent (unique, 1–1) · `status` RosterStatus · `generatedAt` DateTime? · `generatedBy` Guid? → User · `finalizedAt` DateTime? · `finalizedBy` Guid? → User
+`eventId` Guid → LiturgicalEvent (unique, 1–1) · `status` RosterStatus · `generatedAt` DateTime? · `generatedBy` Guid? → User · `finalizedAt` DateTime? · `finalizedBy` Guid? → User · `wholeServiceFinalizedAt` DateTime?
 
 **29. `RosterAssignment`** — one assignment line (FE-38/40)
-`rosterId` Guid → ServiceRoster · `memberId` Guid → MemberProfile · `skillId` Guid → Skill · `songListItemId` Guid? → SongListItem · `source` AssignmentSource · `notifiedAt` DateTime? · `status` RosterAssignmentStatus · `replacedByAssignmentId` Guid? → RosterAssignment (self; set when Replaced)
+`rosterId` Guid → ServiceRoster · `memberId` Guid → MemberProfile · `skillId` Guid → Skill · `songListItemId` Guid? → SongListItem · `source` AssignmentSource · `notifiedAt` DateTime? · `status` RosterAssignmentStatus · `replacedByAssignmentId` Guid? → RosterAssignment (self; set when Replaced) · `note` string(200)? · `songListItemId` null = whole-service line
 
 **30. ~~`RosterShortage`~~** — removed 2026-10-26: shortages are computed at runtime (`RosterShortageDto`), never stored.
 
 ## G. Rehearsal & practice
 
 **31. `Rehearsal`** — rehearsal session (FE-26) ***auditable***
-`eventId` Guid? → LiturgicalEvent · `locationId` Guid? → WorshipLocation · `startTime` DateTime · `endTime` DateTime · `note` string(500)? · `choirId` Guid? → Choir (D7)
+`eventId` Guid? → LiturgicalEvent · `locationId` Guid? → WorshipLocation · `startTime` DateTime · `endTime` DateTime · `note` string(500)? · `choirId` Guid? → Choir (D7) · `isJoint` bool (rehearsal of every choir serving the event, planned by the lead choir; has `eventId`, no `choirId`)
 
 **32. `RehearsalAttendance`** — attendance record (FE-45/46)
 `rehearsalId` Guid → Rehearsal · `memberId` Guid → MemberProfile · `status` AttendanceStatus · `checkedBy` Guid → User · `checkedAt` DateTime · unique `(rehearsalId, memberId)`
@@ -265,8 +265,9 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 | `ReportFormat` | Csv, Xlsx, Pdf, Xml, Json |
 | `ReportPeriod` | Week, Month, Year |
 | `LiturgicalNameKind` | Celebration, Rank, Season |
+| `PlaybackInstrument` | Piano, Organ, Guitar, StringEnsemble |
 
-29 enums. `PracticeFeedback.result` reuses `SubmissionStatus` rather than adding a near-duplicate enum.
+30 enums. `PracticeFeedback.result` reuses `SubmissionStatus` rather than adding a near-duplicate enum.
 
 ---
 
@@ -385,3 +386,4 @@ Sửa: `SongVocalRequirement`, `SongInstrumentRequirement` thêm `requiredCount`
 `ServiceRoster` thêm `wholeServiceFinalizedAt` DateTime? (chốt sớm vai cả buổi lễ). Bỏ bảng `RosterShortage`.
 - 2026-11-18: D9 — one choir per member. `ChoirJoinRequest` + enum `ChoirJoinRequestStatus` added (56 → 57 entities, 28 → 29 enums); `ChoirMembership` gains filtered unique index on `memberId` where active. Needs migration `AddChoirJoinRequest`.
 - 2026-11-18: `MemberRegistration` gains `preferredChoirId` — the choir the applicant would like to join; creating the account turns it into a `ChoirJoinRequest`. Count stays 57. Needs a migration.
+- 2026-11-18: synced with the code — count corrected to 58 entities (the 2026-10-26 change added `EventPersonnelRequirement` + `LiturgicalSlotRequirement` and dropped `RosterShortage`, net +1, never counted) and 30 enums (`PlaybackInstrument` was missing). Attributes already in the code added to their entity: `Skill.gender`, `LiturgicalSeason.calendarKey`, `MemberSkill.revoked*`, `MusicMaterial.playback*`, `LiturgicalEventChoir.substituteDirectorId`/`reason`, `Rehearsal.isJoint`, `EventParticipation.lastReminderAt`, `requiredCount`, `RosterAssignment.note`, `ServiceRoster.wholeServiceFinalizedAt`. No schema change.

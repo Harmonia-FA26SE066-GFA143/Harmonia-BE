@@ -58,8 +58,6 @@ Phương án A (đã chốt 2026-09-21): entity ném, Service **không** bắt,
 
 | Exception | Khi nào ném | Mã | HTTP |
 |---|---|---|---|
-| `LiturgicalEventAlreadyPublishedException` | Sửa / xoá sự kiện hoặc công bố lại sau khi đã công bố | `LITURGICAL_EVENT_ALREADY_PUBLISHED` | 409 |
-| `LiturgicalEventNotPublishedException` | Thao tác đòi hỏi sự kiện đã công bố (đề xuất song list, gửi xác nhận tham gia…) | `LITURGICAL_EVENT_NOT_PUBLISHED` | 409 |
 | `LiturgicalEventTypeRequiredException` | Không có cả `MassTypeId` lẫn `CeremonyTypeId` | `LITURGICAL_EVENT_TYPE_REQUIRED` | 400 |
 | `LiturgicalEventCancelledException` | Thao tác trên sự kiện đã huỷ | `LITURGICAL_EVENT_CANCELLED` | 409 |
 | `LiturgicalEventAlreadyPassedException` | Sửa sự kiện đã diễn ra | `LITURGICAL_EVENT_ALREADY_PASSED` | 409 |
@@ -137,3 +135,4 @@ ra 500) — không có domain exception riêng.
 ## Nguồn
 - 2026-09-21: tạo từ `harmonia-domain-entity-list.md` và `error-codes.md`.
 - 2026-09-21: chốt phương án A; gắn mã `SONG_LIST_CANNOT_BE_REVISED`; bỏ `PracticeFeedbackResultInvalidException`; tách `SkillInactiveException` khỏi `LookupInactiveException` cho khớp `error-codes.md`.
+- 2026-11-18: bỏ `LiturgicalEventAlreadyPublishedException`, `LiturgicalEventNotPublishedException` — chưa từng có trong code; `LITURGICAL_EVENT_ALREADY_PUBLISHED` / `LITURGICAL_EVENT_NOT_PUBLISHED` (409) trả qua `Result.Failure` ở `LiturgicalEventService` / `EventParticipationService`.

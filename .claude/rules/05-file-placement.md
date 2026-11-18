@@ -54,6 +54,7 @@
   | `Middlewares/` | Middleware pipeline, bảng mã lỗi → HTTP status | Cấu hình DI |
   | `Extensions/` | Cấu hình DI và pipeline đặc thù API (Swagger, **xác thực** JWT, CORS, SignalR), **và** extension chỉ API dùng (`ClaimsPrincipal.GetUserId()`) | Logic nghiệp vụ |
   | `Filters/` | Action / authorization filter | Middleware |
+  | `SoundFonts/` | File SoundFont `.sf2` (kèm license) mà `MidiRenderer` dùng render MIDI, copy ra thư mục output khi build/publish | Code, file upload của người dùng |
 
   `Extensions/` đặt tên `<Chủ đề>Extensions.cs`, method `AddApi<X>` / `UseApi<X>` —
   tiền tố `Api` để không đụng tên extension có sẵn của thư viện (`AddCors`, `AddSwagger`).

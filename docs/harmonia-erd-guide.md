@@ -2,7 +2,7 @@
 
 ERD (Entity Relationship Diagram) trả lời: **cơ sở dữ liệu có những bảng nào, mỗi bảng có
 cột gì, bảng nào tham chiếu bảng nào**. Khác với conceptual diagram
-(`harmonia-conceptual-diagram-guide.md`), ERD vẽ **đủ 50 entity**, kể cả entity kỹ thuật và
+(`harmonia-conceptual-diagram-guide.md`), ERD vẽ **đủ 58 entity**, kể cả entity kỹ thuật và
 bảng trung gian, có thuộc tính, khoá chính, khoá ngoại.
 
 Nguồn dữ liệu, theo thứ tự ưu tiên khi hai bên lệch nhau:
@@ -18,18 +18,18 @@ VS Code hoặc dán vào <https://mermaid.live> để xem hình.
 
 ## 1. Chia sơ đồ
 
-50 bảng không vừa một trang. Vẽ **một sơ đồ tổng** chỉ có tên bảng và đường nối, rồi
+58 bảng không vừa một trang. Vẽ **một sơ đồ tổng** chỉ có tên bảng và đường nối, rồi
 **chín sơ đồ chi tiết** có đủ cột, theo đúng chín nhóm của `harmonia-domain-entity-list.md`:
 
 | Nhóm | Bảng | Số bảng |
 |---|---|---|
-| A. Identity & Access | `User`, `Role`, `MemberProfile`, `RefreshToken`, `PasswordResetToken`, `Choir`, `ChoirMembership` | 7 |
+| A. Identity & Access | `User`, `Role`, `MemberProfile`, `RefreshToken`, `PasswordResetToken`, `Choir`, `ChoirMembership`, `ChoirJoinRequest`, `MemberRegistration`, `DirectorNomination`, `DirectorTraining` | 11 |
 | B. Skills | `SkillCategory`, `Skill`, `MemberSkill` | 3 |
 | C. Liturgical calendar | `LiturgicalDay`, `LiturgicalEvent`, `LiturgicalSeason`, `MassType`, `CeremonyType`, `EventCategory`, `WorshipLocation`, `LiturgicalEventChoir`, `MassSchedule`, `LiturgicalNameTranslation` | 10 |
-| D. Music library | `Song`, `SongTheme`, `SongClassification`, `SongVocalRequirement`, `SongInstrumentRequirement`, `MusicMaterial`, `MaterialLearningProgress` | 7 |
+| D. Music library | `Song`, `SongTheme`, `SongClassification`, `SongVocalRequirement`, `SongInstrumentRequirement`, `MusicMaterial`, `MaterialLearningProgress`, `TimedLyrics`, `LyricsExtractionJob` | 9 |
 | E. Song list & approval | `SongList`, `SongListItem`, `LiturgicalSlot`, `SongListReview` | 4 |
-| F. Participation & roster | `EventParticipation`, `SongPersonnelRequirement`, `ServiceRoster`, `RosterAssignment`, `RosterShortage` | 5 |
-| G. Rehearsal & practice | `Rehearsal`, `RehearsalAttendance`, `RehearsalSong`, `PracticeAssignment`, `PracticeAssignmentTarget`, `PracticeAssignmentMaterial`, `PracticeSubmission`, `PracticeFeedback` | 8 |
+| F. Participation & roster | `EventParticipation`, `SongPersonnelRequirement`, `EventPersonnelRequirement`, `LiturgicalSlotRequirement`, `ServiceRoster`, `RosterAssignment` | 6 |
+| G. Rehearsal & practice | `Rehearsal`, `RehearsalAttendance`, `RehearsalSong`, `RehearsalRecording`, `PracticeAssignment`, `PracticeAssignmentTarget`, `PracticeAssignmentMaterial`, `PracticeSubmission`, `PracticeFeedback` | 9 |
 | H. Communication | `Notification`, `NotificationRecipient`, `DirectorNote` | 3 |
 | I. System | `SystemSetting`, `AuditLog`, `ReportExport` | 3 |
 
@@ -95,7 +95,7 @@ một `ServiceRoster`. `Rehearsal.EventId` là `Guid?` → buổi tập có th�
 1. Lập **bảng cột** cho từng bảng theo mục 2: `Khoá | Tên cột | Kiểu | Null? | Ghi chú`.
 2. Lập **bảng quan hệ**: `Bảng con | Cột FK | Bảng cha | Null? | Unique?` — mỗi cột FK
    một dòng. Bảng đúng thì sơ đồ đúng.
-3. Vẽ sơ đồ tổng trước: 50 ô chỉ có tên, gom theo chín nhóm, bốn hub
+3. Vẽ sơ đồ tổng trước: 58 ô chỉ có tên, gom theo chín nhóm, bốn hub
    (`LiturgicalEvent`, `MemberProfile`, `Song`, `Skill`) ở giữa trang.
 4. Với từng sơ đồ chi tiết: đặt **bảng cha ở trên hoặc bên trái**, bảng con ở dưới hoặc
    bên phải; bảng trung gian nằm giữa hai bảng cha của nó.
@@ -115,7 +115,7 @@ một `ServiceRoster`. `Rehearsal.EventId` là `Guid?` → buổi tập có th�
 | Tự tham chiếu | `SongList.PreviousVersionId`; `RosterAssignment.ReplacedByAssignmentId` | Đường vòng ra rồi quay về chính bảng đó, hai đầu `o\|` |
 | Nhiều FK tới cùng một bảng | `DirectorNote.FromUserId` / `ToUserId`; `ServiceRoster.GeneratedBy` / `FinalizedBy` | Vẽ **hai đường riêng**, ghi tên cột trên mỗi đường |
 | FK tuỳ chọn loại trừ nhau | `PracticeAssignmentTarget.MemberId` / `SkillId` | Hai đường, cả hai đầu cha là `o\|`; ghi chú "đúng một trong hai, theo `TargetType`" |
-| Unique có điều kiện | `MemberSkill (MemberId, SkillId)` khi `Status ≠ Rejected`; `LiturgicalEvent (EventDate, Time, LocationId)` khi `Status ≠ Cancelled` | Ghi `UK1` ở mọi cột trong nhóm, kèm ghi chú điều kiện |
+| Unique có điều kiện | `MemberSkill (MemberId, SkillId)` khi `Status ≠ Rejected`; `LiturgicalEvent (EventDate, Time, LocationId)` khi `Status ≠ Cancelled`; `ChoirMembership (MemberId)` khi `IsActive` (D9); `ChoirJoinRequest (MemberId)` khi Pending và không phải lời mời; `ChoirJoinRequest (MemberId, ChoirId)` khi Pending; `LiturgicalSeason (CalendarKey)` khi có giá trị và `IsActive` | Ghi `UK1` ở mọi cột trong nhóm, kèm ghi chú điều kiện |
 | Unique nhiều cột | `SongList (EventId, Version)`; `ChoirMembership (MemberId, ChoirId)`; `LiturgicalEventChoir (EventId, ChoirId)`; `MassSchedule (DayOfWeek, Time, LocationId)`; `PracticeAssignmentMaterial (PracticeAssignmentId, MaterialId)`; `LiturgicalNameTranslation (Kind, EnglishName)` | Ghi `UK1` ở mọi cột trong nhóm |
 | Cột audit `CreatedBy` / `UpdatedBy` | Mọi bảng auditable | Liệt kê là cột, **không** vẽ đường nối tới `User` — vẽ thì `User` nối với nửa sơ đồ |
 
@@ -125,7 +125,7 @@ một `ServiceRoster`. `Rehearsal.EventId` là `Guid?` → buổi tập có th�
 - Đường nối chạm vào đúng dòng của cột FK và cột PK, không chạm vào tên bảng.
 - Bảng danh mục (`MassType`, `SongTheme`...) đặt ở rìa ngoài.
 - Mỗi sơ đồ chi tiết vừa một trang A4 ngang. Tiêu đề: `ERD – <tên nhóm>`.
-- Kèm bảng chú giải ký hiệu và bảng 22 enum ở cuối phần ERD của báo cáo.
+- Kèm bảng chú giải ký hiệu và bảng 30 enum ở cuối phần ERD của báo cáo.
 
 ## 4. Sơ đồ mẫu
 
@@ -144,6 +144,7 @@ erDiagram
     MemberProfile ||--o{ MemberSkill : "MemberId"
     Skill ||--o{ MemberSkill : "SkillId"
     User |o--o{ MemberSkill : "ApprovedBy"
+    User |o--o{ MemberSkill : "RevokedBy"
     MemberProfile ||--o{ ChoirMembership : "MemberId"
     Choir ||--o{ ChoirMembership : "ChoirId"
 
@@ -158,6 +159,8 @@ erDiagram
         string Email UK
         string FullName
         string Phone "null"
+        string SaintName "null"
+        Gender Gender "null"
         string PasswordHash
         bool IsActive
         bool IsPasswordChangeRequired
@@ -212,6 +215,7 @@ erDiagram
         Guid CategoryId FK "UK1"
         string Name "UK1"
         string Description "null"
+        Gender Gender "null"
         bool IsActive
     }
     MemberSkill {
@@ -223,6 +227,9 @@ erDiagram
         Guid ApprovedBy FK "null"
         DateTime ApprovedAt "null"
         string RejectReason "null"
+        Guid RevokedBy FK "null"
+        DateTime RevokedAt "null"
+        string RevokeReason "null"
         string EvidencePublicId "null"
         string EvidenceFileName "null"
         long EvidenceSizeBytes "null"
@@ -260,8 +267,6 @@ erDiagram
     Skill ||--o{ RosterAssignment : "SkillId"
     SongListItem |o--o{ RosterAssignment : "SongListItemId"
     RosterAssignment |o--o| RosterAssignment : "ReplacedByAssignmentId"
-    ServiceRoster ||--o{ RosterShortage : "RosterId"
-    Skill ||--o{ RosterShortage : "SkillId"
 
     LiturgicalEvent {
         Guid Id PK
@@ -328,6 +333,7 @@ erDiagram
         DateTime RequestedAt
         DateTime RespondedAt "null"
         string Note "null"
+        DateTime LastReminderAt "null"
     }
     ServiceRoster {
         Guid Id PK
@@ -337,6 +343,7 @@ erDiagram
         Guid GeneratedBy FK "null"
         DateTime FinalizedAt "null"
         Guid FinalizedBy FK "null"
+        DateTime WholeServiceFinalizedAt "null"
     }
     RosterAssignment {
         Guid Id PK
@@ -348,14 +355,7 @@ erDiagram
         DateTime NotifiedAt "null"
         RosterAssignmentStatus Status
         Guid ReplacedByAssignmentId FK "null"
-    }
-    RosterShortage {
-        Guid Id PK
-        Guid RosterId FK
-        Guid SkillId FK
-        int RequiredCount
-        int AvailableCount
-        DateTime DetectedAt
+        string Note "null"
     }
 ```
 
@@ -363,14 +363,14 @@ Bảy nhóm còn lại vẽ theo cùng cách.
 
 ## 5. Checklist trước khi nộp sơ đồ
 
-- [ ] Đủ 50 bảng, đếm lại theo bảng ở mục 1.
+- [ ] Đủ 58 bảng, đếm lại theo bảng ở mục 1.
 - [ ] Mỗi bảng có `Id` là PK ở dòng đầu.
 - [ ] Mọi cột khoá ngoại đều đánh dấu `FK` và có đúng một đường nối — trừ tham chiếu đa hình.
 - [ ] Mọi đường nối có ký hiệu ở **cả hai đầu**, đúng theo cột FK có null / unique hay không.
 - [ ] Mọi unique index trong file `Configuration` đều có `UK` trên sơ đồ.
 - [ ] Bảng auditable có đủ bốn cột audit.
-- [ ] Enum là kiểu của cột, không phải bảng; có bảng chú giải 24 enum.
-- [ ] Không có bảng `UserRole`, `LiturgicalWeek`, `SheetMusic` — đã bị loại khỏi mô hình.
+- [ ] Enum là kiểu của cột, không phải bảng; có bảng chú giải 30 enum.
+- [ ] Không có bảng `UserRole`, `LiturgicalWeek`, `SheetMusic`, `RosterShortage` — đã bị loại khỏi mô hình.
 - [ ] Tên bảng và tên cột khớp entity trong `src/Harmonia.Domain/Entities/`.
 - [ ] Có migration đổi schema thì sửa ERD trong cùng PR.
 
@@ -385,3 +385,13 @@ Bảy nhóm còn lại vẽ theo cùng cách.
   `LiturgicalNameKind`).
 - **Xoá** không có.
 - File sơ đồ `../doc/harmonia-erd.mmd` sửa cùng đợt (44 → 50 bảng, thêm các bảng D7 / D8 còn thiếu).
+
+**2026-11-18** — đối chiếu code `main@afc4b51`:
+
+- **Thêm** bảng: nhóm A `ChoirJoinRequest`, `MemberRegistration`, `DirectorNomination`, `DirectorTraining` (7 → 11); nhóm D
+  `TimedLyrics`, `LyricsExtractionJob` (7 → 9); nhóm F `EventPersonnelRequirement`, `LiturgicalSlotRequirement`; nhóm G
+  `RehearsalRecording` (8 → 9).
+- **Xoá** `RosterShortage` (bỏ từ 2026-10-26, tính lúc chạy) khỏi nhóm F và hình mẫu 4.2 (F: 5 → 6 sau khi thêm/bỏ).
+- **Sửa** số bảng 50 → 58, số enum 24 → 30. Hình mẫu thêm cột `User.SaintName/Gender`, `Skill.Gender`,
+  `MemberSkill.Revoked*`, `EventParticipation.LastReminderAt`, `ServiceRoster.WholeServiceFinalizedAt`, `RosterAssignment.Note`.
+  Thêm các unique có điều kiện của D9 và `LiturgicalSeason.CalendarKey`.
