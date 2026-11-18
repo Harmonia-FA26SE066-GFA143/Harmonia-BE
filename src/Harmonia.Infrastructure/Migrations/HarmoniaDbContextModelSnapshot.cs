@@ -961,9 +961,6 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Property<DateTime?>("EvidenceUploadedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("Level")
-                        .HasColumnType("int");
-
                     b.Property<Guid>("MemberId")
                         .HasColumnType("uniqueidentifier");
 
@@ -1745,6 +1742,9 @@ namespace Harmonia.Infrastructure.Migrations
                     b.Property<string>("Description")
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
+
+                    b.Property<int?>("Gender")
+                        .HasColumnType("int");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
