@@ -86,6 +86,7 @@ public sealed class HarmoniaApiFactory : WebApplicationFactory<AuthController>
         builder.UseSetting("Brevo:ApiKey", "test");
         builder.UseSetting("Brevo:FromEmail", "noreply@test.com");
         builder.UseSetting("Brevo:FromName", "Harmonia Test");
+        builder.UseSetting("Brevo:AssetBaseUrl", "https://assets.test/email/");
         builder.UseSetting("PasswordReset:WebUrl", "https://web.harmonia.test/reset");
         builder.UseSetting("PasswordReset:MobileUrl", "harmonia://reset");
         builder.UseSetting("Google:ClientIds", "test-client-id.apps.googleusercontent.com");

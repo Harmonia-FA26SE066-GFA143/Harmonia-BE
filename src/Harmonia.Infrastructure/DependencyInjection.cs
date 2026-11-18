@@ -59,7 +59,8 @@ public static class DependencyInjection
             .Validate(
                 o => !string.IsNullOrWhiteSpace(o.ApiKey)
                     && !string.IsNullOrWhiteSpace(o.FromEmail)
-                    && !string.IsNullOrWhiteSpace(o.FromName),
+                    && !string.IsNullOrWhiteSpace(o.FromName)
+                    && Uri.TryCreate(o.AssetBaseUrl, UriKind.Absolute, out var assets) && assets.Scheme == Uri.UriSchemeHttps,
                 "Missing or invalid Brevo__* configuration. See src/Harmonia.API/.env.example.")
             .ValidateOnStart();
 

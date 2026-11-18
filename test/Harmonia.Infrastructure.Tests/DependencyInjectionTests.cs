@@ -24,6 +24,7 @@ public class DependencyInjectionTests
         ["Brevo:ApiKey"] = "key",
         ["Brevo:FromEmail"] = "noreply@test.com",
         ["Brevo:FromName"] = "Harmonia",
+        ["Brevo:AssetBaseUrl"] = "https://res.cloudinary.com/demo/image/upload/harmonia/email/",
         ["PasswordReset:WebUrl"] = "https://web.test/reset",
         ["PasswordReset:MobileUrl"] = "harmonia://reset",
         ["Gemini:ApiKey"] = "key",
@@ -108,6 +109,7 @@ public class DependencyInjectionTests
     [Theory]
     [InlineData("Brevo:ApiKey")]
     [InlineData("Brevo:FromEmail")]
+    [InlineData("Brevo:AssetBaseUrl")]
     public void MissingBrevoSetting_FailsValidation(string key)
     {
         using var provider = Build(s => s.Remove(key));

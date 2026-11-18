@@ -13,6 +13,7 @@ public class BrevoEmailSender : IEmailSender
 {
     private readonly TransactionalEmailsApi _api;
     private readonly SendSmtpEmailSender _sender;
+    private readonly string _assetBaseUrl;
     private readonly ILogger<BrevoEmailSender> _logger;
 
     public BrevoEmailSender(IOptions<BrevoOptions> options, ILogger<BrevoEmailSender> logger)
@@ -26,6 +27,7 @@ public class BrevoEmailSender : IEmailSender
             ApiKey = new Dictionary<string, string> { ["api-key"] = brevo.ApiKey }
         });
         _sender = new SendSmtpEmailSender(name: brevo.FromName, email: brevo.FromEmail);
+        _assetBaseUrl = brevo.AssetBaseUrl;
         _logger = logger;
     }
 
@@ -35,7 +37,7 @@ public class BrevoEmailSender : IEmailSender
             sender: _sender,
             to: [new SendSmtpEmailTo(email: to)],
             subject: subject,
-            htmlContent: htmlBody);
+            htmlContent: EmailLayout.Wrap(_assetBaseUrl, subject, htmlBody));
 
         try
         {

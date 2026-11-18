@@ -2,26 +2,41 @@
 
 ## QUY TRÌNH CA VIÊN → CA TRƯỞNG
 
-### Gia nhập (2 cách)
-1. Nộp đơn:
-   - Online: đăng ký qua trang chính, gồm họ tên, email, số điện thoại, ca đoàn muốn vào (không bắt buộc), chưa cần đăng nhập
+### Gia nhập
+1. Nộp đơn (2 cách):
+   - Online: đăng ký qua trang chính, gồm họ tên, email, số điện thoại, ca đoàn muốn vào (không bắt buộc, xem được mô tả từng ca đoàn: giờ lễ phục vụ, lịch tập), chưa cần đăng nhập. Admin được báo có đơn mới
    - Offline: điền đơn giấy tại giáo xứ, đơn được chuyển cho Admin
 2. Tạo tài khoản ca viên, server gửi mật khẩu qua email (Admin)
    - Đơn online: Admin xem danh sách đăng ký, bấm tạo tài khoản (thông tin điền sẵn); đăng ký không hợp lệ thì xoá
-   - Đơn offline: Admin tạo tài khoản trực tiếp như hiện nay
+   - Đơn offline: Admin tạo tài khoản trực tiếp, nhập ca đoàn muốn vào nếu có
+   - Có ca đoàn muốn vào: hệ thống tạo yêu cầu vào ca đoàn, ca trưởng ca đoàn đó được báo
+   - Không có: ca viên ở trạng thái chưa có ca đoàn
 3. Đăng nhập lần đầu, đổi mật khẩu (Ca viên)
-4. Thêm vào ca đoàn, một người có thể ở nhiều ca đoàn (Ca trưởng của ca đoàn đó)
-5. Khai báo kỹ năng, nộp minh chứng → ca trưởng duyệt (Ca viên, ca trưởng)
-6. Đi tập, làm bài tập, phục vụ lễ: tích lũy thành tích (Ca viên)
+4. Khai báo kỹ năng, nộp minh chứng (Ca viên)
+   - Làm được ngay, không cần có ca đoàn trước
+   - Hệ thống báo ca trưởng ca đoàn mình; chưa có ca đoàn thì báo ca trưởng ca đoàn đang xin vào, không xin đâu thì báo mọi ca trưởng
+5. Duyệt hoặc từ chối kỹ năng, từ chối phải ghi lý do; được duyệt nhiều kỹ năng một lần (Ca trưởng)
+   - Ca viên chưa có ca đoàn: ca trưởng nào cũng duyệt được
+6. Vào ca đoàn, mỗi ca viên chỉ ở một ca đoàn theo quy định giáo xứ (3 cách):
+   - Ca viên xin vào: chọn ca đoàn, gửi yêu cầu kèm lời nhắn; mỗi lúc chỉ một yêu cầu đang chờ, được tự huỷ (Ca viên)
+     → Đồng ý hoặc từ chối kèm lý do, xem được kỹ năng ca viên đã khai để quyết định. Ca viên được báo kết quả (Ca trưởng)
+   - Ca trưởng nhận người chưa có ca đoàn: thêm thẳng vào ca đoàn mình, ca viên được báo. Người đang ở ca đoàn khác thì không thêm được (Ca trưởng)
+   - Ca viên chờ lâu không ai nhận: Admin xếp ca đoàn thay (Admin)
+7. Đổi ca đoàn (Ca viên):
+   - Xin chuyển: gửi yêu cầu sang ca đoàn mới, trong lúc chờ vẫn ở ca đoàn cũ. Ca trưởng ca đoàn mới đồng ý thì chuyển ngay
+   - Tự rời: về trạng thái chưa có ca đoàn
+   - Chuyển hoặc rời: phân công ở sự kiện sắp tới của ca đoàn cũ bị gỡ; ca trưởng ca đoàn cũ và ca trưởng phụ trách sự kiện được báo để xếp người thay
+   - Ca trưởng xoá ca viên khỏi ca đoàn (ca đoàn quá đông, không phù hợp): ca viên được báo, về trạng thái chưa có ca đoàn
+8. Đi tập, làm bài tập, phục vụ lễ: tích lũy thành tích (Ca viên)
 
 ### Lên ca trưởng
-7. Tạo đề cử, kèm bảng thành tích và cảnh báo nếu chưa đủ ngưỡng (Ca trưởng: ca viên của ca đoàn mình; hoặc cha xứ: ca viên bất kỳ)
-8. Duyệt hoặc từ chối đề cử (Cha xứ)
-9. Cử đi học lớp ca trưởng, ghi kết quả; được học nhiều lần hoặc được miễn, bắt buộc ghi lý do (Cha xứ)
-10. Bổ nhiệm: chọn ca đoàn (theo gợi ý, ca đoàn khác hoặc ca đoàn mới), đổi role sang ca trưởng, gán ca trưởng cho ca đoàn (Admin)
-11. Bàn giao tự động (Hệ thống):
+9. Tạo đề cử, kèm bảng thành tích và cảnh báo nếu chưa đủ ngưỡng (Ca trưởng: ca viên của ca đoàn mình; hoặc cha xứ: ca viên bất kỳ)
+10. Duyệt hoặc từ chối đề cử (Cha xứ)
+11. Cử đi học lớp ca trưởng, ghi kết quả; được học nhiều lần hoặc được miễn, bắt buộc ghi lý do (Cha xứ)
+12. Bổ nhiệm: chọn ca đoàn (theo gợi ý, ca đoàn khác hoặc ca đoàn mới), đổi role sang ca trưởng, gán ca trưởng cho ca đoàn (Admin)
+13. Bàn giao tự động (Hệ thống):
     - Người mới đăng nhập lại để nhận quyền ca trưởng
-    - Người mới rời các ca đoàn với tư cách ca viên, ca trưởng các ca đoàn đó được báo
+    - Người mới rời ca đoàn đang ở với tư cách ca viên, ca trưởng ca đoàn đó được báo; yêu cầu vào ca đoàn đang chờ (nếu có) tự huỷ
     - Ca trưởng cũ được báo, vẫn giữ các ca đoàn khác của mình
     - Buổi tập, danh sách bài, phân công của ca đoàn tự chuyển sang người mới
 

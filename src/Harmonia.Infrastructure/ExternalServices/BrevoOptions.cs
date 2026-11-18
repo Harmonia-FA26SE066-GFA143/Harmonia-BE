@@ -11,4 +11,7 @@ public class BrevoOptions
     public string FromEmail { get; set; } = string.Empty;
 
     public string FromName { get; set; } = string.Empty;
+
+    /// <summary>Public folder (Cloudinary) holding the email images used by <see cref="EmailLayout"/>.</summary>
+    public string AssetBaseUrl { get; set; } = string.Empty;
 }
