@@ -1,6 +1,6 @@
 # Harmonia – Domain Entity List & Attributes (for ERD, Report 3/4)
 
-56 entities derived from FE-01→FE-54 (`claude/functional-requirements-by-actor.md`), the canonical use cases (`claude/use-case-list.md`) and the daily liturgical program model (D6). Diagram: `harmonia-erd.mmd`.
+57 entities derived from FE-01→FE-54 (`claude/functional-requirements-by-actor.md`), the canonical use cases (`claude/use-case-list.md`) and the daily liturgical program model (D6). Diagram: `harmonia-erd.mmd`.
 
 Conceptual/logical level: attribute names, types and constraints. No indexes, no migration syntax.
 
@@ -15,6 +15,7 @@ Conceptual/logical level: attribute names, types and constraints. No indexes, no
 | D5 | **Admin configures FE-49/FE-50 categories at runtime.** | 2026-09-20 | 9 lookup entities stay entities, not enums |
 | D6 | **Liturgical program is planned by day, not by week.** The liturgical day (celebration name, rank, season) comes from an external Catholic calendar API; the priest creates the Masses/events of each day himself; each event is published on its own. Admin still configures `LiturgicalSeason` (FE-50) — the API season only pre-fills the event's season. | 2026-09-30 | `LiturgicalWeek` removed, `LiturgicalDay` (API cache) added; publish moves to `LiturgicalEvent`; `DirectorNote.weekId` → `noteDate` |
 | D7 | **Several choirs.** A member can join several choirs and an event can be served by several choirs. The Choir Director manages every choir — no per-choir director. Schema only for now: services do not yet filter by choir. | 2026-10-17 | `Choir`, `ChoirMembership`, `LiturgicalEventChoir` added; `SongList`, `Rehearsal`, `PracticeAssignment` gain `choirId?` |
+| D9 | **One choir per member.** A member is in at most one active choir (parish rule). They ask to join or transfer, or a director invites them; the other side accepts (`ChoirJoinRequest`). Until approved they stay in their current choir; on approval they leave it and join the new one in one save. The Admin may place a member directly; a member may leave on their own. Supersedes the "member can join several choirs" part of D7; events keep several choirs. | 2026-11-18 | `ChoirJoinRequest` + enum `ChoirJoinRequestStatus` added; filtered unique `ChoirMembership(memberId) where isActive` |
 | D8 | **One director per choir.** Each choir has one Choir Director, assigned by the Admin; a director may lead several choirs and manages only their own. An event served by several choirs is planned by its lead choir (`LiturgicalEventChoir.isLead`), chosen by the Parish Priest; directors of the other serving choirs only read it. Records with no choir (data from before D8) are open to every director. Supersedes the "manages every choir" part of D7. | 2026-10-25 | `Choir` gains `directorId?`; `LiturgicalEventChoir` gains `isLead` |
 
 ## Attribute conventions
@@ -51,10 +52,13 @@ Written once here instead of repeated 47 times:
 `name` string(100) unique · `description` string(500)? · `isActive` bool · `directorId` Guid? → User (D8)
 
 **46. `ChoirMembership`** — a member belongs to a choir (D7)
-`memberId` Guid → MemberProfile · `choirId` Guid → Choir · `joinedDate` DateOnly · `isActive` bool (false = left the choir) · unique `(memberId, choirId)`
+`memberId` Guid → MemberProfile · `choirId` Guid → Choir · `joinedDate` DateOnly · `isActive` bool (false = left the choir) · unique `(memberId, choirId)` · unique `memberId` where `isActive` (D9)
+
+**57. `ChoirJoinRequest`** — a member's request to join or transfer to a choir, or a director's invitation; waits for the other side (D9) ***auditable***
+`memberId` Guid → MemberProfile · `choirId` Guid → Choir · `isInvitation` bool · `status` ChoirJoinRequestStatus · `message` string(500)? · `rejectReason` string(500)? · `reviewedById` Guid? → User · `reviewedAt` DateTime? · unique `memberId` where Pending and not invitation · unique `(memberId, choirId)` where Pending · every FK restrict
 
 **52. `MemberRegistration`** — request to join sent from the public home page without signing in; deleted once the Admin creates the account or rejects it ***auditable***
-`fullName` string(100) · `email` string(256) (indexed, not unique) · `phone` string(20)? · `saintName` string(50)? · `gender` Gender? · `note` string(500)?
+`fullName` string(100) · `email` string(256) (indexed, not unique) · `phone` string(20)? · `saintName` string(50)? · `gender` Gender? · `note` string(500)? · `preferredChoirId` Guid? → Choir (set null; D9)
 
 **53. `DirectorNomination`** — a member put forward to become a Choir Director: nominated by a Choir Director or the Parish Priest, decided by the Parish Priest, appointed by the Admin (UC-46) ***auditable***
 `memberId` Guid → MemberProfile · `nominatedById` Guid → User · `reason` string(1000) · `proposedChoirId` Guid? → Choir · `status` DirectorNominationStatus · `reviewedById` Guid? → User · `reviewedAt` DateTime? · `reviewNote` string(500)? · `trainingWaiverReason` string(500)? · `appointedChoirId` Guid? → Choir · `appointedAt` DateTime? · index `(memberId, status)` · every FK restrict
@@ -237,6 +241,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 | `TimedLyricsGranularity` | Line |
 | `LyricsExtractionStatus` | Queued, Running, Succeeded, Failed |
 | `DirectorNominationStatus` | Pending, Approved, InTraining, Trained, Appointed, Rejected, Cancelled |
+| `ChoirJoinRequestStatus` | Pending, Approved, Rejected, Cancelled |
 | `DirectorTrainingResult` | InProgress, Passed, Failed |
 | `DevicePlatform` | Android, iOS, Web |
 | `ApprovalStatus` | Pending, Approved, Rejected |
@@ -261,7 +266,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 | `ReportPeriod` | Week, Month, Year |
 | `LiturgicalNameKind` | Celebration, Rank, Season |
 
-28 enums. `PracticeFeedback.result` reuses `SubmissionStatus` rather than adding a near-duplicate enum.
+29 enums. `PracticeFeedback.result` reuses `SubmissionStatus` rather than adding a near-duplicate enum.
 
 ---
 
@@ -275,6 +280,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 
 **Choirs** *(D7)*
 - `MemberProfile` 1 — n `ChoirMembership` n — 1 `Choir`
+- `MemberProfile` 1 — n `ChoirJoinRequest` n — 1 `Choir` *(D9)*
 - `LiturgicalEvent` 1 — n `LiturgicalEventChoir` n — 1 `Choir`
 - `Choir` 1 — n `SongList` / `Rehearsal` / `PracticeAssignment` *(optional)*
 
@@ -377,3 +383,5 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 Sửa: `SongVocalRequirement`, `SongInstrumentRequirement` thêm `requiredCount` int (mặc định 1) · `RosterAssignment` thêm
 `note` string(200)?; `songListItemId` null = dòng cả buổi lễ.
 `ServiceRoster` thêm `wholeServiceFinalizedAt` DateTime? (chốt sớm vai cả buổi lễ). Bỏ bảng `RosterShortage`.
+- 2026-11-18: D9 — one choir per member. `ChoirJoinRequest` + enum `ChoirJoinRequestStatus` added (56 → 57 entities, 28 → 29 enums); `ChoirMembership` gains filtered unique index on `memberId` where active. Needs migration `AddChoirJoinRequest`.
+- 2026-11-18: `MemberRegistration` gains `preferredChoirId` — the choir the applicant would like to join; creating the account turns it into a `ChoirJoinRequest`. Count stays 57. Needs a migration.

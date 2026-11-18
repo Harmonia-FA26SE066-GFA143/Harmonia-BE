@@ -475,6 +475,18 @@ public static class ErrorCodes
 
     public const string ChoirChangeReasonRequired = "CHOIR_CHANGE_REASON_REQUIRED";
 
+    public const string MemberAlreadyInChoir = "MEMBER_ALREADY_IN_CHOIR";
+
+    public const string ChoirJoinRequestNotFound = "CHOIR_JOIN_REQUEST_NOT_FOUND";
+
+    public const string ChoirJoinRequestAlreadyPending = "CHOIR_JOIN_REQUEST_ALREADY_PENDING";
+
+    public const string ChoirJoinRequestNotPending = "CHOIR_JOIN_REQUEST_NOT_PENDING";
+
+    public const string ChoirJoinRequestAlreadyMember = "CHOIR_JOIN_REQUEST_ALREADY_MEMBER";
+
+    public const string ChoirJoinRequestRejectReasonRequired = "CHOIR_JOIN_REQUEST_REJECT_REASON_REQUIRED";
+
     // 16. Mass schedule.
     public const string MassScheduleNotFound = "MASS_SCHEDULE_NOT_FOUND";
 

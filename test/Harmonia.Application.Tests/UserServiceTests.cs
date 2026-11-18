@@ -24,6 +24,7 @@ public class UserServiceTests
     private readonly IFileStorageService _storage = Substitute.For<IFileStorageService>();
     private readonly IGenericRepository<Choir> _choirs = Substitute.For<IGenericRepository<Choir>>();
     private readonly IGenericRepository<LiturgicalEventChoir> _eventChoirs = Substitute.For<IGenericRepository<LiturgicalEventChoir>>();
+    private readonly IChoirJoinRequestRepository _joinRequests = Substitute.For<IChoirJoinRequestRepository>();
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
     private readonly UserService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
@@ -38,9 +39,11 @@ public class UserServiceTests
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<UserProfile>(), NullLoggerFactory.Instance).CreateMapper();
         _sut = new UserService(
-            _users, _memberProfiles, _hasher, _email, _currentUser, _storage, _choirs, _eventChoirs, _notifications, mapper);
+            _users, _memberProfiles, _hasher, _email, _currentUser, _storage, _choirs, _eventChoirs, _joinRequests, _notifications,
+            mapper);
         _choirs.ListAsync(Arg.Any<Expression<Func<Choir, bool>>>(), _ct).Returns([]);
         _eventChoirs.ListAsync(Arg.Any<Expression<Func<LiturgicalEventChoir, bool>>>(), _ct).Returns([]);
+        _joinRequests.GetPendingForUpdateAsync(Arg.Any<IReadOnlyCollection<Guid>>(), _ct).Returns([]);
         _storage.UploadAsync(default!, default!, default!, default, default)
             .ReturnsForAnyArgs(Result<FileUploadResponse>.Success(new FileUploadResponse("harmonia/avatars/new.png", "https://cdn.test/new.png")));
         _storage.DeleteAsync(default!, default, default).ReturnsForAnyArgs(Result.Success());
@@ -152,6 +155,47 @@ public class UserServiceTests
         await _email.Received(1).SendAsync(
             "new@example.com", Arg.Any<string>(), Arg.Is<string>(body => body.Contains(_hashedPassword)), _ct);
         Assert.Equal((user.Id, RoleNames.ChoirMember, true), (result.Value!.Id, result.Value.RoleName, result.Value.IsPasswordChangeRequired));
+    }
+
+    [Fact]
+    public async Task Create_ChoirMemberWithPreferredChoir_AddsJoinRequestInTheSameSave_AndNotifiesDirector_Async()
+    {
+        var directorId = Guid.NewGuid();
+        var choir = new Choir { Id = Guid.NewGuid(), Name = "Cecilia", IsActive = true, DirectorId = directorId };
+        _choirs.GetByIdAsync(choir.Id, _ct).Returns(choir);
+        var added = new List<ChoirJoinRequest>();
+        _joinRequests.AddAsync(Arg.Do<ChoirJoinRequest>(added.Add), _ct).Returns(Task.CompletedTask);
+        var request = NewUser(RoleNames.ChoirMember);
+        request.PreferredChoirId = choir.Id;
+
+        var result = await _sut.CreateAsync(request, _ct);
+
+        Assert.True(result.IsSuccess);
+        var joinRequest = Assert.Single(added);
+        var user = Assert.Single(_added);
+        Assert.Equal(
+            (user.MemberProfile!.Id, choir.Id, false, ChoirJoinRequestStatus.Pending),
+            (joinRequest.MemberId, joinRequest.ChoirId, joinRequest.IsInvitation, joinRequest.Status));
+        await _users.Received(1).SaveChangesAsync(_ct);
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(n => n.RecipientUserIds.SequenceEqual(new[] { directorId })
+                && n.ReferenceId == joinRequest.Id),
+            _ct);
+    }
+
+    [Fact]
+    public async Task Create_PreferredChoirInactive_ReturnsInactive_AndSavesNothing_Async()
+    {
+        var choir = new Choir { Id = Guid.NewGuid(), Name = "Closed", IsActive = false };
+        _choirs.GetByIdAsync(choir.Id, _ct).Returns(choir);
+        var request = NewUser(RoleNames.ChoirMember);
+        request.PreferredChoirId = choir.Id;
+
+        var result = await _sut.CreateAsync(request, _ct);
+
+        Assert.Equal(ErrorCodes.ChoirInactive, result.Code);
+        Assert.Empty(_added);
+        await _users.DidNotReceive().SaveChangesAsync(_ct);
     }
 
     [Fact]

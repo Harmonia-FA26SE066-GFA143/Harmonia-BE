@@ -18,7 +18,7 @@ public class MemberRegistrationRepository(HarmoniaDbContext dbContext)
     public async Task<PagedList<MemberRegistration>> SearchAsync(
         string? keyword, SearchMemberRegistrationsRequest filter, CancellationToken cancellationToken)
     {
-        var query = DbContext.MemberRegistrations.AsNoTracking();
+        var query = DbContext.MemberRegistrations.AsNoTracking().Include(x => x.PreferredChoir).AsQueryable();
 
         if (keyword is not null)
         {

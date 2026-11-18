@@ -1,13 +1,14 @@
 # Từ điển nghiệp vụ — dùng đúng tên, không tự đặt từ đồng nghĩa
 
-Nguồn chuẩn: `docs/harmonia-domain-entity-list.md` (56 entity, 28 enum).
+Nguồn chuẩn: `docs/harmonia-domain-entity-list.md` (57 entity, 29 enum).
 Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 
 | Tiếng Việt | Tên trong code |
 |---|---|
 | tài khoản | `User` |
 | ca đoàn | `Choir` |
-| ca viên thuộc ca đoàn | `ChoirMembership` |
+| ca viên thuộc ca đoàn | `ChoirMembership` — mỗi ca viên tối đa một dòng đang hoạt động (D9) |
+| yêu cầu vào / chuyển ca đoàn, lời mời của ca trưởng | `ChoirJoinRequest` (cờ `IsInvitation`) + enum `ChoirJoinRequestStatus` |
 | ca đoàn phục vụ sự kiện | `LiturgicalEventChoir` |
 | token đặt lại mật khẩu | `PasswordResetToken` |
 | đăng ký gia nhập (đơn online từ trang chính) | `MemberRegistration` |
@@ -60,7 +61,7 @@ Tên nào không có ở đây thì tra file đó, đừng tự dịch.
 | cấu hình hệ thống | `SystemSetting` |
 | lịch sử hoạt động | `AuditLog` |
 
-**Nhiều ca đoàn (D7, chốt 2026-10-17):** ca viên gia nhập nhiều `Choir` qua `ChoirMembership`, sự kiện có nhiều `Choir` qua `LiturgicalEventChoir`. Mỗi `Choir` có **một** ca trưởng (`Choir.DirectorId`, Admin gán); một `ChoirDirector` phụ trách được nhiều ca đoàn và chỉ quản lý ca đoàn của mình — ca đoàn của người khác trả 404 (D8, chốt 2026-10-25). Sự kiện nhiều ca đoàn do **ca đoàn phụ trách** (`LiturgicalEventChoir.IsLead`, cha xứ chọn) lập danh sách bài, mời và phân công; ca đoàn phục vụ khác chỉ xem. Mọi service kiểm phạm vi qua `IChoirScopeService`; buổi tập / bài tập chưa gắn ca đoàn thì ca trưởng nào cũng quản lý được. Sự kiện bắt buộc có ca đoàn khi tạo tay và khi công bố; sự kiện chưa gắn ca đoàn thì ca trưởng chỉ xem, không lập danh sách bài, mời hay phân công (chốt 2026-11-05).
+**Nhiều ca đoàn (D7, chốt 2026-10-17):** sự kiện có nhiều `Choir` qua `LiturgicalEventChoir`. **Mỗi ca viên ở tối đa một `Choir` đang hoạt động** (D9, chốt 2026-11-18, thay nửa "ca viên nhiều ca đoàn" của D7): ca viên tự xin vào / xin chuyển, ca trưởng mời — đều qua `ChoirJoinRequest` chờ bên kia đồng ý; Admin xếp thẳng được; ca viên tự rời không cần duyệt; ca viên chưa ở ca đoàn nào là "rổ chung" mọi ca trưởng thấy. Mỗi `Choir` có **một** ca trưởng (`Choir.DirectorId`, Admin gán); một `ChoirDirector` phụ trách được nhiều ca đoàn và chỉ quản lý ca đoàn của mình — ca đoàn của người khác trả 404 (D8, chốt 2026-10-25). Sự kiện nhiều ca đoàn do **ca đoàn phụ trách** (`LiturgicalEventChoir.IsLead`, cha xứ chọn) lập danh sách bài, mời và phân công; ca đoàn phục vụ khác chỉ xem. Mọi service kiểm phạm vi qua `IChoirScopeService`; buổi tập / bài tập chưa gắn ca đoàn thì ca trưởng nào cũng quản lý được. Sự kiện bắt buộc có ca đoàn khi tạo tay và khi công bố; sự kiện chưa gắn ca đoàn thì ca trưởng chỉ xem, không lập danh sách bài, mời hay phân công (chốt 2026-11-05).
 
 `LiturgicalEvent`, `MemberProfile`, `Song`, `Skill` là bốn hub — hầu hết entity khác
 móc vào chúng.

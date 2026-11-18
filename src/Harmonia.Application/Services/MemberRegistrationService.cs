@@ -14,6 +14,7 @@ namespace Harmonia.Application.Services;
 
 public class MemberRegistrationService(
     IMemberRegistrationRepository registrationRepository,
+    IGenericRepository<Choir> choirRepository,
     IUserRepository userRepository,
     IUserService userService,
     INotificationService notificationService,
@@ -22,6 +23,13 @@ public class MemberRegistrationService(
 {
     public async Task<Result> SubmitAsync(CreateMemberRegistrationRequest request, CancellationToken cancellationToken)
     {
+        // The form lists active choirs only; anything else reads as not found.
+        if (request.PreferredChoirId is { } choirId
+            && await choirRepository.GetByIdAsync(choirId, cancellationToken) is not { IsActive: true })
+        {
+            return Result.Failure(ErrorCodes.ChoirNotFound);
+        }
+
         var email = request.Email.Trim();
 
         // Same answer as a new registration, so the public form cannot be used to probe for accounts.
@@ -43,6 +51,7 @@ public class MemberRegistrationService(
         registration.SaintName = TrimToNull(request.SaintName);
         registration.Gender = request.Gender;
         registration.Note = TrimToNull(request.Note);
+        registration.PreferredChoirId = request.PreferredChoirId;
         await registrationRepository.SaveChangesAsync(cancellationToken);
 
         // Only a new row is news to the Admins; a resubmission just refreshes one they already saw.
@@ -144,6 +153,12 @@ public class MemberRegistrationService(
             return Result<UserDto>.Failure(ErrorCodes.MemberRegistrationNotFound);
         }
 
+        // A choir closed since the form was sent takes no requests; the member then starts with no choir.
+        var preferredChoirId = registration.PreferredChoirId is { } choirId
+            && await choirRepository.GetByIdAsync(choirId, cancellationToken) is { IsActive: true }
+                ? registration.PreferredChoirId
+                : null;
+
         // Account creation, the first password and its email stay in one place: UserService.
         var created = await userService.CreateAsync(
             new CreateUserRequest
@@ -154,6 +169,7 @@ public class MemberRegistrationService(
                 SaintName = registration.SaintName,
                 Gender = registration.Gender,
                 RoleName = RoleNames.ChoirMember,
+                PreferredChoirId = preferredChoirId,
             },
             cancellationToken);
         if (!created.IsSuccess)

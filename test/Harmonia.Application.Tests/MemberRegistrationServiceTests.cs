@@ -17,6 +17,7 @@ public class MemberRegistrationServiceTests
 {
     private readonly IMemberRegistrationRepository _registrations = Substitute.For<IMemberRegistrationRepository>();
     private readonly IUserRepository _users = Substitute.For<IUserRepository>();
+    private readonly IGenericRepository<Choir> _choirs = Substitute.For<IGenericRepository<Choir>>();
     private readonly IUserService _userService = Substitute.For<IUserService>();
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
     private readonly IEmailSender _email = Substitute.For<IEmailSender>();
@@ -30,7 +31,7 @@ public class MemberRegistrationServiceTests
         var mapper = new MapperConfiguration(
                 cfg => cfg.AddProfile<MemberRegistrationProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new MemberRegistrationService(_registrations, _users, _userService, _notifications, _email, mapper);
+        _sut = new MemberRegistrationService(_registrations, _choirs, _users, _userService, _notifications, _email, mapper);
 
         _users.GetActiveUserIdsByRolesAsync(Arg.Any<IReadOnlyCollection<string>>(), _ct).Returns([_adminId]);
         _registrations.AddAsync(Arg.Do<MemberRegistration>(_added.Add), _ct).Returns(Task.CompletedTask);
@@ -109,6 +110,57 @@ public class MemberRegistrationServiceTests
             _ct);
         _registrations.Received(1).Remove(registration);
         await _registrations.Received(1).SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Submit_WithActiveChoir_StoresIt_Async()
+    {
+        var choir = new Choir { Id = Guid.NewGuid(), Name = "Cecilia", IsActive = true };
+        _choirs.GetByIdAsync(choir.Id, _ct).Returns(choir);
+        var request = NewRequest();
+        request.PreferredChoirId = choir.Id;
+
+        var result = await _sut.SubmitAsync(request, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(choir.Id, Assert.Single(_added).PreferredChoirId);
+    }
+
+    [Fact]
+    public async Task Submit_InactiveOrUnknownChoir_ReturnsNotFound_AndStoresNothing_Async()
+    {
+        var closed = new Choir { Id = Guid.NewGuid(), Name = "Closed", IsActive = false };
+        _choirs.GetByIdAsync(closed.Id, _ct).Returns(closed);
+        var request = NewRequest();
+
+        foreach (var choirId in new[] { closed.Id, Guid.NewGuid() })
+        {
+            request.PreferredChoirId = choirId;
+            var result = await _sut.SubmitAsync(request, _ct);
+            Assert.Equal(ErrorCodes.ChoirNotFound, result.Code);
+        }
+
+        Assert.Empty(_added);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Accept_PassesThePreferredChoir_OnlyWhileItIsActive_Async(bool isActive)
+    {
+        var choir = new Choir { Id = Guid.NewGuid(), Name = "Cecilia", IsActive = isActive };
+        _choirs.GetByIdAsync(choir.Id, _ct).Returns(choir);
+        var registration = new MemberRegistration
+        {
+            Id = Guid.NewGuid(), Email = "a@example.com", FullName = "A", PreferredChoirId = choir.Id,
+        };
+        _registrations.GetByIdAsync(registration.Id, _ct).Returns(registration);
+        _userService.CreateAsync(Arg.Any<CreateUserRequest>(), _ct).Returns(Result<UserDto>.Success(new UserDto()));
+
+        await _sut.AcceptAsync(registration.Id, _ct);
+
+        Guid? expected = isActive ? choir.Id : null;
+        await _userService.Received(1).CreateAsync(Arg.Is<CreateUserRequest>(r => r.PreferredChoirId == expected), _ct);
     }
 
     [Fact]

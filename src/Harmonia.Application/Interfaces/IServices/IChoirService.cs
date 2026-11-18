@@ -11,18 +11,38 @@ public interface IChoirService
 {
     Task<Result<ChoirDto>> CreateAsync(CreateChoirRequest request, CancellationToken cancellationToken);
 
-    /// <summary>Every choir for the Admin, only the caller's own choirs for a Choir Director; ordered by name.</summary>
+    /// <summary>
+    /// Every choir for the Admin and the Parish Priest, only the caller's own choirs for a Choir Director, the active
+    /// choirs for a Choir Member; ordered by name.
+    /// </summary>
     Task<Result<List<ChoirDto>>> GetAllAsync(CancellationToken cancellationToken);
+
+    /// <summary>Active choirs by name, for the anonymous join form.</summary>
+    Task<Result<List<ChoirSummaryDto>>> GetPublicAsync(CancellationToken cancellationToken);
 
     Task<Result<ChoirDto>> UpdateAsync(Guid id, UpdateChoirRequest request, CancellationToken cancellationToken);
 
     /// <summary>Active members of the choir, ordered by name.</summary>
     Task<Result<List<ChoirMemberDto>>> GetMembersAsync(Guid choirId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// The Admin places the members in the choir directly and their Pending join requests close; a Choir Director
+    /// invites them instead, and each joins once they accept. A member in another choir is refused.
+    /// </summary>
     Task<Result> AddMembersAsync(Guid choirId, AddChoirMembersRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Moves the member into the choir, leaving their current choir (with its upcoming-event clean-up) in the same
+    /// save. That save also carries whatever the caller staged on the request's unit of work, e.g. the join request
+    /// status. The old choir's director is notified.
+    /// </summary>
+    Task<Result> MoveMemberAsync(Guid memberId, Guid choirId, CancellationToken cancellationToken);
 
     /// <summary>Marks the membership as left; the row stays as history.</summary>
     Task<Result> RemoveMemberAsync(Guid choirId, Guid memberId, CancellationToken cancellationToken);
+
+    /// <summary>The calling Choir Member leaves the choir on their own; the choir's director is notified.</summary>
+    Task<Result> LeaveAsync(Guid choirId, CancellationToken cancellationToken);
 
     /// <summary>Choirs serving the event, the lead choir first, then by name.</summary>
     Task<Result<List<LiturgicalEventChoirDto>>> GetEventChoirsAsync(Guid eventId, CancellationToken cancellationToken);

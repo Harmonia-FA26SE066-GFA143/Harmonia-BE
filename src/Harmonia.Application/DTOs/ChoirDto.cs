@@ -13,4 +13,7 @@ public class ChoirDto
     public Guid? DirectorId { get; set; }
 
     public string? DirectorFullName { get; set; }
+
+    /// <summary>Members currently in the choir.</summary>
+    public int MemberCount { get; set; }
 }

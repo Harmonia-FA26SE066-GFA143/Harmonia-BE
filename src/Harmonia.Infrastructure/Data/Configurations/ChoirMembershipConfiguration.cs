@@ -10,6 +10,13 @@ public class ChoirMembershipConfiguration : IEntityTypeConfiguration<ChoirMember
     {
         builder.HasIndex(x => new { x.MemberId, x.ChoirId }).IsUnique();
 
+        // One active choir per member (2026-11-18). IsActive is a key column, not only the filter, so EF orders the
+        // UPDATE that leaves the old choir before the one that joins the new choir within a single save.
+        builder.HasIndex(x => new { x.MemberId, x.IsActive })
+            .IsUnique()
+            .HasDatabaseName("IX_ChoirMemberships_MemberId_Active")
+            .HasFilter("[IsActive] = 1");
+
         builder.HasOne(x => x.Member)
             .WithMany(x => x.ChoirMemberships)
             .HasForeignKey(x => x.MemberId)

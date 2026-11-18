@@ -263,7 +263,7 @@ hiển thị email thay tên. `phone`, `saintName` (tên thánh), `gender` (`Mal
 |---|---|---|---|---|
 | GET | `/api/users` | query `keyword`, `roleName`, `isActive`, `pageNumber`, `pageSize` | 200 `PagedList<UserDto>` | — |
 | GET | `/api/users/{id}` | — | 200 `UserDto` | 404 `USER_NOT_FOUND` |
-| POST | `/api/users` | `{ "email", "fullName?", "phone?", "saintName?", "gender", "roleName" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `ROLE_NOT_FOUND` · 409 `USER_EMAIL_ALREADY_EXISTS` |
+| POST | `/api/users` | `{ "email", "fullName?", "phone?", "saintName?", "gender", "roleName", "preferredChoirId?" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `ROLE_NOT_FOUND`, `CHOIR_NOT_FOUND` · 409 `USER_EMAIL_ALREADY_EXISTS`, `CHOIR_INACTIVE` |
 | PUT | `/api/users/{id}` | `{ "email", "fullName?", "phone?", "saintName?", "gender?" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `USER_NOT_FOUND` · 409 `USER_EMAIL_ALREADY_EXISTS` |
 | PATCH | `/api/users/{id}/activate` | — | 204 | 404 `USER_NOT_FOUND` · 409 `USER_ALREADY_ACTIVE` |
 | PATCH | `/api/users/{id}/deactivate` | — | 204 | 404 `USER_NOT_FOUND` · 409 `USER_CANNOT_MODIFY_SELF`, `USER_ALREADY_INACTIVE`, `USER_LAST_ADMIN`, `USER_STILL_DIRECTING` |
@@ -279,6 +279,10 @@ hiển thị email thay tên. `phone`, `saintName` (tên thánh), `gender` (`Mal
   `VALIDATION_FAILED` trong `errors`, chưa có mã riêng theo field.
 - Tạo tài khoản role `ChoirMember` (hoặc đổi role sang `ChoirMember`) → hồ sơ ca viên được tạo
   tự động (`status = Active`, `joinedDate` = hôm nay). Đổi role khỏi `ChoirMember` thì hồ sơ vẫn giữ.
+- `preferredChoirId` (D9, đơn giấy nộp ở giáo xứ): chỉ nhận khi `roleName = ChoirMember` (role khác gửi kèm → 400
+  `VALIDATION_FAILED`). Ca đoàn phải đang hoạt động. Admin **không** xếp thẳng: cùng lần lưu sinh một yêu cầu vào ca đoàn
+  (`ChoirJoinRequest`, mục 4f-1) và ca trưởng ca đoàn đó nhận `ChoirChanged` "Yêu cầu vào ca đoàn". Bỏ trống → ca viên
+  chưa ở ca đoàn nào.
 - `deactivate` và đổi role thu hồi mọi phiên đăng nhập của user đó (xem refresh ở mục 2).
 - Ca trưởng còn là `directorId` của một ca đoàn (kể cả ca đoàn đã tắt) hoặc là ca trưởng thay thế ở một sự kiện chưa
   qua, chưa huỷ → `deactivate` và đổi role khỏi `ChoirDirector` trả 409 `USER_STILL_DIRECTING`. Gán ca trưởng khác cho
@@ -290,13 +294,13 @@ hiển thị email thay tên. `phone`, `saintName` (tên thánh), `gender` (`Mal
 `MemberRegistrationDto`:
 
 ```json
-{ "id": "guid", "fullName": "Nguyễn Văn A", "email": "a@b.com", "phone": "0900000000", "saintName": "Giuse", "gender": "Male", "note": "Muốn vào ca đoàn Cecilia", "createdAt": "2026-11-09T08:00:00Z",
+{ "id": "guid", "fullName": "Nguyễn Văn A", "email": "a@b.com", "phone": "0900000000", "saintName": "Giuse", "gender": "Male", "note": "Em hát bè Alto", "preferredChoirId": "guid", "preferredChoirName": "Ca đoàn Cêcilia", "createdAt": "2026-11-09T08:00:00Z",
   "possibleDuplicates": [{ "kind": "User", "id": "guid", "fullName": "Nguyễn Văn A", "email": "old@b.com", "matchedOn": "Phone" }] }
 ```
 
 | Method | Route | Quyền | Body / Query | Thành công | Lỗi |
 |---|---|---|---|---|---|
-| POST | `/api/member-registrations` | anonymous | `{ "fullName", "email", "phone?", "note?" }` | 204 | 400 `VALIDATION_FAILED` · 429 `RATE_LIMIT_EXCEEDED` |
+| POST | `/api/member-registrations` | anonymous | `{ "fullName", "email", "phone?", "saintName?", "gender", "note?", "preferredChoirId?" }` | 204 | 400 `VALIDATION_FAILED` · 404 `CHOIR_NOT_FOUND` · 429 `RATE_LIMIT_EXCEEDED` |
 | GET | `/api/member-registrations` | `Admin` | query `keyword`, `pageNumber`, `pageSize` | 200 `PagedList<MemberRegistrationDto>` | — |
 | POST | `/api/member-registrations/{id}/accept` | `Admin` | — | 200 `UserDto` | 404 `MEMBER_REGISTRATION_NOT_FOUND` · 409 `USER_EMAIL_ALREADY_EXISTS` |
 | DELETE | `/api/member-registrations/{id}` | `Admin` | `{ "reason" }` | 204 | 400 `VALIDATION_FAILED` · 404 `MEMBER_REGISTRATION_NOT_FOUND` |
@@ -305,6 +309,9 @@ hiển thị email thay tên. `phone`, `saintName` (tên thánh), `gender` (`Mal
   `null`. **Luôn trả 204** kể cả khi email đã có tài khoản (không lưu gì) — không tiết lộ email nào đã đăng ký. Email
   đang có đăng ký chờ thì ghi đè đăng ký đó. Đăng ký mới → báo mọi Admin đang hoạt động (`MemberRegistrationSubmitted`).
   Tối đa 5 lần / 10 phút / IP, quá thì 429.
+  `preferredChoirId` (tuỳ chọn) lấy từ `GET /api/choirs/public`; ca đoàn không có hoặc đã tắt → 404 `CHOIR_NOT_FOUND`.
+- `accept`: đơn có `preferredChoirId` mà ca đoàn còn hoạt động → tạo tài khoản kèm yêu cầu vào ca đoàn đó (như
+  `POST /api/users`); ca đoàn đã tắt từ lúc gửi đơn → bỏ qua, ca viên chưa ở ca đoàn nào.
 - `GET`: chỉ có đăng ký đang chờ (xử lý xong là xoá); `keyword` khớp một phần tên hoặc email; mới nhất trước.
   `possibleDuplicates`: đơn khác đang chờ (`kind = "Registration"`) hoặc tài khoản đã có (`kind = "User"`) có thể là cùng
   một người dùng email khác. `matchedOn = "Phone"`: trùng số điện thoại (bỏ khoảng trắng, dấu chấm, gạch; `+84` đọc là `0`).
@@ -465,7 +472,10 @@ giá trị). Bản `Rejected` hoặc `Revoked` là lịch sử: ca viên khai b�
 - Skill có `gender` (vd. Soprano/Alto = `Female`) → ca viên chưa khai giới tính 409 `MEMBER_SKILL_GENDER_REQUIRED`, khác giới tính 409 `MEMBER_SKILL_GENDER_MISMATCH`. `gender` null → ai cũng khai được.
 - `status` (tuỳ chọn): `Pending` | `Approved` | `Rejected` | `Revoked` — bỏ trống thì trả mọi trạng thái.
 - `GET /{id}` chỉ trả bản khai của chính người gọi; bản khai của ca viên khác → 404 `MEMBER_SKILL_NOT_FOUND`.
-- Bị **từ chối** thì được khai lại: bản `Rejected` giữ nguyên làm lịch sử, hệ thống thêm bản mới `Pending`.
+- Bị **từ chối** (hoặc bị thu hồi) thì được khai lại: bản cũ giữ nguyên làm lịch sử, hệ thống thêm bản mới `Pending`.
+- Khai xong (kể cả khai lại), ca trưởng nhận `SkillReview` "Kỹ năng chờ duyệt" (`referenceId` = id bản khai), theo thứ tự
+  (D9): ca trưởng ca đoàn của ca viên → chưa có ca đoàn thì ca trưởng ca đoàn ca viên đang **xin vào** (lời mời không tính)
+  → không có ai thì **mọi** ca trưởng đang hoạt động (ca viên chưa có ca đoàn thì ca trưởng nào cũng duyệt được).
 - `GET .../mine` trả **mọi** bản khai kể cả lịch sử bị từ chối, mới nhất trước.
 - Role khác gọi vào → `403` body rỗng.
 
@@ -477,6 +487,8 @@ giá trị). Bản `Rejected` hoặc `Revoked` là lịch sử: ca viên khai b�
 |---|---|---|---|---|---|
 | GET | `/api/member-skills/pending` | `ChoirDirector` | query `pageNumber`, `pageSize` | 200 `PagedList<MemberSkillDetailDto>` | — |
 | PATCH | `/api/member-skills/{id}/approve` | `ChoirDirector` | — | 200 `MemberSkillDetailDto` | 404 `MEMBER_SKILL_NOT_FOUND` · 409 `MEMBER_SKILL_ALREADY_REVIEWED` |
+| POST | `/api/member-skills/bulk-approve` | `ChoirDirector` | `{ "ids": ["guid"] }` (1–50) | 200 `{ "approved": MemberSkillDetailDto[], "failed": [{ "id", "code" }] }` | 400 `VALIDATION_FAILED` |
+| POST | `/api/member-skills/assign` | `ChoirDirector` | `{ "memberId", "skillId" }` | 200 `MemberSkillDetailDto` (`Approved`) | 400 `VALIDATION_FAILED` · 404 `MEMBER_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `MEMBER_NOT_ACTIVE`, `SKILL_INACTIVE`, `MEMBER_SKILL_ALREADY_DECLARED`, `MEMBER_SKILL_GENDER_REQUIRED`, `MEMBER_SKILL_GENDER_MISMATCH` |
 | PATCH | `/api/member-skills/{id}/reject` | `ChoirDirector` | `{ "reason" }` | 200 `MemberSkillDetailDto` | 400 `MEMBER_SKILL_REJECT_REASON_REQUIRED`, `VALIDATION_FAILED` · 404 `MEMBER_SKILL_NOT_FOUND` · 409 `MEMBER_SKILL_ALREADY_REVIEWED` |
 | PATCH | `/api/member-skills/{id}/revoke` | `ChoirDirector` | `{ "reason" }` | 200 `MemberSkillDetailDto` | 400 `MEMBER_SKILL_REVOKE_REASON_REQUIRED`, `VALIDATION_FAILED` · 404 `MEMBER_SKILL_NOT_FOUND` · 409 `MEMBER_SKILL_NOT_APPROVED` |
 
@@ -488,6 +500,13 @@ giá trị). Bản `Rejected` hoặc `Revoked` là lịch sử: ca viên khai b�
   cũ nhất trước. Duyệt / từ chối bản khai của ca viên khác → 404 `MEMBER_SKILL_NOT_FOUND`.
 - `reason` bắt buộc, tối đa 500 ký tự.
 - Chỉ duyệt/từ chối được bản `Pending`; bản đã duyệt hoặc đã từ chối → 409.
+- `bulk-approve`: duyệt **từng** bản như `PATCH .../approve` (id trùng tự loại); bản lỗi không chặn bản khác — `failed` ghi
+  mã lỗi mà duyệt lẻ sẽ trả (`MEMBER_SKILL_NOT_FOUND`, `MEMBER_SKILL_ALREADY_REVIEWED`). Mỗi bản duyệt được vẫn gửi thông báo
+  và email riêng cho ca viên.
+- `assign`: ca trưởng ghi nhận kỹ năng đã tự nghe / thấy, bản mới vào thẳng `Approved` (không qua `Pending`). `memberId` là
+  id `MemberProfile` của ca viên ca trưởng **quản lý** (ca đoàn mình hoặc chưa có ca đoàn), khác → 404 `MEMBER_NOT_FOUND`.
+  Cùng luật với khai báo: kỹ năng còn hoạt động, đúng giới tính, chưa có bản `Pending` / `Approved` (đang có bản `Pending`
+  thì duyệt bản đó). Ca viên nhận `SkillReview` "Kỹ năng được ca trưởng ghi nhận".
 - Duyệt hoặc từ chối xong, ca viên nhận notification `type = SkillReview`,
   `referenceType = "MemberSkill"`, `referenceId` = id bản khai (S-05).
 
@@ -944,9 +963,9 @@ dữ liệu trong khoảng lọc vẫn hiện với các số bằng 0.
 
 ---
 
-## 4f. Choirs — `api/choirs` · tạo / sửa: `Admin` · xem, quản lý ca viên: `Admin`, `ChoirDirector` · xem danh sách: `ParishPriest` · ca đoàn phục vụ sự kiện `api/liturgical-events/{id}/choirs`: gán `ParishPriest`, xem `ParishPriest`, `ChoirDirector` (D7, D8)
+## 4f. Choirs — `api/choirs` · tạo / sửa: `Admin` · xem, quản lý ca viên: `Admin`, `ChoirDirector` · xem danh sách: `ParishPriest`, `ChoirMember` · tự rời: `ChoirMember` · ca đoàn phục vụ sự kiện `api/liturgical-events/{id}/choirs`: gán `ParishPriest`, xem `ParishPriest`, `ChoirDirector` (D7, D8)
 
-Một giáo xứ có nhiều ca đoàn; ca viên gia nhập được nhiều ca đoàn, một sự kiện có nhiều ca đoàn phục vụ.
+Một giáo xứ có nhiều ca đoàn; mỗi ca viên chỉ ở **một** ca đoàn đang hoạt động (2026-11-18), một sự kiện có nhiều ca đoàn phục vụ.
 Mỗi ca đoàn có **một** ca trưởng do Admin gán (`directorId`); một ca trưởng có thể phụ trách nhiều ca đoàn.
 Ca trưởng chỉ thấy và quản lý ca đoàn của mình — ca đoàn của ca trưởng khác trả 404 `CHOIR_NOT_FOUND`.
 Admin thấy và quản lý mọi ca đoàn.
@@ -955,7 +974,7 @@ Admin thấy và quản lý mọi ca đoàn.
 
 ```json
 { "id": "guid", "name": "Ca đoàn Cêcilia", "description": "Ca đoàn giới trẻ", "isActive": true,
-  "directorId": "guid", "directorFullName": "Nguyễn Văn A" }
+  "directorId": "guid", "directorFullName": "Nguyễn Văn A", "memberCount": 12 }
 ```
 
 ```json
@@ -965,11 +984,13 @@ Admin thấy và quản lý mọi ca đoàn.
 | Method | Route | Role | Body / Query | Thành công | Lỗi |
 |---|---|---|---|---|---|
 | POST | `/api/choirs` | `Admin` | `{ "name", "description?", "directorId?" }` | 200 `ChoirDto` | 400 `VALIDATION_FAILED`, `CHOIR_DIRECTOR_INVALID` · 409 `CHOIR_NAME_ALREADY_EXISTS` |
-| GET | `/api/choirs` | `Admin`, `ChoirDirector`, `ParishPriest` | — | 200 `ChoirDto[]` (sắp theo tên, gồm cả ca đoàn đã tắt; ca trưởng chỉ nhận ca đoàn của mình, Admin và cha xứ nhận mọi ca đoàn) | — |
+| GET | `/api/choirs` | Mọi role | — | 200 `ChoirDto[]` (sắp theo tên, gồm cả ca đoàn đã tắt; ca trưởng chỉ nhận ca đoàn của mình, Admin và cha xứ nhận mọi ca đoàn, ca viên nhận các ca đoàn đang hoạt động) | — |
+| GET | `/api/choirs/public` | anonymous | — | 200 `ChoirSummaryDto[]` `{ "id", "name", "description" }` (ca đoàn đang hoạt động, sắp theo tên) | 429 `RATE_LIMIT_EXCEEDED` (30 lần / phút / IP) |
 | PUT | `/api/choirs/{id}` | `Admin` | `{ "name", "description?", "isActive", "directorId?" }` | 200 `ChoirDto` | 400 `VALIDATION_FAILED`, `CHOIR_DIRECTOR_INVALID` · 404 `CHOIR_NOT_FOUND` · 409 `CHOIR_NAME_ALREADY_EXISTS` |
 | GET | `/api/choirs/{id}/members` | `Admin`, `ChoirDirector` | — | 200 `ChoirMemberDto[]` (ca viên đang ở trong ca đoàn, sắp theo tên) | 404 `CHOIR_NOT_FOUND` |
-| POST | `/api/choirs/{id}/members` | `Admin`, `ChoirDirector` | `{ "memberIds": ["guid"] }` | 204 | 400 `VALIDATION_FAILED` (`CHOIR_MEMBER_INVALID`), `CHOIR_MEMBER_INVALID` · 404 `CHOIR_NOT_FOUND` · 409 `CHOIR_INACTIVE` |
+| POST | `/api/choirs/{id}/members` | `Admin`, `ChoirDirector` | `{ "memberIds": ["guid"] }` | 204 (Admin: thêm thẳng · ca trưởng: gửi lời mời) | 400 `VALIDATION_FAILED` (`CHOIR_MEMBER_INVALID`), `CHOIR_MEMBER_INVALID` · 404 `CHOIR_NOT_FOUND` · 409 `CHOIR_INACTIVE`, `MEMBER_ALREADY_IN_CHOIR`, `CHOIR_JOIN_REQUEST_ALREADY_PENDING` (ca trưởng) |
 | DELETE | `/api/choirs/{id}/members/{memberId}` | `Admin`, `ChoirDirector` | — | 204 | 404 `CHOIR_NOT_FOUND`, `CHOIR_MEMBERSHIP_NOT_FOUND` |
+| POST | `/api/choirs/{id}/leave` | `ChoirMember` | — | 204 | 404 `CHOIR_NOT_FOUND`, `CHOIR_MEMBERSHIP_NOT_FOUND` |
 | GET | `/api/liturgical-events/{id}/choirs` | `ParishPriest`, `ChoirDirector` | — | 200 `LiturgicalEventChoirDto[]` (ca đoàn phụ trách trước, rồi theo tên) | 404 `LITURGICAL_EVENT_NOT_FOUND` |
 | PUT | `/api/liturgical-events/{id}/choirs/{choirId}/substitute-director` | `ParishPriest` | `{ "directorId?", "reason?" }` | 200 `LiturgicalEventChoirDto[]` | 400 `VALIDATION_FAILED` (`CHOIR_CHANGE_REASON_REQUIRED`), `CHOIR_DIRECTOR_INVALID` · 404 `LITURGICAL_EVENT_NOT_FOUND` · 409 `CHOIR_NOT_SERVING_EVENT`, `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED` |
 | PUT | `/api/liturgical-events/{id}/choirs` | `ParishPriest` | `{ "choirIds": ["guid"], "leadChoirId", "reason?" }` | 200 `LiturgicalEventChoirDto[]` (danh sách sau khi lưu) | 400 `VALIDATION_FAILED` (`LITURGICAL_EVENT_CHOIR_REQUIRED`, `CHOIR_LEAD_INVALID`), `CHOIR_CHANGE_REASON_REQUIRED` · 404 `LITURGICAL_EVENT_NOT_FOUND`, `CHOIR_NOT_FOUND` · 409 `LITURGICAL_EVENT_CANCELLED`, `LITURGICAL_EVENT_ALREADY_PASSED`, `CHOIR_INACTIVE` |
@@ -985,10 +1006,18 @@ Admin thấy và quản lý mọi ca đoàn.
 - `memberIds` là id `MemberProfile` (lấy từ `GET /api/member-profiles`); id trùng tự loại. Có id nào không tồn tại
   hoặc ca viên không ở trạng thái `Active` → 400 `CHOIR_MEMBER_INVALID`, không lưu gì.
   Ca viên đã ở trong ca đoàn thì bỏ qua; ca viên từng rời ca đoàn thì vào lại, `joinedDate` = hôm nay.
+  Có ca viên đang ở ca đoàn **khác** → 409 `MEMBER_ALREADY_IN_CHOIR`, không lưu gì (không kéo người của ca trưởng khác).
+  **Admin** thêm thẳng; yêu cầu / lời mời đang chờ của người được thêm chuyển `Cancelled`. **Ca trưởng** chỉ gửi **lời mời**
+  (`ChoirJoinRequest` có `isInvitation = true`, xem 4f-1): ca viên đồng ý thì mới vào ca đoàn. Người đã được ca đoàn này mời
+  bỏ qua; người đã tự xin vào chính ca đoàn này → 409 `CHOIR_JOIN_REQUEST_ALREADY_PENDING` (duyệt yêu cầu thay vì mời).
+  Ca viên được mời nhận `ChoirChanged` "Lời mời vào ca đoàn".
 - `DELETE .../members/{memberId}`: ca viên rời ca đoàn, lịch sử vẫn giữ; thêm lại bằng `POST .../members`. Ở các sự kiện
   sắp tới của ca đoàn mà ca viên không còn phục vụ qua ca đoàn nào khác: lời mời và dòng phân công bị xoá, bảng đã chốt mở
   lại `Draft`. Sự kiện nào mất dòng phân công thì ca trưởng ca đoàn phụ trách và ca trưởng thay thế của ca đoàn đó (trừ
   người gỡ) nhận `AssignmentNotice` "Ca viên rời ca đoàn".
+- `POST .../leave`: ca viên tự rời ca đoàn của mình, không cần duyệt. Xử lý sự kiện sắp tới như `DELETE .../members/{memberId}`;
+  ca trưởng của ca đoàn nhận `ChoirChanged` "Ca viên rời ca đoàn".
+- `memberCount`: số ca viên đang ở trong ca đoàn.
 - `PUT /api/liturgical-events/{id}/choirs` **thay toàn bộ** danh sách ca đoàn của sự kiện; không nhận `[]`
   (400 `LITURGICAL_EVENT_CHOIR_REQUIRED`).
   Sự kiện đã huỷ hoặc đã qua ngày thì không sửa được. Ca đoàn đã tắt vẫn được giữ lại nếu đã gán từ trước,
@@ -1033,6 +1062,49 @@ bài, mời hay phân công được: trả 403 `CHOIR_NOT_LEAD` cho tới khi c
 `SongList.choirId` được gán bằng ca đoàn phụ trách lúc tạo. Ca viên chỉ nhận bài tập của ca đoàn mình đang ở.
 
 ---
+
+## 4f-1. Choir join requests — `api/choir-join-requests` · tạo: `ChoirMember` · xem, trả lời, huỷ: `Admin`, `ChoirDirector`, `ChoirMember` (D9)
+
+Mỗi ca viên ở tối đa **một** ca đoàn đang hoạt động. Vào ca đoàn đi qua một dòng `ChoirJoinRequest` chờ bên kia đồng ý:
+
+| Loại | Ai tạo | Ai đồng ý / từ chối | Ai huỷ |
+|---|---|---|---|
+| Yêu cầu (`isInvitation = false`) — xin vào, hoặc xin chuyển khi đang ở ca đoàn khác | Ca viên (`POST`) | Ca trưởng của ca đoàn, hoặc Admin | Ca viên |
+| Lời mời (`isInvitation = true`) — chỉ cho ca viên chưa ở ca đoàn nào | Ca trưởng (`POST /api/choirs/{id}/members`) | Ca viên được mời | Ca trưởng, Admin |
+
+Dòng ngoài phạm vi, hoặc người gọi không phải bên được làm thao tác đó → 404 `CHOIR_JOIN_REQUEST_NOT_FOUND`.
+
+### `ChoirJoinRequestDto`
+
+```json
+{ "id": "guid", "memberId": "guid", "memberUserId": "guid", "memberFullName": "Nguyễn Văn A",
+  "currentChoirId": "guid", "currentChoirName": "Ca đoàn Thiếu nhi", "choirId": "guid", "choirName": "Ca đoàn Cêcilia",
+  "isInvitation": false, "status": "Pending", "message": "Em muốn hát bè Alto", "rejectReason": null,
+  "reviewedById": null, "reviewedAt": null, "createdAt": "2026-11-18T03:00:00Z" }
+```
+
+`currentChoir*` là ca đoàn ca viên **đang** ở (null = chưa có ca đoàn) — có giá trị nghĩa là yêu cầu chuyển. `status`:
+`Pending`, `Approved`, `Rejected`, `Cancelled`.
+
+| Method | Route | Role | Body / Query | Thành công | Lỗi |
+|---|---|---|---|---|---|
+| POST | `/api/choir-join-requests` | `ChoirMember` | `{ "choirId", "message?" }` | 200 `ChoirJoinRequestDto` | 400 `VALIDATION_FAILED` · 404 `MEMBER_NOT_FOUND`, `CHOIR_NOT_FOUND` · 409 `CHOIR_INACTIVE`, `CHOIR_JOIN_REQUEST_ALREADY_MEMBER`, `CHOIR_JOIN_REQUEST_ALREADY_PENDING` |
+| GET | `/api/choir-join-requests` | `Admin`, `ChoirDirector`, `ChoirMember` | `?status&choirId&isInvitation&pageNumber&pageSize` | 200 `PagedList<ChoirJoinRequestDto>` (mới nhất trước; ca viên: dòng của mình · ca trưởng: dòng của ca đoàn mình · Admin: tất cả) | — |
+| POST | `/api/choir-join-requests/{id}/approve` | Bên trả lời | — | 200 `ChoirJoinRequestDto` | 404 `CHOIR_JOIN_REQUEST_NOT_FOUND` · 400 `CHOIR_MEMBER_INVALID` · 409 `CHOIR_JOIN_REQUEST_NOT_PENDING`, `CHOIR_INACTIVE`, `CHOIR_JOIN_REQUEST_ALREADY_MEMBER` |
+| POST | `/api/choir-join-requests/{id}/reject` | Bên trả lời | `{ "reason?" }` | 200 `ChoirJoinRequestDto` | 400 `VALIDATION_FAILED`, `CHOIR_JOIN_REQUEST_REJECT_REASON_REQUIRED` · 404 `CHOIR_JOIN_REQUEST_NOT_FOUND` · 409 `CHOIR_JOIN_REQUEST_NOT_PENDING` |
+| POST | `/api/choir-join-requests/{id}/cancel` | Bên tạo | — | 200 `ChoirJoinRequestDto` | 404 `CHOIR_JOIN_REQUEST_NOT_FOUND` · 409 `CHOIR_JOIN_REQUEST_NOT_PENDING` |
+
+- `POST`: `message` ≤ 500 ký tự. Mỗi ca viên chỉ có **một** yêu cầu tự gửi đang chờ; đang có lời mời của chính ca đoàn đó thì
+  trả lời lời mời thay vì gửi yêu cầu (409 `CHOIR_JOIN_REQUEST_ALREADY_PENDING`). Lời mời từ nhiều ca đoàn chờ cùng lúc được.
+  Ca trưởng ca đoàn nhận `ChoirChanged` "Yêu cầu vào ca đoàn" / "Yêu cầu chuyển ca đoàn"; ca đoàn chưa có ca trưởng thì Admin nhận.
+- `approve`: ca viên **rời ca đoàn cũ** (lời mời / phân công ở sự kiện sắp tới của ca đoàn cũ bị gỡ như `POST /api/choirs/{id}/leave`)
+  và **vào ca đoàn mới** trong một lần lưu; mọi yêu cầu / lời mời đang chờ khác của ca viên chuyển `Cancelled`. Ca trưởng ca đoàn
+  cũ nhận `ChoirChanged` "Ca viên chuyển ca đoàn". Duyệt yêu cầu → ca viên nhận "Yêu cầu vào ca đoàn được duyệt"; ca viên nhận lời
+  mời → ca trưởng nhận "Ca viên nhận lời mời".
+- `reject`: `reason` ≤ 500 ký tự, **bắt buộc** khi ca trưởng / Admin từ chối yêu cầu của ca viên, tuỳ chọn khi ca viên từ chối lời
+  mời. Bên kia nhận `ChoirChanged`, kèm lý do nếu có.
+- `cancel`: không gửi thông báo.
+- Ca viên được đổi sang role khác (`PUT /api/users/{id}/role`, kể cả khi được bổ nhiệm ca trưởng) → mọi dòng đang chờ của họ `Cancelled`.
 
 ## 4g. Mass schedules — `api/mass-schedules` · xem: `Admin`, `ParishPriest` · sửa: `Admin` (UC-12)
 

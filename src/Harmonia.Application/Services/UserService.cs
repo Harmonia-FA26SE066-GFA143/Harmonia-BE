@@ -24,6 +24,7 @@ public class UserService(
 	IFileStorageService fileStorageService,
 	IGenericRepository<Choir> choirRepository,
 	IGenericRepository<LiturgicalEventChoir> eventChoirRepository,
+	IChoirJoinRequestRepository joinRequestRepository,
 	INotificationService notificationService,
 	IMapper mapper) : IUserService
 {
@@ -57,6 +58,14 @@ public class UserService(
 		var role = await userRepository.GetRoleByNameAsync(request.RoleName, ct);
 		if (role is null) return Result<UserDto>.Failure(ErrorCodes.RoleNotFound);
 
+		Choir? preferredChoir = null;
+		if (request.PreferredChoirId is { } choirId && role.Name == RoleNames.ChoirMember)
+		{
+			preferredChoir = await choirRepository.GetByIdAsync(choirId, ct);
+			if (preferredChoir is null) return Result<UserDto>.Failure(ErrorCodes.ChoirNotFound);
+			if (!preferredChoir.IsActive) return Result<UserDto>.Failure(ErrorCodes.ChoirInactive);
+		}
+
 		var user = new User
 		{
 			Id = Guid.NewGuid(),
@@ -75,6 +84,18 @@ public class UserService(
 			user.MemberProfile = NewMemberProfile(user.Id);
 
 		await userRepository.AddAsync(user, ct);
+		// The Admin does not place the member: the choir's director accepts them like any join request (D9).
+		ChoirJoinRequest? joinRequest = null;
+		if (preferredChoir is not null)
+		{
+			joinRequest = new ChoirJoinRequest
+			{
+				Id = Guid.NewGuid(), MemberId = user.MemberProfile!.Id, ChoirId = preferredChoir.Id,
+				Status = ChoirJoinRequestStatus.Pending,
+			};
+			await joinRequestRepository.AddAsync(joinRequest, ct);
+		}
+
 		await userRepository.SaveChangesAsync(ct);
 
 		// The result is ignored on purpose: the account exists, and if the email is lost the user can still get in
@@ -86,6 +107,16 @@ public class UserService(
 				+ $"<p>Email: <b>{WebUtility.HtmlEncode(user.Email)}</b><br/>Mật khẩu: <b>{WebUtility.HtmlEncode(initialPassword)}</b></p>"
 				+ "<p>Bạn sẽ được yêu cầu đổi mật khẩu ở lần đăng nhập đầu tiên.</p>",
 			ct);
+
+		if (joinRequest is not null && preferredChoir!.DirectorId is { } directorId)
+		{
+			await notificationService.SendAsync(
+				new SendNotificationRequest(
+					NotificationType.ChoirChanged, "Yêu cầu vào ca đoàn",
+					$"Ca viên mới {user.FullName} xin vào ca đoàn {preferredChoir.Name}.",
+					[directorId], nameof(ChoirJoinRequest), joinRequest.Id),
+				ct);
+		}
 
 		return Result<UserDto>.Success(mapper.Map<UserDto>(user));
 	}
@@ -242,6 +273,8 @@ public class UserService(
 			if (profile.Status == MemberStatus.Active) profile.Status = MemberStatus.Inactive;
 			leftChoirIds = profile.ChoirMemberships.Where(m => m.IsActive).Select(m => m.ChoirId).ToList();
 			foreach (var membership in profile.ChoirMemberships) membership.IsActive = false;
+			foreach (var joinRequest in await joinRequestRepository.GetPendingForUpdateAsync([profile.Id], ct))
+				joinRequest.Status = ChoirJoinRequestStatus.Cancelled;
 		}
 		// The old role lives on in every issued token; force a fresh sign-in.
 		await userRepository.RevokeAllRefreshTokensAsync(id, ct);

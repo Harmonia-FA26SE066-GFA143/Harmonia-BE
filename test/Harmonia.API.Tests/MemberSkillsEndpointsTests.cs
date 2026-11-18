@@ -163,7 +163,8 @@ public class MemberSkillsEndpointsTests(HarmoniaApiFactory factory) : IClassFixt
         Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
         Assert.Equal(ApprovalStatus.Approved, own.Status);
         Assert.NotNull(own.ApprovedAt);
-        Assert.Equal(1, await CountSkillNotificationsAsync(declared.Id, _ct));
+        // One to the directors on declaring, one to the member on the (single) review.
+        Assert.Equal(2, await CountSkillNotificationsAsync(declared.Id, _ct));
     }
 
     [Fact]
@@ -183,7 +184,8 @@ public class MemberSkillsEndpointsTests(HarmoniaApiFactory factory) : IClassFixt
         Assert.Equal(HttpStatusCode.OK, reject.StatusCode);
         Assert.Equal(ApprovalStatus.Rejected, own.Status);
         Assert.Equal("Not ready", own.RejectReason);
-        Assert.Equal(1, await CountSkillNotificationsAsync(declared.Id, _ct));
+        // One to the directors on declaring, one to the member on the (single) review.
+        Assert.Equal(2, await CountSkillNotificationsAsync(declared.Id, _ct));
     }
 
     [Fact]

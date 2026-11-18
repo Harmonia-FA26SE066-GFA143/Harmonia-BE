@@ -24,6 +24,7 @@ public partial class ApiConventionTests
         $"{nameof(AuthController)}.{nameof(AuthController.ResetPasswordAsync)}",
         $"{nameof(SystemSettingsController)}.{nameof(SystemSettingsController.GetPublicAsync)}",
         $"{nameof(MemberRegistrationsController)}.{nameof(MemberRegistrationsController.SubmitAsync)}",
+        $"{nameof(ChoirsController)}.{nameof(ChoirsController.GetPublicAsync)}",
     ];
 
     private static readonly Assembly ApiAssembly = typeof(AuthController).Assembly;

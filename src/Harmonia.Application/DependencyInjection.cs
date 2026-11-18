@@ -45,6 +45,7 @@ public static class DependencyInjection
         services.AddScoped<IEventParticipationService, EventParticipationService>();
         services.AddScoped<IChoirService, ChoirService>();
         services.AddScoped<IChoirScopeService, ChoirScopeService>();
+        services.AddScoped<IChoirJoinRequestService, ChoirJoinRequestService>();
         services.AddScoped<IMassScheduleService, MassScheduleService>();
         services.AddScoped<IMemberRegistrationService, MemberRegistrationService>();
         services.AddScoped<IDirectorNominationService, DirectorNominationService>();

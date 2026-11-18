@@ -147,6 +147,7 @@ public static class DependencyInjection
         services.AddScoped<IEventParticipationRepository, EventParticipationRepository>();
         services.AddScoped<IMemberRegistrationRepository, MemberRegistrationRepository>();
         services.AddScoped<IDirectorNominationRepository, DirectorNominationRepository>();
+        services.AddScoped<IChoirJoinRequestRepository, ChoirJoinRequestRepository>();
 
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IPasswordHasherService, PasswordHasherService>();

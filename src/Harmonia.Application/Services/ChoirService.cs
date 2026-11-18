@@ -13,6 +13,7 @@ namespace Harmonia.Application.Services;
 public class ChoirService(
     IGenericRepository<Choir> choirRepository,
     IGenericRepository<ChoirMembership> membershipRepository,
+    IChoirJoinRequestRepository joinRequestRepository,
     IGenericRepository<LiturgicalEventChoir> eventChoirRepository,
     IMemberProfileRepository memberRepository,
     ILiturgicalEventRepository liturgicalEventRepository,
@@ -56,12 +57,20 @@ public class ChoirService(
     public async Task<Result<List<ChoirDto>>> GetAllAsync(CancellationToken cancellationToken)
     {
         var userId = currentUser.UserId;
-        var choirs = currentUser.RoleName is RoleNames.Admin or RoleNames.ParishPriest
-            ? await choirRepository.ListAsync(_ => true, cancellationToken)
-            : await choirRepository.ListAsync(x => x.DirectorId == userId, cancellationToken);
+        var choirs = currentUser.RoleName switch
+        {
+            RoleNames.Admin or RoleNames.ParishPriest => await choirRepository.ListAsync(_ => true, cancellationToken),
+            // Members browse the choirs they could join.
+            RoleNames.ChoirMember => await choirRepository.ListAsync(x => x.IsActive, cancellationToken),
+            _ => await choirRepository.ListAsync(x => x.DirectorId == userId, cancellationToken),
+        };
 
         return Result<List<ChoirDto>>.Success(await ToDtosAsync(choirs, cancellationToken));
     }
+
+    public async Task<Result<List<ChoirSummaryDto>>> GetPublicAsync(CancellationToken cancellationToken) =>
+        Result<List<ChoirSummaryDto>>.Success(mapper.Map<List<ChoirSummaryDto>>(
+            (await choirRepository.ListAsync(x => x.IsActive, cancellationToken)).OrderBy(x => x.Name).ToList()));
 
     public async Task<Result<ChoirDto>> UpdateAsync(
         Guid id, UpdateChoirRequest request, CancellationToken cancellationToken)
@@ -198,32 +207,29 @@ public class ChoirService(
             return Result.Failure(ErrorCodes.ChoirMemberInvalid);
         }
 
-        // Read-only rows; the unique (MemberId, ChoirId) index means a member who left rejoins on the old row.
-        var existing = (await membershipRepository.ListAsync(
-                x => x.ChoirId == choirId && memberIds.Contains(x.MemberId), cancellationToken))
-            .ToDictionary(x => x.MemberId);
-        var today = VietnamTime.Today;
-        var joinedMemberIds = new List<Guid>();
+        // One active choir per member: someone in another choir moves by their own request, never pulled across.
+        if ((await membershipRepository.ListAsync(
+                x => memberIds.Contains(x.MemberId) && x.IsActive && x.ChoirId != choirId, cancellationToken)).Count > 0)
+        {
+            return Result.Failure(ErrorCodes.MemberAlreadyInChoir);
+        }
 
+        // A director only invites; the member joins once they accept (2026-11-18). The Admin places members directly.
+        if (currentUser.RoleName == RoleNames.ChoirDirector)
+        {
+            return await InviteAsync(choir, memberIds, activeMembers, cancellationToken);
+        }
+
+        var joinedMemberIds = new List<Guid>();
         foreach (var memberId in memberIds)
         {
-            if (!existing.TryGetValue(memberId, out var row))
+            if (await StageJoinAsync(choirId, memberId, cancellationToken))
             {
-                await membershipRepository.AddAsync(new ChoirMembership
-                {
-                    Id = Guid.NewGuid(), ChoirId = choirId, MemberId = memberId, JoinedDate = today,
-                }, cancellationToken);
-                joinedMemberIds.Add(memberId);
-            }
-            else if (!row.IsActive)
-            {
-                var tracked = await membershipRepository.GetByIdAsync(row.Id, cancellationToken);
-                tracked!.IsActive = true;
-                tracked.JoinedDate = today;
                 joinedMemberIds.Add(memberId);
             }
         }
 
+        await CancelPendingJoinRequestsAsync(joinedMemberIds, cancellationToken);
         await membershipRepository.SaveChangesAsync(cancellationToken);
 
         // Members already in the choir hear nothing new.
@@ -251,12 +257,226 @@ public class ChoirService(
             return Result.Failure(ErrorCodes.ChoirNotFound);
         }
 
+        var reopened = await StageLeaveAsync(choirId, memberId, cancellationToken);
+        if (reopened is null)
+        {
+            return Result.Failure(ErrorCodes.ChoirMembershipNotFound);
+        }
+
+        await membershipRepository.SaveChangesAsync(cancellationToken);
+
+        var member = (await memberRepository.GetByIdsWithUserAsync([memberId], cancellationToken)).SingleOrDefault();
+        await NotifyLeadDirectorsOfRemovalAsync(reopened, member?.User.FullName, cancellationToken);
+        if (member is not null)
+        {
+            await notificationService.SendAsync(
+                new SendNotificationRequest(
+                    NotificationType.ChoirChanged, "Rời ca đoàn",
+                    $"Bạn không còn ở ca đoàn {choir.Name}.", [member.UserId], nameof(Choir), choir.Id),
+                cancellationToken);
+        }
+
+        return Result.Success();
+    }
+
+    public async Task<Result> LeaveAsync(Guid choirId, CancellationToken cancellationToken)
+    {
+        var choir = await choirRepository.GetByIdAsync(choirId, cancellationToken);
+        if (choir is null)
+        {
+            return Result.Failure(ErrorCodes.ChoirNotFound);
+        }
+
+        var member = currentUser.UserId is { } userId
+            ? await memberRepository.GetByUserIdAsync(userId, cancellationToken)
+            : null;
+        if (member is null)
+        {
+            return Result.Failure(ErrorCodes.ChoirMembershipNotFound);
+        }
+
+        var reopened = await StageLeaveAsync(choirId, member.Id, cancellationToken);
+        if (reopened is null)
+        {
+            return Result.Failure(ErrorCodes.ChoirMembershipNotFound);
+        }
+
+        await membershipRepository.SaveChangesAsync(cancellationToken);
+
+        var fullName = (await userRepository.GetByIdAsync(member.UserId, cancellationToken))?.FullName;
+        await NotifyLeadDirectorsOfRemovalAsync(reopened, fullName, cancellationToken);
+        if (choir.DirectorId is { } directorId)
+        {
+            await notificationService.SendAsync(
+                new SendNotificationRequest(
+                    NotificationType.ChoirChanged, "Ca viên rời ca đoàn",
+                    $"{fullName ?? "Một ca viên"} đã rời ca đoàn {choir.Name}.", [directorId], nameof(Choir), choir.Id),
+                cancellationToken);
+        }
+
+        return Result.Success();
+    }
+
+    public async Task<Result> MoveMemberAsync(Guid memberId, Guid choirId, CancellationToken cancellationToken)
+    {
+        var choir = await choirRepository.GetByIdAsync(choirId, cancellationToken);
+        if (choir is null)
+        {
+            return Result.Failure(ErrorCodes.ChoirNotFound);
+        }
+
+        if (!choir.IsActive)
+        {
+            return Result.Failure(ErrorCodes.ChoirInactive);
+        }
+
+        var member = (await memberRepository.GetByIdsWithUserAsync([memberId], cancellationToken)).SingleOrDefault();
+        if (member is null || member.Status != MemberStatus.Active)
+        {
+            return Result.Failure(ErrorCodes.ChoirMemberInvalid);
+        }
+
+        var currentChoirIds = (await membershipRepository.ListAsync(
+                x => x.MemberId == memberId && x.IsActive, cancellationToken))
+            .Select(x => x.ChoirId)
+            .ToList();
+        if (currentChoirIds.Contains(choirId))
+        {
+            return Result.Failure(ErrorCodes.ChoirJoinRequestAlreadyMember);
+        }
+
+        var reopened = new List<LiturgicalEvent>();
+        foreach (var currentChoirId in currentChoirIds)
+        {
+            reopened.AddRange(await StageLeaveAsync(currentChoirId, memberId, cancellationToken) ?? []);
+        }
+
+        await StageJoinAsync(choirId, memberId, cancellationToken);
+        await membershipRepository.SaveChangesAsync(cancellationToken);
+
+        var oldChoirs = await choirRepository.ListAsync(
+            x => currentChoirIds.Contains(x.Id) && x.DirectorId != null, cancellationToken);
+        foreach (var oldChoir in oldChoirs)
+        {
+            await notificationService.SendAsync(
+                new SendNotificationRequest(
+                    NotificationType.ChoirChanged, "Ca viên chuyển ca đoàn",
+                    $"{member.User.FullName} đã chuyển từ ca đoàn {oldChoir.Name} sang ca đoàn {choir.Name}.",
+                    [oldChoir.DirectorId!.Value], nameof(Choir), oldChoir.Id),
+                cancellationToken);
+        }
+
+        await NotifyLeadDirectorsOfRemovalAsync(reopened, member.User.FullName, cancellationToken);
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// The director's invitations to the members. Members already in the choir or already invited by it are skipped;
+    /// a member who asked to join this choir is answered through their request instead.
+    /// </summary>
+    private async Task<Result> InviteAsync(
+        Choir choir, IReadOnlyCollection<Guid> memberIds, IReadOnlyCollection<MemberProfile> members,
+        CancellationToken cancellationToken)
+    {
+        var choirId = choir.Id;
+        var current = (await membershipRepository.ListAsync(
+                x => x.ChoirId == choirId && x.IsActive && memberIds.Contains(x.MemberId), cancellationToken))
+            .Select(x => x.MemberId)
+            .ToHashSet();
+        var pending = await joinRequestRepository.ListAsync(
+            x => x.ChoirId == choirId && memberIds.Contains(x.MemberId) && x.Status == ChoirJoinRequestStatus.Pending,
+            cancellationToken);
+        if (pending.Any(x => !x.IsInvitation))
+        {
+            return Result.Failure(ErrorCodes.ChoirJoinRequestAlreadyPending);
+        }
+
+        var invitedIds = memberIds
+            .Where(x => !current.Contains(x) && pending.All(p => p.MemberId != x))
+            .ToList();
+        if (invitedIds.Count == 0)
+        {
+            return Result.Success();
+        }
+
+        foreach (var memberId in invitedIds)
+        {
+            await joinRequestRepository.AddAsync(new ChoirJoinRequest
+            {
+                Id = Guid.NewGuid(), MemberId = memberId, ChoirId = choirId, IsInvitation = true,
+                Status = ChoirJoinRequestStatus.Pending,
+            }, cancellationToken);
+        }
+
+        await joinRequestRepository.SaveChangesAsync(cancellationToken);
+
+        await notificationService.SendAsync(
+            new SendNotificationRequest(
+                NotificationType.ChoirChanged, "Lời mời vào ca đoàn",
+                $"Bạn được mời vào ca đoàn {choir.Name}. Mở lời mời để đồng ý hoặc từ chối.",
+                members.Where(x => invitedIds.Contains(x.Id)).Select(x => x.UserId).ToList(),
+                nameof(Choir), choirId),
+            cancellationToken);
+
+        return Result.Success();
+    }
+
+    /// <summary>A member placed in a choir needs no other way in: their Pending rows close. Not saved.</summary>
+    private async Task CancelPendingJoinRequestsAsync(IReadOnlyCollection<Guid> memberIds, CancellationToken cancellationToken)
+    {
+        if (memberIds.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var row in await joinRequestRepository.GetPendingForUpdateAsync(memberIds, cancellationToken))
+        {
+            row.Status = ChoirJoinRequestStatus.Cancelled;
+        }
+    }
+
+    /// <summary>
+    /// Adds the membership, or reactivates the old row of a member who left (unique (MemberId, ChoirId)). Not saved.
+    /// False when the member is already in the choir.
+    /// </summary>
+    private async Task<bool> StageJoinAsync(Guid choirId, Guid memberId, CancellationToken cancellationToken)
+    {
+        var row = (await membershipRepository.ListAsync(
+                x => x.ChoirId == choirId && x.MemberId == memberId, cancellationToken))
+            .SingleOrDefault();
+        if (row is null)
+        {
+            await membershipRepository.AddAsync(new ChoirMembership
+            {
+                Id = Guid.NewGuid(), ChoirId = choirId, MemberId = memberId, JoinedDate = VietnamTime.Today,
+            }, cancellationToken);
+            return true;
+        }
+
+        if (row.IsActive)
+        {
+            return false;
+        }
+
+        var tracked = await membershipRepository.GetByIdAsync(row.Id, cancellationToken);
+        tracked!.IsActive = true;
+        tracked.JoinedDate = VietnamTime.Today;
+        return true;
+    }
+
+    /// <summary>
+    /// Marks the member's active membership as left and drops them from the choir's upcoming events. Not saved.
+    /// Returns the events that lost a roster line, or null when the member is not in the choir.
+    /// </summary>
+    private async Task<List<LiturgicalEvent>?> StageLeaveAsync(
+        Guid choirId, Guid memberId, CancellationToken cancellationToken)
+    {
         var row = (await membershipRepository.ListAsync(
                 x => x.ChoirId == choirId && x.MemberId == memberId && x.IsActive, cancellationToken))
             .SingleOrDefault();
         if (row is null)
         {
-            return Result.Failure(ErrorCodes.ChoirMembershipNotFound);
+            return null;
         }
 
         var tracked = await membershipRepository.GetByIdAsync(row.Id, cancellationToken);
@@ -289,24 +509,7 @@ public class ChoirService(
             }
         }
 
-        await membershipRepository.SaveChangesAsync(cancellationToken);
-
-        var member = (await memberRepository.GetByIdsWithUserAsync([memberId], cancellationToken)).SingleOrDefault();
-        if (member is not null)
-        {
-            await notificationService.SendAsync(
-                new SendNotificationRequest(
-                    NotificationType.ChoirChanged, "Rời ca đoàn",
-                    $"Bạn không còn ở ca đoàn {choir.Name}.", [member.UserId], nameof(Choir), choir.Id),
-                cancellationToken);
-        }
-
-        if (reopened.Count > 0)
-        {
-            await NotifyLeadDirectorsOfRemovalAsync(reopened, member?.User.FullName, cancellationToken);
-        }
-
-        return Result.Success();
+        return reopened;
     }
 
     /// <summary>Tells who plans each event that a roster line went with the member; the caller already knows.</summary>
@@ -691,6 +894,11 @@ public class ChoirService(
             ? []
             : (await userRepository.ListAsync(x => directorIds.Contains(x.Id), cancellationToken))
                 .ToDictionary(x => x.Id, x => x.FullName);
+        var choirIds = choirs.Select(x => x.Id).ToList();
+        var memberCounts = (await membershipRepository.ListAsync(
+                x => x.IsActive && choirIds.Contains(x.ChoirId), cancellationToken))
+            .GroupBy(x => x.ChoirId)
+            .ToDictionary(x => x.Key, x => x.Count());
 
         return choirs
             .OrderBy(x => x.Name)
@@ -698,6 +906,7 @@ public class ChoirService(
             {
                 var dto = mapper.Map<ChoirDto>(x);
                 dto.DirectorFullName = x.DirectorId is { } id ? names.GetValueOrDefault(id) : null;
+                dto.MemberCount = memberCounts.GetValueOrDefault(x.Id);
                 return dto;
             })
             .ToList();

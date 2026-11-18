@@ -16,5 +16,7 @@ public class CreateUserRequestValidator : AbstractValidator<CreateUserRequest>
         RuleFor(x => x.RoleName).NotEmpty()
             .Must(r => r is RoleNames.Admin or RoleNames.ParishPriest
                         or RoleNames.ChoirDirector or RoleNames.ChoirMember);
+        // Only Choir Members join choirs.
+        RuleFor(x => x.PreferredChoirId).Null().When(x => x.RoleName != RoleNames.ChoirMember);
     }
 }

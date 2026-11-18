@@ -555,7 +555,8 @@ public sealed class RepositoryTests : IDisposable
             context.AddRange(
                 new LiturgicalEventChoir { Id = Guid.NewGuid(), EventId = liturgicalEvent.Id, ChoirId = serving.Id, IsLead = true },
                 new ChoirMembership { Id = Guid.NewGuid(), ChoirId = serving.Id, MemberId = binh },
-                new ChoirMembership { Id = Guid.NewGuid(), ChoirId = other.Id, MemberId = binh },
+                // Left another choir before joining the serving one (one active choir per member).
+                new ChoirMembership { Id = Guid.NewGuid(), ChoirId = other.Id, MemberId = binh, IsActive = false },
                 // Left the serving choir: counts neither for the event nor as having a choir.
                 new ChoirMembership { Id = Guid.NewGuid(), ChoirId = serving.Id, MemberId = an, IsActive = false });
             await context.SaveChangesAsync(_ct);
@@ -566,7 +567,7 @@ public sealed class RepositoryTests : IDisposable
 
         var row = Assert.Single(forEvent.Items);
         Assert.Equal(binh, row.Id);
-        Assert.Equal(["Other", "Serving"], row.ChoirMemberships.Select(m => m.Choir.Name).Order());
+        Assert.Equal(["Serving"], row.ChoirMemberships.Select(m => m.Choir.Name).Order());
         Assert.Equal(["An", "Member"], withoutChoir.Items.Select(m => m.User.FullName));
         Assert.Empty(withoutChoir.Items.Single(m => m.Id == an).ChoirMemberships);
     }
@@ -607,7 +608,7 @@ public sealed class RepositoryTests : IDisposable
         var repository = new MemberProfileRepository(context);
 
         Assert.True(await repository.IsManagedByDirectorAsync(scope.InMine, scope.MeId, _ct));
-        Assert.True(await repository.IsManagedByDirectorAsync(scope.InBoth, scope.MeId, _ct));
+        Assert.True(await repository.IsManagedByDirectorAsync(scope.MovedToMine, scope.MeId, _ct));
         Assert.True(await repository.IsManagedByDirectorAsync(scope.NoChoir, scope.MeId, _ct));
         Assert.True(await repository.IsManagedByDirectorAsync(scope.LeftMine, scope.MeId, _ct));
         Assert.False(await repository.IsManagedByDirectorAsync(scope.InTheirs, scope.MeId, _ct));
@@ -660,17 +661,125 @@ public sealed class RepositoryTests : IDisposable
         var recipients = await repository.GetActiveUserIdsOfEventChoirsAsync(served.Id, _ct);
 
         Assert.Equal(
-            new[] { scope.MeId, userIdOf[scope.InMine], userIdOf[scope.InBoth] }.Order(),
+            new[] { scope.MeId, userIdOf[scope.InMine], userIdOf[scope.MovedToMine] }.Order(),
             recipients!.Order());
         Assert.Null(await repository.GetActiveUserIdsOfEventChoirsAsync(unserved.Id, _ct));
     }
 
+    // ---- One active choir per member (2026-11-18) ----
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ChoirMembership_LeaveOldAndJoinNewInOneSave_IsAccepted_Async(bool rejoinsOldRow)
+    {
+        var scope = await SeedDirectorScopeAsync(_ct);
+        await using (var context = _db.NewContext())
+        {
+            var theirs = await context.Choirs.SingleAsync(x => x.Name == "Theirs", _ct);
+            var oldRow = await context.ChoirMemberships.SingleAsync(x => x.MemberId == scope.InMine, _ct);
+            if (rejoinsOldRow)
+            {
+                context.ChoirMemberships.Add(new ChoirMembership
+                {
+                    Id = Guid.NewGuid(), ChoirId = theirs.Id, MemberId = scope.InMine, IsActive = false,
+                });
+                await context.SaveChangesAsync(_ct);
+                (await context.ChoirMemberships.SingleAsync(
+                    x => x.MemberId == scope.InMine && x.ChoirId == theirs.Id, _ct)).IsActive = true;
+            }
+            else
+            {
+                // Staged before the old row changes, so only EF's ordering keeps the index satisfied.
+                context.ChoirMemberships.Add(new ChoirMembership { Id = Guid.NewGuid(), ChoirId = theirs.Id, MemberId = scope.InMine });
+            }
+
+            oldRow.IsActive = false;
+            await context.SaveChangesAsync(_ct);
+        }
+
+        await using var readContext = _db.NewContext();
+        var active = await readContext.ChoirMemberships
+            .Where(x => x.MemberId == scope.InMine && x.IsActive)
+            .Select(x => x.Choir.Name)
+            .ToListAsync(_ct);
+        Assert.Equal(["Theirs"], active);
+    }
+
+    [Fact]
+    public async Task ChoirMembership_SecondActiveChoir_IsRejectedByTheIndex_Async()
+    {
+        var scope = await SeedDirectorScopeAsync(_ct);
+        await using var context = _db.NewContext();
+        var theirs = await context.Choirs.SingleAsync(x => x.Name == "Theirs", _ct);
+        context.ChoirMemberships.Add(new ChoirMembership { Id = Guid.NewGuid(), ChoirId = theirs.Id, MemberId = scope.InMine });
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync(_ct));
+    }
+
+    // ---- ChoirJoinRequestRepository ----
+
+    [Fact]
+    public async Task ChoirJoinRequest_SecondOwnPendingRequest_IsRejected_ButInvitationsMayWait_Async()
+    {
+        var scope = await SeedDirectorScopeAsync(_ct);
+        await using (var context = _db.NewContext())
+        {
+            var choirIds = await context.Choirs.Select(x => x.Id).ToListAsync(_ct);
+            var third = new Choir { Id = Guid.NewGuid(), Name = "Third" };
+            context.Choirs.Add(third);
+            context.ChoirJoinRequests.AddRange(
+                NewJoinRequest(scope.NoChoir, choirIds[0], isInvitation: false),
+                NewJoinRequest(scope.NoChoir, choirIds[1], isInvitation: true),
+                NewJoinRequest(scope.NoChoir, third.Id, isInvitation: true));
+            await context.SaveChangesAsync(_ct);
+        }
+
+        await using var failing = _db.NewContext();
+        var other = await failing.Choirs.SingleAsync(x => x.Name == "Third", _ct);
+        failing.ChoirJoinRequests.Add(NewJoinRequest(scope.NoChoir, other.Id, isInvitation: false));
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => failing.SaveChangesAsync(_ct));
+    }
+
+    [Fact]
+    public async Task ChoirJoinRequestSearch_DirectorSeesOwnChoirs_WithTheMembersCurrentChoir_Async()
+    {
+        var scope = await SeedDirectorScopeAsync(_ct);
+        await using (var context = _db.NewContext())
+        {
+            var mine = await context.Choirs.SingleAsync(x => x.Name == "Mine", _ct);
+            var theirs = await context.Choirs.SingleAsync(x => x.Name == "Theirs", _ct);
+            context.ChoirJoinRequests.AddRange(
+                NewJoinRequest(scope.InTheirs, mine.Id, isInvitation: false),
+                NewJoinRequest(scope.NoChoir, theirs.Id, isInvitation: false));
+            await context.SaveChangesAsync(_ct);
+        }
+
+        await using var readContext = _db.NewContext();
+        var repository = new ChoirJoinRequestRepository(readContext);
+        var page = await repository.SearchAsync(new SearchChoirJoinRequestsRequest(), null, scope.MeId, _ct);
+        var pending = await repository.GetPendingForUpdateAsync([scope.InTheirs, scope.NoChoir], _ct);
+
+        var row = Assert.Single(page.Items);
+        Assert.Equal((scope.InTheirs, "Mine", "In Theirs"), (row.MemberId, row.Choir.Name, row.Member.User.FullName));
+        Assert.Equal(["Theirs"], row.Member.ChoirMemberships.Select(x => x.Choir.Name));
+        Assert.Equal(2, pending.Count);
+        Assert.All(pending, x => Assert.Equal(EntityState.Unchanged, readContext.Entry(x).State));
+    }
+
+    private static ChoirJoinRequest NewJoinRequest(Guid memberId, Guid choirId, bool isInvitation) => new()
+    {
+        Id = Guid.NewGuid(), MemberId = memberId, ChoirId = choirId, IsInvitation = isInvitation,
+        Status = ChoirJoinRequestStatus.Pending,
+    };
+
     private sealed record DirectorScope(
-        Guid MeId, Guid SkillId, Guid InMine, Guid InTheirs, Guid InBoth, Guid NoChoir, Guid LeftMine);
+        Guid MeId, Guid SkillId, Guid InMine, Guid InTheirs, Guid MovedToMine, Guid NoChoir, Guid LeftMine);
 
     /// <summary>
     /// Choir "Mine" led by me, "Theirs" by another director, and one member per case: active in Mine, active in
-    /// Theirs, active in both, in no choir, and one who left Mine.
+    /// Theirs, moved from Theirs to Mine, in no choir, and one who left Mine.
     /// </summary>
     private async Task<DirectorScope> SeedDirectorScopeAsync(CancellationToken cancellationToken = default)
     {
@@ -678,7 +787,7 @@ public sealed class RepositoryTests : IDisposable
         var other = await _db.AddUserAsync("other@test.com", RoleNames.ChoirDirector, cancellationToken);
         var inMine = await AddMemberAsync("In Mine", MemberStatus.Active, [], cancellationToken);
         var inTheirs = await AddMemberAsync("In Theirs", MemberStatus.Active, [], cancellationToken);
-        var inBoth = await AddMemberAsync("In Both", MemberStatus.Active, [], cancellationToken);
+        var movedToMine = await AddMemberAsync("Moved To Mine", MemberStatus.Active, [], cancellationToken);
         var noChoir = await AddMemberAsync("No Choir", MemberStatus.Active, [], cancellationToken);
         var leftMine = await AddMemberAsync("Left Mine", MemberStatus.Active, [], cancellationToken);
         var skill = new Skill { Id = Guid.NewGuid(), CategoryId = SkillCategoryIds.Vocal, Name = "Tenor", IsActive = true };
@@ -691,12 +800,12 @@ public sealed class RepositoryTests : IDisposable
         context.ChoirMemberships.AddRange(
             NewMembership(mine.Id, inMine),
             NewMembership(theirs.Id, inTheirs),
-            NewMembership(mine.Id, inBoth),
-            NewMembership(theirs.Id, inBoth),
+            NewMembership(mine.Id, movedToMine),
+            NewMembership(theirs.Id, movedToMine, isActive: false),
             NewMembership(mine.Id, leftMine, isActive: false));
         await context.SaveChangesAsync(cancellationToken);
 
-        return new DirectorScope(me.Id, skill.Id, inMine, inTheirs, inBoth, noChoir, leftMine);
+        return new DirectorScope(me.Id, skill.Id, inMine, inTheirs, movedToMine, noChoir, leftMine);
 
         static ChoirMembership NewMembership(Guid choirId, Guid memberId, bool isActive = true) => new()
         {

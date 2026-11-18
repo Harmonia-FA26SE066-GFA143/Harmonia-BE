@@ -35,14 +35,17 @@
 ## Tài khoản & mật khẩu
 
 - Tài khoản do `Admin` tạo và gán role. Người ngoài **không tự tạo được tài khoản** —
-  chỉ `login`, `google`, `refresh`, `forgot-password`, `reset-password`, `GET api/system-settings/public` và
-  `POST api/member-registrations` là `[AllowAnonymous]` (`reset-password`: người dùng đã quên mật khẩu, danh tính xác
+  chỉ `login`, `google`, `refresh`, `forgot-password`, `reset-password`, `GET api/system-settings/public`,
+  `GET api/choirs/public` và `POST api/member-registrations` là `[AllowAnonymous]` (`reset-password`: người dùng đã quên mật khẩu, danh tính xác
   minh bằng token trong email; `system-settings/public`: trang chủ và trang đăng nhập cần tên giáo xứ và email liên hệ,
-  chốt 2026-10-25).
+  chốt 2026-10-25; `choirs/public`: form đăng ký chọn ca đoàn muốn vào, chỉ trả tên + mô tả ca đoàn đang hoạt động,
+  policy `public-read` 30 lần / phút / IP, chốt 2026-11-18).
 - Đăng ký gia nhập (`POST api/member-registrations`, chốt 2026-11-09) chỉ lưu một `MemberRegistration` để Admin xem;
   Admin bấm tạo tài khoản thì mới có `User`. Luôn trả 204 kể cả khi email đã có tài khoản — không tiết lộ email nào
   đã đăng ký. Giới hạn 5 lần / 10 phút / IP (policy `member-registration`, quá thì 429 `RATE_LIMIT_EXCEEDED`).
   Endpoint ẩn danh mới phải có rate limit tương tự.
+  Đơn có `PreferredChoirId` (tuỳ chọn) thì lúc Admin tạo tài khoản, hệ thống sinh `ChoirJoinRequest` gửi ca trưởng ca
+  đoàn đó duyệt — Admin không xếp thẳng (D9, chốt 2026-11-18).
 - Đăng nhập Google (`api/auth/google`) chỉ khớp `User` có sẵn theo email đã xác minh —
   KHÔNG tự tạo tài khoản. Email chưa có tài khoản trả `AUTH_INVALID_CREDENTIALS`.
 - Mật khẩu lưu ở `User.passwordHash`, dùng `PasswordHasher<T>` hoặc BCrypt.
@@ -106,6 +109,10 @@
   Ca trưởng **quản lý** ca viên đang ở ca đoàn của mình hoặc chưa ở ca đoàn nào
   (`IMemberProfileRepository.IsManagedByDirectorAsync`): chỉ xem / sửa hồ sơ và duyệt kỹ năng của những ca viên đó,
   còn lại trả 404. Tìm kiếm ca viên vẫn trả toàn giáo xứ để thêm người vào ca đoàn.
+  Vào ca đoàn (D9, chốt 2026-11-18): ca trưởng gọi `POST api/choirs/{id}/members` chỉ sinh **lời mời**, chỉ Admin thêm
+  thẳng; người đang ở ca đoàn khác → 409 `MEMBER_ALREADY_IN_CHOIR`. `ChoirJoinRequest`: ca viên chỉ thấy dòng của mình,
+  ca trưởng chỉ thấy dòng của ca đoàn mình; bên trả lời (ca viên với lời mời, ca trưởng / Admin với yêu cầu) và bên
+  tạo (huỷ) kiểm trong service, ngoài phạm vi → 404 `CHOIR_JOIN_REQUEST_NOT_FOUND`.
   Buổi tập, bài tập, sự kiện, danh sách bài, phân công, lời mời: kiểm qua `IChoirScopeService` — ngoài phạm vi
   trả 404, ca đoàn phục vụ nhưng không phụ trách mà sửa trả 403 `CHOIR_NOT_LEAD`. Chỉ `ParishPriest` gán ca đoàn
   và ca đoàn phụ trách cho sự kiện. Thêm endpoint mới cho ca trưởng thì phải gọi scope service tương ứng.

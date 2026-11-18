@@ -8,7 +8,8 @@ namespace Harmonia.Application.Interfaces.IServices;
 public interface IMemberSkillService
 {
     /// <summary>
-    /// The calling member declares a skill, which starts as Pending until the Choir Director reviews it.
+    /// The calling member declares a skill, which starts as Pending until the Choir Director reviews it; the directors
+    /// who may review it are notified (D9).
     /// A skill that was rejected before can be declared again: the rejected row stays as history and
     /// a new Pending row is added. A Pending or Approved declaration of the same skill fails with
     /// MEMBER_SKILL_ALREADY_DECLARED.
@@ -49,6 +50,21 @@ public interface IMemberSkillService
     /// manage (D8) fails with MEMBER_SKILL_NOT_FOUND.
     /// </summary>
     Task<Result<MemberSkillDetailDto>> ApproveAsync(Guid directorUserId, Guid id, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Approves each Pending declaration on its own, as <see cref="ApproveAsync"/> does; the response lists the rows
+    /// approved and, for the others, the error code a single approve would have returned.
+    /// </summary>
+    Task<Result<ApproveMemberSkillsResponse>> ApproveManyAsync(
+        Guid directorUserId, ApproveMemberSkillsRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The Choir Director records a skill for a member they manage (D8), Approved at once, and the member is notified.
+    /// Same rules as declaring: active member and skill, matching gender, no Pending or Approved row of that skill.
+    /// A member outside the director's scope fails with MEMBER_NOT_FOUND.
+    /// </summary>
+    Task<Result<MemberSkillDetailDto>> AssignAsync(
+        Guid directorUserId, AssignMemberSkillRequest request, CancellationToken cancellationToken);
 
     /// <summary>
     /// The Choir Director rejects a Pending declaration with a reason and the member is notified.

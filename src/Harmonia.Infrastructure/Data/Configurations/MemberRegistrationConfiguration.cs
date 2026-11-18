@@ -16,5 +16,11 @@ public class MemberRegistrationConfiguration : IEntityTypeConfiguration<MemberRe
 
         // Not unique: two submissions racing on one email would otherwise turn an anonymous form into a 500.
         builder.HasIndex(x => x.Email);
+
+        // A choir is never deleted, only deactivated; SetNull just keeps a stray delete from blocking.
+        builder.HasOne(x => x.PreferredChoir)
+            .WithMany()
+            .HasForeignKey(x => x.PreferredChoirId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

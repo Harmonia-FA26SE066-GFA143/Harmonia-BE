@@ -13,6 +13,10 @@ namespace Harmonia.Application.Services;
 public class MemberSkillService(
     IMemberSkillRepository memberSkillRepository,
     IMemberProfileRepository memberProfileRepository,
+    IGenericRepository<ChoirMembership> membershipRepository,
+    IGenericRepository<Choir> choirRepository,
+    IChoirJoinRequestRepository joinRequestRepository,
+    IUserRepository userRepository,
     INotificationService notificationService,
     IFileStorageService fileStorageService,
     IServiceRosterRepository rosterRepository,
@@ -33,42 +37,150 @@ public class MemberSkillService(
     {
         var member = await memberProfileRepository.GetByUserIdAsync(userId, cancellationToken);
         if (member is null) return Result<MemberSkillDto>.Failure(ErrorCodes.MemberNotFound);
-        if (member.Status != MemberStatus.Active) return Result<MemberSkillDto>.Failure(ErrorCodes.MemberNotActive);
 
-        var skill = await memberSkillRepository.GetSkillWithCategoryAsync(request.SkillId, cancellationToken);
-        if (skill is null) return Result<MemberSkillDto>.Failure(ErrorCodes.SkillNotFound);
+        var memberSkill = new MemberSkill
+        {
+            Id = Guid.NewGuid(), MemberId = member.Id, SkillId = request.SkillId, Status = ApprovalStatus.Pending,
+            DeclaredAt = DateTime.UtcNow,
+        };
+        if (await AddCheckedAsync(member, memberSkill, cancellationToken) is { } error)
+        {
+            return Result<MemberSkillDto>.Failure(error);
+        }
+
+        var saved = await memberSkillRepository.GetWithSkillAsync(memberSkill.Id, cancellationToken);
+        await NotifyReviewersAsync(member, saved!, cancellationToken);
+        return Result<MemberSkillDto>.Success(mapper.Map<MemberSkillDto>(saved));
+    }
+
+    public async Task<Result<MemberSkillDetailDto>> AssignAsync(
+        Guid directorUserId, AssignMemberSkillRequest request, CancellationToken cancellationToken)
+    {
+        var member = await memberProfileRepository.GetWithUserAsync(request.MemberId, cancellationToken);
+        if (member is null
+            || !await memberProfileRepository.IsManagedByDirectorAsync(member.Id, directorUserId, cancellationToken))
+        {
+            return Result<MemberSkillDetailDto>.Failure(ErrorCodes.MemberNotFound);
+        }
+
+        // The director heard the member themselves, so the row skips the Pending step.
+        var now = DateTime.UtcNow;
+        var memberSkill = new MemberSkill
+        {
+            Id = Guid.NewGuid(), MemberId = member.Id, SkillId = request.SkillId, Status = ApprovalStatus.Approved,
+            DeclaredAt = now, ApprovedBy = directorUserId, ApprovedAt = now,
+        };
+        if (await AddCheckedAsync(member, memberSkill, cancellationToken) is { } error)
+        {
+            return Result<MemberSkillDetailDto>.Failure(error);
+        }
+
+        var saved = await memberSkillRepository.GetForReviewAsync(memberSkill.Id, cancellationToken);
+        await notificationService.SendAsync(
+            new SendNotificationRequest(
+                NotificationType.SkillReview, "Kỹ năng được ca trưởng ghi nhận",
+                $"Ca trưởng đã ghi nhận kỹ năng {saved!.Skill.Name} cho bạn.",
+                [member.UserId], nameof(MemberSkill), memberSkill.Id),
+            cancellationToken);
+
+        return Result<MemberSkillDetailDto>.Success(ToDto<MemberSkillDetailDto>(saved));
+    }
+
+    public async Task<Result<ApproveMemberSkillsResponse>> ApproveManyAsync(
+        Guid directorUserId, ApproveMemberSkillsRequest request, CancellationToken cancellationToken)
+    {
+        var response = new ApproveMemberSkillsResponse();
+
+        // One review per row, as the single approve does: a row that fails does not hold back the others.
+        foreach (var id in request.Ids.Distinct())
+        {
+            var result = await ReviewAsync(directorUserId, id, ApprovalStatus.Approved, null, cancellationToken);
+            if (result.IsSuccess)
+            {
+                response.Approved.Add(result.Value!);
+            }
+            else
+            {
+                response.Failed.Add(new MemberSkillReviewFailureDto { Id = id, Code = result.Code! });
+            }
+        }
+
+        return Result<ApproveMemberSkillsResponse>.Success(response);
+    }
+
+    /// <summary>
+    /// Checks the member and the skill for a new row and saves it. Returns the error code, or null once saved. A skill
+    /// rejected or revoked before may be added again; a Pending or Approved one may not.
+    /// </summary>
+    private async Task<string?> AddCheckedAsync(
+        MemberProfile member, MemberSkill memberSkill, CancellationToken cancellationToken)
+    {
+        if (member.Status != MemberStatus.Active) return ErrorCodes.MemberNotActive;
+
+        var skill = await memberSkillRepository.GetSkillWithCategoryAsync(memberSkill.SkillId, cancellationToken);
+        if (skill is null) return ErrorCodes.SkillNotFound;
 
         // A skill in a disabled category is hidden from the lookup, so it counts as inactive too.
-        if (!skill.IsActive || !skill.Category.IsActive) return Result<MemberSkillDto>.Failure(ErrorCodes.SkillInactive);
+        if (!skill.IsActive || !skill.Category.IsActive) return ErrorCodes.SkillInactive;
 
         if (skill.Gender is { } skillGender)
         {
             var memberGender = member.User.Gender;
-            if (memberGender is null) return Result<MemberSkillDto>.Failure(ErrorCodes.MemberSkillGenderRequired);
-            if (memberGender != skillGender) return Result<MemberSkillDto>.Failure(ErrorCodes.MemberSkillGenderMismatch);
+            if (memberGender is null) return ErrorCodes.MemberSkillGenderRequired;
+            if (memberGender != skillGender) return ErrorCodes.MemberSkillGenderMismatch;
         }
 
-        if (await memberSkillRepository.HasActiveDeclarationAsync(member.Id, skill.Id, cancellationToken))
+        if (await memberSkillRepository.HasActiveDeclarationAsync(member.Id, skill.Id, cancellationToken)
+            || !await memberSkillRepository.TryAddAsync(memberSkill, cancellationToken))
         {
-            return Result<MemberSkillDto>.Failure(ErrorCodes.MemberSkillAlreadyDeclared);
+            return ErrorCodes.MemberSkillAlreadyDeclared;
         }
 
-        var memberSkill = new MemberSkill
-        {
-            Id = Guid.NewGuid(),
-            MemberId = member.Id,
-            SkillId = skill.Id,
-            Status = ApprovalStatus.Pending,
-            DeclaredAt = DateTime.UtcNow
-        };
+        return null;
+    }
 
-        if (!await memberSkillRepository.TryAddAsync(memberSkill, cancellationToken))
+    /// <summary>
+    /// Tells who reviews the new declaration (D9): the director of the member's choir; with no choir, the director of
+    /// the choir they asked to join; otherwise every active Choir Director, since any of them may review a member with
+    /// no choir.
+    /// </summary>
+    private async Task NotifyReviewersAsync(MemberProfile member, MemberSkill memberSkill, CancellationToken cancellationToken)
+    {
+        var memberId = member.Id;
+        var choirIds = (await membershipRepository.ListAsync(x => x.MemberId == memberId && x.IsActive, cancellationToken))
+            .Select(x => x.ChoirId)
+            .ToList();
+        if (choirIds.Count == 0)
         {
-            return Result<MemberSkillDto>.Failure(ErrorCodes.MemberSkillAlreadyDeclared);
+            choirIds = (await joinRequestRepository.ListAsync(
+                    x => x.MemberId == memberId && x.Status == ChoirJoinRequestStatus.Pending && !x.IsInvitation,
+                    cancellationToken))
+                .Select(x => x.ChoirId)
+                .ToList();
         }
 
-        var saved = await memberSkillRepository.GetWithSkillAsync(memberSkill.Id, cancellationToken);
-        return Result<MemberSkillDto>.Success(mapper.Map<MemberSkillDto>(saved));
+        var directorIds = choirIds.Count == 0
+            ? []
+            : (await choirRepository.ListAsync(x => choirIds.Contains(x.Id) && x.DirectorId != null, cancellationToken))
+                .Select(x => x.DirectorId!.Value)
+                .Distinct()
+                .ToList();
+        if (directorIds.Count == 0)
+        {
+            directorIds = await userRepository.GetActiveUserIdsByRolesAsync([RoleNames.ChoirDirector], cancellationToken);
+        }
+
+        if (directorIds.Count == 0)
+        {
+            return;
+        }
+
+        await notificationService.SendAsync(
+            new SendNotificationRequest(
+                NotificationType.SkillReview, "Kỹ năng chờ duyệt",
+                $"{member.User.FullName} khai báo kỹ năng {memberSkill.Skill.Name}, vui lòng xem và duyệt.",
+                directorIds, nameof(MemberSkill), memberSkill.Id),
+            cancellationToken);
     }
 
     public async Task<Result<PagedList<MemberSkillDto>>> GetMineAsync(

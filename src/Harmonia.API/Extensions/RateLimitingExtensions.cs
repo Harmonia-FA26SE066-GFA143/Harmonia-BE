@@ -15,9 +15,19 @@ public static class RateLimitingExtensions
     /// </summary>
     public const string AuthPolicy = "auth";
 
+    /// <summary>
+    /// Anonymous lookups behind the join form (the choir list): 30 requests per IP per minute. Its own bucket, so
+    /// loading the form never spends the 5 submissions of <see cref="MemberRegistrationPolicy"/>.
+    /// </summary>
+    public const string PublicReadPolicy = "public-read";
+
     public static IServiceCollection AddApiRateLimiting(this IServiceCollection services) =>
         services.AddRateLimiter(options =>
         {
+            options.AddPolicy(PublicReadPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
+                context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1) }));
+
             options.AddPolicy(MemberRegistrationPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
                 context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(10) }));

@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using AutoMapper;
 using Harmonia.Application.Common.Models;
 using Harmonia.Application.DTOs;
@@ -17,6 +18,14 @@ public class MemberSkillServiceTests
 {
     private readonly IMemberSkillRepository _memberSkills = Substitute.For<IMemberSkillRepository>();
     private readonly IMemberProfileRepository _members = Substitute.For<IMemberProfileRepository>();
+    private readonly IGenericRepository<ChoirMembership> _memberships = Substitute.For<IGenericRepository<ChoirMembership>>();
+    private readonly IGenericRepository<Choir> _choirs = Substitute.For<IGenericRepository<Choir>>();
+    private readonly IChoirJoinRequestRepository _joinRequests = Substitute.For<IChoirJoinRequestRepository>();
+    private readonly IUserRepository _users = Substitute.For<IUserRepository>();
+    private readonly List<ChoirMembership> _membershipRows = [];
+    private readonly List<Choir> _choirRows = [];
+    private readonly List<ChoirJoinRequest> _joinRequestRows = [];
+    private readonly List<Guid> _allDirectorIds = [];
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
     private readonly IFileStorageService _files = Substitute.For<IFileStorageService>();
     private readonly IServiceRosterRepository _rosters = Substitute.For<IServiceRosterRepository>();
@@ -32,14 +41,29 @@ public class MemberSkillServiceTests
     {
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<MemberSkillProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
-        _sut = new MemberSkillService(_memberSkills, _members, _notifications, _files, _rosters, _scope, _email, mapper);
+        _sut = new MemberSkillService(
+            _memberSkills, _members, _memberships, _choirs, _joinRequests, _users, _notifications, _files, _rosters, _scope, _email, mapper);
         _rosters.GetUpcomingAssignmentsForUpdateAsync(default, default, default, default).ReturnsForAnyArgs([]);
         _files.UploadAsync(default!, default!, default!, default, default).ReturnsForAnyArgs(call =>
             Result<FileUploadResponse>.Success(new FileUploadResponse(
                 $"harmonia/{call.ArgAt<string>(2)}/new{Path.GetExtension(call.ArgAt<string>(1))}", string.Empty)));
         _files.GetSignedUrl(default!).ReturnsForAnyArgs(call => $"signed:{call.Arg<string>()}");
 
-        _member = new MemberProfile { Id = Guid.NewGuid(), UserId = _userId, Status = MemberStatus.Active };
+        _member = new MemberProfile
+        {
+            Id = Guid.NewGuid(), UserId = _userId, Status = MemberStatus.Active,
+            User = new User { Id = _userId, FullName = "Anna" },
+        };
+        // The fakes evaluate the service's predicate against in-memory rows, as the database would.
+        _memberships.ListAsync(Arg.Any<Expression<Func<ChoirMembership, bool>>>(), _ct)
+            .Returns(call => _membershipRows.Where(call.Arg<Expression<Func<ChoirMembership, bool>>>().Compile()).ToList());
+        _choirs.ListAsync(Arg.Any<Expression<Func<Choir, bool>>>(), _ct)
+            .Returns(call => _choirRows.Where(call.Arg<Expression<Func<Choir, bool>>>().Compile()).ToList());
+        _joinRequests.ListAsync(Arg.Any<Expression<Func<ChoirJoinRequest, bool>>>(), _ct)
+            .Returns(call => _joinRequestRows.Where(call.Arg<Expression<Func<ChoirJoinRequest, bool>>>().Compile()).ToList());
+        _users.GetActiveUserIdsByRolesAsync(
+                Arg.Is<IReadOnlyCollection<string>>(x => x.Contains(RoleNames.ChoirDirector)), _ct)
+            .Returns(_ => _allDirectorIds.ToList());
         var vocal = new SkillCategory { Id = SkillCategoryIds.Vocal, Name = "Vocal", IsActive = true };
         _tenor = new Skill { Id = Guid.NewGuid(), CategoryId = vocal.Id, Category = vocal, Name = "Tenor", IsActive = true };
 
@@ -255,6 +279,198 @@ public class MemberSkillServiceTests
         _memberSkills.GetForReviewAsync(row.Id, _ct).Returns(row);
         _memberSkills.TrySaveReviewAsync(row, _ct).Returns(true);
         return row;
+    }
+
+    // ---- Who hears of a new declaration (D9) ----
+
+    private Choir AddChoir(Guid? directorId)
+    {
+        var choir = new Choir { Id = Guid.NewGuid(), Name = "Choir", IsActive = true, DirectorId = directorId };
+        _choirRows.Add(choir);
+        return choir;
+    }
+
+    private async Task<SendNotificationRequest> DeclareAndGetNoticeAsync()
+    {
+        var sent = new List<SendNotificationRequest>();
+        _notifications.SendAsync(Arg.Do<SendNotificationRequest>(sent.Add), _ct).Returns(Task.CompletedTask);
+
+        Assert.True((await _sut.DeclareAsync(_userId, NewRequest(), _ct)).IsSuccess);
+
+        var notice = Assert.Single(sent);
+        Assert.Equal((NotificationType.SkillReview, nameof(MemberSkill)), (notice.Type, notice.ReferenceType));
+        Assert.Contains("Anna", notice.Content);
+        return notice;
+    }
+
+    [Fact]
+    public async Task Declare_MemberInAChoir_NotifiesThatChoirsDirector_Async()
+    {
+        var directorId = Guid.NewGuid();
+        _allDirectorIds.Add(Guid.NewGuid());
+        _membershipRows.Add(new ChoirMembership { MemberId = _member.Id, ChoirId = AddChoir(directorId).Id, IsActive = true });
+        // A pending request elsewhere does not matter once the member is in a choir.
+        _joinRequestRows.Add(new ChoirJoinRequest
+        {
+            MemberId = _member.Id, ChoirId = AddChoir(Guid.NewGuid()).Id, Status = ChoirJoinRequestStatus.Pending,
+        });
+
+        var notice = await DeclareAndGetNoticeAsync();
+
+        Assert.Equal([directorId], notice.RecipientUserIds);
+    }
+
+    [Fact]
+    public async Task Declare_NoChoirButAskedToJoinOne_NotifiesThatChoirsDirector_Async()
+    {
+        var directorId = Guid.NewGuid();
+        _allDirectorIds.Add(Guid.NewGuid());
+        _membershipRows.Add(new ChoirMembership { MemberId = _member.Id, ChoirId = AddChoir(Guid.NewGuid()).Id, IsActive = false });
+        _joinRequestRows.Add(new ChoirJoinRequest
+        {
+            MemberId = _member.Id, ChoirId = AddChoir(directorId).Id, Status = ChoirJoinRequestStatus.Pending,
+        });
+
+        var notice = await DeclareAndGetNoticeAsync();
+
+        Assert.Equal([directorId], notice.RecipientUserIds);
+    }
+
+    [Fact]
+    public async Task Declare_NoChoirAndOnlyAnInvitation_NotifiesEveryDirector_Async()
+    {
+        _allDirectorIds.AddRange([Guid.NewGuid(), Guid.NewGuid()]);
+        _joinRequestRows.Add(new ChoirJoinRequest
+        {
+            MemberId = _member.Id, ChoirId = AddChoir(Guid.NewGuid()).Id, IsInvitation = true,
+            Status = ChoirJoinRequestStatus.Pending,
+        });
+
+        var notice = await DeclareAndGetNoticeAsync();
+
+        Assert.Equal(_allDirectorIds.Order(), notice.RecipientUserIds.Order());
+    }
+
+    [Fact]
+    public async Task Declare_ChoirWithoutDirector_FallsBackToEveryDirector_Async()
+    {
+        _allDirectorIds.Add(Guid.NewGuid());
+        _membershipRows.Add(new ChoirMembership { MemberId = _member.Id, ChoirId = AddChoir(null).Id, IsActive = true });
+
+        var notice = await DeclareAndGetNoticeAsync();
+
+        Assert.Equal(_allDirectorIds, notice.RecipientUserIds);
+    }
+
+    [Fact]
+    public async Task Declare_Fails_NotifiesNobody_Async()
+    {
+        _allDirectorIds.Add(Guid.NewGuid());
+        _memberSkills.HasActiveDeclarationAsync(_member.Id, _tenor.Id, _ct).Returns(true);
+
+        var result = await _sut.DeclareAsync(_userId, NewRequest(), _ct);
+
+        Assert.Equal(ErrorCodes.MemberSkillAlreadyDeclared, result.Code);
+        await _notifications.DidNotReceiveWithAnyArgs().SendAsync(default!, default);
+    }
+
+    // ---- Bulk approve ----
+
+    [Fact]
+    public async Task ApproveMany_ApprovesEachPendingRow_AndReportsTheOthersWithTheirCode_Async()
+    {
+        var pending = StubForReview(ApprovalStatus.Pending);
+        var reviewed = StubForReview(ApprovalStatus.Rejected);
+        var missing = Guid.NewGuid();
+
+        var result = await _sut.ApproveManyAsync(
+            Guid.NewGuid(), new ApproveMemberSkillsRequest { Ids = [pending.Id, reviewed.Id, missing, pending.Id] }, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal([pending.Id], result.Value!.Approved.Select(x => x.Id));
+        Assert.Equal(ApprovalStatus.Approved, pending.Status);
+        Assert.Equal(
+            [(reviewed.Id, ErrorCodes.MemberSkillAlreadyReviewed), (missing, ErrorCodes.MemberSkillNotFound)],
+            result.Value.Failed.Select(x => (x.Id, x.Code)));
+        await _memberSkills.Received(1).TrySaveReviewAsync(pending, _ct);
+    }
+
+    // ---- Assign ----
+
+    private void StubAssignable()
+    {
+        _members.GetWithUserAsync(_member.Id, _ct).Returns(_member);
+        _memberSkills.GetForReviewAsync(Arg.Any<Guid>(), _ct).Returns(call => new MemberSkill
+        {
+            Id = call.Arg<Guid>(), MemberId = _member.Id, Member = _member, SkillId = _tenor.Id, Skill = _tenor,
+            Status = ApprovalStatus.Approved, DeclaredAt = DateTime.UtcNow,
+        });
+    }
+
+    [Fact]
+    public async Task Assign_ManagedMember_AddsApprovedRowAndNotifiesMember_Async()
+    {
+        StubAssignable();
+        var directorId = Guid.NewGuid();
+
+        var result = await _sut.AssignAsync(
+            directorId, new AssignMemberSkillRequest { MemberId = _member.Id, SkillId = _tenor.Id }, _ct);
+
+        Assert.True(result.IsSuccess);
+        await _memberSkills.Received(1).TryAddAsync(
+            Arg.Is<MemberSkill>(x => x.MemberId == _member.Id && x.SkillId == _tenor.Id
+                && x.Status == ApprovalStatus.Approved && x.ApprovedBy == directorId && x.ApprovedAt != null),
+            _ct);
+        await _notifications.Received(1).SendAsync(
+            Arg.Is<SendNotificationRequest>(x => x.Type == NotificationType.SkillReview && x.RecipientUserIds.Single() == _userId),
+            _ct);
+    }
+
+    [Fact]
+    public async Task Assign_MemberOutsideTheDirectorsScope_ReturnsMemberNotFound_Async()
+    {
+        StubAssignable();
+        _members.IsManagedByDirectorAsync(_member.Id, Arg.Any<Guid>(), _ct).Returns(false);
+
+        var result = await _sut.AssignAsync(
+            Guid.NewGuid(), new AssignMemberSkillRequest { MemberId = _member.Id, SkillId = _tenor.Id }, _ct);
+
+        Assert.Equal(ErrorCodes.MemberNotFound, result.Code);
+        await _memberSkills.DidNotReceiveWithAnyArgs().TryAddAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task Assign_UnknownMember_ReturnsMemberNotFound_Async()
+    {
+        var result = await _sut.AssignAsync(
+            Guid.NewGuid(), new AssignMemberSkillRequest { MemberId = Guid.NewGuid(), SkillId = _tenor.Id }, _ct);
+
+        Assert.Equal(ErrorCodes.MemberNotFound, result.Code);
+    }
+
+    [Fact]
+    public async Task Assign_AlreadyPendingOrApproved_ReturnsAlreadyDeclared_Async()
+    {
+        StubAssignable();
+        _memberSkills.HasActiveDeclarationAsync(_member.Id, _tenor.Id, _ct).Returns(true);
+
+        var result = await _sut.AssignAsync(
+            Guid.NewGuid(), new AssignMemberSkillRequest { MemberId = _member.Id, SkillId = _tenor.Id }, _ct);
+
+        Assert.Equal(ErrorCodes.MemberSkillAlreadyDeclared, result.Code);
+    }
+
+    [Fact]
+    public async Task Assign_GenderMismatch_ReturnsMismatch_Async()
+    {
+        StubAssignable();
+        _tenor.Gender = Gender.Male;
+        _member.User.Gender = Gender.Female;
+
+        var result = await _sut.AssignAsync(
+            Guid.NewGuid(), new AssignMemberSkillRequest { MemberId = _member.Id, SkillId = _tenor.Id }, _ct);
+
+        Assert.Equal(ErrorCodes.MemberSkillGenderMismatch, result.Code);
     }
 
     [Fact]

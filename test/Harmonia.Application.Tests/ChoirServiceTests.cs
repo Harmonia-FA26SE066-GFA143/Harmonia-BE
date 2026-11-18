@@ -18,6 +18,8 @@ public class ChoirServiceTests
     private readonly IGenericRepository<Choir> _choirs = Substitute.For<IGenericRepository<Choir>>();
     private readonly IGenericRepository<ChoirMembership> _memberships = Substitute.For<IGenericRepository<ChoirMembership>>();
     private readonly IGenericRepository<LiturgicalEventChoir> _eventChoirs = Substitute.For<IGenericRepository<LiturgicalEventChoir>>();
+    private readonly IChoirJoinRequestRepository _joinRequests = Substitute.For<IChoirJoinRequestRepository>();
+    private readonly List<ChoirJoinRequest> _joinRequestRows = [];
     private readonly IMemberProfileRepository _members = Substitute.For<IMemberProfileRepository>();
     private readonly ILiturgicalEventRepository _events = Substitute.For<ILiturgicalEventRepository>();
     private readonly IUserRepository _users = Substitute.For<IUserRepository>();
@@ -50,7 +52,7 @@ public class ChoirServiceTests
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<ChoirProfile>(), NullLoggerFactory.Instance)
             .CreateMapper();
         _sut = new ChoirService(
-            _choirs, _memberships, _eventChoirs, _members, _events, _users, _participations, _rosters, _songLists,
+            _choirs, _memberships, _joinRequests, _eventChoirs, _members, _events, _users, _participations, _rosters, _songLists,
             _notifications, _currentUser, _scope, mapper);
         _currentUser.RoleName.Returns(RoleNames.Admin);
 
@@ -92,6 +94,14 @@ public class ChoirServiceTests
         _songLists.GetByIdAsync(Arg.Any<Guid>(), _ct)
             .Returns(call => _songListRows.SingleOrDefault(x => x.Id == call.Arg<Guid>()));
         _notifications.SendAsync(Arg.Do<SendNotificationRequest>(_sent.Add), _ct).Returns(Task.CompletedTask);
+        _joinRequests.ListAsync(Arg.Any<Expression<Func<ChoirJoinRequest, bool>>>(), _ct)
+            .Returns(call => _joinRequestRows.Where(call.Arg<Expression<Func<ChoirJoinRequest, bool>>>().Compile()).ToList());
+        _joinRequests.AddAsync(Arg.Do<ChoirJoinRequest>(_joinRequestRows.Add), _ct).Returns(Task.CompletedTask);
+        _joinRequests.GetPendingForUpdateAsync(Arg.Any<IReadOnlyCollection<Guid>>(), _ct)
+            .Returns(call => _joinRequestRows
+                .Where(x => call.Arg<IReadOnlyCollection<Guid>>().Contains(x.MemberId)
+                    && x.Status == ChoirJoinRequestStatus.Pending)
+                .ToList());
         _users.ListAsync(Arg.Any<Expression<Func<User, bool>>>(), _ct)
             .Returns(call => _userRows.Where(call.Arg<Expression<Func<User, bool>>>().Compile()).ToList());
         _users.GetActiveByRoleAsync(RoleNames.ChoirDirector, _ct).Returns(_ => _activeDirectors.ToList());
@@ -561,6 +571,208 @@ public class ChoirServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.Empty(_sent);
+    }
+
+    [Fact]
+    public async Task AddMembers_MemberInAnotherChoir_ReturnsConflictAndSavesNothing_Async()
+    {
+        var other = NewChoir("Other Choir");
+        var taken = NewMember();
+        _membershipRows.Add(new ChoirMembership { Id = Guid.NewGuid(), ChoirId = other.Id, MemberId = taken.Id, IsActive = true });
+        var fresh = NewMember();
+
+        var result = await _sut.AddMembersAsync(
+            _choir.Id, new AddChoirMembersRequest { MemberIds = [fresh.Id, taken.Id] }, _ct);
+
+        Assert.Equal(ErrorCodes.MemberAlreadyInChoir, result.Code);
+        Assert.Empty(_addedMemberships);
+        await _memberships.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task AddMembers_MemberLeftAnotherChoir_IsAdded_Async()
+    {
+        var other = NewChoir("Other Choir");
+        var member = NewMember();
+        _membershipRows.Add(new ChoirMembership { Id = Guid.NewGuid(), ChoirId = other.Id, MemberId = member.Id, IsActive = false });
+
+        var result = await _sut.AddMembersAsync(_choir.Id, new AddChoirMembersRequest { MemberIds = [member.Id] }, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(member.Id, Assert.Single(_addedMemberships).MemberId);
+    }
+
+    [Fact]
+    public async Task GetAll_AsMember_ReturnsActiveChoirsWithMemberCount_Async()
+    {
+        NewChoir("Closed", isActive: false);
+        NewMembership(NewMember());
+        NewMembership(NewMember());
+        NewMembership(NewMember(), isActive: false);
+        _currentUser.RoleName.Returns(RoleNames.ChoirMember);
+
+        var result = await _sut.GetAllAsync(_ct);
+
+        var choir = Assert.Single(result.Value!);
+        Assert.Equal((_choir.Id, 2), (choir.Id, choir.MemberCount));
+    }
+
+    [Fact]
+    public async Task GetPublic_ReturnsActiveChoirsByNameWithoutDirector_Async()
+    {
+        NewChoir("Closed", isActive: false);
+        NewChoir("Agnes Choir", directorId: NewDirector("Director").Id);
+
+        var result = await _sut.GetPublicAsync(_ct);
+
+        Assert.Equal(["Agnes Choir", "Cecilia Choir"], result.Value!.Select(x => x.Name));
+    }
+
+    [Fact]
+    public async Task Leave_OwnChoir_MarksLeftAndNotifiesDirector_Async()
+    {
+        var director = NewDirector("Director");
+        _choir.DirectorId = director.Id;
+        var member = NewMember(fullName: "Anna");
+        var row = NewMembership(member);
+        _members.GetByUserIdAsync(member.UserId, _ct).Returns(member);
+        _users.GetByIdAsync(member.UserId, _ct).Returns(member.User);
+        _currentUser.RoleName.Returns(RoleNames.ChoirMember);
+        _currentUser.UserId.Returns(member.UserId);
+
+        var result = await _sut.LeaveAsync(_choir.Id, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(row.IsActive);
+        await _memberships.Received(1).SaveChangesAsync(_ct);
+        var notice = Assert.Single(_sent);
+        Assert.Equal((NotificationType.ChoirChanged, _choir.Id), (notice.Type, notice.ReferenceId));
+        Assert.Equal([director.Id], notice.RecipientUserIds);
+        Assert.Contains("Anna", notice.Content);
+    }
+
+    [Fact]
+    public async Task Leave_NotAMember_ReturnsNotFound_Async()
+    {
+        var member = NewMember();
+        _members.GetByUserIdAsync(member.UserId, _ct).Returns(member);
+        _currentUser.RoleName.Returns(RoleNames.ChoirMember);
+        _currentUser.UserId.Returns(member.UserId);
+
+        var result = await _sut.LeaveAsync(_choir.Id, _ct);
+
+        Assert.Equal(ErrorCodes.ChoirMembershipNotFound, result.Code);
+        Assert.Empty(_sent);
+    }
+
+    [Fact]
+    public async Task AddMembers_AsDirector_InvitesInsteadOfAdding_SkipsCurrentAndInvited_Async()
+    {
+        var director = NewDirector("Director");
+        _choir.DirectorId = director.Id;
+        SignInAsDirector(director);
+        var fresh = NewMember();
+        var current = NewMember();
+        NewMembership(current);
+        var invited = NewMember();
+        _joinRequestRows.Add(new ChoirJoinRequest
+        {
+            Id = Guid.NewGuid(), MemberId = invited.Id, ChoirId = _choir.Id, IsInvitation = true,
+            Status = ChoirJoinRequestStatus.Pending,
+        });
+
+        var result = await _sut.AddMembersAsync(
+            _choir.Id, new AddChoirMembersRequest { MemberIds = [fresh.Id, current.Id, invited.Id] }, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(_addedMemberships);
+        var invitation = Assert.Single(_joinRequestRows, x => x.MemberId == fresh.Id);
+        Assert.Equal((true, ChoirJoinRequestStatus.Pending, _choir.Id), (invitation.IsInvitation, invitation.Status, invitation.ChoirId));
+        await _joinRequests.Received(1).SaveChangesAsync(_ct);
+        Assert.Equal([fresh.UserId], Assert.Single(_sent).RecipientUserIds);
+    }
+
+    [Fact]
+    public async Task AddMembers_AsDirector_MemberAskedToJoinThisChoir_ReturnsConflict_Async()
+    {
+        var director = NewDirector("Director");
+        _choir.DirectorId = director.Id;
+        SignInAsDirector(director);
+        var asking = NewMember();
+        _joinRequestRows.Add(new ChoirJoinRequest
+        {
+            Id = Guid.NewGuid(), MemberId = asking.Id, ChoirId = _choir.Id, Status = ChoirJoinRequestStatus.Pending,
+        });
+
+        var result = await _sut.AddMembersAsync(_choir.Id, new AddChoirMembersRequest { MemberIds = [asking.Id] }, _ct);
+
+        Assert.Equal(ErrorCodes.ChoirJoinRequestAlreadyPending, result.Code);
+        Assert.Single(_joinRequestRows);
+    }
+
+    [Fact]
+    public async Task AddMembers_AsAdmin_CancelsPendingRowsOfThoseAdded_Async()
+    {
+        var member = NewMember();
+        var pending = new ChoirJoinRequest
+        {
+            Id = Guid.NewGuid(), MemberId = member.Id, ChoirId = NewChoir("Other").Id, Status = ChoirJoinRequestStatus.Pending,
+        };
+        _joinRequestRows.Add(pending);
+
+        var result = await _sut.AddMembersAsync(_choir.Id, new AddChoirMembersRequest { MemberIds = [member.Id] }, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(member.Id, Assert.Single(_addedMemberships).MemberId);
+        Assert.Equal(ChoirJoinRequestStatus.Cancelled, pending.Status);
+    }
+
+    [Fact]
+    public async Task MoveMember_FromAnotherChoir_LeavesOldJoinsNewInOneSaveAndNotifiesOldDirector_Async()
+    {
+        var oldDirector = NewDirector("Old Director");
+        var old = NewChoir("Old", directorId: oldDirector.Id);
+        var member = NewMember(fullName: "Anna");
+        var oldRow = new ChoirMembership { Id = Guid.NewGuid(), ChoirId = old.Id, MemberId = member.Id, IsActive = true };
+        _membershipRows.Add(oldRow);
+
+        var result = await _sut.MoveMemberAsync(member.Id, _choir.Id, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(oldRow.IsActive);
+        Assert.Equal(_choir.Id, Assert.Single(_addedMemberships).ChoirId);
+        await _memberships.Received(1).SaveChangesAsync(_ct);
+        var notice = Assert.Single(_sent);
+        Assert.Equal([oldDirector.Id], notice.RecipientUserIds);
+        Assert.Equal(old.Id, notice.ReferenceId);
+        Assert.Contains("Anna", notice.Content);
+    }
+
+    [Fact]
+    public async Task MoveMember_AlreadyInTheChoir_ReturnsAlreadyMember_Async()
+    {
+        var member = NewMember();
+        NewMembership(member);
+
+        var result = await _sut.MoveMemberAsync(member.Id, _choir.Id, _ct);
+
+        Assert.Equal(ErrorCodes.ChoirJoinRequestAlreadyMember, result.Code);
+        await _memberships.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Theory]
+    [InlineData(false, MemberStatus.Active, ErrorCodes.ChoirInactive)]
+    [InlineData(true, MemberStatus.Inactive, ErrorCodes.ChoirMemberInvalid)]
+    public async Task MoveMember_InactiveChoirOrMember_IsRefused_Async(
+        bool choirActive, MemberStatus status, string expectedCode)
+    {
+        _choir.IsActive = choirActive;
+        var member = NewMember(status);
+
+        var result = await _sut.MoveMemberAsync(member.Id, _choir.Id, _ct);
+
+        Assert.Equal(expectedCode, result.Code);
+        Assert.Empty(_addedMemberships);
     }
 
     [Fact]

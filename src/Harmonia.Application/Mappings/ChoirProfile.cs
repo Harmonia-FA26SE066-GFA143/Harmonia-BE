@@ -9,5 +9,6 @@ public class ChoirProfile : Profile
     public ChoirProfile()
     {
         CreateMap<Choir, ChoirDto>();
+        CreateMap<Choir, ChoirSummaryDto>();
     }
 }

@@ -367,6 +367,12 @@ lọc theo cặp `(NotificationId, UserId)` nên "không tồn tại" và "của
 | `CHOIR_LEAD_INVALID` | 400 | Ca đoàn phụ trách phải là một trong các ca đoàn phục vụ sự kiện |
 | `CHOIR_NOT_LEAD` | 403 | Chỉ ca trưởng của ca đoàn phụ trách mới được thực hiện thao tác này |
 | `CHOIR_CHANGE_REASON_REQUIRED` | 400 | Vui lòng nhập lý do thay đổi ca trưởng / ca đoàn |
+| `MEMBER_ALREADY_IN_CHOIR` | 409 | Ca viên đang ở một ca đoàn khác — mỗi ca viên chỉ thuộc một ca đoàn |
+| `CHOIR_JOIN_REQUEST_NOT_FOUND` | 404 | Không tìm thấy yêu cầu / lời mời vào ca đoàn |
+| `CHOIR_JOIN_REQUEST_ALREADY_PENDING` | 409 | Đã có yêu cầu hoặc lời mời đang chờ xử lý |
+| `CHOIR_JOIN_REQUEST_NOT_PENDING` | 409 | Yêu cầu / lời mời này đã được xử lý |
+| `CHOIR_JOIN_REQUEST_ALREADY_MEMBER` | 409 | Bạn đã ở trong ca đoàn này |
+| `CHOIR_JOIN_REQUEST_REJECT_REASON_REQUIRED` | 400 | Vui lòng nhập lý do từ chối |
 
 ## 16. Giờ lễ cố định
 
@@ -483,3 +489,8 @@ xem — trả 404, để không lộ sự tồn tại của bản ghi.
 - 2026-11-17: thêm `LITURGICAL_SEASON_CALENDAR_KEY_INVALID`, `LITURGICAL_SEASON_CALENDAR_KEY_DUPLICATE` — mùa phụng vụ gắn
   với mùa của lịch (`calendarKey`). `LITURGICAL_EVENT_DATE_OUTSIDE_LITURGICAL_SEASON` còn trả khi mùa có key khác mùa của ngày
   cử hành trong lịch đã đồng bộ.
+- 2026-11-18: thêm `MEMBER_ALREADY_IN_CHOIR` — mỗi ca viên chỉ ở một ca đoàn đang hoạt động. `POST /api/choirs/{id}/members`
+  chọn ca viên đang ở ca đoàn khác bị chặn, không lưu gì.
+- 2026-11-18: thêm `CHOIR_JOIN_REQUEST_NOT_FOUND`, `_ALREADY_PENDING`, `_NOT_PENDING`, `_ALREADY_MEMBER`,
+  `_REJECT_REASON_REQUIRED` cho `api/choir-join-requests` (D9). `POST /api/choirs/{id}/members` do ca trưởng gọi còn trả
+  `CHOIR_JOIN_REQUEST_ALREADY_PENDING` khi ca viên đã tự xin vào chính ca đoàn đó.

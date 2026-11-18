@@ -17,6 +17,8 @@ public class Choir : BaseAuditableEntity
 
     public ICollection<ChoirMembership> Memberships { get; set; } = [];
 
+    public ICollection<ChoirJoinRequest> JoinRequests { get; set; } = [];
+
     public ICollection<LiturgicalEventChoir> EventChoirs { get; set; } = [];
 
     public ICollection<SongList> SongLists { get; set; } = [];

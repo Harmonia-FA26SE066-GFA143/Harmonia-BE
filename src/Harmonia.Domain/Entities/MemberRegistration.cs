@@ -19,6 +19,14 @@ public class MemberRegistration : BaseAuditableEntity
 
     public Gender? Gender { get; set; }
 
-    /// <summary>Free text from the applicant, such as the choir they would like to join.</summary>
+    /// <summary>Free text from the applicant.</summary>
     public string? Note { get; set; }
+
+    /// <summary>
+    /// The choir the applicant would like to join; null = no preference. Creating the account turns it into a join
+    /// request to that choir's director (D9).
+    /// </summary>
+    public Guid? PreferredChoirId { get; set; }
+
+    public Choir? PreferredChoir { get; set; }
 }

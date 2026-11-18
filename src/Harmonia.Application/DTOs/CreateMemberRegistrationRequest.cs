@@ -16,4 +16,7 @@ public class CreateMemberRegistrationRequest
     public Gender? Gender { get; set; }
 
     public string? Note { get; set; }
+
+    /// <summary>Optional, from GET api/choirs/public.</summary>
+    public Guid? PreferredChoirId { get; set; }
 }

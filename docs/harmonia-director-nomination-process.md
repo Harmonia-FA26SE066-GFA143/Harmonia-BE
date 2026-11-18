@@ -6,10 +6,10 @@ Bản đề xuất ngày 2026-11-09, chưa triển khai. Phần **Còn phải ch
 
 | # | Bước | Người làm | Trạng thái |
 |---|---|---|---|
-| 1 | **Đăng ký qua trang chính**: họ tên, email, số điện thoại, lời nhắn (ví dụ ca đoàn muốn vào) | Người muốn gia nhập (chưa đăng nhập) | Đã làm BE (UC-45), chờ migration |
+| 1 | **Đăng ký qua trang chính**: họ tên, email, số điện thoại, lời nhắn, ca đoàn muốn vào (tuỳ chọn) | Người muốn gia nhập (chưa đăng nhập) | Đã làm BE (UC-45), chờ migration |
 | 2 | **Xem danh sách đăng ký**, bấm tạo tài khoản `ChoirMember` từ đăng ký (thông tin điền sẵn), server gửi mật khẩu qua email. Đăng ký không hợp lệ thì xoá | Admin | Đã làm BE (UC-45), chờ migration |
 | 3 | Đăng nhập lần đầu, đổi mật khẩu | Ca viên | Đã có |
-| 4 | Thêm vào ca đoàn (một người có thể ở nhiều ca đoàn) | Ca trưởng của ca đoàn đó | Đã có |
+| 4 | **Vào ca đoàn** — mỗi ca viên tối đa một ca đoàn (D9): ca đoàn chọn ở bước 1 thành yêu cầu chờ ca trưởng duyệt; hoặc ca viên tự xin vào / xin chuyển; hoặc ca trưởng mời người chưa có ca đoàn và ca viên đồng ý. Admin xếp thẳng được khi chờ lâu | Ca viên, ca trưởng, Admin | Đã làm BE (UC-47, UC-48), chờ migration |
 | 5 | Khai báo kỹ năng, nộp minh chứng → ca trưởng duyệt | Ca viên, ca trưởng | Đã có |
 | 6 | Đi tập, làm bài tập, phục vụ lễ: tích lũy thành tích | Ca viên | Đã có |
 | 7 | **Tạo đề cử**, kèm bảng thành tích và cảnh báo nếu chưa đủ ngưỡng | Ca trưởng (ca viên của ca đoàn mình) hoặc cha xứ (ca viên bất kỳ) | Đã làm BE (UC-46), chờ migration |
@@ -18,12 +18,12 @@ Bản đề xuất ngày 2026-11-09, chưa triển khai. Phần **Còn phải ch
 | 10 | **Bổ nhiệm**: chọn ca đoàn (theo gợi ý, ca đoàn khác hoặc ca đoàn mới), đổi role, gán `Choir.DirectorId` | Admin | Đã làm BE (UC-46), chờ migration |
 | 11 | **Bàn giao tự động** (xem bên dưới) | Hệ thống | Đã làm BE |
 
-Đơn offline (điền giấy tại giáo xứ) được chuyển cho Admin. Admin tạo tài khoản trực tiếp như hiện nay, không cần qua bước 1. Ca trưởng của ca đoàn mà người đăng ký đã chọn được báo khi Admin duyệt, để thêm người đó vào ca đoàn ở bước 4.
+Đơn offline (điền giấy tại giáo xứ) được chuyển cho Admin. Admin tạo tài khoản trực tiếp (`POST /api/users`), không cần qua bước 1, và chọn luôn ca đoàn người đó muốn vào (`preferredChoirId`). Dù đơn online hay giấy, ca đoàn đã chọn đều thành yêu cầu vào ca đoàn chờ ca trưởng duyệt ở bước 4 — Admin không xếp thẳng.
 
 Ở bước 11, hệ thống tự làm các việc sau:
 
 - Người mới phải đăng nhập lại để nhận quyền ca trưởng (token cũ bị thu hồi).
-- Người mới rời các ca đoàn với tư cách ca viên; ca trưởng các ca đoàn đó nhận thông báo.
+- Người mới rời ca đoàn với tư cách ca viên; ca trưởng ca đoàn đó nhận thông báo. Yêu cầu / lời mời vào ca đoàn đang chờ của người đó bị huỷ.
 - Ca trưởng cũ của ca đoàn được giao nhận thông báo và vẫn giữ các ca đoàn khác của mình.
 - Buổi tập, danh sách bài và phân công của ca đoàn tự chuyển sang người mới, vì quyền đi theo `Choir.DirectorId`.
 

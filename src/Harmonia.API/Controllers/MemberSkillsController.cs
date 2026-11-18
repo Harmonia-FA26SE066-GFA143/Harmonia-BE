@@ -11,7 +11,7 @@ namespace Harmonia.API.Controllers;
 
 /// <summary>
 /// Skills declared by choir members: a member declares and tracks their own (UC-03),
-/// the Choir Director approves or rejects them (UC-19).
+/// the Choir Director approves or rejects them, several at once if needed, or records one directly (UC-19).
 /// </summary>
 [Route("api/member-skills")]
 [Authorize]
@@ -68,6 +68,20 @@ public class MemberSkillsController(IMemberSkillService memberSkillService) : Ap
     [ProducesResponseType<MemberSkillDetailDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> ApproveAsync(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await memberSkillService.ApproveAsync(User.GetUserId(), id, cancellationToken));
+
+    [HttpPost("bulk-approve")]
+    [Authorize(Roles = RoleNames.ChoirDirector)]
+    [ProducesResponseType<ApproveMemberSkillsResponse>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ApproveManyAsync(
+        [FromBody] ApproveMemberSkillsRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await memberSkillService.ApproveManyAsync(User.GetUserId(), request, cancellationToken));
+
+    [HttpPost("assign")]
+    [Authorize(Roles = RoleNames.ChoirDirector)]
+    [ProducesResponseType<MemberSkillDetailDto>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> AssignAsync(
+        [FromBody] AssignMemberSkillRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await memberSkillService.AssignAsync(User.GetUserId(), request, cancellationToken));
 
     [HttpPatch("{id:guid}/reject")]
     [Authorize(Roles = RoleNames.ChoirDirector)]

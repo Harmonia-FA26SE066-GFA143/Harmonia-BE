@@ -18,6 +18,10 @@ public class MemberRegistrationDto
 
     public string? Note { get; set; }
 
+    public Guid? PreferredChoirId { get; set; }
+
+    public string? PreferredChoirName { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     /// <summary>Rows that may be the same person under another email; a hint for the Admin, never a block.</summary>
