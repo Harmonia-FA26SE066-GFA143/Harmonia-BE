@@ -10,6 +10,9 @@ public class SongInstrumentRequirementConfiguration : IEntityTypeConfiguration<S
     {
         builder.HasIndex(x => new { x.SongId, x.SkillId }).IsUnique();
 
+        // Existing rows predate the count and meant one person.
+        builder.Property(x => x.RequiredCount).HasDefaultValue(1);
+
         builder.HasOne(x => x.Song)
             .WithMany(x => x.InstrumentRequirements)
             .HasForeignKey(x => x.SongId)

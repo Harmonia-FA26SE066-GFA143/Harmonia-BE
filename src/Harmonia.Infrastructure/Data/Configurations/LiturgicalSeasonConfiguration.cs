@@ -10,5 +10,11 @@ public class LiturgicalSeasonConfiguration : IEntityTypeConfiguration<Liturgical
     {
         builder.Property(x => x.Name).IsRequired().HasMaxLength(100);
         builder.Property(x => x.ColorHex).HasMaxLength(7);
+        builder.Property(x => x.CalendarKey).HasMaxLength(20);
+
+        // One active season per calendar key, so an event's day resolves to a single row.
+        builder.HasIndex(x => x.CalendarKey)
+            .IsUnique()
+            .HasFilter("[CalendarKey] IS NOT NULL AND [IsActive] = 1");
     }
 }

@@ -11,4 +11,6 @@ public class MassType : BaseEntity
     public bool IsActive { get; set; } = true;
 
     public ICollection<LiturgicalEvent> LiturgicalEvents { get; set; } = [];
+
+    public ICollection<MassSchedule> MassSchedules { get; set; } = [];
 }

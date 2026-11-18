@@ -1,0 +1,238 @@
+HARMONIA - TỔNG HỢP UNHAPPY CASE
+Cập nhật: 15/11/2026
+Ghi chú: (mới) = ca vừa bổ sung hoặc đổi cách xử lý trong đợt 14-15/11/2026.
+
+======================================================================
+A. CÁC CA HỆ THỐNG ĐÃ XỬ LÝ
+======================================================================
+
+----------------------------------------------------------------------
+1. TÀI KHOẢN VÀ ĐĂNG NHẬP
+----------------------------------------------------------------------
+- Sai email hoặc mật khẩu
+  -> Báo chung "sai tài khoản hoặc mật khẩu", không nói sai phần nào.
+- Đăng nhập Google bằng email chưa có tài khoản
+  -> Từ chối, không tự tạo tài khoản.
+- Tài khoản bị vô hiệu hoá vẫn cố đăng nhập
+  -> 403.
+- Lần đầu đăng nhập bằng mật khẩu Admin cấp mà chưa đổi
+  -> Chặn mọi thao tác cho đến khi đổi mật khẩu.
+- Link đặt lại mật khẩu quá 1 giờ, đã dùng, hoặc đã có link mới hơn
+  -> Báo hết hạn hoặc không hợp lệ.
+- Quên mật khẩu với email không tồn tại
+  -> Vẫn báo "đã gửi", không lộ email nào có tài khoản.
+- Đổi mật khẩu khi máy khác vẫn đang đăng nhập
+  -> Mọi phiên khác bị đăng xuất.
+- Mail gửi mật khẩu đầu tiên không tới
+  -> Người dùng tự vào bằng chức năng quên mật khẩu.
+- Người lạ spam form đăng ký gia nhập
+  -> Tối đa 5 lần / 10 phút / IP.
+- Đăng ký gia nhập bằng email đã có tài khoản
+  -> Vẫn báo thành công, không lộ thông tin.
+- (mới) Một người gửi nhiều đơn bằng email khác nhau
+  -> Đơn được gắn cờ "có thể trùng" khi trùng số điện thoại, hoặc trùng cả
+     họ tên lẫn tên thánh, với đơn khác hoặc tài khoản có sẵn.
+     Admin tự quyết, hệ thống không chặn.
+
+----------------------------------------------------------------------
+2. ADMIN QUẢN LÝ NGƯỜI DÙNG VÀ CA ĐOÀN
+----------------------------------------------------------------------
+- Admin tự hạ quyền hoặc tự khoá mình
+  -> Chặn.
+- Gỡ quyền của Admin cuối cùng
+  -> Chặn.
+- Hạ quyền hoặc khoá ca trưởng còn phụ trách ca đoàn, hay đang là ca trưởng
+  thay thế ở lễ sắp tới
+  -> Chặn, phải giao ca đoàn cho người khác trước.
+- Gán làm ca trưởng một người không phải ca trưởng đang hoạt động
+  -> Chặn.
+- Thêm ca viên hoặc sự kiện vào ca đoàn đã ngừng hoạt động
+  -> Chặn.
+- Tắt một mục danh mục đang được dùng
+  -> Chặn.
+- (mới) Tắt một kỹ năng mà còn phân công sắp tới dùng nó
+  -> Chặn (409 LOOKUP_IN_USE).
+- (mới) Sửa ngày của mùa phụng vụ làm sự kiện sắp tới rơi ra ngoài mùa
+  -> Chặn (409 LOOKUP_IN_USE).
+- (mới) Ca viên rời ca đoàn sau khi đã được phân công
+  -> Lời mời và dòng phân công ở lễ sắp tới bị gỡ, bảng đã chốt mở lại.
+     Ca trưởng phụ trách và ca trưởng thay thế nhận thông báo.
+     Ca viên vẫn phục vụ qua ca đoàn khác thì giữ nguyên.
+
+----------------------------------------------------------------------
+3. KỸ NĂNG CA VIÊN
+----------------------------------------------------------------------
+- Khai báo trùng một kỹ năng
+  -> Chặn.
+- Minh chứng sai định dạng hoặc quá dung lượng
+  -> Chặn.
+- Từ chối kỹ năng mà không ghi lý do
+  -> Bắt buộc ghi lý do.
+- Hai ca trưởng cùng duyệt một bản khai
+  -> Người thứ hai nhận "đã duyệt rồi".
+- Ca trưởng xem ca viên của ca đoàn khác
+  -> 404, như thể không tồn tại.
+- (mới) Kỹ năng đã duyệt không còn đúng (mất giọng, bỏ nhạc cụ)
+  -> Ca trưởng thu hồi, bắt buộc ghi lý do. Dòng phân công ở lễ sắp tới bị
+     gỡ; ca viên, ca trưởng phụ trách và ca trưởng thay thế nhận thông báo.
+     Ca viên khai báo lại được.
+
+----------------------------------------------------------------------
+4. SỰ KIỆN PHỤNG VỤ
+----------------------------------------------------------------------
+- Hai sự kiện cùng giờ, cùng nơi
+  -> Chặn.
+- Sửa sự kiện đã huỷ hoặc đã diễn ra
+  -> Chặn.
+- Công bố khi chưa có mùa phụng vụ hoặc chưa có ca đoàn
+  -> Chặn.
+- Ngày không thuộc mùa đã chọn
+  -> Chặn (lễ vọng được sớm hơn 1 ngày).
+- Sinh sự kiện hàng loạt quá 62 ngày, hoặc bắt đầu từ quá khứ
+  -> Chặn.
+- API lịch Công giáo bên ngoài không phản hồi
+  -> 502.
+- Ca trưởng thao tác trên sự kiện chưa gắn ca đoàn
+  -> Chỉ được xem.
+- Ca đoàn phục vụ (không phụ trách) định sửa danh sách bài hoặc phân công
+  -> 403 CHOIR_NOT_LEAD.
+- Ca trưởng ốm đột xuất
+  -> Cha xứ gán ca trưởng thay thế riêng cho từng sự kiện.
+- (mới) Sự kiện đã công bố bị đổi ngày, giờ hoặc địa điểm
+  -> Ca đoàn nhận thông báo "từ ... sang ...". Đổi ngày thì mọi câu trả lời
+     về lại "chưa trả lời" và bảng đã chốt mở lại. Người đang được phân công
+     mà bị trùng giờ ở thời điểm mới thì chặn lưu.
+- (mới) Lịch Công giáo đổi tên lễ hoặc bậc lễ sau khi đã tạo sự kiện
+  -> Kết quả đồng bộ liệt kê các sự kiện bị ảnh hưởng, cha xứ nhận thông báo.
+
+----------------------------------------------------------------------
+5. DANH SÁCH BÀI HÁT VÀ DUYỆT
+----------------------------------------------------------------------
+- Gửi duyệt khi danh sách rỗng
+  -> Chặn.
+- Sửa danh sách đã gửi duyệt hoặc phiên bản cũ
+  -> Chặn.
+- Cha xứ từ chối hoặc yêu cầu sửa mà không ghi chú
+  -> Bắt buộc ghi chú.
+- Sự kiện đã có bản được duyệt mà gửi thêm bản khác
+  -> Chặn.
+- Trùng một bài trong cùng một vị trí phụng vụ
+  -> Chặn.
+- Xoá bài hát đang được dùng
+  -> Chặn.
+- (mới) Quá hạn nộp mà chưa có bản được duyệt
+  -> Cờ "quá hạn" hiện ở danh sách sự kiện và trang chuẩn bị. Gửi duyệt trễ
+     thì cha xứ nhận thông báo "(gấp)" kèm số ngày còn lại. Vẫn bắt buộc
+     duyệt mới chốt được phân công.
+
+----------------------------------------------------------------------
+6. MỜI THAM GIA VÀ PHÂN CÔNG PHỤC VỤ
+----------------------------------------------------------------------
+- Mời trùng một ca viên
+  -> Chặn.
+- Trả lời lời mời sau khi lễ đã diễn ra
+  -> Chặn.
+- (mới) Ca viên nhận lời rồi báo bận
+  -> Được đổi câu trả lời đến trước giờ lễ 24 giờ (cấu hình được), quá hạn
+     thì chặn. Đổi sang từ chối thì dòng phân công bị gỡ, bảng đã chốt mở
+     lại, ca trưởng phụ trách và ca trưởng thay thế nhận thông báo.
+- (mới) Ca viên không trả lời lời mời
+  -> Mỗi ngày tự nhắc khi có người dùng đầu tiên đăng nhập từ 07:00, cho các
+     lễ trong 3 ngày tới. Cha xứ và ca trưởng nhắc tay được. Mỗi người không
+     bị nhắc lại trong 12 giờ.
+- Phân công người chưa xác nhận, đã từ chối, hoặc chưa được duyệt kỹ năng
+  -> Chặn.
+- Một ca viên bị xếp vào hai lễ gần giờ nhau
+  -> Chặn.
+- (mới) Hai lễ sát giờ ở hai nơi khác nhau
+  -> Cộng thêm thời gian di chuyển vào khoảng cách tối thiểu (mặc định
+     0 phút, cấu hình được).
+- (mới) Mời người đang được phân công ở lễ trùng giờ
+  -> Cho mời nhưng gắn cờ cảnh báo trùng giờ.
+- (mới) Ca viên đã rời ca đoàn vẫn nằm trong bảng phân công
+  -> Chặn chốt (404 MEMBER_NOT_FOUND).
+- Chốt phân công khi danh sách bài chưa duyệt, hoặc chưa khai báo nhân sự cần
+  -> Chặn.
+- Thiếu người cho một bè hoặc nhạc cụ
+  -> Hiện cảnh báo thiếu người.
+- Sửa phân công đã chốt; gửi thông báo khi chưa chốt
+  -> Chặn.
+
+----------------------------------------------------------------------
+7. BUỔI TẬP VÀ ĐIỂM DANH
+----------------------------------------------------------------------
+- Giờ kết thúc sớm hơn giờ bắt đầu
+  -> Chặn.
+- Phòng tập trùng giờ với buổi tập khác
+  -> Chặn.
+- (mới) Buổi tập trùng giờ với lễ mà ca viên đang được phân công
+  -> Tạo hoặc sửa buổi tập vẫn lưu được, nhưng response liệt kê những người
+     bị trùng. Lúc phân công, người đó bị gắn cờ, và gợi ý tự động bỏ họ khỏi
+     danh sách ứng viên. Buổi tập ngay trước chính lễ đó không tính là trùng.
+- Điểm danh trước giờ tập, hoặc điểm danh trùng
+  -> Chặn.
+- Xoá buổi tập đã có điểm danh
+  -> Chặn.
+- File ghi âm sai định dạng hoặc lớn hơn 20 MB
+  -> Chặn.
+
+----------------------------------------------------------------------
+8. BÀI TẬP VÀ BẢN THU
+----------------------------------------------------------------------
+- Nộp sau hạn; nộp lại bài đã đạt
+  -> Chặn.
+- Bài quá hạn
+  -> Tự hiện "quá hạn", tính lúc đọc nên không cần job.
+- Chấm một bản thu cũ
+  -> Chặn, phải chấm bản mới nhất.
+- Hai thiết bị cùng nộp một lúc
+  -> Báo xung đột.
+- Bản thu hỏng; bài tập chưa có bản mẫu MIDI
+  -> 422.
+
+----------------------------------------------------------------------
+9. THƯ VIỆN NHẠC
+----------------------------------------------------------------------
+- File sai định dạng hoặc quá 20 MB; MIDI / MusicXML hỏng
+  -> Chặn / 422.
+- Lời Karaoke chồng mốc hoặc vượt độ dài audio
+  -> Chặn.
+- Server khởi động lại giữa lúc AI đang trích lời
+  -> Lượt trích báo gián đoạn, thử lại được.
+- Mất mạng sau khi file đã lên Cloudinary
+  -> File rác được xoá lại.
+- Gemini, Cloudinary hoặc Brevo không phản hồi
+  -> 502.
+
+----------------------------------------------------------------------
+10. ĐỀ CỬ VÀ ĐÀO TẠO CA TRƯỞNG
+----------------------------------------------------------------------
+- Đề cử người đang có đề cử chưa xong; thao tác sai trạng thái
+  -> Chặn.
+- Thêm khoá học khi khoá trước chưa có kết quả; sửa khoá đã có kết quả
+  -> Chặn.
+- Đổi ca trưởng giữa chừng
+  -> Ca trưởng mới tự thấy danh sách bài, bài tập và phân công cũ.
+
+----------------------------------------------------------------------
+11. HẠ TẦNG
+----------------------------------------------------------------------
+- DB Azure miễn phí đang tạm dừng hoặc hết hạn mức
+  -> 500 INTERNAL_ERROR, không lộ chi tiết.
+- Access token hết hạn
+  -> Tự xoay refresh token; token cũ dùng lại thì bị từ chối.
+- (mới) App không có Always On
+  -> Nhắc tự động chạy khi có request đầu tiên trong ngày, không phụ thuộc
+     giờ hẹn.
+
+======================================================================
+B. CÒN HỞ
+======================================================================
+- Ngày không ai đăng nhập
+  -> Ngày đó không có nhắc tự động; giờ nhắc phụ thuộc người vào đầu tiên.
+- Lễ đêm qua ngày (23:30 và 00:30 hôm sau)
+  -> Không bị coi là trùng giờ, vì chỉ so các lễ cùng ngày.
+- Mobile mất mạng giữa lúc upload
+  -> Việc thử lại upload là của FE, backend chưa kiểm.
+- Trùng tên mà không có tên thánh hoặc số điện thoại
+  -> Không gắn cờ trùng, Admin phải tự dò.

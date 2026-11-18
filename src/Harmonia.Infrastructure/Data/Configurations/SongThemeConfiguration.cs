@@ -12,5 +12,11 @@ public class SongThemeConfiguration : IEntityTypeConfiguration<SongTheme>
         builder.Property(x => x.Description).HasMaxLength(300);
 
         builder.HasIndex(x => x.Name).IsUnique();
+
+        // Restrict: themes are switched off, never deleted, so a parent with children must not vanish.
+        builder.HasOne(x => x.Parent)
+            .WithMany(x => x.Children)
+            .HasForeignKey(x => x.ParentId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

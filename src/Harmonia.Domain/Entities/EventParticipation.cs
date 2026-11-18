@@ -17,6 +17,9 @@ public class EventParticipation : BaseEntity
 
     public string? Note { get; set; }
 
+    /// <summary>When the member was last reminded to answer, by hand or by the daily job; spaces reminders apart.</summary>
+    public DateTime? LastReminderAt { get; set; }
+
     public LiturgicalEvent LiturgicalEvent { get; set; } = null!;
 
     public MemberProfile Member { get; set; } = null!;

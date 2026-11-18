@@ -26,5 +26,10 @@ public class PracticeAssignmentConfiguration : IEntityTypeConfiguration<Practice
             .WithMany()
             .HasForeignKey(x => x.MaterialId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasOne(x => x.Choir)
+            .WithMany(x => x.PracticeAssignments)
+            .HasForeignKey(x => x.ChoirId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

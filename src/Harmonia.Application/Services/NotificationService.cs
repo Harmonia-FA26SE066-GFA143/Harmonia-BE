@@ -44,9 +44,9 @@ public class NotificationService(
     }
 
     public async Task<Result<PagedList<NotificationDto>>> GetForUserAsync(
-        Guid userId, PagingRequest paging, CancellationToken cancellationToken)
+        Guid userId, bool? isRead, PagingRequest paging, CancellationToken cancellationToken)
     {
-        var page = await notificationRepository.GetForUserAsync(userId, paging, cancellationToken);
+        var page = await notificationRepository.GetForUserAsync(userId, isRead, paging, cancellationToken);
 
         return Result<PagedList<NotificationDto>>.Success(new PagedList<NotificationDto>(
             mapper.Map<List<NotificationDto>>(page.Items), page.PageNumber, page.PageSize, page.TotalCount));
@@ -71,6 +71,12 @@ public class NotificationService(
             await notificationRepository.SaveChangesAsync(cancellationToken);
         }
 
+        return Result.Success();
+    }
+
+    public async Task<Result> MarkAllAsReadAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        await notificationRepository.MarkAllAsReadAsync(userId, DateTime.UtcNow, cancellationToken);
         return Result.Success();
     }
 }

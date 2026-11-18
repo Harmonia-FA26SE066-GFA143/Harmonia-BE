@@ -5,36 +5,44 @@
 | cha xứ / ban phụng vụ | `ParishPriest` |
 | ca trưởng | `ChoirDirector` — KHÔNG dùng `ChoirLeader` |
 | ca viên | `ChoirMember` (role) · `MemberProfile` (hồ sơ) |
+| đăng ký gia nhập (đơn online từ trang chính) | `MemberRegistration` |
 | nhạc công | KHÔNG có role riêng — là `ChoirMember` có `MemberSkill` thuộc `SkillCategory` nhạc cụ |
-| tuần phụng vụ | `LiturgicalWeek` |
+| ngày phụng vụ (cache lịch Công giáo từ API ngoài) | `LiturgicalDay` — KHÔNG còn `LiturgicalWeek`, lịch lên theo ngày (D6) |
 | sự kiện / thánh lễ | `LiturgicalEvent` — KHÔNG dùng `Event` (trùng từ khoá C#) |
 | mùa phụng vụ | `LiturgicalSeason` — KHÔNG dùng `Season` |
 | loại thánh lễ | `MassType` |
 | nghi thức (hôn phối, an táng...) | `CeremonyType` |
 | nơi cử hành | `WorshipLocation` |
+| giờ lễ cố định của giáo xứ | `MassSchedule` |
 | vị trí bài trong lễ | `LiturgicalSlot` |
+| ca đoàn | `Choir` · thành viên ca đoàn `ChoirMembership` · ca đoàn phục vụ sự kiện `LiturgicalEventChoir` |
+| yêu cầu vào / chuyển ca đoàn, lời mời của ca trưởng | `ChoirJoinRequest` (cờ `IsInvitation`) + enum `ChoirJoinRequestStatus` |
 | bài hát | `Song` |
 | tư liệu bài hát (bản nhạc, lời, audio mẫu) | `MusicMaterial` + enum `MaterialType` |
+| lời có mốc thời gian (Karaoke) | `TimedLyrics` · một dòng `TimedLyricLine` (value object) |
 | danh sách bài hát | `SongList` — mỗi phiên bản một dòng |
 | bài trong danh sách | `SongListItem` |
 | cha xứ duyệt danh sách | `SongListReview` |
 | yêu cầu nhân sự cho bài | `SongPersonnelRequirement` |
 | phân công phục vụ | `ServiceRoster` (cả bảng) · `RosterAssignment` (một dòng phân công) |
+| đề cử ca trưởng | `DirectorNomination` · khoá học ca trưởng `DirectorTraining` |
 | xác nhận tham gia | `EventParticipation` |
 | buổi tập | `Rehearsal` |
 | điểm danh | `RehearsalAttendance` |
+| bài hát của buổi tập | `RehearsalSong` — KHÔNG phải `SongList` (không phiên bản, không duyệt) |
+| bản thu buổi tập (ca trưởng ghi ở phòng tập) | `RehearsalRecording` — KHÔNG phải `PracticeSubmission` (bản thu ca viên nộp bài) |
 | bài tập về nhà | `PracticeAssignment` |
 | bản thu nộp | `PracticeSubmission` |
 | nhận xét của ca trưởng | `PracticeFeedback` |
 | thông báo | `Notification` + `NotificationRecipient` |
 | kỹ năng | `Skill` · nhóm `SkillCategory` · kỹ năng của ca viên `MemberSkill` |
 
-**Hệ thống phục vụ MỘT ca đoàn.** Không có entity `Choir`, không có `ChoirId` ở đâu cả.
+**Nhiều ca đoàn (D7, chốt 2026-10-17):** sự kiện có nhiều `Choir` qua `LiturgicalEventChoir`. **Mỗi ca viên ở tối đa một `Choir` đang hoạt động** (D9, chốt 2026-11-18, thay nửa "ca viên nhiều ca đoàn" của D7): ca viên tự xin vào / xin chuyển, ca trưởng mời — đều qua `ChoirJoinRequest` chờ bên kia đồng ý; Admin xếp thẳng được; ca viên tự rời không cần duyệt; ca viên chưa ở ca đoàn nào là "rổ chung" mọi ca trưởng thấy. Mỗi `Choir` có **một** ca trưởng (`Choir.DirectorId`, Admin gán); một `ChoirDirector` phụ trách được nhiều ca đoàn và chỉ quản lý ca đoàn của mình — ca đoàn của người khác trả 404 (D8, chốt 2026-10-25). Sự kiện nhiều ca đoàn do **ca đoàn phụ trách** (`LiturgicalEventChoir.IsLead`, cha xứ chọn) lập danh sách bài, mời và phân công; ca đoàn phục vụ khác chỉ xem. Mọi service kiểm phạm vi qua `IChoirScopeService`; buổi tập / bài tập chưa gắn ca đoàn thì ca trưởng nào cũng quản lý được. Sự kiện bắt buộc có ca đoàn khi tạo tay và khi công bố; sự kiện chưa gắn ca đoàn thì ca trưởng chỉ xem, không lập danh sách bài, mời hay phân công (chốt 2026-11-05).
 
 `LiturgicalEvent` là entity trung tâm — lịch tập, danh sách bài hát, phân công phục vụ
 và xác nhận tham gia đều móc vào nó. Ba hub còn lại: `MemberProfile`, `Song`, `Skill`.
 
-Nguồn chuẩn đầy đủ 42 entity + 21 enum: `doc/harmonia-domain-entity-list.md`.
+Nguồn chuẩn đầy đủ 58 entity + 30 enum: `docs/harmonia-domain-entity-list.md`.
 Bảng trên chỉ là lối vào nhanh. Gặp thuật ngữ chưa có ở cả hai chỗ: hỏi, đừng tự dịch.
 
 ## Quy ước tên khác
@@ -43,6 +51,7 @@ Bảng trên chỉ là lối vào nhanh. Gặp thuật ngữ chưa có ở cả 
   Ngoại lệ: method có chữ ký do framework quy định (middleware `InvokeAsync`, filter,
   `Hub`, `BackgroundService`) không thêm được token. Lấy token từ `HttpContext.RequestAborted`
   hoặc `stoppingToken` rồi truyền xuống các lời gọi bên trong.
+  Trong `test/`: token lấy từ `TestContext.Current.CancellationToken` (chi tiết ở `02-naming.md`).
 
 - Interface repository: `I<Entity>Repository` — `ISongListRepository`, kế thừa
   `IGenericRepository<Entity>`. CRUD đơn giản thì inject thẳng `IGenericRepository<T>`.

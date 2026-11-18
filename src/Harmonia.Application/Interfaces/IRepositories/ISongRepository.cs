@@ -1,0 +1,65 @@
+using Harmonia.Application.Common.Models;
+using Harmonia.Application.DTOs;
+using Harmonia.Domain.Entities;
+using Harmonia.Domain.Enums;
+
+namespace Harmonia.Application.Interfaces.IRepositories;
+
+public interface ISongRepository : IGenericRepository<Song>
+{
+    /// <summary>
+    /// One page of active songs ordered by title. <paramref name="keyword"/> matches title,
+    /// composer, lyricist or the text of an active lyrics material; null returns every active song. The classification ids of
+    /// <paramref name="filter"/> narrow the result further when set.
+    /// </summary>
+    Task<PagedList<Song>> SearchAsync(string? keyword, SearchSongsRequest filter, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Read-only active songs matching at least one of the event's season, Mass type, ceremony type or the slot, with
+    /// which ones they match. A song classified only under other seasons, or only under other slots, is left out: it
+    /// was put there on purpose (a Christmas carol in Lent, an entrance hymn at communion). A null id matches nothing.
+    /// The Has* flags say whether the song is classified on that dimension at all (any season, any Mass or ceremony type, any slot).
+    /// </summary>
+    Task<List<(Song Song, bool MatchesSeason, bool MatchesEventType, bool MatchesSlot, bool HasSeason, bool HasEventType, bool HasSlot)>> GetSuggestionMatchesAsync(
+        Guid? liturgicalSeasonId, Guid? massTypeId, Guid? ceremonyTypeId, Guid? slotId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// True if another active song has the same title and composer (a null composer matches only null).
+    /// Deleted songs are ignored, so a deleted title can be created again.
+    /// </summary>
+    Task<bool> ExistsByTitleAsync(string title, string? composer, Guid? excludeSongId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// <see cref="SongStats"/> of the given songs keyed by id, usage counted before <paramref name="today"/>.
+    /// Ids that do not exist are absent.
+    /// </summary>
+    Task<Dictionary<Guid, SongStats>> GetStatsAsync(
+        IReadOnlyCollection<Guid> ids, DateOnly today, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// True when a song list (any version or status), a rehearsal programme or a practice assignment holds the song,
+    /// so deleting it would leave a reference to an inactive song behind.
+    /// </summary>
+    Task<bool> IsInUseAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Tracked song with its classifications and vocal / instrument requirements (each with its Skill).</summary>
+    Task<Song?> GetWithClassificationAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Name and active state of the given ids in the lookup table <paramref name="targetType"/> points at.
+    /// Ids that do not exist are simply missing from the result.
+    /// </summary>
+    Task<Dictionary<Guid, (string Name, bool IsActive)>> GetClassificationTargetsAsync(
+        ClassificationTarget targetType, IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken);
+
+    /// <summary>Tracked skills keyed by id. Missing ids are absent from the result.</summary>
+    Task<Dictionary<Guid, Skill>> GetSkillsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// One page of songs with the number of Published events before <paramref name="today"/> whose Approved
+    /// song list holds them, narrowed by the event, season and date range of <paramref name="filter"/>; most used
+    /// first, then by title. Active songs are listed even at zero uses; deleted songs only when they were used.
+    /// </summary>
+    Task<PagedList<(Song Song, int TimesUsed, DateOnly? LastUsedDate)>> GetUsageAsync(
+        SearchReportsRequest filter, DateOnly today, CancellationToken cancellationToken);
+}
