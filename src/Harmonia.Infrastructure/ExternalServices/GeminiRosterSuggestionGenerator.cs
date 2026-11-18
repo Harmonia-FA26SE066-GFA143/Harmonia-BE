@@ -13,7 +13,7 @@ namespace Harmonia.Infrastructure.ExternalServices;
 public class GeminiRosterSuggestionGenerator(
     HttpClient httpClient, IOptions<GeminiOptions> options, ILogger<GeminiRosterSuggestionGenerator> logger) : IRosterSuggestionGenerator
 {
-    // String enums so the model reads "Advanced" rather than 2.
+    // String enums so the model would read names rather than numbers, should an enum be sent.
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
 
     private const string Instructions =
@@ -24,8 +24,7 @@ public class GeminiRosterSuggestionGenerator(
         Choral parts are never slots: everyone sings them.
         Rules:
         - Pick at most neededCount members per slot, only from that slot's candidates, no repeats in a slot.
-        - Prefer a higher level (Advanced > Intermediate > Beginner > null).
-        - Among similar levels prefer a lower recentServiceCount, to spread the load fairly.
+        - Prefer a lower recentServiceCount, to spread the load fairly.
         - Spread song slots across members: avoid giving one member several song slots while another candidate has none.
         - A member chosen for a whole-service slot is busy all event; give them a song slot only when nobody else can take it.
         Return one entry per slot with the chosen memberCodes.

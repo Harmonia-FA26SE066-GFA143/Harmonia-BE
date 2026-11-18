@@ -218,7 +218,6 @@ erDiagram
         Guid Id PK
         Guid MemberId FK "UK1 khi Status khac Rejected"
         Guid SkillId FK "UK1 khi Status khac Rejected"
-        SkillLevel Level "null"
         ApprovalStatus Status
         DateTime DeclaredAt
         Guid ApprovedBy FK "null"

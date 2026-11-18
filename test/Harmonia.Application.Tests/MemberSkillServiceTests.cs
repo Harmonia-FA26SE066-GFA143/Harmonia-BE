@@ -49,11 +49,11 @@ public class MemberSkillServiceTests
         _memberSkills.GetWithSkillAsync(Arg.Any<Guid>(), _ct).Returns(call => new MemberSkill
         {
             Id = call.Arg<Guid>(), MemberId = _member.Id, SkillId = _tenor.Id, Skill = _tenor,
-            Level = SkillLevel.Intermediate, Status = ApprovalStatus.Pending, DeclaredAt = DateTime.UtcNow,
+            Status = ApprovalStatus.Pending, DeclaredAt = DateTime.UtcNow,
         });
     }
 
-    private DeclareMemberSkillRequest NewRequest() => new() { SkillId = _tenor.Id, Level = SkillLevel.Intermediate };
+    private DeclareMemberSkillRequest NewRequest() => new() { SkillId = _tenor.Id };
 
     [Fact]
     public async Task Declare_NewSkill_AddsPendingRowForCaller_Async()
@@ -66,7 +66,7 @@ public class MemberSkillServiceTests
         Assert.Equal("Vocal", result.Value.CategoryName);
         await _memberSkills.Received(1).TryAddAsync(
             Arg.Is<MemberSkill>(x => x.MemberId == _member.Id && x.SkillId == _tenor.Id
-                && x.Status == ApprovalStatus.Pending && x.Level == SkillLevel.Intermediate
+                && x.Status == ApprovalStatus.Pending
                 && x.ApprovedBy == null && x.RejectReason == null),
             _ct);
     }

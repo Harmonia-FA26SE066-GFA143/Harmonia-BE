@@ -7,7 +7,6 @@ public class DeclareMemberSkillRequestValidator : AbstractValidator<DeclareMembe
 {
     public DeclareMemberSkillRequestValidator()
     {
-        RuleFor(x => x.SkillId).NotEmpty();
-        RuleFor(x => x.Level).IsInEnum();
+        RuleFor(x => x.SkillId).NotEmpty();
     }
 }

@@ -64,14 +64,14 @@ public class RosterServiceTests
         _repository.GetApprovedSongListAsync(_event.Id, _ct).Returns(_songList);
         _repository.GetCandidateSkillsAsync(_event.Id, Arg.Any<IReadOnlyCollection<Guid>>(), _ct).Returns(
         [
-            new MemberSkill { MemberId = _an, SkillId = _soprano.Id, Level = SkillLevel.Beginner },
-            new MemberSkill { MemberId = _binh, SkillId = _soprano.Id, Level = SkillLevel.Advanced },
-            new MemberSkill { MemberId = _chi, SkillId = _soprano.Id, Level = SkillLevel.Advanced },
-            new MemberSkill { MemberId = _an, SkillId = _guitar.Id, Level = SkillLevel.Intermediate },
+            new MemberSkill { MemberId = _an, SkillId = _soprano.Id },
+            new MemberSkill { MemberId = _binh, SkillId = _soprano.Id },
+            new MemberSkill { MemberId = _chi, SkillId = _soprano.Id },
+            new MemberSkill { MemberId = _an, SkillId = _guitar.Id },
         ]);
-        // Chi served more recently than Binh, so the rules prefer Binh among the two Advanced sopranos.
+        // Binh served least, then Chi, then An, so the rules rank the sopranos Binh, Chi, An.
         _repository.CountRecentServicesAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), _ct)
-            .Returns(new Dictionary<Guid, int> { [_chi] = 3, [_binh] = 1 });
+            .Returns(new Dictionary<Guid, int> { [_an] = 5, [_chi] = 3, [_binh] = 1 });
         _repository.GetAssignmentsAsync(Arg.Any<Guid>(), _ct).Returns([]);
         _repository.GetMembersServingNearAsync(default!, default, default, default, default, default, default, default, default)
             .ReturnsForAnyArgs(new List<Guid>());
@@ -106,8 +106,8 @@ public class RosterServiceTests
         return _event.ServiceRoster;
     }
 
-    private static string CodeOf(List<RosterSlotInput> slots, string skillName, SkillLevel level, int recent) =>
-        slots.First(s => s.SkillName == skillName).Candidates.First(c => c.Level == level && c.RecentServiceCount == recent).MemberCode;
+    private static string CodeOf(List<RosterSlotInput> slots, string skillName, int recent) =>
+        slots.First(s => s.SkillName == skillName).Candidates.First(c => c.RecentServiceCount == recent).MemberCode;
 
     private Task<Result<RosterSuggestionResponse>> SuggestAsync() =>
         _sut.SuggestAsync(new SuggestServiceRosterRequest { EventId = _event.Id }, _ct);
@@ -119,8 +119,8 @@ public class RosterServiceTests
         // AI deliberately picks Chi over Binh; a valid choice must be kept as is.
         AiReturns(slots =>
         [
-            new() { SlotCode = "S1", MemberCodes = [CodeOf(slots, "Soprano", SkillLevel.Advanced, 3), CodeOf(slots, "Soprano", SkillLevel.Beginner, 0)] },
-            new() { SlotCode = "S2", MemberCodes = [CodeOf(slots, "Guitar", SkillLevel.Intermediate, 0)] },
+            new() { SlotCode = "S1", MemberCodes = [CodeOf(slots, "Soprano", 3), CodeOf(slots, "Soprano", 5)] },
+            new() { SlotCode = "S2", MemberCodes = [CodeOf(slots, "Guitar", 5)] },
         ]);
 
         var result = await SuggestAsync();
@@ -155,10 +155,10 @@ public class RosterServiceTests
         AiReturns(slots =>
         [
             // Unknown code and a repeat in the soprano slot.
-            new() { SlotCode = "S1", MemberCodes = ["M99", CodeOf(slots, "Soprano", SkillLevel.Beginner, 0), CodeOf(slots, "Soprano", SkillLevel.Beginner, 0)] },
+            new() { SlotCode = "S1", MemberCodes = ["M99", CodeOf(slots, "Soprano", 5), CodeOf(slots, "Soprano", 5)] },
             // Chi does not play guitar, and the guitar slot needs only one person.
-            new() { SlotCode = "S2", MemberCodes = [CodeOf(slots, "Soprano", SkillLevel.Advanced, 3), CodeOf(slots, "Guitar", SkillLevel.Intermediate, 0), "M1", "M2"] },
-            new() { SlotCode = "S9", MemberCodes = [CodeOf(slots, "Soprano", SkillLevel.Advanced, 1)] },
+            new() { SlotCode = "S2", MemberCodes = [CodeOf(slots, "Soprano", 3), CodeOf(slots, "Guitar", 5), "M1", "M2"] },
+            new() { SlotCode = "S9", MemberCodes = [CodeOf(slots, "Soprano", 1)] },
         ]);
 
         var result = await SuggestAsync();
@@ -1000,8 +1000,8 @@ public class RosterServiceTests
         EventNeedsGuitar();
         _repository.GetCandidateSkillsAsync(_event.Id, Arg.Any<IReadOnlyCollection<Guid>>(), _ct).Returns(
         [
-            new MemberSkill { MemberId = _an, SkillId = _guitar.Id, Level = SkillLevel.Advanced },
-            new MemberSkill { MemberId = _binh, SkillId = _guitar.Id, Level = SkillLevel.Beginner },
+            new MemberSkill { MemberId = _an, SkillId = _guitar.Id },
+            new MemberSkill { MemberId = _binh, SkillId = _guitar.Id },
         ]);
         // Added by hand before the whole-service guitar was required.
         roster.Assignments.Add(new RosterAssignment
@@ -1026,7 +1026,7 @@ public class RosterServiceTests
 
         await SuggestAsync();
 
-        // Binh and Chi already sing the entrance, so the offertory goes to An despite a lower level.
+        // Binh and Chi already sing the entrance, so the offertory goes to An despite more recent services.
         Assert.Equal(_an, Assert.Single(roster.Assignments, x => x.SongListItemId == offertory.Id).MemberId);
     }
 
@@ -1164,15 +1164,15 @@ public class RosterServiceTests
         _entrance.PersonnelRequirements.Single(x => x.SkillId == _guitar.Id).RequiredCount = 2;
         _repository.GetCandidateSkillsAsync(_event.Id, Arg.Any<IReadOnlyCollection<Guid>>(), _ct).Returns(
         [
-            new MemberSkill { MemberId = _an, SkillId = _guitar.Id, Level = SkillLevel.Advanced },
-            new MemberSkill { MemberId = _binh, SkillId = _guitar.Id, Level = SkillLevel.Beginner },
+            new MemberSkill { MemberId = _an, SkillId = _guitar.Id },
+            new MemberSkill { MemberId = _binh, SkillId = _guitar.Id },
         ]);
 
         var result = await SuggestAsync();
 
-        // An plays guitar for the whole service; the song's second guitar must be someone else.
-        Assert.Equal(_an, Assert.Single(roster.Assignments, x => x.SkillId == _guitar.Id && x.SongListItemId == null).MemberId);
-        Assert.Equal(_binh, Assert.Single(roster.Assignments, x => x.SkillId == _guitar.Id && x.SongListItemId == _entrance.Id).MemberId);
+        // Binh (fewer recent services) plays guitar for the whole service; the song's second guitar must be someone else.
+        Assert.Equal(_binh, Assert.Single(roster.Assignments, x => x.SkillId == _guitar.Id && x.SongListItemId == null).MemberId);
+        Assert.Equal(_an, Assert.Single(roster.Assignments, x => x.SkillId == _guitar.Id && x.SongListItemId == _entrance.Id).MemberId);
         Assert.DoesNotContain(result.Value!.Shortages, x => x.SkillId == _guitar.Id);
     }
 

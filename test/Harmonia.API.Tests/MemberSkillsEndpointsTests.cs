@@ -44,13 +44,12 @@ public class MemberSkillsEndpointsTests(HarmoniaApiFactory factory) : IClassFixt
         var member = await CreateMemberClientAsync("ms-declare@test.com", _ct);
         var tenor = await AddSkillAsync("ms-Tenor", cancellationToken: _ct);
 
-        var post = await member.PostAsJsonAsync("api/member-skills", new { skillId = tenor.Id, level = "Intermediate" }, _ct);
+        var post = await member.PostAsJsonAsync("api/member-skills", new { skillId = tenor.Id }, _ct);
         var mine = (await member.GetFromJsonAsync<Page>("api/member-skills/mine", TestJson.Options, _ct))!;
 
         Assert.Equal(HttpStatusCode.OK, post.StatusCode);
         var declared = (await post.Content.ReadFromJsonAsync<MemberSkillDto>(TestJson.Options, _ct))!;
         Assert.Equal(ApprovalStatus.Pending, declared.Status);
-        Assert.Equal(SkillLevel.Intermediate, declared.Level);
         Assert.Equal("ms-Tenor", declared.SkillName);
         Assert.Equal(declared.Id, Assert.Single(mine.Items).Id);
     }

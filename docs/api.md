@@ -354,12 +354,12 @@ Hồ sơ đó chuyển sang `Inactive` và rời mọi ca đoàn, nên không c�
   "roleName": "ChoirMember",
   "choirs": [{ "id": "guid", "name": "Ca đoàn Cecilia" }],
   "approvedSkills": [
-    { "id": "guid", "skillId": "guid", "skillName": "Tenor", "categoryId": "guid", "categoryName": "Vocal", "level": "Intermediate" }
+    { "id": "guid", "skillId": "guid", "skillName": "Tenor", "categoryId": "guid", "categoryName": "Vocal" }
   ]
 }
 ```
 
-`approvedSkills` chỉ gồm kỹ năng **đã duyệt** và skill đang hoạt động; `level` có thể `null`. `id` là id của `MemberSkill`
+`approvedSkills` chỉ gồm kỹ năng **đã duyệt** và skill đang hoạt động. `id` là id của `MemberSkill`
 (dùng cho `PATCH /api/member-skills/{id}/revoke`), `skillId` là id kỹ năng trong danh mục.
 Chưa có kỹ năng nào → `[]`.
 
@@ -429,7 +429,6 @@ ca đoàn của ca trưởng — dùng để chọn người mời); ca trưởn
   "skillName": "Tenor",
   "categoryId": "guid",
   "categoryName": "Vocal",
-  "level": "Intermediate",
   "status": "Pending",
   "declaredAt": "2026-10-05T08:00:00Z",
   "approvedAt": null,
@@ -446,21 +445,21 @@ ca đoàn của ca trưởng — dùng để chọn người mời); ca trưởn
 }
 ```
 
-`level`: `Beginner` | `Intermediate` | `Advanced` | `null`. `status`: `Pending` | `Approved` | `Rejected` | `Revoked` (đã duyệt rồi bị ca trưởng thu hồi; `revokedAt`, `revokeReason` có
+`status`: `Pending` | `Approved` | `Rejected` | `Revoked` (đã duyệt rồi bị ca trưởng thu hồi; `revokedAt`, `revokeReason` có
 giá trị). Bản `Rejected` hoặc `Revoked` là lịch sử: ca viên khai báo lại cùng kỹ năng được.
 `approvedAt` là lúc ca trưởng duyệt **hoặc** từ chối; `rejectReason` chỉ có khi `Rejected`.
 `evidence` là `null` khi chưa gửi minh chứng; `type`: `Voice` | `Clip`. `url` là link ký có hạn, hết hạn thì gọi lại API để lấy link mới.
 
 | Method | Route | Role | Body / Query | Thành công | Lỗi |
 |---|---|---|---|---|---|
-| POST | `/api/member-skills` | `ChoirMember` | `{ "skillId", "level" }` | 200 `MemberSkillDto` | 400 `VALIDATION_FAILED` · 404 `MEMBER_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `MEMBER_NOT_ACTIVE`, `SKILL_INACTIVE`, `MEMBER_SKILL_ALREADY_DECLARED` |
+| POST | `/api/member-skills` | `ChoirMember` | `{ "skillId" }` | 200 `MemberSkillDto` | 400 `VALIDATION_FAILED` · 404 `MEMBER_NOT_FOUND`, `SKILL_NOT_FOUND` · 409 `MEMBER_NOT_ACTIVE`, `SKILL_INACTIVE`, `MEMBER_SKILL_ALREADY_DECLARED` |
 | GET | `/api/member-skills/mine` | `ChoirMember` | query `status`, `pageNumber`, `pageSize` | 200 `PagedList<MemberSkillDto>` | 404 `MEMBER_NOT_FOUND` |
 | GET | `/api/member-skills/{id}` | `ChoirMember` | — | 200 `MemberSkillDto` | 404 `MEMBER_NOT_FOUND`, `MEMBER_SKILL_NOT_FOUND` |
 | PUT | `/api/member-skills/{id}/evidence` | `ChoirMember` | multipart `file` | 200 `MemberSkillDto` | 400 `MEMBER_SKILL_EVIDENCE_REQUIRED`, `MEMBER_SKILL_EVIDENCE_TYPE_NOT_ALLOWED` · 404 `MEMBER_NOT_FOUND`, `MEMBER_SKILL_NOT_FOUND` · 409 `MEMBER_NOT_ACTIVE`, `MEMBER_SKILL_ALREADY_REVIEWED` · 413 `MEMBER_SKILL_EVIDENCE_TOO_LARGE` · 502 `EXTERNAL_STORAGE_FAILED` |
 
 - Minh chứng: mỗi bản khai **một file**, ghi âm `.mp3`, `.m4a`, `.wav` tối đa 20 MB hoặc clip `.mp4`, `.mov` tối đa 100 MB. Chỉ gửi được khi bản khai còn `Pending` của chính mình; gửi lại sẽ thay file cũ. Không bắt buộc để được duyệt.
 - Ca viên luôn khai cho **chính mình** — không có `memberId` trong body. Kỹ năng mới vào trạng thái `Pending`.
-- `skillId` bắt buộc, lấy từ `GET /api/lookups/skills`. `level` tuỳ chọn.
+- `skillId` bắt buộc, lấy từ `GET /api/lookups/skills`.
 - Skill bị tắt, hoặc thuộc nhóm kỹ năng bị tắt → 409 `SKILL_INACTIVE`. Ca viên `Inactive` / `Left` → 409 `MEMBER_NOT_ACTIVE`.
 - Đã có bản khai `Pending` hoặc `Approved` cho skill đó → 409 `MEMBER_SKILL_ALREADY_DECLARED`.
 - `status` (tuỳ chọn): `Pending` | `Approved` | `Rejected` | `Revoked` — bỏ trống thì trả mọi trạng thái.
@@ -1890,12 +1889,12 @@ Role `ParishPriest`, `ChoirDirector`. 200 `PagedList<SongSuggestionResponse>` ·
 - Ca viên đang có dòng `Active` ở lễ khác (chưa huỷ) cùng ngày, bắt đầu cách nhau ít hơn `Roster.EventOverlapMinutes`
   phút, bị bỏ khỏi ứng viên; thêm / thay tay người đó trả 409 `ROSTER_MEMBER_TIME_CONFLICT`. Chỉ so lễ cùng ngày; khi chốt
   không kiểm lại.
-- AI (Gemini) chọn trong ứng viên, ưu tiên level cao và người ít phục vụ trong 60 ngày gần nhất. Server
+- AI (Gemini) chọn trong ứng viên, ưu tiên người ít phục vụ trong 60 ngày gần nhất. Server
   kiểm lại mọi lựa chọn của AI, rồi tự bù chỗ còn trống theo cùng tiêu chí. AI lỗi hoặc quá 20 giây thì
   phần bù lo toàn bộ và `isAiGenerated = false`. Endpoint không trả lỗi vì AI.
 - AI được biết ô nào là cả buổi lễ (`isWholeService`) và được dặn rải đều, tránh giao thêm bài cho người đã giữ vai cả lễ.
 - Một ca viên có thể phục vụ nhiều bài, và nhiều skill trong cùng một bài. Phần bù theo luật **rải đều**: ưu tiên người
-  đang giữ ít dòng nhất trong lần gợi ý này, cùng số dòng thì theo level / số lần phục vụ gần đây. Yêu cầu cả buổi lễ
+  đang giữ ít dòng nhất trong lần gợi ý này, cùng số dòng thì theo số lần phục vụ gần đây. Yêu cầu cả buổi lễ
   được xếp trước, nên organist ít khi bị giao thêm solo.
 - Gọi lại được nhiều lần cho tới khi chốt: dòng `source = Suggested` cũ bị thay; dòng `Manual` (ca trưởng sửa
   tay) **được giữ** và tính là đã có người, nên chỉ gợi ý thêm cho phần còn thiếu.

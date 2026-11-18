@@ -49,7 +49,6 @@ public class MemberSkillService(
             Id = Guid.NewGuid(),
             MemberId = member.Id,
             SkillId = skill.Id,
-            Level = request.Level,
             Status = ApprovalStatus.Pending,
             DeclaredAt = DateTime.UtcNow
         };

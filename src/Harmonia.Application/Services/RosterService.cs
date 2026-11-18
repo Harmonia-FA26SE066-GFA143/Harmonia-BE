@@ -19,7 +19,7 @@ public class RosterService(
     IRehearsalRepository rehearsalRepository,
     IMapper mapper) : IRosterService
 {
-    private sealed record Candidate(Guid MemberId, SkillLevel? Level, int RecentServiceCount);
+    private sealed record Candidate(Guid MemberId, int RecentServiceCount);
 
     /// <summary>One requirement of the event: Item is null for a whole-service one (organist, conductor...).</summary>
     private sealed record Need(SongListItem? Item, Guid SkillId, Skill Skill, int RequiredCount);
@@ -702,9 +702,8 @@ public class RosterService(
 
             var candidates = candidateSkills
                 .Where(c => c.SkillId == x.SkillId && !excludedMemberIds.Contains(c.MemberId))
-                .Select(c => new Candidate(c.MemberId, c.Level, recent.GetValueOrDefault(c.MemberId)))
-                .OrderByDescending(c => c.Level.HasValue ? (int)c.Level.Value : -1)
-                .ThenBy(c => c.RecentServiceCount)
+                .Select(c => new Candidate(c.MemberId, recent.GetValueOrDefault(c.MemberId)))
+                .OrderBy(c => c.RecentServiceCount)
                 .ThenBy(c => c.MemberId)
                 .ToList();
 
@@ -743,7 +742,6 @@ public class RosterService(
             Candidates = x.Candidates.Select(c => new RosterCandidateInput
             {
                 MemberCode = codeOf[c.MemberId],
-                Level = c.Level,
                 RecentServiceCount = c.RecentServiceCount,
             }).ToList(),
         }).ToList();

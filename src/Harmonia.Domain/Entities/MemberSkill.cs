@@ -9,8 +9,6 @@ public class MemberSkill : BaseEntity
 
     public Guid SkillId { get; set; }
 
-    public SkillLevel? Level { get; set; }
-
     public ApprovalStatus Status { get; set; }
 
     public DateTime DeclaredAt { get; set; }

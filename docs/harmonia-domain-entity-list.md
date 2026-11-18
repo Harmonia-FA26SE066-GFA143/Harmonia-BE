@@ -73,7 +73,7 @@ Written once here instead of repeated 47 times:
 `categoryId` Guid → SkillCategory · `name` string(50) · `description` string(300)? · `isActive` bool · unique `(categoryId, name)`
 
 **7. `MemberSkill`** — declared skill + approval outcome (FE-03/04/25)
-`memberId` Guid → MemberProfile · `skillId` Guid → Skill · `level` SkillLevel? · `status` ApprovalStatus · `declaredAt` DateTime · `approvedBy` Guid? → User · `approvedAt` DateTime? · `rejectReason` string(500)? · `evidencePublicId` string(255)? · `evidenceFileName` string(255)? · `evidenceSizeBytes` long? · `evidenceUploadedAt` DateTime? · unique `(memberId, skillId)` where `status ≠ Rejected` — rejected rows stay as history and the skill can be declared again as a new Pending row
+`memberId` Guid → MemberProfile · `skillId` Guid → Skill · `status` ApprovalStatus · `declaredAt` DateTime · `approvedBy` Guid? → User · `approvedAt` DateTime? · `rejectReason` string(500)? · `evidencePublicId` string(255)? · `evidenceFileName` string(255)? · `evidenceSizeBytes` long? · `evidenceUploadedAt` DateTime? · unique `(memberId, skillId)` where `status ≠ Rejected` — rejected rows stay as history and the skill can be declared again as a new Pending row
 
 ## C. Liturgical calendar
 
@@ -239,7 +239,6 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 | `DirectorNominationStatus` | Pending, Approved, InTraining, Trained, Appointed, Rejected, Cancelled |
 | `DirectorTrainingResult` | InProgress, Passed, Failed |
 | `DevicePlatform` | Android, iOS, Web |
-| `SkillLevel` | Beginner, Intermediate, Advanced |
 | `ApprovalStatus` | Pending, Approved, Rejected |
 | `EventStatus` | Draft, Published, Cancelled |
 | `ClassificationTarget` | LiturgicalSeason, MassType, CeremonyType, SongTheme, LiturgicalSlot |
@@ -262,7 +261,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 | `ReportPeriod` | Week, Month, Year |
 | `LiturgicalNameKind` | Celebration, Rank, Season |
 
-29 enums. `PracticeFeedback.result` reuses `SubmissionStatus` rather than adding a near-duplicate enum.
+28 enums. `PracticeFeedback.result` reuses `SubmissionStatus` rather than adding a near-duplicate enum.
 
 ---
 
@@ -365,6 +364,7 @@ Kept (2026-10-11): every export is stored privately and recorded here. `fileUrl`
 - 2026-11-10: `User` and `MemberRegistration` gain `saintName` string(50)? (Catholic baptismal name, e.g. "Giuse"); copied to `User` when the Admin accepts a registration. Count unchanged. Needs a migration.
 - 2026-11-12: `LyricsExtractionJob` + enum `LyricsExtractionStatus` added (55 → 56 entities, 27 → 28 enums) — AI lyrics extraction runs as a background job that survives a reload or restart. Needs a migration.
 - 2026-11-13: `User` and `MemberRegistration` gain `gender` Gender? + enum `Gender` (28 → 29 enums). Required when the Admin creates an account and on the public registration form; nullable in the DB for accounts created before it and the seeded Admin. Optional on update (null keeps the current value). Copied to `User` when the Admin accepts a registration. Needs migration `AddGender`.
+- 2026-11-18: `MemberSkill.level` and enum `SkillLevel` removed (29 → 28 enums) — skills are declared without a proficiency level; roster suggestions rank candidates by recent services only. Needs migration `RemoveMemberSkillLevel`.
 
 **Bổ sung 2026-10-26 — phân công 3 tầng**
 

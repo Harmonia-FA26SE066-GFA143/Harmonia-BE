@@ -15,8 +15,6 @@ public class MemberSkillDto
 
     public string CategoryName { get; set; } = string.Empty;
 
-    public SkillLevel? Level { get; set; }
-
     public ApprovalStatus Status { get; set; }
 
     public DateTime DeclaredAt { get; set; }
