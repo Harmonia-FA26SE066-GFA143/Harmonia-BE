@@ -107,6 +107,10 @@ public sealed class HarmoniaApiFactory : WebApplicationFactory<AuthController>
             services.AddSingleton(EmailSender);
             services.AddSingleton(FileStorage);
 
+            // The reminder worker would query the shared SQLite connection alongside the request and break it.
+            Remove(services, typeof(IParticipationReminderTrigger));
+            services.AddSingleton(Substitute.For<IParticipationReminderTrigger>());
+
             services.AddSingleton<IStartupFilter, ClientIpStartupFilter>();
         });
     }
