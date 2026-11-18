@@ -153,6 +153,31 @@ public class MemberSkillServiceTests
         Assert.Equal(ErrorCodes.SkillInactive, result.Code);
     }
 
+    [Theory]
+    [InlineData(Gender.Male, ErrorCodes.MemberSkillGenderMismatch)]
+    [InlineData(null, ErrorCodes.MemberSkillGenderRequired)]
+    public async Task Declare_GenderNotAllowed_ReturnsGenderError_Async(Gender? memberGender, string code)
+    {
+        _tenor.Gender = Gender.Female;
+        _member.User = new User { Id = _userId, FullName = "Skill Member", Gender = memberGender };
+
+        var result = await _sut.DeclareAsync(_userId, NewRequest(), _ct);
+
+        Assert.Equal(code, result.Code);
+        await _memberSkills.DidNotReceive().TryAddAsync(Arg.Any<MemberSkill>(), _ct);
+    }
+
+    [Fact]
+    public async Task Declare_GenderMatches_AddsRow_Async()
+    {
+        _tenor.Gender = Gender.Male;
+        _member.User = new User { Id = _userId, FullName = "Skill Member", Gender = Gender.Male };
+
+        var result = await _sut.DeclareAsync(_userId, NewRequest(), _ct);
+
+        Assert.True(result.IsSuccess);
+    }
+
     [Fact]
     public async Task GetMine_ReturnsCallersDeclarations_Async()
     {

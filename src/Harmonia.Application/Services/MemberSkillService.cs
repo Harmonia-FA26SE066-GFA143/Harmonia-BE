@@ -39,6 +39,13 @@ public class MemberSkillService(
         // A skill in a disabled category is hidden from the lookup, so it counts as inactive too.
         if (!skill.IsActive || !skill.Category.IsActive) return Result<MemberSkillDto>.Failure(ErrorCodes.SkillInactive);
 
+        if (skill.Gender is { } skillGender)
+        {
+            var memberGender = member.User.Gender;
+            if (memberGender is null) return Result<MemberSkillDto>.Failure(ErrorCodes.MemberSkillGenderRequired);
+            if (memberGender != skillGender) return Result<MemberSkillDto>.Failure(ErrorCodes.MemberSkillGenderMismatch);
+        }
+
         if (await memberSkillRepository.HasActiveDeclarationAsync(member.Id, skill.Id, cancellationToken))
         {
             return Result<MemberSkillDto>.Failure(ErrorCodes.MemberSkillAlreadyDeclared);

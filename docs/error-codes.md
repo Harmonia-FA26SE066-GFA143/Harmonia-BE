@@ -157,6 +157,8 @@ Mã lỗi validate field của `LoginRequest`/`RefreshTokenRequest`/`LogoutReque
 | `MEMBER_SKILL_EVIDENCE_REQUIRED` | 400 | Vui lòng chọn tệp minh chứng |
 | `MEMBER_SKILL_EVIDENCE_TYPE_NOT_ALLOWED` | 400 | Minh chứng chỉ nhận ghi âm .mp3, .m4a, .wav hoặc clip .mp4, .mov |
 | `MEMBER_SKILL_EVIDENCE_TOO_LARGE` | 413 | Ghi âm tối đa 20 MB, clip tối đa 100 MB |
+| `MEMBER_SKILL_GENDER_REQUIRED` | 409 | Vui lòng cập nhật giới tính trong hồ sơ trước khi khai báo kỹ năng này |
+| `MEMBER_SKILL_GENDER_MISMATCH` | 409 | Kỹ năng này không dành cho giới tính của bạn |
 
 ## 5. Lịch phụng vụ
 

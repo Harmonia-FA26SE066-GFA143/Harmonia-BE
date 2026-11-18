@@ -75,6 +75,8 @@ public static class ErrorStatusMap
         [ErrorCodes.MemberSkillEvidenceRequired] = StatusCodes.Status400BadRequest,
         [ErrorCodes.MemberSkillEvidenceTypeNotAllowed] = StatusCodes.Status400BadRequest,
         [ErrorCodes.MemberSkillEvidenceTooLarge] = StatusCodes.Status413PayloadTooLarge,
+        [ErrorCodes.MemberSkillGenderRequired] = StatusCodes.Status409Conflict,
+        [ErrorCodes.MemberSkillGenderMismatch] = StatusCodes.Status409Conflict,
 
         // 5. Liturgical calendar.
         [ErrorCodes.CalendarDayNotFound] = StatusCodes.Status404NotFound,

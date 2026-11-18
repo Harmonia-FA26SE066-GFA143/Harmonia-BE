@@ -131,6 +131,10 @@ public static class ErrorCodes
 
     public const string MemberSkillEvidenceTooLarge = "MEMBER_SKILL_EVIDENCE_TOO_LARGE";
 
+    public const string MemberSkillGenderRequired = "MEMBER_SKILL_GENDER_REQUIRED";
+
+    public const string MemberSkillGenderMismatch = "MEMBER_SKILL_GENDER_MISMATCH";
+
     // 5. Liturgical calendar.
     public const string CalendarDayNotFound = "CALENDAR_DAY_NOT_FOUND";
 

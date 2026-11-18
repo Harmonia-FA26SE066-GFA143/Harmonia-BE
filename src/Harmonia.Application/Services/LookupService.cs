@@ -176,7 +176,7 @@ public class LookupService(
         return await SaveAsync<Skill, SkillDto>(
             skills, id, ErrorCodes.SkillNotFound,
             x => x.CategoryId == request.CategoryId && x.Name == name && x.Id != id, ErrorCodes.SkillNameDuplicate,
-            x => { x.CategoryId = request.CategoryId; x.Name = name; x.Description = request.Description; x.IsActive = request.IsActive; },
+            x => { x.CategoryId = request.CategoryId; x.Name = name; x.Description = request.Description; x.Gender = request.Gender; x.IsActive = request.IsActive; },
             cancellationToken);
     }
 
