@@ -269,7 +269,7 @@ hiển thị email thay tên. `phone`, `saintName` (tên thánh), `gender` (`Mal
 | PATCH | `/api/users/{id}/deactivate` | — | 204 | 404 `USER_NOT_FOUND` · 409 `USER_CANNOT_MODIFY_SELF`, `USER_ALREADY_INACTIVE`, `USER_LAST_ADMIN`, `USER_STILL_DIRECTING` |
 | PUT | `/api/users/{id}/role` | `{ "roleName" }` | 200 `UserDto` | 400 `VALIDATION_FAILED` · 404 `USER_NOT_FOUND`, `ROLE_NOT_FOUND` · 409 `USER_CANNOT_MODIFY_SELF`, `USER_LAST_ADMIN`, `USER_STILL_DIRECTING` |
 
-- `GET /api/users`: `keyword` khớp một phần email; các bộ lọc kết hợp AND; sắp theo email.
+- `GET /api/users`: `keyword` khớp một phần email hoặc họ tên; các bộ lọc kết hợp AND; sắp theo email.
 - Bắt buộc: `email`, `roleName`, `gender` (`Male` | `Female`; khi `PUT` thì tuỳ chọn, bỏ trống là giữ nguyên). Tuỳ chọn: `fullName` (≤ 100, bỏ trống → `""`),
   `phone` (≤ 20), `saintName` (≤ 50) — bỏ trống → `null`; khoảng trắng đầu/cuối bị cắt. `PUT` thay toàn bộ: trường bỏ trống bị xoá.
 - Admin **không** nhập mật khẩu: server tự sinh mật khẩu đầu tiên (12 ký tự ngẫu nhiên), gửi email chứa email đăng

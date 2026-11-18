@@ -98,7 +98,7 @@ public class UserRepository(HarmoniaDbContext dbContext)
 
         if (keyword is not null)
         {
-            query = query.Where(x => x.Email.Contains(keyword));
+            query = query.Where(x => x.Email.Contains(keyword) || x.FullName.Contains(keyword));
         }
 
         if (filter.RoleName is not null)
