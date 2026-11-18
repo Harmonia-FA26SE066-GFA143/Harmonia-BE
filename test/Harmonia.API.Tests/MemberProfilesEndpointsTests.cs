@@ -222,6 +222,36 @@ public class MemberProfilesEndpointsTests(HarmoniaApiFactory factory) : IClassFi
 
         Assert.Equal(RoleNames.ChoirMember, mine.RoleName);
         Assert.Equal("mp-mine-Alto", Assert.Single(mine.ApprovedSkills).SkillName);
+        Assert.Empty(mine.ChoirNames);
+    }
+
+    [Fact]
+    public async Task Member_GetMine_ReturnsActiveChoirNamesOnly_Async()
+    {
+        var user = await CreateUserAsync("mp-mine-choir@test.com", "Mine Choir Singer", cancellationToken: _ct);
+        await factory.WithDbAsync(async (db, ct) =>
+        {
+            var memberId = (await db.MemberProfiles.SingleAsync(x => x.UserId == user.Id, ct)).Id;
+            var current = new Choir { Id = Guid.NewGuid(), Name = "mp-mine current choir" };
+            var former = new Choir { Id = Guid.NewGuid(), Name = "mp-mine former choir" };
+            db.Choirs.AddRange(current, former);
+            db.ChoirMemberships.AddRange(
+                new ChoirMembership
+                {
+                    Id = Guid.NewGuid(), ChoirId = current.Id, MemberId = memberId, JoinedDate = new DateOnly(2025, 1, 1),
+                },
+                new ChoirMembership
+                {
+                    Id = Guid.NewGuid(), ChoirId = former.Id, MemberId = memberId, JoinedDate = new DateOnly(2024, 1, 1),
+                    IsActive = false,
+                });
+            return await db.SaveChangesAsync(ct);
+        }, _ct);
+        var member = await factory.CreateClientAsAsync("mp-mine-choir@test.com", _ct);
+
+        var mine = (await member.GetFromJsonAsync<MemberProfileDetailDto>("api/member-profiles/me", TestJson.Options, _ct))!;
+
+        Assert.Equal("mp-mine current choir", Assert.Single(mine.ChoirNames));
     }
 
     [Fact]

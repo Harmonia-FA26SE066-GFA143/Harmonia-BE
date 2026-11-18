@@ -41,7 +41,11 @@ public class MemberProfileProfile : Profile
             .ForMember(dest => dest.Gender, opt => opt.MapFrom(src => src.User.Gender))
             .ForMember(dest => dest.SaintName, opt => opt.MapFrom(src => src.User.SaintName))
             .ForMember(dest => dest.RoleName, opt => opt.MapFrom(src => src.User.Role.Name))
-            .ForMember(dest => dest.ApprovedSkills, opt => opt.MapFrom(src => src.MemberSkills));
+            .ForMember(dest => dest.ApprovedSkills, opt => opt.MapFrom(src => src.MemberSkills))
+            .ForMember(dest => dest.ChoirNames, opt => opt.MapFrom(src => src.ChoirMemberships
+                .Where(m => m.IsActive)
+                .OrderBy(m => m.Choir.Name)
+                .Select(m => m.Choir.Name)));
 
         // LearningProgresses must hold only the row of one material (see GetLearnersOfMaterialAsync).
         CreateMap<MemberProfile, MaterialLearningProgressDetailDto>()

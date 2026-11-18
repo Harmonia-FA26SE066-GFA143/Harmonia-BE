@@ -24,6 +24,9 @@ public class MemberProfileRepository(HarmoniaDbContext dbContext)
             .Include(x => x.User.Role)
             .Include(x => x.MemberSkills.Where(s => s.Status == ApprovalStatus.Approved && s.Skill.IsActive))
                 .ThenInclude(s => s.Skill.Category)
+            .Include(x => x.ChoirMemberships.Where(m => m.IsActive))
+                .ThenInclude(m => m.Choir)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
 
     public Task<MemberProfile?> GetByUserIdForUpdateAsync(Guid userId, CancellationToken cancellationToken) =>

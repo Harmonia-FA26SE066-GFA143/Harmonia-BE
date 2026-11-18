@@ -12,6 +12,7 @@ public interface IMemberProfileRepository : IGenericRepository<MemberProfile>
     /// <summary>
     /// Read-only, with <see cref="MemberProfile.User"/> and its Role loaded. <see cref="MemberProfile.MemberSkills"/>
     /// holds only approved skills that are still active, with <see cref="Skill.Category"/> loaded.
+    /// <see cref="MemberProfile.ChoirMemberships"/> holds only the active rows, with <see cref="ChoirMembership.Choir"/> loaded.
     /// </summary>
     Task<MemberProfile?> GetByUserIdWithApprovedSkillsAsync(Guid userId, CancellationToken cancellationToken);
 

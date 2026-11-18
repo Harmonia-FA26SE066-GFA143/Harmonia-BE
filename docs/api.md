@@ -350,6 +350,8 @@ hiển thị email thay tên. `phone`, `saintName` (tên thánh), `gender` (`Mal
 ### `MemberProfileSummaryDto` / `MemberProfileDetailDto`
 
 `MemberProfileSummaryDto` và `MemberProfileDetailDto` có cùng field: `MemberProfileDto` + `roleName` + `approvedSkills`.
+`MemberProfileSummaryDto` có thêm `choirs: [{ id, name }]`; `MemberProfileDetailDto` (`GET /api/member-profiles/me`) có thêm
+`choirNames: string[]` — tên ca đoàn đang hoạt động, `[]` khi chưa ở ca đoàn nào.
 `roleName` là role **hiện tại** của tài khoản. Ca trưởng và cha xứ không hát: hồ sơ được giữ lại khi ca viên đổi
 sang role khác để không mất lịch sử, nên `GET /api/member-profiles` vẫn có dòng với `roleName` khác `ChoirMember`.
 Hồ sơ đó chuyển sang `Inactive` và rời mọi ca đoàn, nên không còn trong luồng mời, giao bài, điểm danh mới và báo cáo.

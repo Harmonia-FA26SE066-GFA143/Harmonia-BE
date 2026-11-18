@@ -11,6 +11,13 @@ Những thay đổi Web và Mobile cần biết, mới nhất ở trên. Chi ti�
   huống trước đây chưa có. FE bỏ qua trường lạ, hiển thị câu chung cho mã lạ.
 - Mỗi PR đổi hợp đồng thêm một dòng vào mục ngày tương ứng ở đây, cùng PR cập nhật `api.md` / `error-codes.md`.
 
+## 2026-11-18
+
+### Không phá vỡ
+
+- `GET api/member-profiles/me` (`MemberProfileDetailDto`) thêm `choirNames: string[]` — tên ca đoàn ca viên đang hoạt
+  (theo D9 có 0 hoặc 1 phần tử), `[]` khi chưa ở ca đoàn nào.
+
 ## 2026-11-17
 
 ### Phá vỡ
