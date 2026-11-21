@@ -35,7 +35,7 @@ Một ca đoàn giáo xứ mỗi tuần phải trả lời hàng loạt câu h�
 | 📊 | **Báo cáo** | Xuất CSV / XLSX / PDF, nhật ký hoạt động (audit log) |
 | ⛪ | **Nhiều ca đoàn** | Mỗi ca đoàn một ca trưởng, sự kiện nhiều ca đoàn có ca đoàn phụ trách |
 
-Chi tiết đủ 14 feature: [docs/harmonia-feature-list.md](docs/harmonia-feature-list.md).
+Chi tiết đủ 15 feature: [docs/harmonia-feature-list.md](docs/harmonia-feature-list.md).
 
 ## 🎭 Bốn vai trò
 
