@@ -264,6 +264,10 @@ public class PracticeAssignmentService(
         var assignment = await practiceAssignmentRepository.GetByIdForMemberAsync(assignmentId, member.Id, cancellationToken);
         if (assignment is null) return Result<PracticeSubmissionDto>.Failure(ErrorCodes.PracticeAssignmentNotFound);
 
+        // Cancelling the event kept only assignments that already have recordings, as history.
+        if (assignment.LiturgicalEvent?.Status == EventStatus.Cancelled)
+            return Result<PracticeSubmissionDto>.Failure(ErrorCodes.LiturgicalEventCancelled);
+
         // Submissions holds only the member's newest attempt.
         var latest = assignment.Submissions.MaxBy(x => x.AttemptNo);
         var isPastDue = DateTime.UtcNow > assignment.DueDate;

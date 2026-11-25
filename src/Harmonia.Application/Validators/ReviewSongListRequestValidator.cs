@@ -15,5 +15,8 @@ public class ReviewSongListRequestValidator : AbstractValidator<ReviewSongListRe
             .NotEmpty()
             .When(x => x.Decision is ReviewDecision.Reject or ReviewDecision.RequestRevision)
             .WithErrorCode(ErrorCodes.ReviewNotesRequired);
+
+        // Matches the column length, so a long note is a 400 instead of a database error.
+        RuleFor(x => x.Notes).MaximumLength(1000);
     }
 }

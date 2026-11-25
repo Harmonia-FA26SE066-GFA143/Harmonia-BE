@@ -230,30 +230,42 @@ public class DirectorNominationService(
         }
 
         // Reuse the two existing Admin actions so their rules (token revocation, leaving choirs, director checks)
-        // apply exactly as when the Admin does them by hand.
-        var roleResult = await userService.AssignRoleAsync(
-            member.UserId, new AssignRoleRequest { RoleName = RoleNames.ChoirDirector }, cancellationToken);
-        if (!roleResult.IsSuccess)
+        // apply exactly as when the Admin does them by hand. Each saves on its own, so one transaction keeps a
+        // failure from leaving a director without a choir or an appointed nomination still Trained.
+        var appointed = await nominationRepository.ExecuteInTransactionAsync(async () =>
         {
-            return Result<DirectorNominationDetailDto>.Failure(roleResult.Code!, roleResult.Message);
-        }
-
-        var choirResult = await choirService.UpdateAsync(
-            choir.Id,
-            new UpdateChoirRequest
+            var roleResult = await userService.AssignRoleAsync(
+                member.UserId, new AssignRoleRequest { RoleName = RoleNames.ChoirDirector }, cancellationToken);
+            if (!roleResult.IsSuccess)
             {
-                Name = choir.Name, Description = choir.Description, IsActive = choir.IsActive, DirectorId = member.UserId,
-            },
-            cancellationToken);
-        if (!choirResult.IsSuccess)
-        {
-            return Result<DirectorNominationDetailDto>.Failure(choirResult.Code!, choirResult.Message);
-        }
+                return Result.Failure(roleResult.Code!, roleResult.Message);
+            }
 
-        nomination.Status = DirectorNominationStatus.Appointed;
-        nomination.AppointedChoirId = choir.Id;
-        nomination.AppointedAt = DateTime.UtcNow;
-        await nominationRepository.SaveChangesAsync(cancellationToken);
+            var choirResult = await choirService.UpdateAsync(
+                choir.Id,
+                new UpdateChoirRequest
+                {
+                    Name = choir.Name, Description = choir.Description, IsActive = choir.IsActive,
+                    DirectorId = member.UserId,
+                },
+                cancellationToken);
+            if (!choirResult.IsSuccess)
+            {
+                return Result.Failure(choirResult.Code!, choirResult.Message);
+            }
+
+            // Reloaded: a retry after a transient error starts from a cleared change tracker.
+            var tracked = await nominationRepository.GetByIdAsync(id, cancellationToken);
+            tracked!.Status = DirectorNominationStatus.Appointed;
+            tracked.AppointedChoirId = choir.Id;
+            tracked.AppointedAt = DateTime.UtcNow;
+            await nominationRepository.SaveChangesAsync(cancellationToken);
+            return Result.Success();
+        }, cancellationToken);
+        if (!appointed.IsSuccess)
+        {
+            return Result<DirectorNominationDetailDto>.Failure(appointed.Code!, appointed.Message);
+        }
 
         var detail = await ToDetailAsync(id, cancellationToken);
         await NotifyAsync(detail, "Bạn đã được bổ nhiệm ca trưởng",

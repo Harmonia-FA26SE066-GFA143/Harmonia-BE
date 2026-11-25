@@ -17,6 +17,7 @@ public class MemberProfileServiceTests
     private readonly ILiturgicalEventRepository _events = Substitute.For<ILiturgicalEventRepository>();
     private readonly IPracticeAssignmentRepository _assignments = Substitute.For<IPracticeAssignmentRepository>();
     private readonly IChoirScopeService _scope = ChoirScopeFakes.Unrestricted();
+    private readonly IChoirService _choirService = Substitute.For<IChoirService>();
     private readonly MemberProfileService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly Guid _userId = Guid.NewGuid();
@@ -25,7 +26,7 @@ public class MemberProfileServiceTests
 
     public MemberProfileServiceTests()
     {
-        _sut = new MemberProfileService(_members, _events, _assignments, _scope, Substitute.For<IMapper>());
+        _sut = new MemberProfileService(_members, _events, _assignments, _scope, _choirService, Substitute.For<IMapper>());
         _members.GetByUserIdAsync(_userId, _ct).Returns(_member);
     }
 
@@ -80,6 +81,35 @@ public class MemberProfileServiceTests
         Assert.True(result.IsSuccess);
         Assert.Equal(MemberStatus.Inactive, _member.Status);
         await _members.Received(1).SaveChangesAsync(_ct);
+    }
+
+    [Theory]
+    [InlineData(MemberStatus.Inactive, "chuyển sang tạm nghỉ")]
+    [InlineData(MemberStatus.Left, "đã nghỉ")]
+    public async Task Update_ActiveMemberStopsServing_DropsThemFromUpcomingEvents_Async(MemberStatus status, string reason)
+    {
+        var directorId = Guid.NewGuid();
+        _member.User = new User { Id = _userId, FullName = "Anna", Role = new Role { Name = RoleNames.ChoirMember } };
+        _members.IsManagedByDirectorAsync(_member.Id, directorId, _ct).Returns(true);
+        _members.GetWithUserAsync(_member.Id, _ct).Returns(_member);
+
+        await _sut.UpdateAsync(directorId, _member.Id, new UpdateMemberProfileRequest { Status = status }, _ct);
+
+        await _choirService.Received(1).DropMemberFromUpcomingEventsAsync(_member.Id, "Anna", reason, _ct);
+    }
+
+    [Fact]
+    public async Task Update_MemberAlreadyNotServing_DoesNotDropAgain_Async()
+    {
+        var directorId = Guid.NewGuid();
+        _member.Status = MemberStatus.Inactive;
+        _member.User = new User { Id = _userId, Role = new Role { Name = RoleNames.ChoirMember } };
+        _members.IsManagedByDirectorAsync(_member.Id, directorId, _ct).Returns(true);
+        _members.GetWithUserAsync(_member.Id, _ct).Returns(_member);
+
+        await _sut.UpdateAsync(directorId, _member.Id, new UpdateMemberProfileRequest { Status = MemberStatus.Left }, _ct);
+
+        await _choirService.DidNotReceiveWithAnyArgs().DropMemberFromUpcomingEventsAsync(default, default, default!, default);
     }
 
     [Theory]

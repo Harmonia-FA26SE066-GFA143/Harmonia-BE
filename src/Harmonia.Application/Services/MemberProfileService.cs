@@ -13,6 +13,7 @@ public class MemberProfileService(
     ILiturgicalEventRepository liturgicalEventRepository,
     IPracticeAssignmentRepository practiceAssignmentRepository,
     IChoirScopeService choirScope,
+    IChoirService choirService,
     IMapper mapper) : IMemberProfileService
 {
     public async Task<Result<PagedList<ParticipationHistoryDto>>> GetMyHistoryAsync(
@@ -133,8 +134,16 @@ public class MemberProfileService(
         profile.User.Gender = request.Gender ?? profile.User.Gender;
         profile.DateOfBirth = request.DateOfBirth;
         profile.JoinedDate = request.JoinedDate;
+        var stopsServing = profile.Status == MemberStatus.Active && request.Status != MemberStatus.Active;
         profile.Status = request.Status;
         await memberProfileRepository.SaveChangesAsync(cancellationToken);
+
+        if (stopsServing)
+        {
+            var reason = request.Status == MemberStatus.Left ? "đã nghỉ" : "chuyển sang tạm nghỉ";
+            await choirService.DropMemberFromUpcomingEventsAsync(
+                profile.Id, profile.User.FullName, reason, cancellationToken);
+        }
 
         return Result<MemberProfileDto>.Success(mapper.Map<MemberProfileDto>(profile));
     }

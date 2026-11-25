@@ -26,6 +26,7 @@ public class UserServiceTests
     private readonly IGenericRepository<LiturgicalEventChoir> _eventChoirs = Substitute.For<IGenericRepository<LiturgicalEventChoir>>();
     private readonly IChoirJoinRequestRepository _joinRequests = Substitute.For<IChoirJoinRequestRepository>();
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
+    private readonly IChoirService _choirService = Substitute.For<IChoirService>();
     private readonly UserService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
     private readonly List<User> _added = [];
@@ -40,7 +41,7 @@ public class UserServiceTests
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<UserProfile>(), NullLoggerFactory.Instance).CreateMapper();
         _sut = new UserService(
             _users, _memberProfiles, _hasher, _email, _currentUser, _storage, _choirs, _eventChoirs, _joinRequests, _notifications,
-            mapper);
+            _choirService, mapper);
         _choirs.ListAsync(Arg.Any<Expression<Func<Choir, bool>>>(), _ct).Returns([]);
         _eventChoirs.ListAsync(Arg.Any<Expression<Func<LiturgicalEventChoir, bool>>>(), _ct).Returns([]);
         _joinRequests.GetPendingForUpdateAsync(Arg.Any<IReadOnlyCollection<Guid>>(), _ct).Returns([]);
@@ -497,6 +498,19 @@ public class UserServiceTests
         Assert.True(result.IsSuccess);
         Assert.Equal(_directorRole.Id, user.RoleId);
         await _memberProfiles.DidNotReceiveWithAnyArgs().AddAsync(default!, _ct);
+    }
+
+    [Fact]
+    public async Task AssignRole_ChoirMemberToOtherRole_DropsThemFromUpcomingEvents_Async()
+    {
+        var user = Existing(_memberRole);
+        var profile = new MemberProfile { Id = Guid.NewGuid(), UserId = user.Id, Status = MemberStatus.Active };
+        _memberProfiles.GetForRoleChangeAsync(user.Id, _ct).Returns(profile);
+
+        await _sut.AssignRoleAsync(user.Id, new AssignRoleRequest { RoleName = RoleNames.ChoirDirector }, _ct);
+
+        await _choirService.Received(1).DropMemberFromUpcomingEventsAsync(
+            profile.Id, user.FullName, Arg.Any<string>(), _ct);
     }
 
     [Fact]

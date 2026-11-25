@@ -25,6 +25,8 @@ public class LiturgicalEventServiceTests
     private readonly IRosterService _roster = Substitute.For<IRosterService>();
     private readonly IEventParticipationRepository _participations = Substitute.For<IEventParticipationRepository>();
     private readonly IServiceRosterRepository _rosters = Substitute.For<IServiceRosterRepository>();
+    private readonly IRehearsalRepository _rehearsals = Substitute.For<IRehearsalRepository>();
+    private readonly IPracticeAssignmentRepository _assignments = Substitute.For<IPracticeAssignmentRepository>();
     private readonly Choir _choir = new() { Id = Guid.NewGuid(), Name = "Cecilia", IsActive = true };
     private readonly LiturgicalEventService _sut;
     private readonly CancellationToken _ct = TestContext.Current.CancellationToken;
@@ -46,12 +48,14 @@ public class LiturgicalEventServiceTests
             .CreateMapper();
         _sut = new LiturgicalEventService(
             _repository, _users, _choirs, _notifications, _lookups, _scope, _settings, Substitute.For<ICurrentUserService>(),
-            _roster, _participations, _rosters, mapper);
+            _roster, _participations, _rosters, _rehearsals, _assignments, mapper);
         _lookups.CheckEventCatalogsAsync(default, default, default, default, default, default, default, default, default)
             .ReturnsForAnyArgs(Result.Success());
         _choirs.ListAsync(default!, default).ReturnsForAnyArgs([_choir]);
         _repository.GetWithLocationAsync(_event.Id, _ct).Returns(_event);
         _participations.GetRespondedForUpdateAsync(Arg.Any<Guid>(), _ct).Returns([]);
+        _rehearsals.ListAsync(default!, default).ReturnsForAnyArgs([]);
+        _assignments.ListAsync(default!, default).ReturnsForAnyArgs([]);
     }
 
     [Fact]
@@ -370,6 +374,33 @@ public class LiturgicalEventServiceTests
 
         Assert.Equal(ErrorCodes.LiturgicalEventAlreadyPassed, (await _sut.CancelAsync(_event.Id, _ct)).Code);
         await _repository.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Cancel_EventStartedEarlierToday_ReturnsEventAlreadyPassed_Async()
+    {
+        var started = VietnamTime.Now.AddMinutes(-1);
+        _event.EventDate = DateOnly.FromDateTime(started);
+        _event.Time = TimeOnly.FromDateTime(started);
+
+        Assert.Equal(ErrorCodes.LiturgicalEventAlreadyPassed, (await _sut.CancelAsync(_event.Id, _ct)).Code);
+        await _repository.DidNotReceive().SaveChangesAsync(_ct);
+    }
+
+    [Fact]
+    public async Task Cancel_RemovesUpcomingRehearsalsAndUnansweredAssignments_Async()
+    {
+        var rehearsal = new Rehearsal { Id = Guid.NewGuid(), EventId = _event.Id };
+        var assignment = new PracticeAssignment { Id = Guid.NewGuid(), EventId = _event.Id };
+        _rehearsals.ListAsync(default!, default).ReturnsForAnyArgs([rehearsal]);
+        _assignments.ListAsync(default!, default).ReturnsForAnyArgs([assignment]);
+
+        var result = await _sut.CancelAsync(_event.Id, _ct);
+
+        Assert.True(result.IsSuccess);
+        _rehearsals.Received(1).Remove(rehearsal);
+        _assignments.Received(1).Remove(assignment);
+        await _repository.Received(1).SaveChangesAsync(_ct);
     }
 
     private void DraftReadyToPublish()

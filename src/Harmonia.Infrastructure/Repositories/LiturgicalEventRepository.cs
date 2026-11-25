@@ -85,7 +85,9 @@ public class LiturgicalEventRepository(HarmoniaDbContext dbContext)
 
         if (!includeDrafts)
         {
-            query = query.Where(x => x.Status != EventStatus.Draft);
+            // A cancelled Draft was never published, so it stays hidden like any Draft.
+            query = query.Where(x => x.Status != EventStatus.Draft
+                && !(x.Status == EventStatus.Cancelled && x.PublishedAt == null));
         }
 
         if (filter.FromDate is { } fromDate)

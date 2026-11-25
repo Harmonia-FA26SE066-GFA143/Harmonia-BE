@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using Harmonia.Application.Common.Models;
 using Harmonia.Domain.Common;
 
 namespace Harmonia.Application.Interfaces.IRepositories;
@@ -22,4 +23,10 @@ public interface IGenericRepository<T> where T : BaseEntity
 
     /// <summary>Saves every pending change in the request's DbContext, not only this entity type.</summary>
     Task SaveChangesAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Runs <paramref name="operation"/>, and every save it makes, in one database transaction: committed when it
+    /// returns success, rolled back when it fails or throws. It may run again on a transient database error.
+    /// </summary>
+    Task<Result> ExecuteInTransactionAsync(Func<Task<Result>> operation, CancellationToken cancellationToken);
 }

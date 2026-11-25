@@ -388,6 +388,32 @@ public class ChoirServiceTests
     }
 
     [Fact]
+    public async Task DropMemberFromUpcomingEvents_RemovesInviteAndLine_AndTellsTheLeadDirectorWhy_Async()
+    {
+        var member = NewMember();
+        var invite = new EventParticipation { Id = Guid.NewGuid(), EventId = _event.Id, MemberId = member.Id, LiturgicalEvent = _event };
+        _participationRows.Add(invite);
+        var roster = new ServiceRoster
+        {
+            Id = Guid.NewGuid(), EventId = _event.Id, Status = RosterStatus.Finalized, LiturgicalEvent = _event,
+            Assignments = [new RosterAssignment { Id = Guid.NewGuid(), MemberId = member.Id, SongListItemId = Guid.NewGuid() }],
+        };
+        _rosters.ListAsync(Arg.Any<Expression<Func<ServiceRoster, bool>>>(), _ct).Returns([roster]);
+        _rosters.GetEventWithRosterAsync(_event.Id, _ct).Returns(new LiturgicalEvent { Id = _event.Id, ServiceRoster = roster });
+        var leadDirectorId = Guid.NewGuid();
+        _scope.GetLeadDirectorUserIdsAsync(_event.Id, _ct).Returns([leadDirectorId]);
+
+        await _sut.DropMemberFromUpcomingEventsAsync(member.Id, "Anna", "chuyển sang tạm nghỉ", _ct);
+
+        Assert.Same(invite, Assert.Single(_removedParticipations));
+        Assert.Empty(roster.Assignments);
+        Assert.Equal(RosterStatus.Draft, roster.Status);
+        var notice = Assert.Single(_sent, x => x.Type == NotificationType.AssignmentNotice);
+        Assert.Equal([leadDirectorId], notice.RecipientUserIds);
+        Assert.Contains("Anna chuyển sang tạm nghỉ", notice.Content);
+    }
+
+    [Fact]
     public async Task RemoveMember_DropsUpcomingInvitesAndLines_UnlessAnotherServingChoirKeepsThem_Async()
     {
         var other = NewChoir("Agnes Choir");

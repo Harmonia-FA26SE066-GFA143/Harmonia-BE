@@ -26,6 +26,8 @@ public class LiturgicalEventService(
     IRosterService rosterService,
     IEventParticipationRepository participationRepository,
     IServiceRosterRepository rosterRepository,
+    IRehearsalRepository rehearsalRepository,
+    IPracticeAssignmentRepository practiceAssignmentRepository,
     IMapper mapper) : ILiturgicalEventService
 {
     public async Task<Result<PagedList<LiturgicalEventListItemDto>>> SearchAsync(
@@ -297,13 +299,29 @@ public class LiturgicalEventService(
             return Result<LiturgicalEventDto>.Failure(ErrorCodes.LiturgicalEventCancelled);
         }
 
-        if (liturgicalEvent.EventDate < VietnamTime.Today)
+        if (HasPassed(liturgicalEvent.EventDate, liturgicalEvent.Time))
         {
             return Result<LiturgicalEventDto>.Failure(ErrorCodes.LiturgicalEventAlreadyPassed);
         }
 
         var wasPublished = liturgicalEvent.Status == EventStatus.Published;
         liturgicalEvent.Status = EventStatus.Cancelled;
+
+        // Rehearsals not yet started and assignments nobody answered would be stuck on a locked event; the event's
+        // cancel notice covers them. Started rehearsals and answered assignments stay as history.
+        var now = DateTime.UtcNow;
+        foreach (var rehearsal in await rehearsalRepository.ListAsync(
+                     x => x.EventId == id && x.StartTime > now, cancellationToken))
+        {
+            rehearsalRepository.Remove(rehearsal);
+        }
+
+        foreach (var assignment in await practiceAssignmentRepository.ListAsync(
+                     x => x.EventId == id && !x.Submissions.Any(), cancellationToken))
+        {
+            practiceAssignmentRepository.Remove(assignment);
+        }
+
         await liturgicalEventRepository.SaveChangesAsync(cancellationToken);
 
         // A Draft was never shown to anyone, so only a published event needs a notice.

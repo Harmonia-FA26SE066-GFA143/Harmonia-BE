@@ -56,6 +56,8 @@ public class DirectorNominationServiceTests
         _users.GetActiveUserIdsByRolesAsync(Arg.Any<IReadOnlyCollection<string>>(), _ct).Returns([_priestId]);
 
         _nominations.AddAsync(Arg.Do<DirectorNomination>(n => _stored[n.Id] = n), _ct).Returns(Task.CompletedTask);
+        _nominations.ExecuteInTransactionAsync(Arg.Any<Func<Task<Result>>>(), _ct)
+            .Returns(call => call.Arg<Func<Task<Result>>>()());
         _nominations.GetByIdAsync(Arg.Any<Guid>(), _ct)
             .Returns(call => _stored.GetValueOrDefault(call.Arg<Guid>()));
         _nominations.GetWithDetailsAsync(Arg.Any<Guid>(), null, null, _ct).Returns(call =>
@@ -279,6 +281,25 @@ public class DirectorNominationServiceTests
         Assert.Equal(ErrorCodes.UserNotFound, result.Code);
         Assert.Equal(DirectorNominationStatus.Trained, nomination.Status);
         await _choirService.DidNotReceive().UpdateAsync(Arg.Any<Guid>(), Arg.Any<UpdateChoirRequest>(), _ct);
+    }
+
+    [Fact]
+    public async Task Appoint_ChoirUpdateFails_ReturnsFailureFromTheTransaction_SoTheRoleChangeRollsBack_Async()
+    {
+        ActAs(RoleNames.Admin, Guid.NewGuid());
+        var nomination = Store(DirectorNominationStatus.Trained);
+        _choirs.GetByIdAsync(_choirId, _ct).Returns(new Choir { Id = _choirId, Name = "Cecilia", IsActive = true });
+        _userService.AssignRoleAsync(_member.UserId, Arg.Any<AssignRoleRequest>(), _ct)
+            .Returns(Result<UserDto>.Success(new UserDto()));
+        _choirService.UpdateAsync(_choirId, Arg.Any<UpdateChoirRequest>(), _ct)
+            .Returns(Result<ChoirDto>.Failure(ErrorCodes.ChoirDirectorInvalid));
+
+        var result = await _sut.AppointAsync(nomination.Id, new AppointDirectorNominationRequest { ChoirId = _choirId }, _ct);
+
+        Assert.Equal(ErrorCodes.ChoirDirectorInvalid, result.Code);
+        Assert.Equal(DirectorNominationStatus.Trained, nomination.Status);
+        await _nominations.Received(1).ExecuteInTransactionAsync(Arg.Any<Func<Task<Result>>>(), _ct);
+        await _notifications.DidNotReceiveWithAnyArgs().SendAsync(default!, default);
     }
 
     [Fact]

@@ -78,7 +78,8 @@ public class RehearsalRepository(HarmoniaDbContext dbContext)
     {
         var query = DbContext.Rehearsals.AsNoTracking();
 
-        query = query.Where(InChoirs(choirIds));
+        query = query.Where(InChoirs(choirIds))
+            .Where(x => x.LiturgicalEvent == null || x.LiturgicalEvent.Status != EventStatus.Cancelled);
 
         if (filter.EventId is { } eventId)
         {

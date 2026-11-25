@@ -26,6 +26,7 @@ public class UserService(
 	IGenericRepository<LiturgicalEventChoir> eventChoirRepository,
 	IChoirJoinRequestRepository joinRequestRepository,
 	INotificationService notificationService,
+	IChoirService choirService,
 	IMapper mapper) : IUserService
 {
 	private const string AvatarFolder = "avatars";
@@ -281,6 +282,8 @@ public class UserService(
 		await userRepository.SaveChangesAsync(ct);
 
 		await NotifyDirectorsOfLeaveAsync(user, leftChoirIds, ct);
+		if (wasChoirMember && newRole.Name != RoleNames.ChoirMember && profile is not null)
+			await choirService.DropMemberFromUpcomingEventsAsync(profile.Id, user.FullName, "được đổi sang vai trò khác", ct);
 		return Result<UserDto>.Success(mapper.Map<UserDto>(user));
 	}
 

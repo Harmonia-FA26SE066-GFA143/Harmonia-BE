@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using Harmonia.Application.Common.Models;
 using Harmonia.Application.Interfaces.IRepositories;
 using Harmonia.Domain.Common;
 using Harmonia.Infrastructure.Data;
@@ -23,4 +24,30 @@ public class GenericRepository<T>(HarmoniaDbContext dbContext) : IGenericReposit
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) =>
         DbContext.SaveChangesAsync(cancellationToken);
+
+    public Task<Result> ExecuteInTransactionAsync(Func<Task<Result>> operation, CancellationToken cancellationToken) =>
+        // A retrying execution strategy (SQL Server) refuses a user transaction unless it wraps the whole unit.
+        DbContext.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await using var transaction = await DbContext.Database.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                var result = await operation();
+                if (result.IsSuccess)
+                {
+                    await transaction.CommitAsync(cancellationToken);
+                    return result;
+                }
+
+                await transaction.RollbackAsync(cancellationToken);
+                DbContext.ChangeTracker.Clear();
+                return result;
+            }
+            catch
+            {
+                // Tracked entities still hold the rolled-back values; a retry must reload them.
+                DbContext.ChangeTracker.Clear();
+                throw;
+            }
+        });
 }

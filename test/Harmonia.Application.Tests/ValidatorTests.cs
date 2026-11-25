@@ -529,6 +529,15 @@ public class ValidatorTests
         Assert.Empty(codes);
     }
 
+    [Fact]
+    public void ReviewSongList_NotesLongerThanTheColumn_HasErrors()
+    {
+        var codes = ErrorCodesOf(new ReviewSongListRequestValidator(),
+            new ReviewSongListRequest { Decision = ReviewDecision.Reject, Notes = new string('a', 1001) });
+
+        Assert.NotEmpty(codes);
+    }
+
     // ---- Rehearsal songs ----
 
     [Fact]

@@ -514,7 +514,8 @@ public class ChoirService(
 
     /// <summary>Tells who plans each event that a roster line went with the member; the caller already knows.</summary>
     private async Task NotifyLeadDirectorsOfRemovalAsync(
-        IReadOnlyCollection<LiturgicalEvent> events, string? memberFullName, CancellationToken cancellationToken)
+        IReadOnlyCollection<LiturgicalEvent> events, string? memberFullName, CancellationToken cancellationToken,
+        string reason = "đã rời ca đoàn")
     {
         var memberName = memberFullName ?? "Một ca viên";
         foreach (var liturgicalEvent in events)
@@ -529,11 +530,45 @@ public class ChoirService(
 
             await notificationService.SendAsync(
                 new SendNotificationRequest(
-                    NotificationType.AssignmentNotice, "Ca viên rời ca đoàn",
-                    $"{memberName} đã rời ca đoàn nên được gỡ khỏi phân công sự kiện {EventLabel(liturgicalEvent)}; vui lòng xếp người thay.",
+                    NotificationType.AssignmentNotice, "Ca viên được gỡ khỏi phân công",
+                    $"{memberName} {reason} nên được gỡ khỏi phân công sự kiện {EventLabel(liturgicalEvent)}; vui lòng xếp người thay.",
                     directorIds, nameof(LiturgicalEvent), liturgicalEvent.Id),
                 cancellationToken);
         }
+    }
+
+    public async Task DropMemberFromUpcomingEventsAsync(
+        Guid memberId, string? memberFullName, string reason, CancellationToken cancellationToken)
+    {
+        var today = VietnamTime.Today;
+        var eventIds = (await participationRepository.ListAsync(
+                x => x.MemberId == memberId
+                    && x.LiturgicalEvent.Status != EventStatus.Cancelled && x.LiturgicalEvent.EventDate >= today,
+                cancellationToken))
+            .Select(x => x.EventId)
+            .Concat((await rosterRepository.ListAsync(
+                    x => x.Assignments.Any(a => a.MemberId == memberId)
+                        && x.LiturgicalEvent.Status != EventStatus.Cancelled && x.LiturgicalEvent.EventDate >= today,
+                    cancellationToken))
+                .Select(x => x.EventId))
+            .Distinct()
+            .ToList();
+        if (eventIds.Count == 0)
+        {
+            return;
+        }
+
+        var reopened = new List<LiturgicalEvent>();
+        foreach (var eventId in eventIds)
+        {
+            if (await DropMembersFromEventAsync(eventId, [memberId], cancellationToken) is { } liturgicalEvent)
+            {
+                reopened.Add(liturgicalEvent);
+            }
+        }
+
+        await participationRepository.SaveChangesAsync(cancellationToken);
+        await NotifyLeadDirectorsOfRemovalAsync(reopened, memberFullName, cancellationToken, reason);
     }
 
     public async Task<Result<List<LiturgicalEventChoirDto>>> GetEventChoirsAsync(

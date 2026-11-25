@@ -44,6 +44,14 @@ public interface IChoirService
     /// <summary>The calling Choir Member leaves the choir on their own; the choir's director is notified.</summary>
     Task<Result> LeaveAsync(Guid choirId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// For a member who stops serving (status no longer Active, or a role other than Choir Member): deletes their
+    /// invitations and roster lines on upcoming events, reopening a finalized roster, saves every pending change and
+    /// tells each event's lead director why (<paramref name="reason"/>, Vietnamese, e.g. "chuyển sang tạm nghỉ").
+    /// </summary>
+    Task DropMemberFromUpcomingEventsAsync(
+        Guid memberId, string? memberFullName, string reason, CancellationToken cancellationToken);
+
     /// <summary>Choirs serving the event, the lead choir first, then by name.</summary>
     Task<Result<List<LiturgicalEventChoirDto>>> GetEventChoirsAsync(Guid eventId, CancellationToken cancellationToken);
 
