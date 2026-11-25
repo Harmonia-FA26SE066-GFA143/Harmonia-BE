@@ -48,8 +48,7 @@ public static class EmailLayout
     </td></tr>
     <tr><td height="2" bgcolor="#c5a46d" style="height:2px;line-height:2px;font-size:0;background:#c5a46d;">&nbsp;</td></tr>
     <tr><td bgcolor="#ffffff" style="background:#ffffff;border-left:1px solid #e6e1d9;border-right:1px solid #e6e1d9;padding:32px;">
-      <h1 style="margin:0 0 12px;font-size:20px;line-height:1.4;font-weight:600;color:#1e1a1c;">{{title}}</h1>
-      <img src="{{assets}}/staff-divider.png" width="160" height="17" alt="" style="display:block;border:0;margin:0 0 20px;">
+      <h1 style="margin:0 0 20px;font-size:20px;line-height:1.4;font-weight:600;color:#1e1a1c;">{{title}}</h1>
       <div class="hm-body" style="font-size:15px;line-height:1.6;color:#3f3639;">{{bodyHtml}}</div>
     </td></tr>
     <tr><td bgcolor="#f5f0e8" style="background:#f5f0e8;border:1px solid #e6e1d9;border-top:0;padding:20px 32px 12px;font-size:13px;line-height:1.6;color:#615558;">
