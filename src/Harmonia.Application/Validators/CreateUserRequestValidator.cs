@@ -9,9 +9,14 @@ public class CreateUserRequestValidator : AbstractValidator<CreateUserRequest>
     public CreateUserRequestValidator()
     {
         RuleFor(x => x.Email).NotEmpty().EmailAddress();
-        RuleFor(x => x.Password).NotEmpty().MinimumLength(8);
+        RuleFor(x => x.FullName).MaximumLength(100);
+        RuleFor(x => x.Phone).MaximumLength(20);
+        RuleFor(x => x.SaintName).MaximumLength(50);
+        RuleFor(x => x.Gender).NotNull().IsInEnum();
         RuleFor(x => x.RoleName).NotEmpty()
             .Must(r => r is RoleNames.Admin or RoleNames.ParishPriest
                         or RoleNames.ChoirDirector or RoleNames.ChoirMember);
+        // Only Choir Members join choirs.
+        RuleFor(x => x.PreferredChoirId).Null().When(x => x.RoleName != RoleNames.ChoirMember);
     }
 }

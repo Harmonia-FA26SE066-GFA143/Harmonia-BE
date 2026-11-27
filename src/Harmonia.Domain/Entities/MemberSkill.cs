@@ -9,8 +9,6 @@ public class MemberSkill : BaseEntity
 
     public Guid SkillId { get; set; }
 
-    public SkillLevel? Level { get; set; }
-
     public ApprovalStatus Status { get; set; }
 
     public DateTime DeclaredAt { get; set; }
@@ -20,6 +18,20 @@ public class MemberSkill : BaseEntity
     public DateTime? ApprovedAt { get; set; }
 
     public string? RejectReason { get; set; }
+
+    public Guid? RevokedBy { get; set; }
+
+    public DateTime? RevokedAt { get; set; }
+
+    public string? RevokeReason { get; set; }
+
+    public string? EvidencePublicId { get; set; }
+
+    public string? EvidenceFileName { get; set; }
+
+    public long? EvidenceSizeBytes { get; set; }
+
+    public DateTime? EvidenceUploadedAt { get; set; }
 
     public MemberProfile Member { get; set; } = null!;
 

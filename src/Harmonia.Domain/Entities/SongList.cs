@@ -19,7 +19,11 @@ public class SongList : BaseAuditableEntity
 
     public DateTime? DecidedAt { get; set; }
 
+    public Guid? ChoirId { get; set; }
+
     public LiturgicalEvent LiturgicalEvent { get; set; } = null!;
+
+    public Choir? Choir { get; set; }
 
     public User Proposer { get; set; } = null!;
 

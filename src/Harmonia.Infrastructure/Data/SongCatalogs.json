@@ -1,0 +1,63 @@
+{
+  "MassTypes": [ "Lễ Chúa nhật", "Lễ ngày thường", "Lễ trọng", "Lễ kính", "Lễ nhớ", "Lễ vọng" ],
+  "CeremonyTypes": [ "Hôn phối", "An táng - Cầu hồn", "Rửa tội", "Thêm sức", "Rước lễ lần đầu", "Truyền chức", "Khấn dòng" ],
+  "LiturgicalSlots": [
+    "Nhập lễ",
+    "Kinh Thương xót",
+    "Kinh Vinh danh",
+    "Đáp ca",
+    "Tung hô Tin Mừng",
+    "Dâng lễ",
+    "Kinh Thánh Thánh",
+    "Lạy Chiên Thiên Chúa",
+    "Hiệp lễ",
+    "Ca nguyện",
+    "Kết lễ"
+  ],
+  "LiturgicalSlotRequirements": {
+    "Đáp ca": "Psalm",
+    "Tung hô Tin Mừng": "Psalm"
+  },
+  "SongThemes": {
+    "Kính Chúa": {
+      "Chúa Ba Ngôi": {},
+      "Chúa Kitô Vua": {},
+      "Chúa Thánh Thần": {},
+      "Thánh Tâm Chúa Giêsu": {},
+      "Thánh Thể": { "Chầu Thánh Thể": {} },
+      "Lòng Thương Xót": {}
+    },
+    "Đức Maria": {
+      "Mẹ Thiên Chúa": {},
+      "Truyền Tin": {},
+      "Đức Mẹ đi viếng": {},
+      "Mẫu Tâm": {},
+      "Đức Mẹ lên trời": {},
+      "Nữ Vương": {},
+      "Sinh nhật Đức Mẹ": {},
+      "Đức Mẹ sầu bi": {},
+      "Mân Côi": {},
+      "Đức Mẹ dâng mình": {},
+      "Vô Nhiễm Nguyên Tội": {}
+    },
+    "Các Thánh": {
+      "Thánh Giuse": {},
+      "Các Thánh chung": {},
+      "Các Thánh riêng": {},
+      "Các Thánh Tử đạo Việt Nam": {}
+    },
+    "Chủ đề khác": {
+      "Mùa Xuân - Tết": {},
+      "Thánh ca Tin Mừng": {},
+      "Thánh hiến - Ơn gọi": {},
+      "Linh mục": {},
+      "Cha mẹ": {},
+      "Thiếu nhi": {},
+      "Bác ái - Hiệp nhất": {},
+      "Loan báo Tin Mừng": {},
+      "Linh đạo - Hội dòng": {},
+      "Tạ ơn - Kỷ niệm": {},
+      "Hợp xướng": {}
+    }
+  }
+}

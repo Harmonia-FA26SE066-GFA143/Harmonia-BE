@@ -2,6 +2,8 @@ using Harmonia.Application.DTOs;
 using Harmonia.Application.Exceptions;
 using Harmonia.Domain.Common;
 using Harmonia.Domain.Exceptions;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 
 namespace Harmonia.API.Middlewares;
 
@@ -40,6 +42,15 @@ public class GlobalExceptionHandlingMiddleware(
                 return (
                     StatusCodes.Status400BadRequest,
                     new ErrorResponse(ErrorCodes.ValidationFailed, validation.Message, validation.Errors));
+
+            // Two requests passed the same "does it exist yet?" check (e.g. a double click); the database kept one.
+            // 2601 / 2627 = SQL Server unique index / constraint violation.
+            case DbUpdateConcurrencyException:
+            case DbUpdateException { InnerException: SqlException { Number: 2601 or 2627 } }:
+                logger.LogWarning(ex, "A concurrent write lost the race");
+                return (
+                    StatusCodes.Status409Conflict,
+                    new ErrorResponse(ErrorCodes.Conflict, "The data was changed by another request. Reload and try again."));
 
             case NotFoundException notFound:
                 logger.LogWarning(notFound, "Expected data was not found");

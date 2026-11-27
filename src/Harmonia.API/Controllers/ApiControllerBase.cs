@@ -25,5 +25,5 @@ public abstract class ApiControllerBase : ControllerBase
     private IActionResult ToErrorResult(Result result) =>
         StatusCode(
             ErrorStatusMap.StatusFor(result.Code!, StatusCodes.Status400BadRequest),
-            new ErrorResponse(result.Code!, result.Message ?? result.Code!));
+            new ErrorResponse(result.Code!, result.Message ?? result.Code!, Details: result.Details));
 }

@@ -1,4 +1,5 @@
 using Harmonia.Domain.Entities;
+using Harmonia.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -9,8 +10,19 @@ public class MemberSkillConfiguration : IEntityTypeConfiguration<MemberSkill>
     public void Configure(EntityTypeBuilder<MemberSkill> builder)
     {
         builder.Property(x => x.RejectReason).HasMaxLength(500);
+        builder.Property(x => x.RevokeReason).HasMaxLength(500);
+        builder.Property(x => x.EvidencePublicId).HasMaxLength(255);
+        builder.Property(x => x.EvidenceFileName).HasMaxLength(255);
 
-        builder.HasIndex(x => new { x.MemberId, x.SkillId }).IsUnique();
+        // A review saves only while the row still holds the status it was read with, so two
+        // directors reviewing the same Pending row cannot both succeed.
+        builder.Property(x => x.Status).IsConcurrencyToken();
+
+        // One live (Pending or Approved) declaration per member and skill; rejected and revoked rows
+        // stay as history, so the member can declare the same skill again afterwards.
+        builder.HasIndex(x => new { x.MemberId, x.SkillId })
+            .IsUnique()
+            .HasFilter($"[Status] IN ({(int)ApprovalStatus.Pending}, {(int)ApprovalStatus.Approved})");
 
         builder.HasOne(x => x.Member)
             .WithMany(x => x.MemberSkills)
@@ -25,6 +37,11 @@ public class MemberSkillConfiguration : IEntityTypeConfiguration<MemberSkill>
         builder.HasOne(x => x.Approver)
             .WithMany()
             .HasForeignKey(x => x.ApprovedBy)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(x => x.RevokedBy)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

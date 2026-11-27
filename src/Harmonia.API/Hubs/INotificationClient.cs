@@ -11,4 +11,13 @@ namespace Harmonia.API.Hubs;
 public interface INotificationClient
 {
     Task ReceiveNotificationAsync(NotificationDto notification, CancellationToken cancellationToken);
+
+    /// <summary>A new note or chat message between the Parish Priest and a Choir Director.</summary>
+    Task ReceiveDirectorNoteAsync(DirectorNoteDto note, CancellationToken cancellationToken);
+
+    /// <summary>One side of a conversation read every note the other side sent them.</summary>
+    Task ReceiveDirectorNotesReadAsync(DirectorNotesReadDto read, CancellationToken cancellationToken);
+
+    /// <summary>A member answered an invitation to an event the receiving director leads; no notification is stored.</summary>
+    Task ReceiveParticipationChangedAsync(ParticipationChangedDto change, CancellationToken cancellationToken);
 }

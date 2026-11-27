@@ -14,5 +14,7 @@ public class LoginRequestValidator : AbstractValidator<LoginRequest>
 
         RuleFor(x => x.Password)
             .NotEmpty().WithErrorCode(ErrorCodes.AuthPasswordRequired);
+
+        RuleFor(x => x.DeviceId).MaximumLength(100);
     }
 }

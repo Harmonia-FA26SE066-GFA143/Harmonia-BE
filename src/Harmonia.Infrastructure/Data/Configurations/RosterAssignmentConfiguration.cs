@@ -8,6 +8,8 @@ public class RosterAssignmentConfiguration : IEntityTypeConfiguration<RosterAssi
 {
     public void Configure(EntityTypeBuilder<RosterAssignment> builder)
     {
+        builder.Property(x => x.Note).HasMaxLength(200);
+
         builder.HasOne(x => x.Roster)
             .WithMany(x => x.Assignments)
             .HasForeignKey(x => x.RosterId)
@@ -27,6 +29,12 @@ public class RosterAssignmentConfiguration : IEntityTypeConfiguration<RosterAssi
             .WithMany(x => x.RosterAssignments)
             .HasForeignKey(x => x.SongListItemId)
             // SQL Server rejects a second path (Event -> SongList -> Item -> Assignment vs Event -> Roster -> Assignment).
+            .OnDelete(DeleteBehavior.ClientSetNull);
+
+        // Deleting a replacement keeps the line it replaced (still Replaced) and only clears the link.
+        builder.HasOne(x => x.ReplacedByAssignment)
+            .WithMany()
+            .HasForeignKey(x => x.ReplacedByAssignmentId)
             .OnDelete(DeleteBehavior.ClientSetNull);
     }
 }

@@ -1,0 +1,32 @@
+{
+  "project": {
+    "name": "Harmonia - Choir & Liturgical Music Coordination System",
+    "code": "FA26SE066",
+    "environment": "1. .NET 9 SDK, xUnit v3 (project test/Harmonia.Application.Tests)\n2. Database: none - repositories and external services mocked with NSubstitute\n3. Web browser / server: not required\n4. Run: dotnet test"
+  },
+  "groups": [
+    { "code": "F1", "name": "F1. Xác thực & Tài khoản cá nhân", "classes": ["AuthService", "LoginRequestValidator", "GoogleLoginRequestValidator", "RefreshTokenRequestValidator", "LogoutRequestValidator", "ForgotPasswordRequestValidator", "ChangePasswordRequestValidator", "ResetPasswordRequestValidator"] },
+    { "code": "F2", "name": "F2. Quản lý Người dùng & Phân quyền", "classes": ["UserService", "MemberRegistrationService", "MemberProfileService"] },
+    { "code": "F3", "name": "F3. Quản lý Thành viên & Kỹ năng", "classes": ["MemberSkillService", "DeclareMemberSkillRequestValidator"] },
+    { "code": "F4", "name": "F4. Lịch Phụng vụ theo Ngày", "classes": ["LiturgicalDayService", "LiturgicalEventService", "MassScheduleService", "LiturgicalSeasonResolver", "UpcomingScheduleService", "CreateLiturgicalEventRequestValidator", "SearchLiturgicalEventsRequestValidator", "GenerateLiturgicalEventsRequestValidator", "GetScheduleRehearsalsRequestValidator"] },
+    { "code": "F5", "name": "F5. Thư viện Thánh nhạc", "classes": ["SongService", "MusicMaterialService", "LyricsExtractionService", "UpdateSongClassificationRequestValidator", "SearchSongsRequestValidator", "UpdateMaterialLearningProgressRequestValidator", "UpdateTimedLyricsRequestValidator"] },
+    { "code": "F6", "name": "F6. Danh sách Bài hát cho Sự kiện (Song List)", "classes": ["SongListService", "SongSuggestionService", "CreateSongListRequestValidator", "UpdateSongListItemsRequestValidator", "ReviewSongListRequestValidator"] },
+    { "code": "F7", "name": "F7. Lịch tập & Xác nhận Tham gia", "classes": ["RehearsalService", "RehearsalSongService", "RehearsalRecordingService", "EventParticipationService", "CreateRehearsalRequestValidator", "UpdateRehearsalSongsRequestValidator", "RespondParticipationRequestValidator", "SendParticipationRequestsRequestValidator"] },
+    { "code": "F8", "name": "F8. Phân công Phục vụ (Service Roster)", "classes": ["RosterService", "SongPersonnelRequirementService", "EventPersonnelRequirementService", "UpdateSongPersonnelRequirementsRequestValidator"] },
+    { "code": "F9", "name": "F9. Bài tập Luyện tập & Chấm điểm", "classes": ["PracticeAssignmentService", "PracticeSubmissionService", "CreatePracticeAssignmentRequestValidator", "ReviewPracticeSubmissionRequestValidator", "AddPracticeFeedbackRequestValidator", "CreatePracticeSubmissionRequestValidator"] },
+    { "code": "F10", "name": "F10. Điểm danh & Theo dõi Chuẩn bị", "classes": ["RehearsalAttendanceService", "EventPreparationService", "RecordRehearsalAttendancesRequestValidator", "SearchMyParticipationHistoryRequestValidator"] },
+    { "code": "F11", "name": "F11. Thông báo & Trao đổi", "classes": ["NotificationService", "DirectorNoteService", "CreateDirectorNoteRequestValidator"] },
+    { "code": "F12", "name": "F12. Báo cáo & Nhật ký", "classes": ["ReportService", "ReportExportService", "AuditLogService", "SearchReportsRequestValidator", "ExportReportRequestValidator", "SearchAuditLogsRequestValidator"] },
+    { "code": "F13", "name": "F13. Quản lý Ca đoàn", "classes": ["ChoirService", "ChoirJoinRequestService", "UpdateEventChoirsRequestValidator"] },
+    { "code": "F14", "name": "F14. Cấu hình Hệ thống", "classes": ["LookupService", "SaveLiturgicalSeasonRequestValidator", "SaveLiturgicalSlotRequestValidator", "LiturgicalNameTranslationService", "SystemSettingService", "SystemSettingKeys", "UpdateSystemSettingRequestValidator"] },
+    { "code": "F15", "name": "F15. Đề cử & Đào tạo Ca trưởng", "classes": ["DirectorNominationService", "DirectorTrainingService"] },
+    { "code": "COM", "name": "Dùng chung (phân trang, validate tìm kiếm)", "classes": ["PagingRequest", "PagedList", "Search*RequestValidator (all search requests)"] }
+  ],
+  "methodOverrides": {
+    "UserService.GetMeAsync": "F1",
+    "UserService.UpdateMeAsync": "F1",
+    "UserService.UpdateMyAvatarAsync": "F1",
+    "UserService.DeleteMyAvatarAsync": "F1",
+    "MemberProfileService.GetMyHistoryAsync": "F10"
+  }
+}

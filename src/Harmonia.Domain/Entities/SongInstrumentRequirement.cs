@@ -10,6 +10,9 @@ public class SongInstrumentRequirement : BaseEntity
 
     public bool IsMandatory { get; set; }
 
+    /// <summary>How many people the song needs with this skill, e.g. 2 for a duet or 3 solos in the Passion.</summary>
+    public int RequiredCount { get; set; } = 1;
+
     public Song Song { get; set; } = null!;
 
     public Skill Skill { get; set; } = null!;

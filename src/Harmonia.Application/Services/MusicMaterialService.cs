@@ -1,0 +1,526 @@
+using System.Security.Cryptography;
+using AutoMapper;
+using Harmonia.Application.Common.Models;
+using Harmonia.Application.DTOs;
+using Harmonia.Application.Interfaces.IRepositories;
+using Harmonia.Application.Interfaces.IServices;
+using Harmonia.Domain.Common;
+using Harmonia.Domain.Entities;
+using Harmonia.Domain.Enums;
+using Harmonia.Domain.ValueObjects;
+
+namespace Harmonia.Application.Services;
+
+public class MusicMaterialService(
+    IMusicMaterialRepository musicMaterialRepository,
+    ISongRepository songRepository,
+    IGenericRepository<Skill> skillRepository,
+    IMemberProfileRepository memberProfileRepository,
+    IMaterialLearningProgressRepository learningProgressRepository,
+    IFileStorageService fileStorageService,
+    IMidiRenderer midiRenderer,
+    IScoreConverter scoreConverter,
+    ILyricsExtractor lyricsExtractor,
+    ITimedLyricsRepository timedLyricsRepository,
+    IAudioDurationReader audioDurationReader,
+    IMapper mapper) : IMusicMaterialService
+{
+    private const string PlaybackFolder = "music-materials/playback";
+
+    private static readonly string[] MidiExtensions = [".mid", ".midi"];
+
+    private static readonly string[] ScoreExtensions = [".musicxml", ".mxl"];
+
+    public const long MaxFileSizeBytes = 20 * 1024 * 1024;
+
+    // Matches MusicMaterialConfiguration.FileName.
+    private const int MaxFileNameLength = 200;
+
+    private static readonly string[] DocumentExtensions = [".pdf", ".png", ".jpg"];
+
+    private static readonly string[] AudioExtensions = [".mp3", ".m4a", ".wav", ".mid", ".midi"];
+
+    private static readonly string[] LyricsExtensions = [".docx"];
+
+    // Recorded audio whose length is read on upload; MIDI and scores get theirs from the renderer.
+    private static readonly string[] RecordedAudioExtensions = [".mp3", ".m4a", ".wav"];
+
+    // Timing cap for audio of unknown length (rows uploaded before lengths were read); matches MidiRenderer.MaxTimelineSeconds.
+    private const double MaxUnknownAudioSeconds = 10 * 60;
+
+    public async Task<Result<MusicMaterialDto>> UploadAsync(
+        UploadMusicMaterialRequest request, FileContent? file, CancellationToken cancellationToken)
+    {
+        var song = await songRepository.GetByIdAsync(request.SongId, cancellationToken);
+        if (song is not { IsActive: true }) return Result<MusicMaterialDto>.Failure(ErrorCodes.SongNotFound);
+
+        var (targetSkill, skillError) = await GetTargetSkillAsync(request.TargetSkillId, cancellationToken);
+        if (skillError is not null) return Result<MusicMaterialDto>.Failure(skillError);
+
+        if (request.MaterialType == MaterialType.Lyrics)
+        {
+            var hasText = !string.IsNullOrWhiteSpace(request.LyricsText);
+            if (hasText == file is not null) return Result<MusicMaterialDto>.Failure(ErrorCodes.MaterialLyricsSourceInvalid);
+            if (hasText) return await AddLyricsTextAsync(request, targetSkill, cancellationToken);
+        }
+
+        if (CheckFile(request.MaterialType, file) is { } fileError)
+            return Result<MusicMaterialDto>.Failure(fileError);
+
+        var audioDuration = ReadAudioDuration(file!);
+        if (!audioDuration.IsSuccess) return Result<MusicMaterialDto>.Failure(audioDuration.Code!);
+
+        var playback = await StorePlaybackAsync(file!, request.Instrument, cancellationToken);
+        if (!playback.IsSuccess) return Result<MusicMaterialDto>.Failure(playback.Code!);
+
+        var upload = await fileStorageService.UploadAsync(
+            file!.Content, file.FileName, FolderFor(request.MaterialType), isPrivate: true, cancellationToken);
+        if (!upload.IsSuccess)
+        {
+            await DeletePlaybackAsync(playback.Value?.AudioPublicId, playback.Value?.NotesPublicId);
+            return Result<MusicMaterialDto>.Failure(upload.Code!);
+        }
+
+        var publicId = upload.Value!.PublicId;
+        var fileName = Path.GetFileName(file.FileName);
+        var material = mapper.Map<MusicMaterial>(request);
+        material.Id = Guid.NewGuid();
+        material.FilePublicId = publicId;
+        // Keep the tail so the extension survives truncation.
+        material.FileName = fileName.Length > MaxFileNameLength ? fileName[^MaxFileNameLength..] : fileName;
+        material.FileSizeBytes = file.Length;
+        material.AudioDurationSeconds = audioDuration.Value;
+        SetPlayback(material, playback.Value);
+
+        try
+        {
+            await musicMaterialRepository.AddAsync(material, cancellationToken);
+            await musicMaterialRepository.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            // No row points at the file, so remove it rather than leave an orphan in storage.
+            // Best effort: a failed cleanup is logged by the storage service and must not hide the save error.
+            // ponytail: an orphan survives if cleanup fails too; add a storage sweep job if that ever matters.
+            await fileStorageService.DeleteAsync(publicId, isPrivate: true, CancellationToken.None);
+            await DeletePlaybackAsync(material.PlaybackAudioPublicId, material.PlaybackNotesPublicId);
+            throw;
+        }
+
+        material.TargetSkill = targetSkill;
+        return Result<MusicMaterialDto>.Success(ToDto<MusicMaterialDto>(material));
+    }
+
+    public async Task<Result<PagedList<MusicMaterialDto>>> GetBySongAsync(
+        Guid songId, PagingRequest paging, CancellationToken cancellationToken)
+    {
+        var song = await songRepository.GetByIdAsync(songId, cancellationToken);
+        if (song is not { IsActive: true }) return Result<PagedList<MusicMaterialDto>>.Failure(ErrorCodes.SongNotFound);
+
+        var page = await musicMaterialRepository.GetActiveBySongAsync(songId, paging, cancellationToken);
+        return Result<PagedList<MusicMaterialDto>>.Success(ToDtoPage<MusicMaterialDto>(page));
+    }
+
+    public async Task<Result<PagedList<MusicMaterialDetailDto>>> GetMineAsync(
+        Guid userId, SearchMusicMaterialsRequest request, CancellationToken cancellationToken)
+    {
+        var member = await memberProfileRepository.GetByUserIdAsync(userId, cancellationToken);
+        if (member is null) return Result<PagedList<MusicMaterialDetailDto>>.Failure(ErrorCodes.MemberNotFound);
+
+        if (request.SongId is { } songId)
+        {
+            var song = await songRepository.GetByIdAsync(songId, cancellationToken);
+            if (song is not { IsActive: true }) return Result<PagedList<MusicMaterialDetailDto>>.Failure(ErrorCodes.SongNotFound);
+        }
+
+        var keyword = string.IsNullOrWhiteSpace(request.Keyword) ? null : request.Keyword.Trim();
+
+        // ponytail: filters by approved skills only; add the finalized-roster song filter once ServiceRoster ships.
+        var page = await musicMaterialRepository.GetActiveForMemberAsync(member.Id, keyword, request, cancellationToken);
+        return Result<PagedList<MusicMaterialDetailDto>>.Success(ToDtoPage<MusicMaterialDetailDto>(page));
+    }
+
+    public async Task<Result<PagedList<MaterialLearningProgressDetailDto>>> GetLearningProgressAsync(
+        Guid directorUserId, Guid materialId, SearchMaterialLearningProgressRequest request,
+        CancellationToken cancellationToken)
+    {
+        var material = await musicMaterialRepository.GetByIdAsync(materialId, cancellationToken);
+        if (material is not { IsActive: true })
+            return Result<PagedList<MaterialLearningProgressDetailDto>>.Failure(ErrorCodes.MaterialNotFound);
+
+        var page = await memberProfileRepository.GetLearnersOfMaterialAsync(
+            material.Id, material.TargetSkillId, directorUserId, request, cancellationToken);
+        return Result<PagedList<MaterialLearningProgressDetailDto>>.Success(new PagedList<MaterialLearningProgressDetailDto>(
+            mapper.Map<List<MaterialLearningProgressDetailDto>>(page.Items), page.PageNumber, page.PageSize, page.TotalCount));
+    }
+
+    public async Task<Result<MaterialLearningProgressDto>> UpdateLearningProgressAsync(
+        Guid userId, Guid materialId, UpdateMaterialLearningProgressRequest request, CancellationToken cancellationToken)
+    {
+        var member = await memberProfileRepository.GetByUserIdAsync(userId, cancellationToken);
+        if (member is null) return Result<MaterialLearningProgressDto>.Failure(ErrorCodes.MemberNotFound);
+
+        // Same scope as GetMineAsync: a material the member cannot list is reported as missing, not forbidden.
+        if (!await musicMaterialRepository.IsVisibleToMemberAsync(materialId, member.Id, cancellationToken))
+            return Result<MaterialLearningProgressDto>.Failure(ErrorCodes.MaterialNotFound);
+
+        var progress = await learningProgressRepository.UpsertAsync(member.Id, materialId, request.Status, cancellationToken);
+        return Result<MaterialLearningProgressDto>.Success(mapper.Map<MaterialLearningProgressDto>(progress));
+    }
+
+    public async Task<Result<MusicMaterialDto>> UpdateAsync(
+        Guid id, UpdateMusicMaterialRequest request, CancellationToken cancellationToken)
+    {
+        var material = await musicMaterialRepository.GetByIdAsync(id, cancellationToken);
+        if (material is not { IsActive: true }) return Result<MusicMaterialDto>.Failure(ErrorCodes.MaterialNotFound);
+
+        var (targetSkill, skillError) = await GetTargetSkillAsync(request.TargetSkillId, cancellationToken);
+        if (skillError is not null) return Result<MusicMaterialDto>.Failure(skillError);
+
+        // Text lyrics must keep their text; a material with a file takes no text.
+        if ((material.FilePublicId is null) == string.IsNullOrWhiteSpace(request.LyricsText))
+            return Result<MusicMaterialDto>.Failure(ErrorCodes.MaterialLyricsSourceInvalid);
+
+        mapper.Map(request, material);
+        await musicMaterialRepository.SaveChangesAsync(cancellationToken);
+
+        material.TargetSkill = targetSkill;
+        return Result<MusicMaterialDto>.Success(ToDto<MusicMaterialDto>(material));
+    }
+
+    public async Task<Result<MusicMaterialDto>> ReplaceFileAsync(
+        Guid id, ReplaceMusicMaterialFileRequest request, FileContent? file, CancellationToken cancellationToken)
+    {
+        var material = await musicMaterialRepository.GetByIdAsync(id, cancellationToken);
+        if (material is not { IsActive: true }) return Result<MusicMaterialDto>.Failure(ErrorCodes.MaterialNotFound);
+        if (material.FilePublicId is null) return Result<MusicMaterialDto>.Failure(ErrorCodes.MaterialLyricsSourceInvalid);
+
+        if (CheckFile(material.MaterialType, file) is { } fileError)
+            return Result<MusicMaterialDto>.Failure(fileError);
+
+        var audioDuration = ReadAudioDuration(file!);
+        if (!audioDuration.IsSuccess) return Result<MusicMaterialDto>.Failure(audioDuration.Code!);
+
+        var playback = await StorePlaybackAsync(file!, request.Instrument, cancellationToken);
+        if (!playback.IsSuccess) return Result<MusicMaterialDto>.Failure(playback.Code!);
+
+        var upload = await fileStorageService.UploadAsync(
+            file!.Content, file.FileName, FolderFor(material.MaterialType), isPrivate: true, cancellationToken);
+        if (!upload.IsSuccess)
+        {
+            await DeletePlaybackAsync(playback.Value?.AudioPublicId, playback.Value?.NotesPublicId);
+            return Result<MusicMaterialDto>.Failure(upload.Code!);
+        }
+
+        var oldPublicId = material.FilePublicId;
+        var (oldAudioId, oldNotesId) = (material.PlaybackAudioPublicId, material.PlaybackNotesPublicId);
+        var newPublicId = upload.Value!.PublicId;
+        var fileName = Path.GetFileName(file.FileName);
+        material.FilePublicId = newPublicId;
+        material.FileName = fileName.Length > MaxFileNameLength ? fileName[^MaxFileNameLength..] : fileName;
+        material.FileSizeBytes = file.Length;
+        material.FileRevision++;
+        material.AudioDurationSeconds = audioDuration.Value;
+        // A non-MIDI replacement clears the playback files, so the old rendering is never served for the new file.
+        SetPlayback(material, playback.Value);
+
+        // A timing made for the old audio would run out of sync with the new one; removed in the same save.
+        foreach (var timing in await timedLyricsRepository.ListAsync(x => x.AudioMaterialId == id, cancellationToken))
+            timedLyricsRepository.Remove(timing);
+
+        if (request.ResetProgress)
+        {
+            foreach (var progress in await learningProgressRepository.ListAsync(x => x.MaterialId == id, cancellationToken))
+                learningProgressRepository.Remove(progress);
+        }
+
+        try
+        {
+            await musicMaterialRepository.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            // The row still points at the old file, so the new one is the orphan; same cleanup as UploadAsync.
+            await fileStorageService.DeleteAsync(newPublicId, isPrivate: true, CancellationToken.None);
+            await DeletePlaybackAsync(playback.Value?.AudioPublicId, playback.Value?.NotesPublicId);
+            throw;
+        }
+
+        // Best effort: nothing points at the old file any more, and a failed delete is logged by the storage service.
+        await fileStorageService.DeleteAsync(oldPublicId, isPrivate: true, CancellationToken.None);
+        await DeletePlaybackAsync(oldAudioId, oldNotesId);
+
+        if (material.TargetSkillId is { } skillId)
+            material.TargetSkill = await skillRepository.GetByIdAsync(skillId, cancellationToken);
+        return Result<MusicMaterialDto>.Success(ToDto<MusicMaterialDto>(material));
+    }
+
+    public async Task<Result> DeleteAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var material = await musicMaterialRepository.GetByIdAsync(id, cancellationToken);
+        if (material is not { IsActive: true }) return Result.Failure(ErrorCodes.MaterialNotFound);
+
+        material.IsActive = false;
+        // A timing is meaningless without either side; the material row itself stays (soft delete).
+        foreach (var timing in await timedLyricsRepository.ListAsync(
+                     x => x.AudioMaterialId == id || x.LyricsMaterialId == id, cancellationToken))
+            timedLyricsRepository.Remove(timing);
+
+        await musicMaterialRepository.SaveChangesAsync(cancellationToken);
+        return Result.Success();
+    }
+
+    public async Task<Result<TimedLyricsDto>> GetTimedLyricsAsync(Guid audioMaterialId, CancellationToken cancellationToken)
+    {
+        var material = await musicMaterialRepository.GetByIdAsync(audioMaterialId, cancellationToken);
+        if (material is not { IsActive: true }) return Result<TimedLyricsDto>.Failure(ErrorCodes.MaterialNotFound);
+
+        var timing = await timedLyricsRepository.GetByAudioMaterialIdAsync(audioMaterialId, cancellationToken);
+        if (timing is null) return Result<TimedLyricsDto>.Failure(ErrorCodes.TimedLyricsNotFound);
+
+        timing.AudioMaterial = material;
+        return Result<TimedLyricsDto>.Success(mapper.Map<TimedLyricsDto>(timing));
+    }
+
+    public async Task<Result<TimedLyricsDto>> UpdateTimedLyricsAsync(
+        Guid audioMaterialId, UpdateTimedLyricsRequest request, CancellationToken cancellationToken)
+    {
+        var material = await musicMaterialRepository.GetByIdAsync(audioMaterialId, cancellationToken);
+        if (material is not { IsActive: true }) return Result<TimedLyricsDto>.Failure(ErrorCodes.MaterialNotFound);
+        if (material.MaterialType is not (MaterialType.SampleAudio or MaterialType.InteractiveScore) || material.FilePublicId is null)
+            return Result<TimedLyricsDto>.Failure(ErrorCodes.MaterialNotAudio);
+
+        var lyrics = await musicMaterialRepository.GetByIdAsync(request.LyricsMaterialId, cancellationToken);
+        if (lyrics is not { IsActive: true, MaterialType: MaterialType.Lyrics } || lyrics.SongId != material.SongId)
+            return Result<TimedLyricsDto>.Failure(ErrorCodes.MaterialNotLyrics);
+
+        // MIDI and scores are timed against their rendered WAV; recorded audio against its own length.
+        var duration = material.AudioDurationSeconds ?? material.PlaybackDurationSeconds ?? MaxUnknownAudioSeconds;
+        if (request.Lines.Max(x => x.EndSeconds) > duration)
+            return Result<TimedLyricsDto>.Failure(ErrorCodes.TimedLyricsExceedsDuration);
+
+        var timing = await timedLyricsRepository.GetByAudioMaterialIdAsync(audioMaterialId, cancellationToken);
+        if (timing is null)
+        {
+            timing = new TimedLyrics { Id = Guid.NewGuid(), AudioMaterialId = audioMaterialId };
+            await timedLyricsRepository.AddAsync(timing, cancellationToken);
+        }
+
+        timing.LyricsMaterialId = lyrics.Id;
+        timing.AudioRevision = material.FileRevision;
+        timing.Granularity = request.Granularity;
+        timing.Lines = mapper.Map<List<TimedLyricLine>>(request.Lines);
+        await timedLyricsRepository.SaveChangesAsync(cancellationToken);
+
+        timing.AudioMaterial = material;
+        return Result<TimedLyricsDto>.Success(mapper.Map<TimedLyricsDto>(timing));
+    }
+
+    public async Task<Result> DeleteTimedLyricsAsync(Guid audioMaterialId, CancellationToken cancellationToken)
+    {
+        var material = await musicMaterialRepository.GetByIdAsync(audioMaterialId, cancellationToken);
+        if (material is not { IsActive: true }) return Result.Failure(ErrorCodes.MaterialNotFound);
+
+        var timing = await timedLyricsRepository.GetByAudioMaterialIdAsync(audioMaterialId, cancellationToken);
+        if (timing is null) return Result.Failure(ErrorCodes.TimedLyricsNotFound);
+
+        timedLyricsRepository.Remove(timing);
+        await timedLyricsRepository.SaveChangesAsync(cancellationToken);
+        return Result.Success();
+    }
+
+    public async Task<Result<PlaybackDto>> GetPlaybackAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var material = await musicMaterialRepository.GetByIdAsync(id, cancellationToken);
+        if (material is not { IsActive: true }) return Result<PlaybackDto>.Failure(ErrorCodes.MaterialNotFound);
+        if (material.PlaybackAudioPublicId is null || material.PlaybackNotesPublicId is null || material.PlaybackDurationSeconds is null)
+            return Result<PlaybackDto>.Failure(ErrorCodes.MaterialPlaybackUnavailable);
+
+        var dto = mapper.Map<PlaybackDto>(material);
+        dto.AudioUrl = fileStorageService.GetSignedUrl(material.PlaybackAudioPublicId);
+        dto.NotesUrl = fileStorageService.GetSignedUrl(material.PlaybackNotesPublicId);
+        return Result<PlaybackDto>.Success(dto);
+    }
+
+    public async Task<Result<InteractiveScoreDto>> GetScoreAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var material = await musicMaterialRepository.GetByIdAsync(id, cancellationToken);
+        if (material is not { IsActive: true }) return Result<InteractiveScoreDto>.Failure(ErrorCodes.MaterialNotFound);
+        if (material.MaterialType != MaterialType.InteractiveScore)
+            return Result<InteractiveScoreDto>.Failure(ErrorCodes.MaterialNotInteractiveScore);
+        // Upload and replacement save the score and its playback together, so this only guards a hand-edited row.
+        if (material.FilePublicId is null || material.PlaybackAudioPublicId is null || material.PlaybackNotesPublicId is null
+            || material.PlaybackDurationSeconds is null)
+            return Result<InteractiveScoreDto>.Failure(ErrorCodes.MaterialPlaybackUnavailable);
+
+        var dto = mapper.Map<InteractiveScoreDto>(material);
+        dto.ScoreUrl = fileStorageService.GetSignedUrl(material.FilePublicId);
+        dto.AudioUrl = fileStorageService.GetSignedUrl(material.PlaybackAudioPublicId);
+        dto.NotesUrl = fileStorageService.GetSignedUrl(material.PlaybackNotesPublicId);
+        return Result<InteractiveScoreDto>.Success(dto);
+    }
+
+    public async Task<Result<ExtractedLyricsResponse>> ExtractLyricsAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var material = await musicMaterialRepository.GetByIdAsync(id, cancellationToken);
+        if (material is not { IsActive: true }) return Result<ExtractedLyricsResponse>.Failure(ErrorCodes.MaterialNotFound);
+        if (material.MaterialType != MaterialType.SheetMusic || material.FilePublicId is null)
+            return Result<ExtractedLyricsResponse>.Failure(ErrorCodes.MaterialNotSheetMusic);
+
+        var lyrics = await lyricsExtractor.ExtractAsync(
+            fileStorageService.GetSignedUrl(material.FilePublicId), material.FilePublicId, cancellationToken);
+        return lyrics.IsSuccess
+            ? Result<ExtractedLyricsResponse>.Success(new ExtractedLyricsResponse(lyrics.Value!))
+            : Result<ExtractedLyricsResponse>.Failure(lyrics.Code!);
+    }
+
+    /// <summary>
+    /// Renders a MIDI or MusicXML/MXL upload and stores its playback files before the file itself, so a file the
+    /// converter or renderer rejects never reaches storage. Any other file returns success with no playback files.
+    /// A score is first converted to MIDI in memory; that MIDI is not stored, and its notes.json is the converter's
+    /// schema v2 timeline in place of the renderer's v1 notes.
+    /// </summary>
+    private async Task<Result<PlaybackFiles?>> StorePlaybackAsync(
+        FileContent file, PlaybackInstrument instrument, CancellationToken cancellationToken)
+    {
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        var isScore = ScoreExtensions.Contains(extension);
+        if (!isScore && !MidiExtensions.Contains(extension)) return Result<PlaybackFiles?>.Success(null);
+
+        // The file itself is uploaded next from the same stream, so every read rewinds; IFormFile streams are seekable.
+        string? scoreSha256 = null;
+        MemoryStream? convertedMidi = null;
+        byte[]? timeline = null;
+        if (isScore)
+        {
+            scoreSha256 = Convert.ToHexStringLower(SHA256.HashData(file.Content));
+            file.Content.Position = 0;
+            var converted = scoreConverter.ToMidi(file.Content, isCompressed: extension == ".mxl");
+            file.Content.Position = 0;
+            if (!converted.IsSuccess) return Result<PlaybackFiles?>.Failure(converted.Code!);
+            convertedMidi = new MemoryStream(converted.Value!.Midi);
+            timeline = converted.Value.TimelineJson;
+        }
+
+        Result<PlaybackRender> render;
+        using (convertedMidi) render = midiRenderer.Render(convertedMidi ?? file.Content, instrument);
+        file.Content.Position = 0;
+        if (!render.IsSuccess) return Result<PlaybackFiles?>.Failure(render.Code!);
+
+        using var audioContent = new MemoryStream(render.Value!.AudioWav);
+        var audio = await fileStorageService.UploadAsync(audioContent, "audio.wav", PlaybackFolder, isPrivate: true, cancellationToken);
+        if (!audio.IsSuccess) return Result<PlaybackFiles?>.Failure(audio.Code!);
+
+        var notesJson = timeline ?? render.Value.NotesJson;
+        using var notesContent = new MemoryStream(notesJson);
+        var notes = await fileStorageService.UploadAsync(notesContent, "notes.json", PlaybackFolder, isPrivate: true, cancellationToken);
+        if (!notes.IsSuccess)
+        {
+            await DeletePlaybackAsync(audio.Value!.PublicId, null);
+            return Result<PlaybackFiles?>.Failure(notes.Code!);
+        }
+
+        return Result<PlaybackFiles?>.Success(new PlaybackFiles(
+            audio.Value!.PublicId, notes.Value!.PublicId, render.Value.DurationSeconds, instrument,
+            scoreSha256, isScore ? Convert.ToHexStringLower(SHA256.HashData(render.Value.AudioWav)) : null,
+            Convert.ToHexStringLower(SHA256.HashData(notesJson))));
+    }
+
+    private static void SetPlayback(MusicMaterial material, PlaybackFiles? playback)
+    {
+        material.PlaybackAudioPublicId = playback?.AudioPublicId;
+        material.PlaybackNotesPublicId = playback?.NotesPublicId;
+        material.PlaybackDurationSeconds = playback?.DurationSeconds;
+        material.PlaybackInstrument = playback?.Instrument;
+        material.ScoreSha256 = playback?.ScoreSha256;
+        material.PlaybackAudioSha256 = playback?.AudioSha256;
+        material.PlaybackNotesSha256 = playback?.NotesSha256;
+        // Only an interactive score has a revision: 1 on upload, +1 on each replacement that saves.
+        material.ScoreRevision = playback?.ScoreSha256 is null ? null : (material.ScoreRevision ?? 0) + 1;
+    }
+
+    // Best effort, like the other cleanups here: a failed delete is logged by the storage service.
+    private async Task DeletePlaybackAsync(string? audioPublicId, string? notesPublicId)
+    {
+        if (audioPublicId is not null) await fileStorageService.DeleteAsync(audioPublicId, isPrivate: true, CancellationToken.None);
+        if (notesPublicId is not null) await fileStorageService.DeleteAsync(notesPublicId, isPrivate: true, CancellationToken.None);
+    }
+
+    private sealed record PlaybackFiles(
+        string AudioPublicId, string NotesPublicId, double DurationSeconds, PlaybackInstrument Instrument,
+        string? ScoreSha256, string? AudioSha256, string NotesSha256);
+
+    /// <summary>Length of a recorded .mp3/.m4a/.wav; success with null for every other file. Rewinds the stream.</summary>
+    private Result<double?> ReadAudioDuration(FileContent file)
+    {
+        if (!RecordedAudioExtensions.Contains(Path.GetExtension(file.FileName).ToLowerInvariant()))
+            return Result<double?>.Success(null);
+
+        var seconds = audioDurationReader.ReadSeconds(file.Content, file.FileName);
+        file.Content.Position = 0;
+        return seconds.IsSuccess ? Result<double?>.Success(seconds.Value) : Result<double?>.Failure(seconds.Code!);
+    }
+
+    private TDto ToDto<TDto>(MusicMaterial material) where TDto : MusicMaterialDto
+    {
+        var dto = mapper.Map<TDto>(material);
+        dto.FileUrl = material.FilePublicId is null ? null : fileStorageService.GetSignedUrl(material.FilePublicId);
+        return dto;
+    }
+
+    private async Task<Result<MusicMaterialDto>> AddLyricsTextAsync(
+        UploadMusicMaterialRequest request, Skill? targetSkill, CancellationToken cancellationToken)
+    {
+        var material = mapper.Map<MusicMaterial>(request);
+        material.Id = Guid.NewGuid();
+        await musicMaterialRepository.AddAsync(material, cancellationToken);
+        await musicMaterialRepository.SaveChangesAsync(cancellationToken);
+
+        material.TargetSkill = targetSkill;
+        return Result<MusicMaterialDto>.Success(ToDto<MusicMaterialDto>(material));
+    }
+
+    private PagedList<TDto> ToDtoPage<TDto>(PagedList<MusicMaterial> page) where TDto : MusicMaterialDto =>
+        new(page.Items.Select(ToDto<TDto>).ToList(), page.PageNumber, page.PageSize, page.TotalCount);
+
+    /// <summary>No skill id means the material is for everyone; otherwise the skill must exist and be active.</summary>
+    private async Task<(Skill? Skill, string? Error)> GetTargetSkillAsync(Guid? skillId, CancellationToken cancellationToken)
+    {
+        if (skillId is null) return (null, null);
+
+        var skill = await skillRepository.GetByIdAsync(skillId.Value, cancellationToken);
+        if (skill is null) return (null, ErrorCodes.SkillNotFound);
+        return skill.IsActive ? (skill, null) : (null, ErrorCodes.SkillInactive);
+    }
+
+    /// <summary>Extension and size come from the server-side upload; the client's Content-Type is never trusted.</summary>
+    private static string? CheckFile(MaterialType materialType, FileContent? file)
+    {
+        if (file is null || file.Length == 0) return ErrorCodes.MaterialFileRequired;
+
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!AllowedExtensions(materialType).Contains(extension)) return ErrorCodes.MaterialFileTypeNotAllowed;
+
+        return file.Length > MaxFileSizeBytes ? ErrorCodes.MaterialFileTooLarge : null;
+    }
+
+    private static string[] AllowedExtensions(MaterialType materialType) => materialType switch
+    {
+        MaterialType.SampleAudio => AudioExtensions,
+        MaterialType.Lyrics => LyricsExtensions,
+        MaterialType.RehearsalMaterial => [.. DocumentExtensions, .. AudioExtensions],
+        MaterialType.InteractiveScore => ScoreExtensions,
+        _ => DocumentExtensions,
+    };
+
+    // One storage folder per material type, e.g. harmonia/music-materials/sample-audio/{guid}.mp3.
+    private static string FolderFor(MaterialType materialType) => materialType switch
+    {
+        MaterialType.SheetMusic => "music-materials/sheet-music",
+        MaterialType.Lyrics => "music-materials/lyrics",
+        MaterialType.SampleAudio => "music-materials/sample-audio",
+        MaterialType.RehearsalMaterial => "music-materials/rehearsal-material",
+        MaterialType.InteractiveScore => "music-materials/interactive-score",
+        _ => throw new ArgumentOutOfRangeException(nameof(materialType), materialType, "Unknown material type."),
+    };
+}
